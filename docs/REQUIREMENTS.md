@@ -30,6 +30,12 @@
 - FR19: Admin/storekeeper can transfer stock between branches with status tracking (multi-branch, phase 2)
 - FR20: System supports batch/lot + expiry tracking for perishable items (grocery/convenience, phase 2)
 
+### Supplier & Purchase Orders
+- FR33: Admin/Warehouse can create/manage a supplier list (name, contact info, active status)
+- FR34: Admin/Warehouse can create a Purchase Order against a supplier (line items, quantities, expected cost), with a status lifecycle (Draft → Sent → Partially Received → Received → Cancelled)
+- FR35: Warehouse can receive stock against an open PO (full or partial receipt), which generates matching stock-in inventory movements and updates PO line status
+- FR36: Manager can view PO history filtered by supplier/status/date
+
 ### Offline & Sync
 - FR21: System continues to process sales when offline, queuing transactions locally
 - FR22: System syncs queued transactions automatically on reconnect

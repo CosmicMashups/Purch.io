@@ -1,0 +1,16 @@
+name: backend-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+jobs:
+  deploy:
+    needs: []
+    runs-on: ubuntu-latest
+    if: false # disabled until backend-ci is green and Render service/render.yaml exist (Phase 12)
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Deploy to Render — wired up in Phase 12"

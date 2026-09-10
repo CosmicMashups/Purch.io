@@ -1,0 +1,38 @@
+# --- Flutter / Dart ---
+client/build/
+client/.dart_tool/
+client/.flutter-plugins
+client/.flutter-plugins-dependencies
+client/.packages
+client/.pub-cache/
+client/.pub/
+**/*.g.dart
+**/*.freezed.dart
+**/*.gr.dart
+client/android/local.properties
+client/ios/Flutter/Generated.xcconfig
+client/**/generated_plugin_registrant.dart
+
+# --- .NET / ASP.NET Core ---
+backend/**/bin/
+backend/**/obj/
+backend/**/*.user
+backend/.vs/
+
+# --- Env / secrets ---
+.env
+appsettings.Development.json
+appsettings.Local.json
+*.pfx
+*.key
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --- OS ---
+.DS_Store
+Thumbs.db

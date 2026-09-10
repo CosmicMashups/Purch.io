@@ -1,0 +1,30 @@
+name: backend-ci
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      # Solution/projects are created in Phase 1 — this workflow is a placeholder
+      # until Purch.sln exists (blocked on installing the .NET SDK locally first).
+      # - run: dotnet restore
+      # - run: dotnet build --configuration Release
+      # - run: dotnet test
+      # - run: dotnet format --verify-no-changes
+      - run: echo "backend project not yet scaffolded — see docs/adr and README"
