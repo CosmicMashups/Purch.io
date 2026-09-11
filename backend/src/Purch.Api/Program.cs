@@ -6,6 +6,7 @@ using Purch.Api.Endpoints;
 using Purch.Api.ErrorHandling;
 using Purch.Api.Middleware;
 using Purch.Application.Auth;
+using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Onboarding;
 using Purch.Infrastructure.Auth;
@@ -52,6 +53,11 @@ builder.Services.AddScoped<IDeviceManagementService, DeviceManagementService>();
 builder.Services.AddScoped<ITenantSettingsService, TenantSettingsService>();
 builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 
+builder.Services.AddScoped<ICategoryRepository, EfCategoryRepository>();
+builder.Services.AddScoped<IItemRepository, EfItemRepository>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IItemService, ItemService>();
+
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
 
@@ -96,6 +102,7 @@ app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
 app.MapOnboardingEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();
 
