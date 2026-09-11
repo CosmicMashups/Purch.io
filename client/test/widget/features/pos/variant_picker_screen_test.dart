@@ -29,6 +29,7 @@ const _tShirt = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _largeRed = ItemVariant(

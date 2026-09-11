@@ -4,13 +4,33 @@ import 'package:purch_client/features/inventory/domain/inventory_repository.dart
 class FakeInventoryRepository implements InventoryRepository {
   FakeInventoryRepository({
     this.recordMovementFailure,
+    this.getDashboardFailure,
     List<InventoryMovement>? initialMovements,
-  }) : movements = initialMovements ?? [];
+    InventoryDashboard? initialDashboard,
+  }) : movements = initialMovements ?? [],
+       dashboard =
+           initialDashboard ??
+           const InventoryDashboard(
+             totalSkus: 0,
+             outOfStockCount: 0,
+             lowStockCount: 0,
+             lowStockItems: [],
+           );
 
   final Object? recordMovementFailure;
+  final Object? getDashboardFailure;
   final List<InventoryMovement> movements;
+  final InventoryDashboard dashboard;
 
   RecordMovementRequest? lastRecordRequest;
+
+  @override
+  Future<InventoryDashboard> getDashboard() async {
+    if (getDashboardFailure != null) {
+      throw getDashboardFailure!;
+    }
+    return dashboard;
+  }
 
   @override
   Future<List<InventoryMovement>> listMovements({

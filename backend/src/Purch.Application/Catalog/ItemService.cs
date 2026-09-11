@@ -239,6 +239,26 @@ public sealed class ItemService(
         return ToDto(item);
     }
 
+    public async Task<ItemDto> UpdateLowStockThresholdAsync(
+        Guid itemId,
+        UpdateLowStockThresholdRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
+            ?? throw new NotFoundException("Item", itemId);
+
+        if (request.Threshold is < 0)
+        {
+            throw new ValidationException(nameof(request.Threshold), "Threshold cannot be negative.");
+        }
+
+        item.LowStockThreshold = request.Threshold;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(item);
+    }
+
     private async Task ValidateDepartmentAsync(Guid? departmentId, CancellationToken cancellationToken)
     {
         if (departmentId is null)
@@ -277,6 +297,7 @@ public sealed class ItemService(
         item.TingiIncrementStep,
         allowedSizes,
         item.ServiceDurationMinutes,
-        item.DepartmentId);
+        item.DepartmentId,
+        item.LowStockThreshold);
     }
 }

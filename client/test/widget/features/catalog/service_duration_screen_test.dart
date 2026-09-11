@@ -26,6 +26,7 @@ const _haircutItem = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 void main() {

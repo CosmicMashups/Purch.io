@@ -18,4 +18,5 @@ public sealed record ItemDto(
     decimal? TingiIncrementStep,
     IReadOnlyList<decimal> TingiAllowedSizes,
     int? ServiceDurationMinutes,
-    Guid? DepartmentId);
+    Guid? DepartmentId,
+    decimal? LowStockThreshold);

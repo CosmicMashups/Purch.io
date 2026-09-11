@@ -14,6 +14,19 @@ InventoryRepository inventoryRepository(Ref ref) {
   return InventoryRepositoryImpl(apiClient: ref.watch(apiClientProvider));
 }
 
+@riverpod
+class InventoryDashboardNotifier extends _$InventoryDashboardNotifier {
+  @override
+  Future<InventoryDashboard> build() {
+    return ref.watch(inventoryRepositoryProvider).getDashboard();
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
 /// One list per filter combination (Riverpod family, inferred from the
 /// named parameters) — C2's movement type filter chips just watch a
 /// different instance of this provider rather than re-filtering client-side.

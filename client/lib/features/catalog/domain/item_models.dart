@@ -20,6 +20,7 @@ class Item {
     required this.tingiAllowedSizes,
     required this.serviceDurationMinutes,
     required this.departmentId,
+    required this.lowStockThreshold,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -43,6 +44,7 @@ class Item {
               .toList(),
       serviceDurationMinutes: json['serviceDurationMinutes'] as int?,
       departmentId: json['departmentId'] as String?,
+      lowStockThreshold: (json['lowStockThreshold'] as num?)?.toDouble(),
     );
   }
 
@@ -62,6 +64,7 @@ class Item {
   final List<double> tingiAllowedSizes;
   final int? serviceDurationMinutes;
   final String? departmentId;
+  final double? lowStockThreshold;
 }
 
 /// Mirrors Purch.Application.Catalog.CreateItemRequest. PricingType is fixed
@@ -138,4 +141,14 @@ class UpdateItemDepartmentRequest {
   final String? departmentId;
 
   Map<String, dynamic> toJson() => {'departmentId': departmentId};
+}
+
+/// Mirrors Purch.Application.Catalog.UpdateLowStockThresholdRequest — C1's
+/// low-stock alert threshold. A null threshold clears the alert.
+class UpdateLowStockThresholdRequest {
+  const UpdateLowStockThresholdRequest({this.threshold});
+
+  final double? threshold;
+
+  Map<String, dynamic> toJson() => {'threshold': threshold};
 }

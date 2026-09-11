@@ -12,7 +12,11 @@ import '../providers/inventory_providers.dart';
 /// the same operation. Spoiled requires a reason category, For Return
 /// requires a supplier reference — every other field is shared.
 class RecordMovementScreen extends ConsumerStatefulWidget {
-  const RecordMovementScreen({super.key});
+  const RecordMovementScreen({super.key, this.presetItem});
+
+  /// Preselects the item — e.g. the dashboard's low-stock "reorder"
+  /// shortcut jumping straight here with the item already chosen.
+  final Item? presetItem;
 
   @override
   ConsumerState<RecordMovementScreen> createState() =>
@@ -29,6 +33,12 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
   Item? _selectedItem;
   Branch? _selectedBranch;
   MovementType _type = MovementType.stockIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedItem = widget.presetItem;
+  }
 
   @override
   void dispose() {
@@ -105,29 +115,41 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
                       error:
                           (error, stackTrace) =>
                               Text('Could not load items: $error'),
-                      data:
-                          (items) => DropdownButtonFormField<Item>(
-                            value: _selectedItem,
-                            decoration: const InputDecoration(
-                              labelText: 'Item',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: [
-                              for (final item in items)
-                                DropdownMenuItem(
-                                  value: item,
-                                  child: Text(item.name),
-                                ),
-                            ],
-                            onChanged:
-                                isLoading
-                                    ? null
-                                    : (item) =>
-                                        setState(() => _selectedItem = item),
-                            validator:
-                                (value) =>
-                                    value == null ? 'Choose an item' : null,
+                      data: (items) {
+                        // The dropdown compares values by identity, but a
+                        // preset item (from the dashboard's reorder
+                        // shortcut) is a different instance than the one
+                        // freshly fetched here — resolve by id instead.
+                        Item? matchedValue;
+                        for (final item in items) {
+                          if (item.id == _selectedItem?.id) {
+                            matchedValue = item;
+                            break;
+                          }
+                        }
+                        return DropdownButtonFormField<Item>(
+                          value: matchedValue,
+                          decoration: const InputDecoration(
+                            labelText: 'Item',
+                            border: OutlineInputBorder(),
                           ),
+                          items: [
+                            for (final item in items)
+                              DropdownMenuItem(
+                                value: item,
+                                child: Text(item.name),
+                              ),
+                          ],
+                          onChanged:
+                              isLoading
+                                  ? null
+                                  : (item) =>
+                                      setState(() => _selectedItem = item),
+                          validator:
+                              (value) =>
+                                  value == null ? 'Choose an item' : null,
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     branchesAsync.when(

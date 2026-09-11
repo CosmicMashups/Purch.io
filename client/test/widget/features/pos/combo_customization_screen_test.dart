@@ -29,6 +29,7 @@ const _valueMeal = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _soda = Item(
@@ -48,6 +49,7 @@ const _soda = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _juice = Item(
@@ -67,6 +69,7 @@ const _juice = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _drinkSlot = ItemComboComponent(

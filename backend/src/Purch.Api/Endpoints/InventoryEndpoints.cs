@@ -9,6 +9,13 @@ public static class InventoryEndpoints
     {
         var inventoryManager = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse) };
 
+        // --- C1 — overview cards + low-stock alert list ---
+        _ = app.MapGet("/inventory/dashboard", async (
+            IInventoryDashboardService dashboardService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await dashboardService.GetDashboardAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- C2/C3 — the stock movement log and the form that records into it ---
         _ = app.MapGet("/inventory/movements", async (
             Guid? itemId,

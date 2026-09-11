@@ -108,6 +108,15 @@ public static class CatalogEndpoints
             Results.Ok(await itemService.UpdateDepartmentAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Low-stock alert threshold (C1) ---
+        _ = app.MapPut("/items/{itemId:guid}/low-stock-threshold", async (
+            Guid itemId,
+            UpdateLowStockThresholdRequest request,
+            IItemService itemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemService.UpdateLowStockThresholdAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Weight/volume batches (B2a) ---
         _ = app.MapGet("/items/{itemId:guid}/batches", async (
             Guid itemId,

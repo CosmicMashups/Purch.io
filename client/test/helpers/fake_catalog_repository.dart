@@ -22,6 +22,7 @@ class FakeCatalogRepository implements CatalogRepository {
     this.updateServiceDurationFailure,
     this.createComboComponentFailure,
     this.updateItemDepartmentFailure,
+    this.updateLowStockThresholdFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
@@ -51,6 +52,7 @@ class FakeCatalogRepository implements CatalogRepository {
   final Object? updateServiceDurationFailure;
   final Object? createComboComponentFailure;
   final Object? updateItemDepartmentFailure;
+  final Object? updateLowStockThresholdFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
@@ -62,6 +64,7 @@ class FakeCatalogRepository implements CatalogRepository {
 
   CreateItemRequest? lastCreateItemRequest;
   CreateItemBatchRequest? lastReceiveBatchRequest;
+  UpdateLowStockThresholdRequest? lastUpdateLowStockThresholdRequest;
 
   @override
   Future<List<Category>> listCategories() async => categories;
@@ -106,6 +109,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiAllowedSizes: const [],
       serviceDurationMinutes: null,
       departmentId: null,
+      lowStockThreshold: null,
     );
     items.add(created);
     return created;
@@ -277,6 +281,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiAllowedSizes: request.allowedSizes ?? const [],
       serviceDurationMinutes: current.serviceDurationMinutes,
       departmentId: current.departmentId,
+      lowStockThreshold: current.lowStockThreshold,
     );
     items[index] = updated;
     return updated;
@@ -309,6 +314,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiAllowedSizes: current.tingiAllowedSizes,
       serviceDurationMinutes: request.durationMinutes,
       departmentId: current.departmentId,
+      lowStockThreshold: current.lowStockThreshold,
     );
     items[index] = updated;
     return updated;
@@ -368,6 +374,41 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiAllowedSizes: current.tingiAllowedSizes,
       serviceDurationMinutes: current.serviceDurationMinutes,
       departmentId: request.departmentId,
+      lowStockThreshold: current.lowStockThreshold,
+    );
+    items[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<Item> updateLowStockThreshold(
+    String itemId,
+    UpdateLowStockThresholdRequest request,
+  ) async {
+    lastUpdateLowStockThresholdRequest = request;
+    if (updateLowStockThresholdFailure != null) {
+      throw updateLowStockThresholdFailure!;
+    }
+    final index = items.indexWhere((item) => item.id == itemId);
+    final current = items[index];
+    final updated = Item(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+      basePrice: current.basePrice,
+      imageUrl: current.imageUrl,
+      pricingType: current.pricingType,
+      stockOnHand: current.stockOnHand,
+      isActive: current.isActive,
+      tingiMode: current.tingiMode,
+      packagedSize: current.packagedSize,
+      tingiIncrementStep: current.tingiIncrementStep,
+      tingiAllowedSizes: current.tingiAllowedSizes,
+      serviceDurationMinutes: current.serviceDurationMinutes,
+      departmentId: current.departmentId,
+      lowStockThreshold: request.threshold,
     );
     items[index] = updated;
     return updated;

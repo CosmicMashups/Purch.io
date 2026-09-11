@@ -193,6 +193,18 @@ class CatalogRepositoryImpl implements CatalogRepository {
     return _put('/items/$itemId/department', request.toJson(), Item.fromJson);
   }
 
+  @override
+  Future<Item> updateLowStockThreshold(
+    String itemId,
+    UpdateLowStockThresholdRequest request,
+  ) {
+    return _put(
+      '/items/$itemId/low-stock-threshold',
+      request.toJson(),
+      Item.fromJson,
+    );
+  }
+
   Future<T> _put<T>(
     String path,
     Map<String, dynamic> data,

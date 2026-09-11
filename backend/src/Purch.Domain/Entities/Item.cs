@@ -39,4 +39,7 @@ public class Item : TenantScopedEntity
 
     /// <summary>B2c — appointment/service length in minutes. Meaningful only when PricingType is Service.</summary>
     public int? ServiceDurationMinutes { get; set; }
+
+    /// <summary>C1 — StockOnHand at or below this (and above zero) triggers the dashboard's low-stock alert. Null means no alert is configured for this item.</summary>
+    public decimal? LowStockThreshold { get; set; }
 }

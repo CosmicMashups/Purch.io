@@ -31,6 +31,7 @@ const _mangoesItem = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _branch = Branch(

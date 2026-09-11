@@ -28,6 +28,7 @@ const _water = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _tShirt = Item(
@@ -47,6 +48,7 @@ const _tShirt = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _valueMeal = Item(
@@ -66,6 +68,7 @@ const _valueMeal = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 const _riceSack = Item(
@@ -85,6 +88,7 @@ const _riceSack = Item(
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
   departmentId: null,
+  lowStockThreshold: null,
 );
 
 Widget _wrap(

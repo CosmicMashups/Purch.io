@@ -88,6 +88,7 @@ builder.Services.AddScoped<IPromoCodeService, PromoCodeService>();
 builder.Services.AddScoped<IBirReadingService, BirReadingService>();
 builder.Services.AddScoped<IInventoryMovementRepository, EfInventoryMovementRepository>();
 builder.Services.AddScoped<IInventoryMovementService, InventoryMovementService>();
+builder.Services.AddScoped<IInventoryDashboardService, InventoryDashboardService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";

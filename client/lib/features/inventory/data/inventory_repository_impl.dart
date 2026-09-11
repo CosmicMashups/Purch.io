@@ -12,6 +12,18 @@ class InventoryRepositoryImpl implements InventoryRepository {
   final ApiClient _apiClient;
 
   @override
+  Future<InventoryDashboard> getDashboard() async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/inventory/dashboard',
+      );
+      return InventoryDashboard.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
   Future<List<InventoryMovement>> listMovements({
     String? itemId,
     String? branchId,

@@ -13,4 +13,6 @@ public interface IItemService
     Task<ItemDto> UpdateServiceDurationAsync(Guid itemId, UpdateServiceDurationRequest request, CancellationToken cancellationToken = default);
 
     Task<ItemDto> UpdateDepartmentAsync(Guid itemId, UpdateItemDepartmentRequest request, CancellationToken cancellationToken = default);
+
+    Task<ItemDto> UpdateLowStockThresholdAsync(Guid itemId, UpdateLowStockThresholdRequest request, CancellationToken cancellationToken = default);
 }

@@ -11,6 +11,7 @@ import 'bundle_rules_screen.dart';
 import 'combo_components_screen.dart';
 import 'item_batches_screen.dart';
 import 'item_modifier_groups_screen.dart';
+import 'low_stock_threshold_screen.dart';
 import 'service_duration_screen.dart';
 import 'tingi_config_screen.dart';
 import 'variants_screen.dart';
@@ -24,6 +25,7 @@ enum _ItemAction {
   serviceDuration,
   comboComponents,
   department,
+  lowStockThreshold,
 }
 
 /// B1's item catalog list. Every item can have modifier groups attached for
@@ -171,6 +173,14 @@ class ItemListScreen extends ConsumerWidget {
                             ),
                           );
                           break;
+                        case _ItemAction.lowStockThreshold:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => LowStockThresholdScreen(item: item),
+                            ),
+                          );
+                          break;
                       }
                     },
                     itemBuilder:
@@ -212,6 +222,10 @@ class ItemListScreen extends ConsumerWidget {
                           const PopupMenuItem(
                             value: _ItemAction.department,
                             child: Text('Assign department'),
+                          ),
+                          const PopupMenuItem(
+                            value: _ItemAction.lowStockThreshold,
+                            child: Text('Low-stock threshold'),
                           ),
                         ],
                   ),

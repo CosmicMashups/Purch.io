@@ -77,4 +77,9 @@ abstract class CatalogRepository {
     String itemId,
     UpdateItemDepartmentRequest request,
   );
+
+  Future<Item> updateLowStockThreshold(
+    String itemId,
+    UpdateLowStockThresholdRequest request,
+  );
 }

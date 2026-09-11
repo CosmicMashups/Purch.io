@@ -112,3 +112,56 @@ class RecordMovementRequest {
     'supplierReference': supplierReference,
   };
 }
+
+/// Mirrors Purch.Application.Inventory.InventoryDashboardDto — C1's overview
+/// cards + low-stock alert list.
+class InventoryDashboard {
+  const InventoryDashboard({
+    required this.totalSkus,
+    required this.outOfStockCount,
+    required this.lowStockCount,
+    required this.lowStockItems,
+  });
+
+  factory InventoryDashboard.fromJson(Map<String, dynamic> json) {
+    return InventoryDashboard(
+      totalSkus: json['totalSkus'] as int,
+      outOfStockCount: json['outOfStockCount'] as int,
+      lowStockCount: json['lowStockCount'] as int,
+      lowStockItems:
+          (json['lowStockItems'] as List<dynamic>)
+              .cast<Map<String, dynamic>>()
+              .map(LowStockItem.fromJson)
+              .toList(),
+    );
+  }
+
+  final int totalSkus;
+  final int outOfStockCount;
+  final int lowStockCount;
+  final List<LowStockItem> lowStockItems;
+}
+
+/// Mirrors Purch.Application.Inventory.LowStockItemDto.
+class LowStockItem {
+  const LowStockItem({
+    required this.itemId,
+    required this.itemName,
+    required this.stockOnHand,
+    required this.lowStockThreshold,
+  });
+
+  factory LowStockItem.fromJson(Map<String, dynamic> json) {
+    return LowStockItem(
+      itemId: json['itemId'] as String,
+      itemName: json['itemName'] as String,
+      stockOnHand: (json['stockOnHand'] as num).toDouble(),
+      lowStockThreshold: (json['lowStockThreshold'] as num).toDouble(),
+    );
+  }
+
+  final String itemId;
+  final String itemName;
+  final double stockOnHand;
+  final double lowStockThreshold;
+}

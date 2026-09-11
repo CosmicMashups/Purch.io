@@ -442,6 +442,32 @@ class UpdateItemDepartmentController extends _$UpdateItemDepartmentController {
   }
 }
 
+@riverpod
+class UpdateLowStockThresholdController
+    extends _$UpdateLowStockThresholdController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> updateThreshold(UpdateLowStockThresholdRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateLowStockThreshold(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
 /// Flattens departments across every branch for the item department picker —
 /// most tenants have a single branch, so this keeps the picker simple rather
 /// than requiring the cashier/admin to pick a branch first.
