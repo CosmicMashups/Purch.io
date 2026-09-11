@@ -6,6 +6,7 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/catalog/presentation/screens/category_list_screen.dart';
 import 'features/catalog/presentation/screens/item_list_screen.dart';
 import 'features/catalog/presentation/screens/modifier_group_list_screen.dart';
+import 'features/inventory/presentation/screens/branch_transfer_list_screen.dart';
 import 'features/inventory/presentation/screens/inventory_dashboard_screen.dart';
 import 'features/inventory/presentation/screens/movement_log_screen.dart';
 import 'features/onboarding/presentation/screens/audit_log_screen.dart';
@@ -204,6 +205,16 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('Stock Movements'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const BranchTransferListScreen(),
+                      ),
+                    ),
+                child: const Text('Stock Transfers'),
               ),
               const SizedBox(height: 16),
               FilledButton(
