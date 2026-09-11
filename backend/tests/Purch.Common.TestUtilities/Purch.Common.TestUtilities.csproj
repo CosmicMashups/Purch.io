@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Purch.Domain\Purch.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Purch.Application\Purch.Application.csproj" />
+    <ProjectReference Include="..\..\src\Purch.Infrastructure\Purch.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -21,10 +21,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
-      # Solution/projects are created in Phase 1 — this workflow is a placeholder
-      # until Purch.sln exists (blocked on installing the .NET SDK locally first).
-      # - run: dotnet restore
-      # - run: dotnet build --configuration Release
-      # - run: dotnet test
-      # - run: dotnet format --verify-no-changes
-      - run: echo "backend project not yet scaffolded — see docs/adr and README"
+      - run: dotnet restore
+      - run: dotnet build --configuration Release --no-restore
+      - run: dotnet test --no-build --configuration Release
+      - run: dotnet format --verify-no-changes
