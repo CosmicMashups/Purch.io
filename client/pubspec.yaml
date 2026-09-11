@@ -55,6 +55,11 @@ dependencies:
   # Secure token storage
   flutter_secure_storage: ^9.2.2
 
+  # Barcode scanning (camera-based, e.g. scan-to-fill on the item form) —
+  # USB/Bluetooth "keyboard wedge" scanners need no package since they just
+  # emit fast keystrokes into whatever text field has focus.
+  mobile_scanner: ^6.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

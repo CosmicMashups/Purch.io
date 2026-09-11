@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
@@ -33,6 +34,15 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     _barcodeController.dispose();
     _priceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanBarcode() async {
+    final scanned = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (scanned != null && mounted) {
+      _barcodeController.text = scanned;
+    }
   }
 
   Future<void> _submit() async {
@@ -199,9 +209,14 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                     TextFormField(
                       controller: _barcodeController,
                       enabled: !isLoading,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Barcode (optional)',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          onPressed: isLoading ? null : _scanBarcode,
+                          icon: const Icon(Icons.qr_code_scanner),
+                          tooltip: 'Scan barcode',
+                        ),
                       ),
                     ),
                     if (failure != null) ...[

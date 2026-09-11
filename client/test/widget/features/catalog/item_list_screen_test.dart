@@ -70,4 +70,24 @@ void main() {
     expect(find.text('Price cannot be negative'), findsOneWidget);
     expect(repository.lastCreateItemRequest, isNull);
   });
+
+  testWidgets('shows a scan-barcode action in the app bar', (tester) async {
+    await tester.pumpWidget(_wrap(FakeCatalogRepository()));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+  });
+
+  testWidgets(
+    'the add-item form offers a scan-to-fill button on the barcode field',
+    (tester) async {
+      await tester.pumpWidget(_wrap(FakeCatalogRepository()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+    },
+  );
 }

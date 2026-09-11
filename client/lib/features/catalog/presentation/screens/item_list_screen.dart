@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/hardware/barcode_scanner_screen.dart';
+import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
@@ -38,7 +40,16 @@ class ItemListScreen extends ConsumerWidget {
     final itemsAsync = ref.watch(itemListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Items')),
+      appBar: AppBar(
+        title: const Text('Items'),
+        actions: [
+          IconButton(
+            onPressed: () => _scanAndLookUp(context, ref),
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Scan barcode',
+          ),
+        ],
+      ),
       body: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
@@ -220,4 +231,35 @@ class ItemListScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Scans a barcode and looks it up against the already-loaded item list —
+/// no separate lookup endpoint needed since the list already carries each
+/// item's barcode.
+Future<void> _scanAndLookUp(BuildContext context, WidgetRef ref) async {
+  final scanned = await Navigator.of(context).push<String>(
+    MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+  );
+  if (scanned == null || !context.mounted) {
+    return;
+  }
+
+  final items = ref.read(itemListProvider).valueOrNull ?? [];
+  Item? match;
+  for (final item in items) {
+    if (item.barcode == scanned) {
+      match = item;
+      break;
+    }
+  }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        match != null
+            ? 'Found: ${match.name} (₱${match.basePrice.toStringAsFixed(2)})'
+            : 'No item found with barcode "$scanned".',
+      ),
+    ),
+  );
 }
