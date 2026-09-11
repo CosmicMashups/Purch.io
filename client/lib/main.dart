@@ -23,6 +23,9 @@ import 'features/pos/presentation/screens/bir_reading_screen.dart';
 import 'features/pos/presentation/screens/item_grid_screen.dart';
 import 'features/pos/presentation/screens/promo_code_list_screen.dart';
 import 'features/pos/presentation/screens/shift_screen.dart';
+import 'features/reports/presentation/screens/inventory_reports_screen.dart';
+import 'features/reports/presentation/screens/sales_dashboard_screen.dart';
+import 'features/reports/presentation/screens/staff_performance_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: PurchApp()));
@@ -149,6 +152,36 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('X / Z Reading'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const SalesDashboardScreen(),
+                      ),
+                    ),
+                child: const Text('Sales Dashboard'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const InventoryReportsScreen(),
+                      ),
+                    ),
+                child: const Text('Inventory Reports'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const StaffPerformanceScreen(),
+                      ),
+                    ),
+                child: const Text('Staff Performance'),
               ),
               const SizedBox(height: 16),
               FilledButton(

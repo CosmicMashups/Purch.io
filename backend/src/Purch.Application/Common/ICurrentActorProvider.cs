@@ -1,3 +1,5 @@
+using Purch.Domain.Enums;
+
 namespace Purch.Application.Common;
 
 /// <summary>
@@ -14,4 +16,11 @@ public interface ICurrentActorProvider
     Guid? DeviceId { get; }
 
     Guid? BranchId { get; }
+
+    /// <summary>Orthogonal to Role — governs which data this actor may see, not
+    /// which actions they may take. Null for a Kiosk token, which carries no
+    /// user/scope claims at all. See ScopeType's own doc comment.</summary>
+    ScopeType? ScopeType { get; }
+
+    Guid? ScopeId { get; }
 }

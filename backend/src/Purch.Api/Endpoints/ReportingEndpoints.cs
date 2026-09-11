@@ -22,6 +22,42 @@ public static class ReportingEndpoints
             Results.Ok(await birReadingService.GenerateZReadingAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        // --- F1 — sales dashboard ---
+        _ = app.MapGet("/reports/sales-dashboard", async (
+            Guid? branchId,
+            ISalesDashboardService salesDashboardService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await salesDashboardService.GetDashboardAsync(branchId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        // --- F3 — inventory reports ---
+        _ = app.MapGet("/reports/inventory/movement-summary", async (
+            Guid? branchId,
+            DateTimeOffset fromUtc,
+            DateTimeOffset toUtc,
+            IInventoryReportService inventoryReportService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryReportService.GetMovementSummaryAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/inventory/low-stock-export.csv", async (
+            IInventoryReportService inventoryReportService,
+            CancellationToken cancellationToken) =>
+            Results.Text(
+                await inventoryReportService.GenerateLowStockReorderCsvAsync(cancellationToken),
+                "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        // --- F4 — staff performance ---
+        _ = app.MapGet("/reports/staff-performance", async (
+            Guid? branchId,
+            DateTimeOffset fromUtc,
+            DateTimeOffset toUtc,
+            IStaffPerformanceService staffPerformanceService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await staffPerformanceService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
         return app;
     }
 }

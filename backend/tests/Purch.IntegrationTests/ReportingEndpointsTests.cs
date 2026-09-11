@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
+using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Application.Reporting;
@@ -118,6 +119,98 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
 
         Assert.Equal(1, reading!.VoidedCount);
         Assert.Equal(25m, reading.VoidedAmount);
+    }
+
+    [Fact]
+    public async Task The_sales_dashboard_reflects_a_completed_sale_in_today_and_the_trend()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        await CompleteACashSaleAsync(client, 150m);
+
+        var response = await client.GetAsync("/reports/sales-dashboard");
+        var dashboard = await response.Content.ReadFromJsonAsync<SalesDashboardDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(150m, dashboard!.RevenueToday);
+        Assert.Equal(150m, dashboard.RevenueLast7Days);
+        Assert.Equal(150m, dashboard.RevenueLast30Days);
+        Assert.Equal(14, dashboard.Trend.Count);
+        Assert.Equal(150m, dashboard.Trend[^1].Revenue);
+        var topItem = Assert.Single(dashboard.TopSellingItems);
+        Assert.Equal(150m, topItem.Revenue);
+        var branchRow = Assert.Single(dashboard.BranchComparison);
+        Assert.Equal(150m, branchRow.Revenue);
+    }
+
+    [Fact]
+    public async Task The_movement_summary_groups_recorded_movements_by_type_within_the_date_range()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Canned Goods", null, null, null, 30m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+
+        _ = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item!.Id, branchId, MovementType.StockIn, 20m, null, null, null, null));
+
+        var fromUtc = DateTimeOffset.UtcNow.AddDays(-1);
+        var toUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var response = await client.GetAsync(
+            $"/reports/inventory/movement-summary?from={Uri.EscapeDataString(fromUtc.ToString("O"))}&to={Uri.EscapeDataString(toUtc.ToString("O"))}");
+        var summary = await response.Content.ReadFromJsonAsync<MovementSummaryDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var stockInRow = summary!.ByType.Single(row => row.Type == MovementType.StockIn);
+        Assert.Equal(20m, stockInRow.TotalQuantity);
+        Assert.Equal(1, stockInRow.MovementCount);
+    }
+
+    [Fact]
+    public async Task The_low_stock_export_returns_a_csv_with_items_under_their_threshold()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Instant Noodles", null, null, null, 15m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PutAsJsonAsync(
+            $"/items/{item!.Id}/low-stock-threshold",
+            new UpdateLowStockThresholdRequest(10m));
+
+        var response = await client.GetAsync("/reports/inventory/low-stock-export.csv");
+        var csv = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("Instant Noodles", csv);
+    }
+
+    [Fact]
+    public async Task The_staff_performance_report_summarizes_sales_and_shift_attendance()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        await CompleteACashSaleAsync(client, 75m);
+
+        var from = DateTimeOffset.UtcNow.AddDays(-1);
+        var to = DateTimeOffset.UtcNow.AddDays(1);
+        var response = await client.GetAsync(
+            $"/reports/staff-performance?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}");
+        var report = await response.Content.ReadFromJsonAsync<StaffPerformanceReportDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var salesRow = Assert.Single(report!.Sales);
+        Assert.Equal(75m, salesRow.TotalSales);
+        Assert.Equal(1, salesRow.TransactionCount);
     }
 
     private static async Task CompleteACashSaleAsync(HttpClient client, decimal price)
