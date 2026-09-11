@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Purch.Api.Endpoints;
+using Purch.Api.ErrorHandling;
 using Purch.Api.Middleware;
 using Purch.Application.Auth;
 using Purch.Infrastructure.Auth;
@@ -11,6 +12,15 @@ using Purch.Infrastructure.Persistence;
 using Purch.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+    };
+});
 
 builder.Services.AddHttpContextAccessor();
 
@@ -51,6 +61,16 @@ builder.Services
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Must be first: wraps every later middleware/endpoint so any thrown exception
+// (including ones from TenantResolutionMiddleware or endpoint handlers) is caught
+// and turned into a consistent ProblemDetails response, never a raw 500 with no body.
+app.UseExceptionHandler();
+
+// Catches status codes set without a response body (e.g. JWT auth failing with a bare
+// 401, [Authorize] failing with a bare 403, an unmatched route's default 404) and fills
+// in a ProblemDetails body for those too, so no error response is ever silently empty.
+app.UseStatusCodePages();
 
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();

@@ -1,3 +1,5 @@
+using Purch.Application.Common.Exceptions;
+
 namespace Purch.Application.Auth;
 
 public sealed class LoginService(
@@ -8,6 +10,8 @@ public sealed class LoginService(
 {
     public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
+        Validate(request);
+
         var device = await deviceRepository.FindByPairingCodeAsync(request.DevicePairingCode, cancellationToken);
         if (device is null)
         {
@@ -24,5 +28,25 @@ public sealed class LoginService(
 
         var accessToken = jwtTokenService.IssueAccessToken(matchedUser);
         return new LoginResult.Success(accessToken);
+    }
+
+    private static void Validate(LoginRequest request)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (string.IsNullOrWhiteSpace(request.DevicePairingCode))
+        {
+            errors[nameof(request.DevicePairingCode)] = ["Device pairing code is required."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Pin))
+        {
+            errors[nameof(request.Pin)] = ["PIN is required."];
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new ValidationException(errors);
+        }
     }
 }

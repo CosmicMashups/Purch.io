@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Purch.Application.Auth;
 using Purch.Common.TestUtilities;
@@ -57,6 +58,8 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest(pairingCode, "9999"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.False(string.IsNullOrWhiteSpace(problem?.Detail));
     }
 
     [Fact]
@@ -68,6 +71,22 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest("NO-SUCH-DEVICE", "1234"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.False(string.IsNullOrWhiteSpace(problem?.Detail));
+    }
+
+    [Fact]
+    public async Task Login_with_empty_pin_returns_400_with_a_field_level_error()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest("SOME-DEVICE", string.Empty));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Contains("Pin", problem!.Errors.Keys);
     }
 
     private async Task SeedTenantDeviceAndUserAsync(Guid tenantId, string pairingCode, string pin, Role role)
