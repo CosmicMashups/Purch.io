@@ -52,6 +52,14 @@ class CartNotifier extends _$CartNotifier {
     return true;
   }
 
+  /// Toggles the Senior Citizen/PWD 20% discount — only after the cashier
+  /// has verified the customer's physical ID themselves.
+  Future<bool> applySeniorPwdDiscount(bool apply) => _mutate(
+    (repository) => repository.applySeniorPwdDiscount(
+      ApplySeniorPwdDiscountRequest(apply: apply),
+    ),
+  );
+
   /// Records a full payment. On success the cart moves to Completed with its
   /// receipt number — the caller shows that as a receipt before calling
   /// [startNewSale] to fetch the fresh cart that replaces it.

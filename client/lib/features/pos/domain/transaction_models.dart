@@ -4,8 +4,7 @@ import 'payment_method.dart';
 enum TransactionStatus { open, awaitingPayment, completed, voided, refunded }
 
 /// Mirrors Purch.Application.Pos.TransactionDto — the cart engine's view of
-/// a device's single in-progress sale. Discount auto-recalculation isn't
-/// modeled yet; that lands with the rest of Phase 4's D5 work.
+/// a device's single in-progress sale.
 class Transaction {
   const Transaction({
     required this.id,
@@ -15,6 +14,7 @@ class Transaction {
     required this.lines,
     required this.subtotal,
     required this.discountAmount,
+    required this.seniorPwdDiscountApplied,
     required this.totalAmount,
     required this.receiptNumber,
     required this.payments,
@@ -33,6 +33,7 @@ class Transaction {
               .toList(),
       subtotal: (json['subtotal'] as num).toDouble(),
       discountAmount: (json['discountAmount'] as num).toDouble(),
+      seniorPwdDiscountApplied: json['seniorPwdDiscountApplied'] as bool,
       totalAmount: (json['totalAmount'] as num).toDouble(),
       receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
       payments:
@@ -50,6 +51,7 @@ class Transaction {
   final List<TransactionLine> lines;
   final double subtotal;
   final double discountAmount;
+  final bool seniorPwdDiscountApplied;
   final double totalAmount;
   final int? receiptNumber;
   final List<Payment> payments;
@@ -163,4 +165,15 @@ class UpdateTransactionLineRequest {
   final double quantity;
 
   Map<String, dynamic> toJson() => {'quantity': quantity};
+}
+
+/// Mirrors Purch.Application.Pos.ApplySeniorPwdDiscountRequest. The cashier
+/// toggles this only after verifying the customer's physical Senior
+/// Citizen/PWD ID themselves — this is not an ID-scanning feature.
+class ApplySeniorPwdDiscountRequest {
+  const ApplySeniorPwdDiscountRequest({required this.apply});
+
+  final bool apply;
+
+  Map<String, dynamic> toJson() => {'apply': apply};
 }

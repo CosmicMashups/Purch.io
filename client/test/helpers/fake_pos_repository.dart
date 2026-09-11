@@ -8,6 +8,7 @@ class FakePosRepository implements PosRepository {
     this.updateLineFailure,
     this.removeLineFailure,
     this.voidCartFailure,
+    this.applySeniorPwdDiscountFailure,
     this.recordPaymentFailure,
     Transaction? initialCart,
   }) : cart = initialCart ?? _emptyCart('cart-1');
@@ -20,6 +21,7 @@ class FakePosRepository implements PosRepository {
     lines: const [],
     subtotal: 0,
     discountAmount: 0,
+    seniorPwdDiscountApplied: false,
     totalAmount: 0,
     receiptNumber: null,
     payments: const [],
@@ -29,6 +31,7 @@ class FakePosRepository implements PosRepository {
   final Object? updateLineFailure;
   final Object? removeLineFailure;
   final Object? voidCartFailure;
+  final Object? applySeniorPwdDiscountFailure;
   final Object? recordPaymentFailure;
 
   Transaction cart;
@@ -127,6 +130,31 @@ class FakePosRepository implements PosRepository {
   }
 
   @override
+  Future<Transaction> applySeniorPwdDiscount(
+    ApplySeniorPwdDiscountRequest request,
+  ) async {
+    if (applySeniorPwdDiscountFailure != null) {
+      throw applySeniorPwdDiscountFailure!;
+    }
+    final subtotal = cart.subtotal;
+    final discountAmount = request.apply ? subtotal * 0.2 : 0.0;
+    cart = Transaction(
+      id: cart.id,
+      branchId: cart.branchId,
+      deviceId: cart.deviceId,
+      status: cart.status,
+      lines: cart.lines,
+      subtotal: subtotal,
+      discountAmount: discountAmount,
+      seniorPwdDiscountApplied: request.apply,
+      totalAmount: subtotal - discountAmount,
+      receiptNumber: cart.receiptNumber,
+      payments: cart.payments,
+    );
+    return cart;
+  }
+
+  @override
   Future<Transaction> recordPayment(RecordPaymentRequest request) async {
     lastRecordPaymentRequest = request;
     if (recordPaymentFailure != null) {
@@ -152,6 +180,7 @@ class FakePosRepository implements PosRepository {
       lines: cart.lines,
       subtotal: cart.subtotal,
       discountAmount: cart.discountAmount,
+      seniorPwdDiscountApplied: cart.seniorPwdDiscountApplied,
       totalAmount: cart.totalAmount,
       receiptNumber: nextReceiptNumber++,
       payments: [payment],
@@ -161,6 +190,7 @@ class FakePosRepository implements PosRepository {
 
   Transaction _withLines(List<TransactionLine> lines) {
     final subtotal = lines.fold(0.0, (total, line) => total + line.lineTotal);
+    final discountAmount = cart.seniorPwdDiscountApplied ? subtotal * 0.2 : 0.0;
     return Transaction(
       id: cart.id,
       branchId: cart.branchId,
@@ -168,8 +198,9 @@ class FakePosRepository implements PosRepository {
       status: cart.status,
       lines: lines,
       subtotal: subtotal,
-      discountAmount: cart.discountAmount,
-      totalAmount: subtotal - cart.discountAmount,
+      discountAmount: discountAmount,
+      seniorPwdDiscountApplied: cart.seniorPwdDiscountApplied,
+      totalAmount: subtotal - discountAmount,
       receiptNumber: cart.receiptNumber,
       payments: cart.payments,
     );

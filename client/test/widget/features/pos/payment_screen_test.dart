@@ -26,6 +26,7 @@ const _cartWithOneLine = Transaction(
   ],
   subtotal: 30,
   discountAmount: 0,
+  seniorPwdDiscountApplied: false,
   totalAmount: 30,
   receiptNumber: null,
   payments: [],

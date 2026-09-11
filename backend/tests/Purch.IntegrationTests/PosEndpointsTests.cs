@@ -275,6 +275,87 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(2, secondCompleted!.ReceiptNumber);
     }
 
+    [Fact]
+    public async Task Applying_the_senior_pwd_discount_takes_twenty_percent_off_the_total()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Rice Meal", null, null, null, 100m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var discountResponse = await client.PutAsJsonAsync(
+            "/transactions/cart/senior-pwd-discount",
+            new ApplySeniorPwdDiscountRequest(true));
+
+        Assert.Equal(HttpStatusCode.OK, discountResponse.StatusCode);
+        var discounted = await discountResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.True(discounted!.SeniorPwdDiscountApplied);
+        Assert.Equal(20m, discounted.DiscountAmount);
+        Assert.Equal(80m, discounted.TotalAmount);
+    }
+
+    [Fact]
+    public async Task The_discount_recalculates_when_a_line_is_added_after_it_is_applied()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Sandwich", null, null, null, 50m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+        _ = await client.PutAsJsonAsync(
+            "/transactions/cart/senior-pwd-discount",
+            new ApplySeniorPwdDiscountRequest(true));
+
+        var secondAddResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item.Id, null, 1m));
+        var cart = await secondAddResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(20m, cart!.DiscountAmount);
+        Assert.Equal(80m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Turning_the_discount_back_off_restores_the_full_total()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Coffee", null, null, null, 40m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+        _ = await client.PutAsJsonAsync(
+            "/transactions/cart/senior-pwd-discount",
+            new ApplySeniorPwdDiscountRequest(true));
+
+        var offResponse = await client.PutAsJsonAsync(
+            "/transactions/cart/senior-pwd-discount",
+            new ApplySeniorPwdDiscountRequest(false));
+        var cart = await offResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.False(cart!.SeniorPwdDiscountApplied);
+        Assert.Equal(0m, cart.DiscountAmount);
+        Assert.Equal(40m, cart.TotalAmount);
+    }
+
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
     {
         var client = factory.CreateClient();

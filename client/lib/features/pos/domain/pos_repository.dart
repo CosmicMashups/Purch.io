@@ -15,5 +15,9 @@ abstract class PosRepository {
 
   Future<Transaction> voidCart();
 
+  Future<Transaction> applySeniorPwdDiscount(
+    ApplySeniorPwdDiscountRequest request,
+  );
+
   Future<Transaction> recordPayment(RecordPaymentRequest request);
 }

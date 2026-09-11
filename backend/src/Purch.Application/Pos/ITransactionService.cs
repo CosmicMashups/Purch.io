@@ -13,6 +13,9 @@ public interface ITransactionService
 
     Task<TransactionDto> VoidCartAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Toggles the Senior Citizen/PWD 20% discount on the current open cart — a cashier-facing toggle, applied only after the cashier has verified the customer's physical ID.</summary>
+    Task<TransactionDto> ApplySeniorPwdDiscountAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>Records a full payment against the current open cart. On success the cart is marked Completed and issued its sequential BIR receipt number.</summary>
     Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default);
 }

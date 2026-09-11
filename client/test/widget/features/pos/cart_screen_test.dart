@@ -25,6 +25,7 @@ const _cartWithOneLine = Transaction(
   ],
   subtotal: 30,
   discountAmount: 0,
+  seniorPwdDiscountApplied: false,
   totalAmount: 30,
   receiptNumber: null,
   payments: [],
@@ -98,5 +99,20 @@ void main() {
       find.text('Cart is empty — go back and add an item.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('toggling the senior/PWD switch applies the 20% discount', (
+    tester,
+  ) async {
+    final repository = FakePosRepository(initialCart: _cartWithOneLine);
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+
+    expect(repository.cart.seniorPwdDiscountApplied, isTrue);
+    expect(find.text('₱-6.00'), findsOneWidget);
+    expect(find.text('₱24.00'), findsOneWidget);
   });
 }

@@ -47,6 +47,17 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<Transaction> applySeniorPwdDiscount(
+    ApplySeniorPwdDiscountRequest request,
+  ) {
+    return _put(
+      '/transactions/cart/senior-pwd-discount',
+      request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
+  @override
   Future<Transaction> recordPayment(RecordPaymentRequest request) {
     return _post(
       '/transactions/cart/payments',

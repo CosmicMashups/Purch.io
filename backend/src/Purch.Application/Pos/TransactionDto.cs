@@ -10,6 +10,7 @@ public sealed record TransactionDto(
     IReadOnlyList<TransactionLineDto> Lines,
     decimal Subtotal,
     decimal DiscountAmount,
+    bool SeniorPwdDiscountApplied,
     decimal TotalAmount,
     long? ReceiptNumber,
     IReadOnlyList<PaymentDto> Payments);

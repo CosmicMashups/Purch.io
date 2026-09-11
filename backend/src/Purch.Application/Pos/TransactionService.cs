@@ -28,6 +28,9 @@ public sealed class TransactionService(
         PaymentMethod.ManualGcashQr,
     ];
 
+    /// <summary>RA 9994/RA 10754 Senior Citizen/PWD discount — see ApplySeniorPwdDiscountRequest for the VAT-treatment caveat.</summary>
+    private const decimal SeniorPwdDiscountRate = 0.20m;
+
 
     public async Task<TransactionDto> GetOrCreateOpenCartAsync(CancellationToken cancellationToken = default)
     {
@@ -190,6 +193,19 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
+    public async Task<TransactionDto> ApplySeniorPwdDiscountAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken = default)
+    {
+        var deviceId = CurrentDeviceId;
+        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open cart", deviceId);
+
+        cart.SeniorPwdDiscountApplied = request.Apply;
+        await RecalculateTotalAsync(cart, cancellationToken);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
     {
         var line = await transactionRepository.GetLineAsync(lineId, cancellationToken)
@@ -232,6 +248,9 @@ public sealed class TransactionService(
             .Where(line => line.Id != excludingLineId)
             .Sum(line => line.LineTotal);
 
+        transaction.DiscountAmount = transaction.SeniorPwdDiscountApplied
+            ? Math.Round(subtotal * SeniorPwdDiscountRate, 2)
+            : 0m;
         transaction.TotalAmount = subtotal - transaction.DiscountAmount;
     }
 
@@ -268,6 +287,7 @@ public sealed class TransactionService(
             lineDtos,
             subtotal,
             transaction.DiscountAmount,
+            transaction.SeniorPwdDiscountApplied,
             transaction.TotalAmount,
             transaction.ReceiptNumber == 0 ? null : transaction.ReceiptNumber,
             paymentDtos);

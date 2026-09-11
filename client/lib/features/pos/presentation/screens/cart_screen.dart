@@ -92,6 +92,18 @@ class CartScreen extends ConsumerWidget {
                 ),
               ),
               const Divider(height: 1),
+              SwitchListTile(
+                value: cart.seniorPwdDiscountApplied,
+                onChanged:
+                    (value) => ref
+                        .read(cartNotifierProvider.notifier)
+                        .applySeniorPwdDiscount(value),
+                title: const Text('Senior Citizen/PWD Discount (20%)'),
+                subtitle: const Text(
+                  'Only apply after verifying the customer\'s physical ID.',
+                ),
+              ),
+              const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(

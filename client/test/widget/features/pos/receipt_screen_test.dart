@@ -28,6 +28,7 @@ const _completedCart = Transaction(
   ],
   subtotal: 15,
   discountAmount: 0,
+  seniorPwdDiscountApplied: false,
   totalAmount: 15,
   receiptNumber: 7,
   payments: [
