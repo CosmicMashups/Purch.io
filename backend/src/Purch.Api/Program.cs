@@ -57,6 +57,10 @@ builder.Services.AddScoped<ICategoryRepository, EfCategoryRepository>();
 builder.Services.AddScoped<IItemRepository, EfItemRepository>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
+builder.Services.AddScoped<IModifierGroupRepository, EfModifierGroupRepository>();
+builder.Services.AddScoped<IModifierGroupService, ModifierGroupService>();
+builder.Services.AddScoped<IItemBatchRepository, EfItemBatchRepository>();
+builder.Services.AddScoped<IItemBatchService, ItemBatchService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";

@@ -47,6 +47,40 @@ public static class CatalogEndpoints
             Results.Ok(await itemService.UpdateAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Modifier groups (B5's other half) ---
+        _ = app.MapGet("/modifier-groups", async (IModifierGroupService modifierGroupService, CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.ListAsync(cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/modifier-groups", async (
+            CreateModifierGroupRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapPost("/modifier-groups/{groupId:guid}/modifiers", async (
+            Guid groupId,
+            CreateItemModifierRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.AddModifierAsync(groupId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Weight/volume batches (B2a) ---
+        _ = app.MapGet("/items/{itemId:guid}/batches", async (
+            Guid itemId,
+            IItemBatchService itemBatchService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemBatchService.ListForItemAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/items/{itemId:guid}/batches", async (
+            Guid itemId,
+            CreateItemBatchRequest request,
+            IItemBatchService itemBatchService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemBatchService.ReceiveAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         return app;
     }
 }
