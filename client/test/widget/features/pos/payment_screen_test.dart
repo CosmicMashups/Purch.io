@@ -22,6 +22,7 @@ const _cartWithOneLine = Transaction(
       quantity: 2,
       unitPrice: 15,
       lineTotal: 30,
+      comboSelections: [],
     ),
   ],
   subtotal: 30,

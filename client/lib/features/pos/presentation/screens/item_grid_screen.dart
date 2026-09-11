@@ -6,11 +6,14 @@ import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'cart_screen.dart';
+import 'combo_customization_screen.dart';
+import 'variant_picker_screen.dart';
 
-/// D1 — the POS item grid. Only PricingType.unit items are addable directly;
-/// weight/volume, bundle, service, combo, and variant-matrix items need
-/// their own customization sheets (D2/D3, tingi entry, etc.) which aren't
-/// built yet, so tapping one just explains that instead of guessing a price.
+/// D1 — the POS item grid. PricingType.unit items are addable directly;
+/// PricingType.combo (D2) and PricingType.variantMatrix (D3) items open
+/// their own customization sheet. Weight/volume, bundle, and service items
+/// still need their own entry flow (tingi entry, etc.), so tapping one just
+/// explains that instead of guessing a price.
 class ItemGridScreen extends ConsumerWidget {
   const ItemGridScreen({super.key});
 
@@ -60,12 +63,33 @@ class ItemGridScreen extends ConsumerWidget {
             itemCount: activeItems.length,
             itemBuilder: (context, index) {
               final item = activeItems[index];
-              final isSellableHere = item.pricingType == PricingType.unit;
+              final isDirectlySellable = item.pricingType == PricingType.unit;
+              final needsCustomization =
+                  item.pricingType == PricingType.combo ||
+                  item.pricingType == PricingType.variantMatrix;
 
               return Card(
                 child: InkWell(
                   onTap: () async {
-                    if (!isSellableHere) {
+                    if (item.pricingType == PricingType.variantMatrix) {
+                      await Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => VariantPickerScreen(item: item),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (item.pricingType == PricingType.combo) {
+                      await Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => ComboCustomizationScreen(item: item),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (!isDirectlySellable) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -94,7 +118,7 @@ class ItemGridScreen extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          isSellableHere
+                          isDirectlySellable || needsCustomization
                               ? Icons.inventory_2
                               : Icons.inventory_2_outlined,
                           size: 32,

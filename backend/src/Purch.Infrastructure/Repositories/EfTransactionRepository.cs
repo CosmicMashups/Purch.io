@@ -31,6 +31,13 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
         return dbContext.TransactionLines.FirstOrDefaultAsync(line => line.Id == lineId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.TransactionLineComboSelections
+            .Where(selection => selection.TransactionLineId == lineId)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(Transaction transaction)
     {
         _ = dbContext.Transactions.Add(transaction);
@@ -44,5 +51,10 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
     public void RemoveLine(TransactionLine line)
     {
         _ = dbContext.TransactionLines.Remove(line);
+    }
+
+    public void AddComboSelection(TransactionLineComboSelection selection)
+    {
+        _ = dbContext.TransactionLineComboSelections.Add(selection);
     }
 }

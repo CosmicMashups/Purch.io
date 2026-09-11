@@ -17,6 +17,7 @@ public sealed class TransactionService(
     IReceiptSequenceRepository receiptSequenceRepository,
     IItemRepository itemRepository,
     IItemVariantRepository itemVariantRepository,
+    IItemComboComponentRepository comboComponentRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
@@ -53,7 +54,47 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(request.ItemId), "This item is not active.");
         }
 
-        var unitPrice = item.BasePrice;
+        if (item.PricingType == PricingType.VariantMatrix && request.ItemVariantId is null)
+        {
+            throw new ValidationException(nameof(request.ItemVariantId), "This item requires choosing a variant.");
+        }
+
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+
+        if (item.PricingType == PricingType.Combo)
+        {
+            var (unitPrice, selections) = await ResolveComboSelectionsAsync(item, request.ComboSelections, cancellationToken);
+
+            var line = new TransactionLine
+            {
+                TenantId = CurrentTenantId,
+                TransactionId = cart.Id,
+                ItemId = request.ItemId,
+                ItemVariantId = null,
+                Quantity = request.Quantity,
+                UnitPrice = unitPrice,
+                LineTotal = unitPrice * request.Quantity,
+            };
+            transactionRepository.AddLine(line);
+
+            foreach (var selection in selections)
+            {
+                transactionRepository.AddComboSelection(new TransactionLineComboSelection
+                {
+                    TenantId = CurrentTenantId,
+                    TransactionLineId = line.Id,
+                    ItemComboComponentId = selection.SlotId,
+                    SelectedItemId = selection.SelectedItemId,
+                });
+            }
+
+            await RecalculateTotalAsync(cart, cancellationToken);
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return await ToDtoAsync(cart, cancellationToken);
+        }
+
+        var resolvedUnitPrice = item.BasePrice;
 
         if (request.ItemVariantId is { } variantId)
         {
@@ -65,10 +106,9 @@ public sealed class TransactionService(
                 throw new ValidationException(nameof(request.ItemVariantId), "This variant does not belong to the specified item.");
             }
 
-            unitPrice = variant.PriceOverride ?? item.BasePrice;
+            resolvedUnitPrice = variant.PriceOverride ?? item.BasePrice;
         }
 
-        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
         var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
 
         var existingLine = lines.FirstOrDefault(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId);
@@ -86,8 +126,8 @@ public sealed class TransactionService(
                 ItemId = request.ItemId,
                 ItemVariantId = request.ItemVariantId,
                 Quantity = request.Quantity,
-                UnitPrice = unitPrice,
-                LineTotal = unitPrice * request.Quantity,
+                UnitPrice = resolvedUnitPrice,
+                LineTotal = resolvedUnitPrice * request.Quantity,
             });
         }
 
@@ -95,6 +135,57 @@ public sealed class TransactionService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    /// <summary>Validates that every combo slot got exactly its required number of
+    /// selections, each a real, active item from that slot's category, and prices
+    /// the line as the combo's base price plus every selected slot's upcharge (if
+    /// any) — the domain model prices a slot's substitution as a flat amount, not
+    /// per specific component, so any pick within a paid slot costs the same.</summary>
+    private async Task<(decimal UnitPrice, IReadOnlyList<ComboSelectionRequest> Selections)> ResolveComboSelectionsAsync(
+        Item item,
+        IReadOnlyList<ComboSelectionRequest>? requestedSelections,
+        CancellationToken cancellationToken)
+    {
+        var slots = await comboComponentRepository.ListByItemAsync(item.Id, cancellationToken);
+        if (slots.Count == 0)
+        {
+            throw new ValidationException(nameof(item.Id), "This combo has no configured slots yet.");
+        }
+
+        var selections = requestedSelections ?? [];
+        var slotIds = slots.Select(slot => slot.Id).ToHashSet();
+        if (selections.Any(selection => !slotIds.Contains(selection.SlotId)))
+        {
+            throw new ValidationException(nameof(AddTransactionLineRequest.ComboSelections), "One of the selections doesn't belong to this combo.");
+        }
+
+        foreach (var slot in slots)
+        {
+            var slotSelections = selections.Where(selection => selection.SlotId == slot.Id).ToList();
+            if (slotSelections.Count != slot.Quantity)
+            {
+                throw new ValidationException(
+                    nameof(AddTransactionLineRequest.ComboSelections),
+                    $"Choose {slot.Quantity} item(s) for \"{slot.SlotLabel}\".");
+            }
+
+            foreach (var selection in slotSelections)
+            {
+                var selectedItem = await itemRepository.GetByIdAsync(selection.SelectedItemId, cancellationToken)
+                    ?? throw new NotFoundException("Item", selection.SelectedItemId);
+
+                if (!selectedItem.IsActive || selectedItem.CategoryId != slot.ComponentCategoryId)
+                {
+                    throw new ValidationException(
+                        nameof(AddTransactionLineRequest.ComboSelections),
+                        $"\"{selectedItem.Name}\" isn't a valid choice for \"{slot.SlotLabel}\".");
+                }
+            }
+        }
+
+        var unitPrice = item.BasePrice + slots.Sum(slot => slot.SubstitutionUpchargeAmount ?? 0m);
+        return (unitPrice, selections);
     }
 
     public async Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default)
@@ -262,6 +353,25 @@ public sealed class TransactionService(
         foreach (var line in lines)
         {
             var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken);
+
+            var comboSelectionDtos = new List<ComboSelectionDto>();
+            if (item?.PricingType == PricingType.Combo)
+            {
+                var slots = await comboComponentRepository.ListByItemAsync(line.ItemId, cancellationToken);
+                var selections = await transactionRepository.ListComboSelectionsAsync(line.Id, cancellationToken);
+
+                foreach (var selection in selections)
+                {
+                    var slot = slots.FirstOrDefault(s => s.Id == selection.ItemComboComponentId);
+                    var selectedItem = await itemRepository.GetByIdAsync(selection.SelectedItemId, cancellationToken);
+                    comboSelectionDtos.Add(new ComboSelectionDto(
+                        selection.ItemComboComponentId,
+                        slot?.SlotLabel ?? "(removed slot)",
+                        selection.SelectedItemId,
+                        selectedItem?.Name ?? "(deleted item)"));
+                }
+            }
+
             lineDtos.Add(new TransactionLineDto(
                 line.Id,
                 line.ItemId,
@@ -269,7 +379,8 @@ public sealed class TransactionService(
                 line.ItemVariantId,
                 line.Quantity,
                 line.UnitPrice,
-                line.LineTotal));
+                line.LineTotal,
+                comboSelectionDtos));
         }
 
         var subtotal = lineDtos.Sum(line => line.LineTotal);

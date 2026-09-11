@@ -24,6 +24,7 @@ const _completedCart = Transaction(
       quantity: 1,
       unitPrice: 15,
       lineTotal: 15,
+      comboSelections: [],
     ),
   ],
   subtotal: 15,

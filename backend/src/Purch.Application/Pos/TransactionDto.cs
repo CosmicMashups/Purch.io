@@ -22,4 +22,13 @@ public sealed record TransactionLineDto(
     Guid? ItemVariantId,
     decimal Quantity,
     decimal UnitPrice,
-    decimal LineTotal);
+    decimal LineTotal,
+    IReadOnlyList<ComboSelectionDto> ComboSelections);
+
+/// <summary>Mirrors Purch.Domain.Entities.TransactionLineComboSelection, resolved to
+/// readable slot/item names for receipt display.</summary>
+public sealed record ComboSelectionDto(
+    Guid SlotId,
+    string SlotLabel,
+    Guid SelectedItemId,
+    string SelectedItemName);

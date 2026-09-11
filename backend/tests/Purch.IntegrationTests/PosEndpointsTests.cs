@@ -356,6 +356,154 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(40m, cart.TotalAmount);
     }
 
+    [Fact]
+    public async Task Adding_a_variant_matrix_item_without_a_variant_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("T-Shirt", null, null, null, 200m, null, PricingType.VariantMatrix));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Adding_a_variant_matrix_item_with_a_variant_prices_off_the_override()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("T-Shirt", null, null, null, 200m, null, PricingType.VariantMatrix));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var variantResponse = await client.PostAsJsonAsync(
+            $"/items/{item!.Id}/variants",
+            new CreateItemVariantRequest(new Dictionary<string, string> { ["size"] = "L" }, null, 220m, null));
+        var variant = await variantResponse.Content.ReadFromJsonAsync<ItemVariantDto>(JsonOptions);
+
+        var addResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item.Id, variant!.Id, 1m));
+        var cart = await addResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        var line = Assert.Single(cart!.Lines);
+        Assert.Equal(220m, line.UnitPrice);
+        Assert.Equal(220m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Adding_a_combo_with_a_full_set_of_selections_prices_it_including_slot_upcharges()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var drinksResponse = await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Drinks", 1));
+        var drinks = await drinksResponse.Content.ReadFromJsonAsync<CategoryDto>(JsonOptions);
+
+        var sodaResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Soda", null, null, drinks!.Id, 25m, null, PricingType.Unit));
+        var soda = await sodaResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var comboResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Value Meal", null, null, null, 150m, null, PricingType.Combo));
+        var combo = await comboResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var slotResponse = await client.PostAsJsonAsync(
+            $"/items/{combo!.Id}/combo-components",
+            new CreateItemComboComponentRequest(drinks.Id, "Choose a Drink", 1, 10m));
+        var slot = await slotResponse.Content.ReadFromJsonAsync<ItemComboComponentDto>(JsonOptions);
+
+        var addResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(
+                combo.Id,
+                null,
+                1m,
+                [new ComboSelectionRequest(slot!.Id, soda!.Id)]));
+        var cart = await addResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        var line = Assert.Single(cart!.Lines);
+        Assert.Equal(160m, line.UnitPrice);
+        Assert.Equal(160m, cart.TotalAmount);
+        var selection = Assert.Single(line.ComboSelections);
+        Assert.Equal("Choose a Drink", selection.SlotLabel);
+        Assert.Equal("Soda", selection.SelectedItemName);
+    }
+
+    [Fact]
+    public async Task Adding_a_combo_missing_a_slot_selection_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var drinksResponse = await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Drinks", 1));
+        var drinks = await drinksResponse.Content.ReadFromJsonAsync<CategoryDto>(JsonOptions);
+
+        var comboResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Value Meal", null, null, null, 150m, null, PricingType.Combo));
+        var combo = await comboResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            $"/items/{combo!.Id}/combo-components",
+            new CreateItemComboComponentRequest(drinks!.Id, "Choose a Drink", 1, null));
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(combo.Id, null, 1m, []));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Adding_a_combo_with_a_selection_from_the_wrong_category_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var drinksResponse = await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Drinks", 1));
+        var drinks = await drinksResponse.Content.ReadFromJsonAsync<CategoryDto>(JsonOptions);
+
+        var snacksResponse = await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Snacks", 2));
+        var snacks = await snacksResponse.Content.ReadFromJsonAsync<CategoryDto>(JsonOptions);
+
+        var chipsResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Chips", null, null, snacks!.Id, 30m, null, PricingType.Unit));
+        var chips = await chipsResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var comboResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Value Meal", null, null, null, 150m, null, PricingType.Combo));
+        var combo = await comboResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var slotResponse = await client.PostAsJsonAsync(
+            $"/items/{combo!.Id}/combo-components",
+            new CreateItemComboComponentRequest(drinks!.Id, "Choose a Drink", 1, null));
+        var slot = await slotResponse.Content.ReadFromJsonAsync<ItemComboComponentDto>(JsonOptions);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(
+                combo.Id,
+                null,
+                1m,
+                [new ComboSelectionRequest(slot!.Id, chips!.Id)]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
     {
         var client = factory.CreateClient();

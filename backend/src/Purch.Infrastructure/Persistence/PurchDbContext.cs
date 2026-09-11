@@ -59,6 +59,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<TransactionLine> TransactionLines => Set<TransactionLine>();
 
+    public DbSet<TransactionLineComboSelection> TransactionLineComboSelections => Set<TransactionLineComboSelection>();
+
     public DbSet<Payment> Payments => Set<Payment>();
 
     public DbSet<PaymentGatewayTransaction> PaymentGatewayTransactions => Set<PaymentGatewayTransaction>();

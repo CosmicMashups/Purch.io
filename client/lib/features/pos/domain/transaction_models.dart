@@ -114,6 +114,7 @@ class TransactionLine {
     required this.quantity,
     required this.unitPrice,
     required this.lineTotal,
+    required this.comboSelections,
   });
 
   factory TransactionLine.fromJson(Map<String, dynamic> json) {
@@ -125,6 +126,11 @@ class TransactionLine {
       quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unitPrice'] as num).toDouble(),
       lineTotal: (json['lineTotal'] as num).toDouble(),
+      comboSelections:
+          (json['comboSelections'] as List<dynamic>)
+              .cast<Map<String, dynamic>>()
+              .map(TransactionLineComboSelection.fromJson)
+              .toList(),
     );
   }
 
@@ -135,26 +141,72 @@ class TransactionLine {
   final double quantity;
   final double unitPrice;
   final double lineTotal;
+  final List<TransactionLineComboSelection> comboSelections;
 }
 
-/// Mirrors Purch.Application.Pos.AddTransactionLineRequest. Only
-/// PricingType.unit items are addable from the item grid so far — combo/
-/// variant customization sheets (D2/D3) aren't built yet.
+/// Mirrors Purch.Application.Pos.ComboSelectionDto — a resolved slot/item pick
+/// on a Combo line, shown on the cart/receipt so the cashier and customer can
+/// see what was actually picked.
+class TransactionLineComboSelection {
+  const TransactionLineComboSelection({
+    required this.slotId,
+    required this.slotLabel,
+    required this.selectedItemId,
+    required this.selectedItemName,
+  });
+
+  factory TransactionLineComboSelection.fromJson(Map<String, dynamic> json) {
+    return TransactionLineComboSelection(
+      slotId: json['slotId'] as String,
+      slotLabel: json['slotLabel'] as String,
+      selectedItemId: json['selectedItemId'] as String,
+      selectedItemName: json['selectedItemName'] as String,
+    );
+  }
+
+  final String slotId;
+  final String slotLabel;
+  final String selectedItemId;
+  final String selectedItemName;
+}
+
+/// Mirrors Purch.Application.Pos.AddTransactionLineRequest.
 class AddTransactionLineRequest {
   const AddTransactionLineRequest({
     required this.itemId,
     this.itemVariantId,
     required this.quantity,
+    this.comboSelections,
   });
 
   final String itemId;
   final String? itemVariantId;
   final double quantity;
+  final List<ComboSelectionRequest>? comboSelections;
 
   Map<String, dynamic> toJson() => {
     'itemId': itemId,
     'itemVariantId': itemVariantId,
     'quantity': quantity,
+    'comboSelections': comboSelections?.map((s) => s.toJson()).toList(),
+  };
+}
+
+/// Mirrors Purch.Application.Pos.ComboSelectionRequest — one picked component
+/// for a Combo item's slot. A slot requiring N items needs N of these
+/// carrying the same slotId.
+class ComboSelectionRequest {
+  const ComboSelectionRequest({
+    required this.slotId,
+    required this.selectedItemId,
+  });
+
+  final String slotId;
+  final String selectedItemId;
+
+  Map<String, dynamic> toJson() => {
+    'slotId': slotId,
+    'selectedItemId': selectedItemId,
   };
 }
 

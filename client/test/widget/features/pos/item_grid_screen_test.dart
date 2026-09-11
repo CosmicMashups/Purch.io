@@ -30,6 +30,44 @@ const _water = Item(
   departmentId: null,
 );
 
+const _tShirt = Item(
+  id: 'item-3',
+  name: 'T-Shirt',
+  sku: null,
+  barcode: null,
+  categoryId: null,
+  basePrice: 200,
+  imageUrl: null,
+  pricingType: PricingType.variantMatrix,
+  stockOnHand: 0,
+  isActive: true,
+  tingiMode: TingiMode.none,
+  packagedSize: null,
+  tingiIncrementStep: null,
+  tingiAllowedSizes: [],
+  serviceDurationMinutes: null,
+  departmentId: null,
+);
+
+const _valueMeal = Item(
+  id: 'item-4',
+  name: 'Value Meal',
+  sku: null,
+  barcode: null,
+  categoryId: null,
+  basePrice: 150,
+  imageUrl: null,
+  pricingType: PricingType.combo,
+  stockOnHand: 0,
+  isActive: true,
+  tingiMode: TingiMode.none,
+  packagedSize: null,
+  tingiIncrementStep: null,
+  tingiAllowedSizes: [],
+  serviceDurationMinutes: null,
+  departmentId: null,
+);
+
 const _riceSack = Item(
   id: 'item-2',
   name: 'Rice (Sack)',
@@ -100,5 +138,39 @@ void main() {
 
     expect(posRepository.cart.lines, isEmpty);
     expect(find.textContaining('needs a customization step'), findsOneWidget);
+  });
+
+  testWidgets('tapping a variant-matrix item opens the variant picker', (
+    tester,
+  ) async {
+    final catalogRepository = FakeCatalogRepository(initialItems: [_tShirt]);
+    final posRepository = FakePosRepository();
+    await tester.pumpWidget(_wrap(catalogRepository, posRepository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('T-Shirt'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No variants have been configured for this item yet.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tapping a combo item opens the combo customization screen', (
+    tester,
+  ) async {
+    final catalogRepository = FakeCatalogRepository(initialItems: [_valueMeal]);
+    final posRepository = FakePosRepository();
+    await tester.pumpWidget(_wrap(catalogRepository, posRepository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Value Meal'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No slots have been configured for this combo yet.'),
+      findsOneWidget,
+    );
   });
 }

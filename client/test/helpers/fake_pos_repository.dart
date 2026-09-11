@@ -38,21 +38,28 @@ class FakePosRepository implements PosRepository {
   int voidCallCount = 0;
   int nextReceiptNumber = 1;
   RecordPaymentRequest? lastRecordPaymentRequest;
+  AddTransactionLineRequest? lastAddLineRequest;
 
   @override
   Future<Transaction> getOrCreateOpenCart() async => cart;
 
   @override
   Future<Transaction> addLine(AddTransactionLineRequest request) async {
+    lastAddLineRequest = request;
     if (addLineFailure != null) {
       throw addLineFailure!;
     }
-    final existingIndex = cart.lines.indexWhere(
-      (line) =>
-          line.itemId == request.itemId &&
-          line.itemVariantId == request.itemVariantId,
-    );
+
     final lines = [...cart.lines];
+    final isCombo = request.comboSelections != null;
+    final existingIndex =
+        isCombo
+            ? -1
+            : lines.indexWhere(
+              (line) =>
+                  line.itemId == request.itemId &&
+                  line.itemVariantId == request.itemVariantId,
+            );
     if (existingIndex >= 0) {
       final existing = lines[existingIndex];
       final newQuantity = existing.quantity + request.quantity;
@@ -64,6 +71,7 @@ class FakePosRepository implements PosRepository {
         quantity: newQuantity,
         unitPrice: existing.unitPrice,
         lineTotal: existing.unitPrice * newQuantity,
+        comboSelections: existing.comboSelections,
       );
     } else {
       lines.add(
@@ -75,6 +83,18 @@ class FakePosRepository implements PosRepository {
           quantity: request.quantity,
           unitPrice: 10,
           lineTotal: 10 * request.quantity,
+          comboSelections:
+              request.comboSelections
+                  ?.map(
+                    (selection) => TransactionLineComboSelection(
+                      slotId: selection.slotId,
+                      slotLabel: 'Slot ${selection.slotId}',
+                      selectedItemId: selection.selectedItemId,
+                      selectedItemName: 'Item ${selection.selectedItemId}',
+                    ),
+                  )
+                  .toList() ??
+              const [],
         ),
       );
     }
@@ -103,6 +123,7 @@ class FakePosRepository implements PosRepository {
             quantity: request.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.unitPrice * request.quantity,
+            comboSelections: line.comboSelections,
           );
         }).toList();
     cart = _withLines(lines);

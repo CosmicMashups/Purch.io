@@ -13,9 +13,13 @@ public interface ITransactionRepository
 
     Task<TransactionLine?> GetLineAsync(Guid lineId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
+
     void Add(Transaction transaction);
 
     void AddLine(TransactionLine line);
 
     void RemoveLine(TransactionLine line);
+
+    void AddComboSelection(TransactionLineComboSelection selection);
 }
