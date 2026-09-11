@@ -15,6 +15,12 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
 
+    /// <summary>Completed sales on this device with ReceiptNumber greater than the given number, ordered ascending — the range a Z/X-reading covers.</summary>
+    Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default);
+
+    /// <summary>Voided carts on this device since the given time — voided carts never get a receipt number, so they can't be selected by range.</summary>
+    Task<IReadOnlyList<Transaction>> ListVoidedByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
+
     void Add(Transaction transaction);
 
     void AddLine(TransactionLine line);

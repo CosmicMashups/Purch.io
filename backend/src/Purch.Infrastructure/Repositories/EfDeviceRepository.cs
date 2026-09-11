@@ -14,6 +14,11 @@ public sealed class EfDeviceRepository(PurchDbContext dbContext) : IDeviceReposi
             .FirstOrDefaultAsync(device => device.PairingCode == pairingCode, cancellationToken);
     }
 
+    public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Devices.FirstOrDefaultAsync(device => device.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Devices

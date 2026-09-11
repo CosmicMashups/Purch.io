@@ -11,4 +11,7 @@ public class Device : TenantScopedEntity
     public string? DeviceIdentifier { get; set; }
 
     public DateTimeOffset? LastSeenAt { get; set; }
+
+    /// <summary>BIR accreditation's Machine Identification Number for this terminal — admin-entered once the unit is accredited; falls back to a device-ID-derived placeholder until then (see BirReadingService).</summary>
+    public string? MachineIdentificationNumber { get; set; }
 }

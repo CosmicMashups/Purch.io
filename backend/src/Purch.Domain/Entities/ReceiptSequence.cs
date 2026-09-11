@@ -14,4 +14,15 @@ public class ReceiptSequence : TenantScopedEntity
     public Guid DeviceId { get; set; }
 
     public long LastIssuedNumber { get; set; }
+
+    /// <summary>BIR Z-reading's "Grand Accumulated Sales" — ever-increasing, never reset, across this device's whole lifetime.</summary>
+    public decimal GrandAccumulatedSales { get; set; }
+
+    /// <summary>BIR Z-reading's "Reset Counter" — increments once per Z-reading run on this device.</summary>
+    public int ZReadingResetCounter { get; set; }
+
+    /// <summary>The highest ReceiptNumber covered by the last Z-reading — the next one starts right after.</summary>
+    public long LastZReadingReceiptNumber { get; set; }
+
+    public DateTimeOffset? LastZReadingAt { get; set; }
 }

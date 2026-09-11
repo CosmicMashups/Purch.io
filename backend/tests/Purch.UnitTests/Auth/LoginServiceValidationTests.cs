@@ -34,6 +34,11 @@ public sealed class LoginServiceValidationTests
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
 
+        public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
         public Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");

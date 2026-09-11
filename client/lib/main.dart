@@ -11,6 +11,7 @@ import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
 import 'features/onboarding/presentation/screens/staff_list_screen.dart';
 import 'features/onboarding/presentation/screens/tenant_settings_screen.dart';
+import 'features/pos/presentation/screens/bir_reading_screen.dart';
 import 'features/pos/presentation/screens/item_grid_screen.dart';
 import 'features/pos/presentation/screens/promo_code_list_screen.dart';
 import 'features/pos/presentation/screens/shift_screen.dart';
@@ -105,6 +106,16 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('Promo Codes'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const BirReadingScreen(),
+                      ),
+                    ),
+                child: const Text('X / Z Reading'),
               ),
               const SizedBox(height: 16),
               FilledButton(
