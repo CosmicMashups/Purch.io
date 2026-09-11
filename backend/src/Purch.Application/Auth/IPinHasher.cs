@@ -1,4 +1,4 @@
-namespace Purch.Infrastructure.Auth;
+namespace Purch.Application.Auth;
 
 public interface IPinHasher
 {

@@ -1,3 +1,5 @@
+using Purch.Application.Auth;
+
 namespace Purch.Infrastructure.Auth;
 
 public sealed class BCryptPinHasher : IPinHasher

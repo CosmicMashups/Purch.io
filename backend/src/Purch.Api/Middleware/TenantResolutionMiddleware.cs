@@ -1,4 +1,4 @@
-using Purch.Infrastructure.Auth;
+using Purch.Application.Auth;
 
 namespace Purch.Api.Middleware;
 

@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\Purch.Domain\Purch.Domain.csproj" />
     <ProjectReference Include="..\..\src\Purch.Application\Purch.Application.csproj" />
     <ProjectReference Include="..\Purch.Common.TestUtilities\Purch.Common.TestUtilities.csproj" />
+    <ProjectReference Include="..\..\src\Purch.Api\Purch.Api.csproj" />
   </ItemGroup>
 
 </Project>

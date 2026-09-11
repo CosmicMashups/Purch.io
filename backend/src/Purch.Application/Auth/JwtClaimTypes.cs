@@ -1,4 +1,4 @@
-namespace Purch.Infrastructure.Auth;
+namespace Purch.Application.Auth;
 
 /// <summary>Custom claim names embedded in the JWT — read by TenantResolutionMiddleware and RBAC filters.</summary>
 public static class JwtClaimTypes
