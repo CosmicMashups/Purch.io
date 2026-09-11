@@ -11,6 +11,8 @@ public sealed record TransactionDto(
     decimal Subtotal,
     decimal DiscountAmount,
     bool SeniorPwdDiscountApplied,
+    string? PromoCode,
+    decimal PromoDiscountAmount,
     decimal TotalAmount,
     long? ReceiptNumber,
     IReadOnlyList<PaymentDto> Payments);

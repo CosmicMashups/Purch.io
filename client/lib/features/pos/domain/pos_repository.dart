@@ -19,5 +19,7 @@ abstract class PosRepository {
     ApplySeniorPwdDiscountRequest request,
   );
 
+  Future<Transaction> applyPromoCode(ApplyPromoCodeRequest request);
+
   Future<Transaction> recordPayment(RecordPaymentRequest request);
 }

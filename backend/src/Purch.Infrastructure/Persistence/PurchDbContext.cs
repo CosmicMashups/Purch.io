@@ -71,6 +71,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<Shift> Shifts => Set<Shift>();
 
+    public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
+
     public DbSet<TenantMetering> TenantMeterings => Set<TenantMetering>();
 
     public DbSet<SyncedRecord> SyncedRecords => Set<SyncedRecord>();

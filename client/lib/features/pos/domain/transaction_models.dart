@@ -15,6 +15,8 @@ class Transaction {
     required this.subtotal,
     required this.discountAmount,
     required this.seniorPwdDiscountApplied,
+    required this.promoCode,
+    required this.promoDiscountAmount,
     required this.totalAmount,
     required this.receiptNumber,
     required this.payments,
@@ -34,6 +36,8 @@ class Transaction {
       subtotal: (json['subtotal'] as num).toDouble(),
       discountAmount: (json['discountAmount'] as num).toDouble(),
       seniorPwdDiscountApplied: json['seniorPwdDiscountApplied'] as bool,
+      promoCode: json['promoCode'] as String?,
+      promoDiscountAmount: (json['promoDiscountAmount'] as num).toDouble(),
       totalAmount: (json['totalAmount'] as num).toDouble(),
       receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
       payments:
@@ -52,6 +56,8 @@ class Transaction {
   final double subtotal;
   final double discountAmount;
   final bool seniorPwdDiscountApplied;
+  final String? promoCode;
+  final double promoDiscountAmount;
   final double totalAmount;
   final int? receiptNumber;
   final List<Payment> payments;
@@ -228,4 +234,14 @@ class ApplySeniorPwdDiscountRequest {
   final bool apply;
 
   Map<String, dynamic> toJson() => {'apply': apply};
+}
+
+/// Mirrors Purch.Application.Pos.ApplyPromoCodeRequest. A null/blank code
+/// clears whatever promo is currently applied.
+class ApplyPromoCodeRequest {
+  const ApplyPromoCodeRequest({this.code});
+
+  final String? code;
+
+  Map<String, dynamic> toJson() => {'code': code};
 }

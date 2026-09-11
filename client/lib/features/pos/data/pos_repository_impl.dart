@@ -58,6 +58,15 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<Transaction> applyPromoCode(ApplyPromoCodeRequest request) {
+    return _put(
+      '/transactions/cart/promo-code',
+      request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
+  @override
   Future<Transaction> recordPayment(RecordPaymentRequest request) {
     return _post(
       '/transactions/cart/payments',

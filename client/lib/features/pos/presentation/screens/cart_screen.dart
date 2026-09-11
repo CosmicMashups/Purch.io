@@ -6,10 +6,22 @@ import '../providers/pos_providers.dart';
 import 'payment_screen.dart';
 
 /// D1's cart review — quantity adjustment and line removal, plus a way into
-/// D5's payment method tabs. Discount auto-recalculation and promo codes
-/// aren't modeled yet.
-class CartScreen extends ConsumerWidget {
+/// D5's payment method tabs. Also D4's Senior/PWD toggle and promo code entry.
+class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
+
+  @override
+  ConsumerState<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends ConsumerState<CartScreen> {
+  final _promoCodeController = TextEditingController();
+
+  @override
+  void dispose() {
+    _promoCodeController.dispose();
+    super.dispose();
+  }
 
   Future<void> _confirmVoid(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
@@ -39,7 +51,7 @@ class CartScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final cartAsync = ref.watch(cartNotifierProvider);
     final failure = ref.read(cartNotifierProvider.notifier).currentFailure;
 
@@ -102,6 +114,57 @@ class CartScreen extends ConsumerWidget {
                 subtitle: const Text(
                   'Only apply after verifying the customer\'s physical ID.',
                 ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child:
+                    cart.promoCode == null
+                        ? Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _promoCodeController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Promo code',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                textCapitalization:
+                                    TextCapitalization.characters,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed:
+                                  () => ref
+                                      .read(cartNotifierProvider.notifier)
+                                      .applyPromoCode(
+                                        _promoCodeController.text.trim(),
+                                      ),
+                              child: const Text('Apply'),
+                            ),
+                          ],
+                        )
+                        : Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Promo code "${cart.promoCode}" applied',
+                              ),
+                            ),
+                            TextButton(
+                              onPressed:
+                                  () => ref
+                                      .read(cartNotifierProvider.notifier)
+                                      .applyPromoCode(null),
+                              child: const Text('Remove'),
+                            ),
+                          ],
+                        ),
               ),
               const Divider(height: 1),
               Padding(

@@ -22,6 +22,13 @@ public class Transaction : TenantScopedEntity
 
     public bool SeniorPwdDiscountApplied { get; set; }
 
+    /// <summary>The applied PromoCode.Code, or null if none — re-resolved against
+    /// PromoCode on every recalculation rather than caching the discount rule.</summary>
+    public string? PromoCode { get; set; }
+
+    /// <summary>Just the promo-code portion of DiscountAmount, for receipt breakdown.</summary>
+    public decimal PromoDiscountAmount { get; set; }
+
     public string? OrderType { get; set; }
 
     /// <summary>Kiosk-originated orders are prep-only — set true, payment always finalized at cashier POS.</summary>

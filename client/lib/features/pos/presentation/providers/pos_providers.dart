@@ -60,6 +60,12 @@ class CartNotifier extends _$CartNotifier {
     ),
   );
 
+  /// Applies (or, with a null code, clears) a cart-level promo code.
+  Future<bool> applyPromoCode(String? code) => _mutate(
+    (repository) =>
+        repository.applyPromoCode(ApplyPromoCodeRequest(code: code)),
+  );
+
   /// Records a full payment. On success the cart moves to Completed with its
   /// receipt number — the caller shows that as a receipt before calling
   /// [startNewSale] to fetch the fresh cart that replaces it.

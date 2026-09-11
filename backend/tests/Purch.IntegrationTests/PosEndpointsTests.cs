@@ -6,6 +6,7 @@ using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Promotions;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -502,6 +503,127 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
                 [new ComboSelectionRequest(slot!.Id, chips!.Id)]));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Applying_a_percentage_promo_code_discounts_the_subtotal()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        _ = await client.PostAsJsonAsync(
+            "/promo-codes",
+            new CreatePromoCodeRequest("SAVE10", PromoDiscountType.Percentage, 10m, null));
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Notebook", null, null, null, 100m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("save10"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal("SAVE10", cart!.PromoCode);
+        Assert.Equal(10m, cart.PromoDiscountAmount);
+        Assert.Equal(10m, cart.DiscountAmount);
+        Assert.Equal(90m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Applying_a_fixed_amount_promo_code_is_capped_at_the_subtotal()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        _ = await client.PostAsJsonAsync(
+            "/promo-codes",
+            new CreatePromoCodeRequest("BIG50", PromoDiscountType.FixedAmount, 50m, null));
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Pencil", null, null, null, 20m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("BIG50"));
+        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(20m, cart!.PromoDiscountAmount);
+        Assert.Equal(0m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Applying_an_unknown_promo_code_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("NOPE"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Clearing_a_promo_code_restores_the_full_total()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        _ = await client.PostAsJsonAsync(
+            "/promo-codes",
+            new CreatePromoCodeRequest("SAVE10", PromoDiscountType.Percentage, 10m, null));
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Notebook", null, null, null, 100m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+        _ = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10"));
+
+        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest(null));
+        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Null(cart!.PromoCode);
+        Assert.Equal(0m, cart.PromoDiscountAmount);
+        Assert.Equal(100m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task A_promo_code_and_the_senior_pwd_discount_stack()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        _ = await client.PostAsJsonAsync(
+            "/promo-codes",
+            new CreatePromoCodeRequest("SAVE10", PromoDiscountType.Percentage, 10m, null));
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Notebook", null, null, null, 100m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+        _ = await client.PutAsJsonAsync(
+            "/transactions/cart/senior-pwd-discount",
+            new ApplySeniorPwdDiscountRequest(true));
+
+        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10"));
+        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        // 20 senior/PWD + 10 promo (10% of the 100 subtotal, not the post-senior-discount remainder).
+        Assert.Equal(10m, cart!.PromoDiscountAmount);
+        Assert.Equal(30m, cart.DiscountAmount);
+        Assert.Equal(70m, cart.TotalAmount);
     }
 
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)

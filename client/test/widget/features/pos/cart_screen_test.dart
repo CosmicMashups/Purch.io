@@ -27,6 +27,8 @@ const _cartWithOneLine = Transaction(
   subtotal: 30,
   discountAmount: 0,
   seniorPwdDiscountApplied: false,
+  promoCode: null,
+  promoDiscountAmount: 0,
   totalAmount: 30,
   receiptNumber: null,
   payments: [],
@@ -115,5 +117,41 @@ void main() {
     expect(repository.cart.seniorPwdDiscountApplied, isTrue);
     expect(find.text('₱-6.00'), findsOneWidget);
     expect(find.text('₱24.00'), findsOneWidget);
+  });
+
+  testWidgets(
+    'applying a promo code shows it as applied with a Remove action',
+    (tester) async {
+      final repository = FakePosRepository(initialCart: _cartWithOneLine);
+      await tester.pumpWidget(_wrap(repository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'SAVE10');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Apply'));
+      await tester.pumpAndSettle();
+
+      expect(repository.lastApplyPromoCodeRequest?.code, 'SAVE10');
+      expect(repository.cart.promoCode, 'SAVE10');
+      expect(find.text('Promo code "SAVE10" applied'), findsOneWidget);
+    },
+  );
+
+  testWidgets('removing an applied promo code clears it', (tester) async {
+    final repository = FakePosRepository(initialCart: _cartWithOneLine);
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'SAVE10');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Apply'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Remove'));
+    await tester.pumpAndSettle();
+
+    expect(repository.cart.promoCode, isNull);
+    expect(find.text('Promo code "SAVE10" applied'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Apply'), findsOneWidget);
   });
 }

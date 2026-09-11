@@ -1,6 +1,7 @@
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.Promotions;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
@@ -18,6 +19,7 @@ public sealed class TransactionService(
     IItemRepository itemRepository,
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
+    IPromoCodeRepository promoCodeRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
@@ -297,6 +299,33 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
+    public async Task<TransactionDto> ApplyPromoCodeAsync(ApplyPromoCodeRequest request, CancellationToken cancellationToken = default)
+    {
+        var deviceId = CurrentDeviceId;
+        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open cart", deviceId);
+
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            cart.PromoCode = null;
+        }
+        else
+        {
+            var promo = await promoCodeRepository.GetByCodeAsync(CurrentTenantId, request.Code.Trim(), cancellationToken);
+            if (promo is null || !promo.IsActive || (promo.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow))
+            {
+                throw new ValidationException(nameof(request.Code), "This promo code isn't valid.");
+            }
+
+            cart.PromoCode = promo.Code;
+        }
+
+        await RecalculateTotalAsync(cart, cancellationToken);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
     {
         var line = await transactionRepository.GetLineAsync(lineId, cancellationToken)
@@ -339,9 +368,31 @@ public sealed class TransactionService(
             .Where(line => line.Id != excludingLineId)
             .Sum(line => line.LineTotal);
 
-        transaction.DiscountAmount = transaction.SeniorPwdDiscountApplied
+        var seniorPwdAmount = transaction.SeniorPwdDiscountApplied
             ? Math.Round(subtotal * SeniorPwdDiscountRate, 2)
             : 0m;
+
+        var promoAmount = 0m;
+        if (!string.IsNullOrWhiteSpace(transaction.PromoCode))
+        {
+            var promo = await promoCodeRepository.GetByCodeAsync(CurrentTenantId, transaction.PromoCode, cancellationToken);
+            if (promo is null || !promo.IsActive || (promo.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow))
+            {
+                // The code became invalid/expired mid-cart — drop it rather than erroring on every line edit.
+                transaction.PromoCode = null;
+            }
+            else
+            {
+                var remainingAfterSenior = Math.Max(subtotal - seniorPwdAmount, 0m);
+                promoAmount = promo.DiscountType == PromoDiscountType.Percentage
+                    ? Math.Round(subtotal * promo.DiscountValue / 100m, 2)
+                    : promo.DiscountValue;
+                promoAmount = Math.Min(promoAmount, remainingAfterSenior);
+            }
+        }
+
+        transaction.PromoDiscountAmount = promoAmount;
+        transaction.DiscountAmount = seniorPwdAmount + promoAmount;
         transaction.TotalAmount = subtotal - transaction.DiscountAmount;
     }
 
@@ -399,6 +450,8 @@ public sealed class TransactionService(
             subtotal,
             transaction.DiscountAmount,
             transaction.SeniorPwdDiscountApplied,
+            transaction.PromoCode,
+            transaction.PromoDiscountAmount,
             transaction.TotalAmount,
             transaction.ReceiptNumber == 0 ? null : transaction.ReceiptNumber,
             paymentDtos);

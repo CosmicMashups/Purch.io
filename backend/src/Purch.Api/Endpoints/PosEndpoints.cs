@@ -58,6 +58,13 @@ public static class PosEndpoints
             Results.Ok(await transactionService.ApplySeniorPwdDiscountAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapPut("/transactions/cart/promo-code", async (
+            ApplyPromoCodeRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.ApplyPromoCodeAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         return app;
     }
 }
