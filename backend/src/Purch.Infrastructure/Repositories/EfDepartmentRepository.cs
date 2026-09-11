@@ -20,6 +20,14 @@ public sealed class EfDepartmentRepository(PurchDbContext dbContext) : IDepartme
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Department>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Departments
+            .AsNoTracking()
+            .Where(department => department.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(Department department)
     {
         _ = dbContext.Departments.Add(department);

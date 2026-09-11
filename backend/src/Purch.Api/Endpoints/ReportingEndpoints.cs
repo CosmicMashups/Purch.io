@@ -58,6 +58,16 @@ public static class ReportingEndpoints
             Results.Ok(await staffPerformanceService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        // --- B6 — department/concessionaire split sales-attribution report ---
+        _ = app.MapGet("/reports/department-sales", async (
+            Guid? branchId,
+            DateTimeOffset fromUtc,
+            DateTimeOffset toUtc,
+            IDepartmentSalesReportService departmentSalesReportService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await departmentSalesReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
         return app;
     }
 }

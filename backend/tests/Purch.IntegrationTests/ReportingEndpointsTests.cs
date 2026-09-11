@@ -213,6 +213,50 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(1, salesRow.TransactionCount);
     }
 
+    [Fact]
+    public async Task The_department_sales_report_splits_revenue_between_a_departments_items_and_general_items()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+        var departmentResponse = await client.PostAsJsonAsync(
+            $"/branches/{branchId}/departments",
+            new CreateDepartmentRequest("Concessionaire Stall", null));
+        var department = await departmentResponse.Content.ReadFromJsonAsync<DepartmentDto>(JsonOptions);
+
+        var departmentItemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Fishball", null, null, null, 20m, null, PricingType.Unit));
+        var departmentItem = await departmentItemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PutAsJsonAsync(
+            $"/items/{departmentItem!.Id}/department",
+            new UpdateItemDepartmentRequest(department!.Id));
+
+        var generalItemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Bottled Water", null, null, null, 15m, null, PricingType.Unit));
+        var generalItem = await generalItemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(departmentItem.Id, null, 1m));
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(generalItem!.Id, null, 1m));
+        _ = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 35m));
+
+        var fromUtc = DateTimeOffset.UtcNow.AddDays(-1);
+        var toUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var response = await client.GetAsync(
+            $"/reports/department-sales?from={Uri.EscapeDataString(fromUtc.ToString("O"))}&to={Uri.EscapeDataString(toUtc.ToString("O"))}");
+        var report = await response.Content.ReadFromJsonAsync<List<DepartmentSalesSummaryDto>>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, report!.Count);
+        var departmentRow = report.Single(row => row.DepartmentId == department.Id);
+        Assert.Equal(20m, departmentRow.Revenue);
+        var generalRow = report.Single(row => row.DepartmentId == null);
+        Assert.Equal(15m, generalRow.Revenue);
+    }
+
     private static async Task CompleteACashSaleAsync(HttpClient client, decimal price)
     {
         var itemResponse = await client.PostAsJsonAsync(

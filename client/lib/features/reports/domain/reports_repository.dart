@@ -1,3 +1,4 @@
+import 'department_sales_models.dart';
 import 'inventory_report_models.dart';
 import 'sales_dashboard_models.dart';
 import 'staff_performance_models.dart';
@@ -18,6 +19,13 @@ abstract class ReportsRepository {
   Future<String> getLowStockReorderCsv();
 
   Future<StaffPerformanceReport> getStaffPerformance({
+    String? branchId,
+    required DateTime from,
+    required DateTime to,
+  });
+
+  /// B6's split sales-attribution report.
+  Future<List<DepartmentSalesSummary>> getDepartmentSales({
     String? branchId,
     required DateTime from,
     required DateTime to,

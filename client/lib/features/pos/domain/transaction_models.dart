@@ -108,14 +108,20 @@ class Payment {
 /// Mirrors Purch.Application.Pos.RecordPaymentRequest. Only cash,
 /// bankTransfer, and manualGcashQr are accepted by the backend so far.
 class RecordPaymentRequest {
-  const RecordPaymentRequest({required this.method, this.amountTendered});
+  const RecordPaymentRequest({
+    required this.method,
+    this.amountTendered,
+    this.customerCreditLedgerId,
+  });
 
   final PaymentMethod method;
   final double? amountTendered;
+  final String? customerCreditLedgerId;
 
   Map<String, dynamic> toJson() => {
     'method': method.index,
     'amountTendered': amountTendered,
+    'customerCreditLedgerId': customerCreditLedgerId,
   };
 }
 

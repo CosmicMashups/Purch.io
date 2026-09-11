@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../credit_ledger/presentation/providers/credit_ledger_providers.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'receipt_screen.dart';
 
-/// D5's payment method tabs. Only cash, bank transfer, and manual GCash QR
-/// have a working checkout flow — the rest are listed but disabled with an
-/// explanation, since faking a confirmation for something that touches real
-/// money (a gateway webhook, a biller API, a credit ledger) would be worse
-/// than just saying it isn't ready yet.
+/// D5's payment method tabs. Cash, bank transfer, manual GCash QR, and
+/// Utang/Credit (Phase 9) have a working checkout flow — the rest are listed
+/// but disabled with an explanation, since faking a confirmation for
+/// something that touches real money (a gateway webhook, a biller API)
+/// would be worse than just saying it isn't ready yet.
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({super.key, required this.total});
 
@@ -22,6 +23,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   PaymentMethod? _selectedMethod;
+  String? _selectedLedgerId;
   final _tenderedController = TextEditingController();
 
   @override
@@ -52,6 +54,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       RecordPaymentRequest(
         method: method,
         amountTendered: method == PaymentMethod.cash ? _tendered : null,
+        customerCreditLedgerId:
+            method == PaymentMethod.utangCredit ? _selectedLedgerId : null,
       ),
     );
 
@@ -76,7 +80,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         !isLoading &&
         _selectedMethod != null &&
         (_selectedMethod != PaymentMethod.cash ||
-            (_change != null && _tendered != null));
+            (_change != null && _tendered != null)) &&
+        (_selectedMethod != PaymentMethod.utangCredit ||
+            _selectedLedgerId != null);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Payment')),
@@ -167,6 +173,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       'verified the payment landed in your account.',
                     ),
                   ],
+                  _MethodTile(
+                    method: PaymentMethod.utangCredit,
+                    label: 'Utang / Credit',
+                    icon: Icons.book,
+                    isSelected: _selectedMethod == PaymentMethod.utangCredit,
+                    isEnabled: !isLoading,
+                    onSelected:
+                        () => setState(
+                          () => _selectedMethod = PaymentMethod.utangCredit,
+                        ),
+                  ),
+                  if (_selectedMethod == PaymentMethod.utangCredit) ...[
+                    const SizedBox(height: 8),
+                    _CreditLedgerPicker(
+                      selectedLedgerId: _selectedLedgerId,
+                      isEnabled: !isLoading,
+                      onChanged: (id) => setState(() => _selectedLedgerId = id),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 8),
@@ -179,11 +204,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     label: 'Bill Payment / E-Load',
                     icon: Icons.receipt_long,
                     reason: 'needs the Dragonpay integration',
-                  ),
-                  _DisabledMethodTile(
-                    label: 'Utang / Credit',
-                    icon: Icons.book,
-                    reason: 'coming in a later phase',
                   ),
                   _DisabledMethodTile(
                     label: 'Split Payment',
@@ -254,6 +274,62 @@ class _MethodTile extends StatelessWidget {
         trailing: isSelected ? const Icon(Icons.check_circle) : null,
         onTap: isEnabled ? onSelected : null,
       ),
+    );
+  }
+}
+
+/// Picks which customer account a Utang/Credit sale is charged against —
+/// only accounts with enough remaining credit for a customer to actually
+/// use are worth surfacing here, but the backend is the source of truth on
+/// the exact limit check at payment time.
+class _CreditLedgerPicker extends ConsumerWidget {
+  const _CreditLedgerPicker({
+    required this.selectedLedgerId,
+    required this.isEnabled,
+    required this.onChanged,
+  });
+
+  final String? selectedLedgerId;
+  final bool isEnabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ledgersAsync = ref.watch(creditLedgerListProvider);
+
+    return ledgersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error:
+          (error, stackTrace) =>
+              Text('Could not load customer accounts: $error'),
+      data: (ledgers) {
+        if (ledgers.isEmpty) {
+          return const Text(
+            'No customer accounts yet — add one from Manage Customer '
+            'Accounts before charging a sale to utang.',
+          );
+        }
+
+        return DropdownButtonFormField<String>(
+          value: selectedLedgerId,
+          decoration: const InputDecoration(
+            labelText: 'Customer account',
+            border: OutlineInputBorder(),
+          ),
+          isExpanded: true,
+          items: [
+            for (final ledger in ledgers)
+              DropdownMenuItem(
+                value: ledger.id,
+                child: Text(
+                  '${ledger.customerFullName} (₱${ledger.availableCredit.toStringAsFixed(2)} available)',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: isEnabled ? onChanged : null,
+        );
+      },
     );
   }
 }

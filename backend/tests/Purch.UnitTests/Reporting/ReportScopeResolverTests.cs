@@ -74,6 +74,11 @@ public sealed class ReportScopeResolverTests
             return Task.FromResult<IReadOnlyList<Department>>([.. Departments.Values.Where(d => d.BranchId == branchId)]);
         }
 
+        public Task<IReadOnlyList<Department>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Department>>([.. Departments.Values.Where(d => d.TenantId == tenantId)]);
+        }
+
         public void Add(Department department)
         {
             Departments[department.Id] = department;

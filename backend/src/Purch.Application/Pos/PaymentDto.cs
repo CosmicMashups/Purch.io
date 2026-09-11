@@ -11,11 +11,11 @@ public sealed record PaymentDto(
     decimal? ChangeGiven);
 
 /// <summary>
-/// Cash/BankTransfer/ManualGcashQr only for now — each is a single full
-/// payment (no split-tender, no partial payments yet). QrPh (needs a live
-/// Xendit webhook), BillPaymentELoad (needs the Dragonpay integration from
-/// ADR 0004), UtangCredit (Phase 9, per the implementation plan), and Split
-/// are rejected with a clear "not yet available" message rather than faking
-/// a confirmation for something that touches real money.
+/// Cash/BankTransfer/ManualGcashQr/UtangCredit only for now — each is a
+/// single full payment (no split-tender, no partial payments yet). QrPh
+/// (needs a live Xendit webhook) and BillPaymentELoad (needs the Dragonpay
+/// integration from ADR 0004) are rejected with a clear "not yet available"
+/// message rather than faking a confirmation for something that touches
+/// real money; Split isn't built yet either.
 /// </summary>
-public sealed record RecordPaymentRequest(PaymentMethod Method, decimal? AmountTendered);
+public sealed record RecordPaymentRequest(PaymentMethod Method, decimal? AmountTendered, Guid? CustomerCreditLedgerId = null);

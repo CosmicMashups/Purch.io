@@ -8,5 +8,7 @@ public interface IDepartmentRepository
 
     Task<IReadOnlyList<Department>> ListByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Department>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
     void Add(Department department);
 }

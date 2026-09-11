@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/reports_repository_impl.dart';
+import '../../domain/department_sales_models.dart';
 import '../../domain/inventory_report_models.dart';
 import '../../domain/reports_repository.dart';
 import '../../domain/sales_dashboard_models.dart';
@@ -47,6 +48,18 @@ Future<StaffPerformanceReport> staffPerformance(
   return ref
       .watch(reportsRepositoryProvider)
       .getStaffPerformance(branchId: branchId, from: fromDate, to: toDate);
+}
+
+@riverpod
+Future<List<DepartmentSalesSummary>> departmentSales(
+  Ref ref, {
+  String? branchId,
+  required DateTime fromDate,
+  required DateTime toDate,
+}) {
+  return ref
+      .watch(reportsRepositoryProvider)
+      .getDepartmentSales(branchId: branchId, from: fromDate, to: toDate);
 }
 
 /// The low-stock CSV export isn't a plain auto-fetch value — it's an

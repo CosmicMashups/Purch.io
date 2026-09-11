@@ -1,6 +1,8 @@
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.CreditLedger;
+using Purch.Application.Onboarding;
 using Purch.Application.Promotions;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -21,6 +23,8 @@ public sealed class TransactionService(
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
     IPromoCodeRepository promoCodeRepository,
+    ICustomerCreditLedgerRepository creditLedgerRepository,
+    ITenantRepository tenantRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
@@ -30,6 +34,7 @@ public sealed class TransactionService(
         PaymentMethod.Cash,
         PaymentMethod.BankTransfer,
         PaymentMethod.ManualGcashQr,
+        PaymentMethod.UtangCredit,
     ];
 
     /// <summary>RA 9994/RA 10754 Senior Citizen/PWD discount — see ApplySeniorPwdDiscountRequest for the VAT-treatment caveat.</summary>
@@ -243,7 +248,7 @@ public sealed class TransactionService(
         {
             throw new ValidationException(
                 nameof(request.Method),
-                $"{request.Method} isn't available for checkout yet — only Cash, Bank Transfer, and Manual GCash QR are supported so far.");
+                $"{request.Method} isn't available for checkout yet — only Cash, Bank Transfer, Manual GCash QR, and Utang/Credit are supported so far.");
         }
 
         var deviceId = CurrentDeviceId;
@@ -266,6 +271,11 @@ public sealed class TransactionService(
             changeGiven = tendered - cart.TotalAmount;
         }
 
+        if (request.Method == PaymentMethod.UtangCredit)
+        {
+            await ChargeToCreditLedgerAsync(cart, request.CustomerCreditLedgerId, cancellationToken);
+        }
+
         paymentRepository.Add(new Payment
         {
             TenantId = CurrentTenantId,
@@ -285,6 +295,48 @@ public sealed class TransactionService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    /// <summary>B7's checkout-side enforcement: utang is off unless the tenant
+    /// has explicitly enabled it, the named customer account must exist and
+    /// still be active, and the sale can't push that account's balance past
+    /// its credit limit. On success, the ledger's Balance is updated and a
+    /// CreditTransaction recorded in the same SaveChangesAsync as the payment
+    /// and transaction-completion below, so a rollback can't charge a customer
+    /// without actually completing the sale (or vice versa).</summary>
+    private async Task ChargeToCreditLedgerAsync(Transaction cart, Guid? customerCreditLedgerId, CancellationToken cancellationToken)
+    {
+        if (customerCreditLedgerId is not { } ledgerId)
+        {
+            throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "A customer credit account is required for Utang/Credit payments.");
+        }
+
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is null || !tenant.CreditLedgerEnabled)
+        {
+            throw new ValidationException(nameof(RecordPaymentRequest.Method), "Utang/credit sales aren't enabled for this business.");
+        }
+
+        var ledger = await creditLedgerRepository.GetByIdAsync(ledgerId, cancellationToken);
+        if (ledger is null || ledger.TenantId != CurrentTenantId || !ledger.IsActive)
+        {
+            throw new NotFoundException("Customer credit account", ledgerId);
+        }
+
+        if (ledger.Balance + cart.TotalAmount > ledger.CreditLimit)
+        {
+            throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.");
+        }
+
+        ledger.Balance += cart.TotalAmount;
+        creditLedgerRepository.AddTransaction(new CreditTransaction
+        {
+            TenantId = CurrentTenantId,
+            CustomerCreditLedgerId = ledger.Id,
+            TransactionId = cart.Id,
+            Amount = cart.TotalAmount,
+            Note = "POS sale on credit",
+        });
     }
 
     public async Task<TransactionDto> ApplySeniorPwdDiscountAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken = default)

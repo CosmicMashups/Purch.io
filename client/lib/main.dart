@@ -6,6 +6,8 @@ import 'core/sync/sync_providers.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/catalog/presentation/screens/category_list_screen.dart';
+import 'features/credit_ledger/presentation/screens/credit_ledger_list_screen.dart';
+import 'features/credit_ledger/presentation/screens/credit_reminders_screen.dart';
 import 'features/catalog/presentation/screens/item_list_screen.dart';
 import 'features/catalog/presentation/screens/modifier_group_list_screen.dart';
 import 'features/inventory/presentation/screens/branch_transfer_list_screen.dart';
@@ -23,6 +25,7 @@ import 'features/pos/presentation/screens/bir_reading_screen.dart';
 import 'features/pos/presentation/screens/item_grid_screen.dart';
 import 'features/pos/presentation/screens/promo_code_list_screen.dart';
 import 'features/pos/presentation/screens/shift_screen.dart';
+import 'features/reports/presentation/screens/department_sales_screen.dart';
 import 'features/reports/presentation/screens/inventory_reports_screen.dart';
 import 'features/reports/presentation/screens/sales_dashboard_screen.dart';
 import 'features/reports/presentation/screens/staff_performance_screen.dart';
@@ -182,6 +185,36 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('Staff Performance'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const DepartmentSalesScreen(),
+                      ),
+                    ),
+                child: const Text('Department Sales'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const CreditLedgerListScreen(),
+                      ),
+                    ),
+                child: const Text('Manage Customer Accounts'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const CreditRemindersScreen(),
+                      ),
+                    ),
+                child: const Text('Payment Due Reminders'),
               ),
               const SizedBox(height: 16),
               FilledButton(
