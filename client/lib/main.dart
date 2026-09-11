@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/sync/presentation/flagged_sync_screen.dart';
+import 'core/sync/sync_providers.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/catalog/presentation/screens/category_list_screen.dart';
@@ -79,6 +81,10 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Starts the background sync drain loop once, for the lifetime of the
+    // logged-in session — keepAlive means later navigations reuse it.
+    ref.watch(syncCoordinatorProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Purch.io')),
       body: Center(
@@ -247,6 +253,16 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('Manage Modifier Groups'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const FlaggedSyncScreen(),
+                      ),
+                    ),
+                child: const Text('Sync Conflicts'),
               ),
               const SizedBox(height: 16),
               OutlinedButton(

@@ -14,6 +14,7 @@ using Purch.Application.Pos;
 using Purch.Application.Promotions;
 using Purch.Application.Reporting;
 using Purch.Application.Shifts;
+using Purch.Application.Sync;
 using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
@@ -95,6 +96,8 @@ builder.Services.AddScoped<ISupplierRepository, EfSupplierRepository>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseOrderRepository, EfPurchaseOrderRepository>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+builder.Services.AddScoped<ISyncedRecordRepository, EfSyncedRecordRepository>();
+builder.Services.AddScoped<ISyncService, SyncService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
@@ -146,6 +149,7 @@ app.MapShiftEndpoints();
 app.MapPromoCodeEndpoints();
 app.MapReportingEndpoints();
 app.MapInventoryEndpoints();
+app.MapSyncEndpoints();
 
 app.Run();
 
