@@ -6,6 +6,8 @@ using Purch.Api.Endpoints;
 using Purch.Api.ErrorHandling;
 using Purch.Api.Middleware;
 using Purch.Application.Auth;
+using Purch.Application.Common;
+using Purch.Application.Onboarding;
 using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
@@ -39,6 +41,17 @@ builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 
+builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+builder.Services.AddScoped<ITenantRepository, EfTenantRepository>();
+builder.Services.AddScoped<IBranchRepository, EfBranchRepository>();
+builder.Services.AddScoped<IAuditLogRepository, EfAuditLogRepository>();
+builder.Services.AddScoped<IBootstrapTenantService, BootstrapTenantService>();
+builder.Services.AddScoped<IStaffService, StaffService>();
+builder.Services.AddScoped<IBranchService, BranchService>();
+builder.Services.AddScoped<IDeviceManagementService, DeviceManagementService>();
+builder.Services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
 
@@ -55,6 +68,10 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
             ValidateLifetime = true,
+            // JwtTokenService issues the role under our own claim name (JwtClaimTypes.Role),
+            // not the .NET-default ClaimTypes.Role — map it here so [Authorize(Roles = "Admin")]
+            // reads the right claim instead of silently never matching.
+            RoleClaimType = JwtClaimTypes.Role,
         };
     });
 
@@ -78,6 +95,7 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
+app.MapOnboardingEndpoints();
 
 app.Run();
 

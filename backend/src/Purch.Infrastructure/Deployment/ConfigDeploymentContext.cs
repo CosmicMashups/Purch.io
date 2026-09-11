@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Purch.Application.Common;
 using Purch.Domain.Enums;
 
 namespace Purch.Infrastructure.Deployment;

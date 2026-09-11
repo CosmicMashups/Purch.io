@@ -1,6 +1,6 @@
 using Purch.Domain.Enums;
 
-namespace Purch.Infrastructure.Deployment;
+namespace Purch.Application.Common;
 
 /// <summary>
 /// The single seam through which Cloud vs Local deployment mode is resolved.

@@ -1,5 +1,5 @@
 using Purch.Application.Auth;
-using Purch.Infrastructure.Persistence;
+using Purch.Application.Common;
 
 namespace Purch.Api.Middleware;
 

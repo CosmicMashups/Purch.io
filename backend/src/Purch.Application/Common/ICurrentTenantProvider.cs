@@ -1,4 +1,4 @@
-namespace Purch.Infrastructure.Persistence;
+namespace Purch.Application.Common;
 
 /// <summary>
 /// Supplies the ambient tenant id for the current request, resolved by

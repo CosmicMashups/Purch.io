@@ -33,11 +33,36 @@ public sealed class LoginServiceValidationTests
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
+
+        public Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public void Add(Device device)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
     }
 
     private sealed class NeverCalledUserRepository : IUserRepository
     {
         public Task<IReadOnlyList<User>> GetActiveUsersByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<IReadOnlyList<User>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public void Add(User user)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

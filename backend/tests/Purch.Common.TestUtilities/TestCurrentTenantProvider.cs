@@ -1,4 +1,4 @@
-using Purch.Infrastructure.Persistence;
+using Purch.Application.Common;
 
 namespace Purch.Common.TestUtilities;
 
