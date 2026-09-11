@@ -4,10 +4,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/catalog_repository_impl.dart';
+import '../../domain/bundle_promo_rule_models.dart';
 import '../../domain/catalog_repository.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_batch_models.dart';
 import '../../domain/item_models.dart';
+import '../../domain/item_variant_models.dart';
 import '../../domain/modifier_models.dart';
 
 part 'catalog_providers.g.dart';
@@ -184,6 +186,87 @@ class ReceiveBatchController extends _$ReceiveBatchController {
     final succeeded = !state.hasError;
     if (succeeded) {
       await ref.read(itemBatchListProvider(itemId).notifier).refresh();
+      await ref
+          .read(itemListProvider.notifier)
+          .refresh(); // StockOnHand changed too
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+/// One list per item (Riverpod family, inferred from the `itemId` parameter).
+@riverpod
+class BundleRuleList extends _$BundleRuleList {
+  @override
+  Future<List<BundlePromoRule>> build(String itemId) {
+    return ref.watch(catalogRepositoryProvider).listBundleRules(itemId);
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+@riverpod
+class CreateBundleRuleController extends _$CreateBundleRuleController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> create(CreateBundlePromoRuleRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.createBundleRule(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(bundleRuleListProvider(itemId).notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+/// One list per item (Riverpod family, inferred from the `itemId` parameter).
+@riverpod
+class ItemVariantList extends _$ItemVariantList {
+  @override
+  Future<List<ItemVariant>> build(String itemId) {
+    return ref.watch(catalogRepositoryProvider).listVariants(itemId);
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+@riverpod
+class CreateVariantController extends _$CreateVariantController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> create(CreateItemVariantRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.createVariant(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemVariantListProvider(itemId).notifier).refresh();
       await ref
           .read(itemListProvider.notifier)
           .refresh(); // StockOnHand changed too

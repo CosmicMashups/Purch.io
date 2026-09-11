@@ -1,7 +1,9 @@
+import 'package:purch_client/features/catalog/domain/bundle_promo_rule_models.dart';
 import 'package:purch_client/features/catalog/domain/catalog_repository.dart';
 import 'package:purch_client/features/catalog/domain/category_models.dart';
 import 'package:purch_client/features/catalog/domain/item_batch_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
+import 'package:purch_client/features/catalog/domain/item_variant_models.dart';
 import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 
 class FakeCatalogRepository implements CatalogRepository {
@@ -11,24 +13,34 @@ class FakeCatalogRepository implements CatalogRepository {
     this.createModifierGroupFailure,
     this.addModifierFailure,
     this.receiveBatchFailure,
+    this.createBundleRuleFailure,
+    this.createVariantFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
     List<ItemBatch>? initialBatches,
+    List<BundlePromoRule>? initialBundleRules,
+    List<ItemVariant>? initialVariants,
   }) : categories = initialCategories ?? [],
        items = initialItems ?? [],
        modifierGroups = initialModifierGroups ?? [],
-       batches = initialBatches ?? [];
+       batches = initialBatches ?? [],
+       bundleRules = initialBundleRules ?? [],
+       variants = initialVariants ?? [];
 
   final Object? createCategoryFailure;
   final Object? createItemFailure;
   final Object? createModifierGroupFailure;
   final Object? addModifierFailure;
   final Object? receiveBatchFailure;
+  final Object? createBundleRuleFailure;
+  final Object? createVariantFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
   final List<ItemBatch> batches;
+  final List<BundlePromoRule> bundleRules;
+  final List<ItemVariant> variants;
 
   CreateItemRequest? lastCreateItemRequest;
   CreateItemBatchRequest? lastReceiveBatchRequest;
@@ -143,6 +155,52 @@ class FakeCatalogRepository implements CatalogRepository {
       receivedAt: DateTime.now(),
     );
     batches.add(created);
+    return created;
+  }
+
+  @override
+  Future<List<BundlePromoRule>> listBundleRules(String itemId) async =>
+      bundleRules;
+
+  @override
+  Future<BundlePromoRule> createBundleRule(
+    String itemId,
+    CreateBundlePromoRuleRequest request,
+  ) async {
+    if (createBundleRuleFailure != null) {
+      throw createBundleRuleFailure!;
+    }
+    final created = BundlePromoRule(
+      id: 'bundle-rule-${bundleRules.length + 1}',
+      description: request.description,
+      triggerQuantity: request.triggerQuantity,
+      bundlePrice: request.bundlePrice,
+      isActive: true,
+    );
+    bundleRules.add(created);
+    return created;
+  }
+
+  @override
+  Future<List<ItemVariant>> listVariants(String itemId) async => variants;
+
+  @override
+  Future<ItemVariant> createVariant(
+    String itemId,
+    CreateItemVariantRequest request,
+  ) async {
+    if (createVariantFailure != null) {
+      throw createVariantFailure!;
+    }
+    final created = ItemVariant(
+      id: 'variant-${variants.length + 1}',
+      attributes: request.attributes,
+      sku: request.sku,
+      stockOnHand: 0,
+      priceOverride: request.priceOverride,
+      imageUrl: request.imageUrl,
+    );
+    variants.add(created);
     return created;
   }
 }

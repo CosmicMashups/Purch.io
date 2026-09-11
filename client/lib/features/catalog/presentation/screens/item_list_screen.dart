@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
+import 'bundle_rules_screen.dart';
 import 'item_batches_screen.dart';
+import 'variants_screen.dart';
 
 /// B1's item catalog list. Tapping a weight/volume item opens its batches
-/// (B2a) — other pricing types have no sub-resource screen yet, so tapping
-/// them is a no-op for now.
+/// (B2a), a bundle item opens its bundle rules (B2b), and a variant-matrix
+/// item opens its variants (B3) — other pricing types have no sub-resource
+/// screen yet, so tapping them is a no-op for now.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -38,6 +41,11 @@ class ItemListScreen extends ConsumerWidget {
                 final item = items[index];
                 final isWeightVolume =
                     item.pricingType == PricingType.weightVolume;
+                final isBundle = item.pricingType == PricingType.bundle;
+                final isVariantMatrix =
+                    item.pricingType == PricingType.variantMatrix;
+                final hasSubResourceScreen =
+                    isWeightVolume || isBundle || isVariantMatrix;
 
                 return ListTile(
                   leading: CircleAvatar(
@@ -54,13 +62,35 @@ class ItemListScreen extends ConsumerWidget {
                         : '₱${item.basePrice.toStringAsFixed(2)}',
                   ),
                   trailing:
-                      isWeightVolume ? const Icon(Icons.chevron_right) : null,
+                      hasSubResourceScreen
+                          ? const Icon(Icons.chevron_right)
+                          : null,
                   onTap:
                       isWeightVolume
                           ? () => Navigator.of(context).push<void>(
                             MaterialPageRoute(
                               builder:
                                   (_) => ItemBatchesScreen(
+                                    itemId: item.id,
+                                    itemName: item.name,
+                                  ),
+                            ),
+                          )
+                          : isBundle
+                          ? () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => BundleRulesScreen(
+                                    itemId: item.id,
+                                    itemName: item.name,
+                                  ),
+                            ),
+                          )
+                          : isVariantMatrix
+                          ? () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => VariantsScreen(
                                     itemId: item.id,
                                     itemName: item.name,
                                   ),

@@ -2,10 +2,12 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
+import '../domain/bundle_promo_rule_models.dart';
 import '../domain/catalog_repository.dart';
 import '../domain/category_models.dart';
 import '../domain/item_batch_models.dart';
 import '../domain/item_models.dart';
+import '../domain/item_variant_models.dart';
 import '../domain/modifier_models.dart';
 
 class CatalogRepositoryImpl implements CatalogRepository {
@@ -72,6 +74,40 @@ class CatalogRepositoryImpl implements CatalogRepository {
       '/items/$itemId/batches',
       request.toJson(),
       ItemBatch.fromJson,
+    );
+  }
+
+  @override
+  Future<List<BundlePromoRule>> listBundleRules(String itemId) {
+    return _getList('/items/$itemId/bundle-rules', BundlePromoRule.fromJson);
+  }
+
+  @override
+  Future<BundlePromoRule> createBundleRule(
+    String itemId,
+    CreateBundlePromoRuleRequest request,
+  ) {
+    return _post(
+      '/items/$itemId/bundle-rules',
+      request.toJson(),
+      BundlePromoRule.fromJson,
+    );
+  }
+
+  @override
+  Future<List<ItemVariant>> listVariants(String itemId) {
+    return _getList('/items/$itemId/variants', ItemVariant.fromJson);
+  }
+
+  @override
+  Future<ItemVariant> createVariant(
+    String itemId,
+    CreateItemVariantRequest request,
+  ) {
+    return _post(
+      '/items/$itemId/variants',
+      request.toJson(),
+      ItemVariant.fromJson,
     );
   }
 
