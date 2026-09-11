@@ -9,6 +9,8 @@ import 'features/catalog/presentation/screens/modifier_group_list_screen.dart';
 import 'features/inventory/presentation/screens/branch_transfer_list_screen.dart';
 import 'features/inventory/presentation/screens/inventory_dashboard_screen.dart';
 import 'features/inventory/presentation/screens/movement_log_screen.dart';
+import 'features/inventory/presentation/screens/purchase_order_list_screen.dart';
+import 'features/inventory/presentation/screens/supplier_list_screen.dart';
 import 'features/onboarding/presentation/screens/audit_log_screen.dart';
 import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
@@ -215,6 +217,26 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       ),
                     ),
                 child: const Text('Stock Transfers'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const SupplierListScreen(),
+                      ),
+                    ),
+                child: const Text('Suppliers'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const PurchaseOrderListScreen(),
+                      ),
+                    ),
+                child: const Text('Purchase Orders'),
               ),
               const SizedBox(height: 16),
               FilledButton(

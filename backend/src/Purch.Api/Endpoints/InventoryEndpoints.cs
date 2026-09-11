@@ -61,6 +61,56 @@ public static class InventoryEndpoints
             Results.Ok(await branchTransferService.MarkReceivedAsync(branchTransferId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // --- C5 — suppliers ---
+        _ = app.MapGet("/suppliers", async (
+            ISupplierService supplierService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await supplierService.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/suppliers", async (
+            CreateSupplierRequest request,
+            ISupplierService supplierService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await supplierService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        // --- C5 — purchase orders ---
+        _ = app.MapGet("/purchase-orders", async (
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-orders", async (
+            CreatePurchaseOrderRequest request,
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-orders/{purchaseOrderId:guid}/mark-sent", async (
+            Guid purchaseOrderId,
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.MarkSentAsync(purchaseOrderId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-orders/{purchaseOrderId:guid}/cancel", async (
+            Guid purchaseOrderId,
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.CancelAsync(purchaseOrderId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-orders/{purchaseOrderId:guid}/receive", async (
+            Guid purchaseOrderId,
+            ReceivePurchaseOrderRequest request,
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.ReceiveAsync(purchaseOrderId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         return app;
     }
 }
