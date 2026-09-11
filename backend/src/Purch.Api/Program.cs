@@ -9,6 +9,7 @@ using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Onboarding;
+using Purch.Application.Inventory;
 using Purch.Application.Pos;
 using Purch.Application.Promotions;
 using Purch.Application.Reporting;
@@ -85,6 +86,8 @@ builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IPromoCodeRepository, EfPromoCodeRepository>();
 builder.Services.AddScoped<IPromoCodeService, PromoCodeService>();
 builder.Services.AddScoped<IBirReadingService, BirReadingService>();
+builder.Services.AddScoped<IInventoryMovementRepository, EfInventoryMovementRepository>();
+builder.Services.AddScoped<IInventoryMovementService, InventoryMovementService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
@@ -135,6 +138,7 @@ app.MapPosEndpoints();
 app.MapShiftEndpoints();
 app.MapPromoCodeEndpoints();
 app.MapReportingEndpoints();
+app.MapInventoryEndpoints();
 
 app.Run();
 

@@ -1,0 +1,138 @@
+using Purch.Application.Auth;
+using Purch.Application.Catalog;
+using Purch.Application.Common;
+using Purch.Application.Common.Exceptions;
+using Purch.Application.Onboarding;
+using Purch.Domain.Entities;
+using Purch.Domain.Enums;
+
+namespace Purch.Application.Inventory;
+
+/// <summary>C2/C3 — the stock movement log and the form that records into
+/// it. Every recorded movement also adjusts Item.StockOnHand in the same
+/// save, so the log and the running stock count can never drift apart.</summary>
+public sealed class InventoryMovementService(
+    IInventoryMovementRepository movementRepository,
+    IItemRepository itemRepository,
+    IBranchRepository branchRepository,
+    IUserRepository userRepository,
+    ICurrentTenantProvider currentTenantProvider,
+    ICurrentActorProvider currentActorProvider,
+    IUnitOfWork unitOfWork) : IInventoryMovementService
+{
+    private static readonly HashSet<MovementType> DecreasingTypes =
+    [
+        MovementType.StockOut,
+        MovementType.Consumption,
+        MovementType.Spoiled,
+        MovementType.Damaged,
+        MovementType.ForReturn,
+        MovementType.Transfer,
+    ];
+
+    public async Task<IReadOnlyList<InventoryMovementDto>> ListAsync(
+        Guid? itemId,
+        Guid? branchId,
+        MovementType? type,
+        CancellationToken cancellationToken = default)
+    {
+        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, cancellationToken);
+
+        var dtos = new List<InventoryMovementDto>();
+        foreach (var movement in movements.OrderByDescending(m => m.CreatedAt))
+        {
+            dtos.Add(await ToDtoAsync(movement, cancellationToken));
+        }
+        return dtos;
+    }
+
+    public async Task<InventoryMovementDto> RecordAsync(RecordMovementRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Quantity == 0)
+        {
+            throw new ValidationException(nameof(request.Quantity), "Quantity must not be zero.");
+        }
+
+        if (request.Type != MovementType.Adjustment && request.Quantity < 0)
+        {
+            throw new ValidationException(nameof(request.Quantity), "Quantity must be greater than zero for this movement type.");
+        }
+
+        if (request.Type == MovementType.Spoiled && string.IsNullOrWhiteSpace(request.ReasonCategory))
+        {
+            throw new ValidationException(nameof(request.ReasonCategory), "A reason category is required for a Spoiled movement.");
+        }
+
+        if (request.Type == MovementType.ForReturn && string.IsNullOrWhiteSpace(request.SupplierReference))
+        {
+            throw new ValidationException(nameof(request.SupplierReference), "A supplier reference is required for a For Return movement.");
+        }
+
+        var item = await itemRepository.GetByIdAsync(request.ItemId, cancellationToken)
+            ?? throw new NotFoundException("Item", request.ItemId);
+
+        _ = await branchRepository.GetByIdAsync(request.BranchId, cancellationToken)
+            ?? throw new NotFoundException("Branch", request.BranchId);
+
+        var movement = new InventoryMovement
+        {
+            TenantId = CurrentTenantId,
+            ItemId = request.ItemId,
+            BranchId = request.BranchId,
+            Type = request.Type,
+            Quantity = request.Quantity,
+            StaffUserId = CurrentUserId,
+            Note = request.Note,
+            ReasonCategory = request.ReasonCategory,
+            PhotoUrl = request.PhotoUrl,
+            SupplierReference = request.SupplierReference,
+        };
+
+        item.StockOnHand += StockDelta(request.Type, request.Quantity);
+
+        movementRepository.Add(movement);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(movement, cancellationToken);
+    }
+
+    /// <summary>How much a movement changes Item.StockOnHand by. StockIn always
+    /// adds; every other named type always subtracts the (always-positive)
+    /// quantity; Adjustment applies the signed quantity as-is, since it's the
+    /// one type meant to correct a miscount in either direction.</summary>
+    private static decimal StockDelta(MovementType type, decimal quantity)
+    {
+        return type is MovementType.StockIn or MovementType.Adjustment
+            ? quantity
+            : DecreasingTypes.Contains(type) ? -quantity : 0m;
+    }
+
+    private async Task<InventoryMovementDto> ToDtoAsync(InventoryMovement movement, CancellationToken cancellationToken)
+    {
+        var item = await itemRepository.GetByIdAsync(movement.ItemId, cancellationToken);
+        var branch = await branchRepository.GetByIdAsync(movement.BranchId, cancellationToken);
+        var staffUser = await userRepository.GetByIdAsync(movement.StaffUserId, cancellationToken);
+
+        return new InventoryMovementDto(
+            movement.Id,
+            movement.ItemId,
+            item?.Name ?? "(deleted item)",
+            movement.BranchId,
+            branch?.Name ?? "(deleted branch)",
+            movement.Type,
+            movement.Quantity,
+            movement.StaffUserId,
+            staffUser?.Name ?? "(removed user)",
+            movement.Note,
+            movement.ReasonCategory,
+            movement.PhotoUrl,
+            movement.SupplierReference,
+            movement.CreatedAt);
+    }
+
+    private Guid CurrentTenantId => currentTenantProvider.TenantId
+        ?? throw new InvalidOperationException("Inventory movements require an authenticated tenant context.");
+
+    private Guid CurrentUserId => currentActorProvider.UserId
+        ?? throw new InvalidOperationException("Inventory movements require an authenticated staff user.");
+}
