@@ -5,6 +5,7 @@ import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/catalog/presentation/screens/category_list_screen.dart';
 import 'features/catalog/presentation/screens/item_list_screen.dart';
+import 'features/catalog/presentation/screens/modifier_group_list_screen.dart';
 import 'features/onboarding/presentation/screens/audit_log_screen.dart';
 import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
@@ -141,6 +142,16 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                       MaterialPageRoute(builder: (_) => const ItemListScreen()),
                     ),
                 child: const Text('Manage Items'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const ModifierGroupListScreen(),
+                      ),
+                    ),
+                child: const Text('Manage Modifier Groups'),
               ),
               const SizedBox(height: 16),
               OutlinedButton(

@@ -4,7 +4,9 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
 import '../domain/catalog_repository.dart';
 import '../domain/category_models.dart';
+import '../domain/item_batch_models.dart';
 import '../domain/item_models.dart';
+import '../domain/modifier_models.dart';
 
 class CatalogRepositoryImpl implements CatalogRepository {
   CatalogRepositoryImpl({required ApiClient apiClient})
@@ -30,6 +32,47 @@ class CatalogRepositoryImpl implements CatalogRepository {
   @override
   Future<Item> createItem(CreateItemRequest request) {
     return _post('/items', request.toJson(), Item.fromJson);
+  }
+
+  @override
+  Future<List<ModifierGroup>> listModifierGroups() {
+    return _getList('/modifier-groups', ModifierGroup.fromJson);
+  }
+
+  @override
+  Future<ModifierGroup> createModifierGroup(
+    CreateModifierGroupRequest request,
+  ) {
+    return _post('/modifier-groups', request.toJson(), ModifierGroup.fromJson);
+  }
+
+  @override
+  Future<ModifierGroup> addModifier(
+    String groupId,
+    CreateItemModifierRequest request,
+  ) {
+    return _post(
+      '/modifier-groups/$groupId/modifiers',
+      request.toJson(),
+      ModifierGroup.fromJson,
+    );
+  }
+
+  @override
+  Future<List<ItemBatch>> listBatches(String itemId) {
+    return _getList('/items/$itemId/batches', ItemBatch.fromJson);
+  }
+
+  @override
+  Future<ItemBatch> receiveBatch(
+    String itemId,
+    CreateItemBatchRequest request,
+  ) {
+    return _post(
+      '/items/$itemId/batches',
+      request.toJson(),
+      ItemBatch.fromJson,
+    );
   }
 
   Future<T> _post<T>(

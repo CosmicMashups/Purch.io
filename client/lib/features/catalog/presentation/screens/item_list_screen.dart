@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
+import 'item_batches_screen.dart';
 
-/// B1's item catalog list.
+/// B1's item catalog list. Tapping a weight/volume item opens its batches
+/// (B2a) — other pricing types have no sub-resource screen yet, so tapping
+/// them is a no-op for now.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -32,6 +36,9 @@ class ItemListScreen extends ConsumerWidget {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
+                final isWeightVolume =
+                    item.pricingType == PricingType.weightVolume;
+
                 return ListTile(
                   leading: CircleAvatar(
                     child: Icon(
@@ -41,7 +48,25 @@ class ItemListScreen extends ConsumerWidget {
                     ),
                   ),
                   title: Text(item.name),
-                  subtitle: Text('₱${item.basePrice.toStringAsFixed(2)}'),
+                  subtitle: Text(
+                    isWeightVolume
+                        ? '₱${item.basePrice.toStringAsFixed(2)} · ${item.stockOnHand} in stock'
+                        : '₱${item.basePrice.toStringAsFixed(2)}',
+                  ),
+                  trailing:
+                      isWeightVolume ? const Icon(Icons.chevron_right) : null,
+                  onTap:
+                      isWeightVolume
+                          ? () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ItemBatchesScreen(
+                                    itemId: item.id,
+                                    itemName: item.name,
+                                  ),
+                            ),
+                          )
+                          : null,
                 );
               },
             ),
