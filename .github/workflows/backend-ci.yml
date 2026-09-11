@@ -24,4 +24,4 @@ jobs:
       - run: dotnet restore
       - run: dotnet build --configuration Release --no-restore
       - run: dotnet test --no-build --configuration Release
-      - run: dotnet format --verify-no-changes
+      - run: dotnet format --verify-no-changes --exclude src/Purch.Infrastructure/Persistence/Migrations
