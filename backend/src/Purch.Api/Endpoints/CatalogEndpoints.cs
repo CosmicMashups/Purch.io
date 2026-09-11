@@ -144,6 +144,21 @@ public static class CatalogEndpoints
             Results.Ok(await itemVariantService.CreateAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Combo/meal builder slots (B4) ---
+        _ = app.MapGet("/items/{itemId:guid}/combo-components", async (
+            Guid itemId,
+            IItemComboComponentService itemComboComponentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemComboComponentService.ListForItemAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/items/{itemId:guid}/combo-components", async (
+            Guid itemId,
+            CreateItemComboComponentRequest request,
+            IItemComboComponentService itemComboComponentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemComboComponentService.CreateAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         return app;
     }
 }

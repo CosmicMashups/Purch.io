@@ -67,6 +67,8 @@ builder.Services.AddScoped<IBundlePromoRuleRepository, EfBundlePromoRuleReposito
 builder.Services.AddScoped<IBundlePromoRuleService, BundlePromoRuleService>();
 builder.Services.AddScoped<IItemVariantRepository, EfItemVariantRepository>();
 builder.Services.AddScoped<IItemVariantService, ItemVariantService>();
+builder.Services.AddScoped<IItemComboComponentRepository, EfItemComboComponentRepository>();
+builder.Services.AddScoped<IItemComboComponentService, ItemComboComponentService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";

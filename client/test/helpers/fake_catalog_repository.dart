@@ -2,6 +2,7 @@ import 'package:purch_client/features/catalog/domain/bundle_promo_rule_models.da
 import 'package:purch_client/features/catalog/domain/catalog_repository.dart';
 import 'package:purch_client/features/catalog/domain/category_models.dart';
 import 'package:purch_client/features/catalog/domain/item_batch_models.dart';
+import 'package:purch_client/features/catalog/domain/item_combo_component_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/item_variant_models.dart';
 import 'package:purch_client/features/catalog/domain/modifier_models.dart';
@@ -19,6 +20,7 @@ class FakeCatalogRepository implements CatalogRepository {
     this.attachModifierGroupFailure,
     this.updateTingiConfigFailure,
     this.updateServiceDurationFailure,
+    this.createComboComponentFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
@@ -26,13 +28,15 @@ class FakeCatalogRepository implements CatalogRepository {
     List<BundlePromoRule>? initialBundleRules,
     List<ItemVariant>? initialVariants,
     Map<String, List<ModifierGroup>>? initialItemModifierGroups,
+    List<ItemComboComponent>? initialComboComponents,
   }) : categories = initialCategories ?? [],
        items = initialItems ?? [],
        modifierGroups = initialModifierGroups ?? [],
        batches = initialBatches ?? [],
        bundleRules = initialBundleRules ?? [],
        variants = initialVariants ?? [],
-       itemModifierGroups = initialItemModifierGroups ?? {};
+       itemModifierGroups = initialItemModifierGroups ?? {},
+       comboComponents = initialComboComponents ?? [];
 
   final Object? createCategoryFailure;
   final Object? createItemFailure;
@@ -44,6 +48,7 @@ class FakeCatalogRepository implements CatalogRepository {
   final Object? attachModifierGroupFailure;
   final Object? updateTingiConfigFailure;
   final Object? updateServiceDurationFailure;
+  final Object? createComboComponentFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
@@ -51,6 +56,7 @@ class FakeCatalogRepository implements CatalogRepository {
   final List<BundlePromoRule> bundleRules;
   final List<ItemVariant> variants;
   final Map<String, List<ModifierGroup>> itemModifierGroups;
+  final List<ItemComboComponent> comboComponents;
 
   CreateItemRequest? lastCreateItemRequest;
   CreateItemBatchRequest? lastReceiveBatchRequest;
@@ -301,5 +307,32 @@ class FakeCatalogRepository implements CatalogRepository {
     );
     items[index] = updated;
     return updated;
+  }
+
+  @override
+  Future<List<ItemComboComponent>> listComboComponents(String itemId) async =>
+      comboComponents;
+
+  @override
+  Future<ItemComboComponent> createComboComponent(
+    String itemId,
+    CreateItemComboComponentRequest request,
+  ) async {
+    if (createComboComponentFailure != null) {
+      throw createComboComponentFailure!;
+    }
+    final category = categories.firstWhere(
+      (category) => category.id == request.componentCategoryId,
+    );
+    final created = ItemComboComponent(
+      id: 'combo-component-${comboComponents.length + 1}',
+      componentCategoryId: category.id,
+      componentCategoryName: category.name,
+      slotLabel: request.slotLabel,
+      quantity: request.quantity,
+      substitutionUpchargeAmount: request.substitutionUpchargeAmount,
+    );
+    comboComponents.add(created);
+    return created;
   }
 }

@@ -6,6 +6,7 @@ import '../domain/bundle_promo_rule_models.dart';
 import '../domain/catalog_repository.dart';
 import '../domain/category_models.dart';
 import '../domain/item_batch_models.dart';
+import '../domain/item_combo_component_models.dart';
 import '../domain/item_models.dart';
 import '../domain/item_variant_models.dart';
 import '../domain/modifier_models.dart';
@@ -145,6 +146,26 @@ class CatalogRepositoryImpl implements CatalogRepository {
       '/items/$itemId/service-duration',
       request.toJson(),
       Item.fromJson,
+    );
+  }
+
+  @override
+  Future<List<ItemComboComponent>> listComboComponents(String itemId) {
+    return _getList(
+      '/items/$itemId/combo-components',
+      ItemComboComponent.fromJson,
+    );
+  }
+
+  @override
+  Future<ItemComboComponent> createComboComponent(
+    String itemId,
+    CreateItemComboComponentRequest request,
+  ) {
+    return _post(
+      '/items/$itemId/combo-components',
+      request.toJson(),
+      ItemComboComponent.fromJson,
     );
   }
 

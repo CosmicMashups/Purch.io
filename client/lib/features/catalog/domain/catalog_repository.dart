@@ -1,6 +1,7 @@
 import 'bundle_promo_rule_models.dart';
 import 'category_models.dart';
 import 'item_batch_models.dart';
+import 'item_combo_component_models.dart';
 import 'item_models.dart';
 import 'item_variant_models.dart';
 import 'modifier_models.dart';
@@ -9,7 +10,7 @@ import 'modifier_models.dart';
 /// modifier group attachment for restaurant-style customization e.g. "No
 /// Ice"/"No Pickles") + B2a (weight/volume batches, incl. tingi/sub-unit
 /// selling config) + B2b (bundle rules) + B2c (service duration) + B3
-/// (variant matrix). Remaining pricing-type sub-resource: B4 (combo).
+/// (variant matrix) + B4 (combo/meal builder slots).
 abstract class CatalogRepository {
   Future<List<Category>> listCategories();
 
@@ -61,5 +62,12 @@ abstract class CatalogRepository {
   Future<Item> updateServiceDuration(
     String itemId,
     UpdateServiceDurationRequest request,
+  );
+
+  Future<List<ItemComboComponent>> listComboComponents(String itemId);
+
+  Future<ItemComboComponent> createComboComponent(
+    String itemId,
+    CreateItemComboComponentRequest request,
   );
 }

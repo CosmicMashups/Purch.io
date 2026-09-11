@@ -5,6 +5,7 @@ import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
 import 'bundle_rules_screen.dart';
+import 'combo_components_screen.dart';
 import 'item_batches_screen.dart';
 import 'item_modifier_groups_screen.dart';
 import 'service_duration_screen.dart';
@@ -18,13 +19,14 @@ enum _ItemAction {
   customization,
   tingi,
   serviceDuration,
+  comboComponents,
 }
 
 /// B1's item catalog list. Every item can have modifier groups attached for
 /// restaurant-style customization (B5, e.g. "No Ice"); pricing-type-specific
 /// actions (weight/volume batches + tingi config (B2a), bundle rules (B2b),
-/// service duration (B2c), variants (B3)) appear alongside it via a per-row
-/// menu.
+/// service duration (B2c), variants (B3), combo slots (B4)) appear alongside
+/// it via a per-row menu.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -58,6 +60,7 @@ class ItemListScreen extends ConsumerWidget {
                 final isVariantMatrix =
                     item.pricingType == PricingType.variantMatrix;
                 final isService = item.pricingType == PricingType.service;
+                final isCombo = item.pricingType == PricingType.combo;
 
                 return ListTile(
                   leading: CircleAvatar(
@@ -135,6 +138,17 @@ class ItemListScreen extends ConsumerWidget {
                             ),
                           );
                           break;
+                        case _ItemAction.comboComponents:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ComboComponentsScreen(
+                                    itemId: item.id,
+                                    itemName: item.name,
+                                  ),
+                            ),
+                          );
+                          break;
                       }
                     },
                     itemBuilder:
@@ -163,6 +177,11 @@ class ItemListScreen extends ConsumerWidget {
                             const PopupMenuItem(
                               value: _ItemAction.serviceDuration,
                               child: Text('Service duration'),
+                            ),
+                          if (isCombo)
+                            const PopupMenuItem(
+                              value: _ItemAction.comboComponents,
+                              child: Text('Combo slots'),
                             ),
                           const PopupMenuItem(
                             value: _ItemAction.customization,

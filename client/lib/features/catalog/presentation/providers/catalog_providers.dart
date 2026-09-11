@@ -8,6 +8,7 @@ import '../../domain/bundle_promo_rule_models.dart';
 import '../../domain/catalog_repository.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_batch_models.dart';
+import '../../domain/item_combo_component_models.dart';
 import '../../domain/item_models.dart';
 import '../../domain/item_variant_models.dart';
 import '../../domain/modifier_models.dart';
@@ -365,6 +366,45 @@ class UpdateServiceDurationController
     final succeeded = !state.hasError;
     if (succeeded) {
       await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+/// One list per item (Riverpod family, inferred from the `itemId` parameter).
+@riverpod
+class ItemComboComponentList extends _$ItemComboComponentList {
+  @override
+  Future<List<ItemComboComponent>> build(String itemId) {
+    return ref.watch(catalogRepositoryProvider).listComboComponents(itemId);
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+@riverpod
+class CreateComboComponentController extends _$CreateComboComponentController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> create(CreateItemComboComponentRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.createComboComponent(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemComboComponentListProvider(itemId).notifier).refresh();
     }
     return succeeded;
   }
