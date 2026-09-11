@@ -1,0 +1,10 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # Nullability/type strictness matches the "robust backend, robust client"
+          # directive — generated columns should be as strict as the Postgres schema.
+          store_date_time_values_as_text: false
+      riverpod_generator:
+        options: {}
