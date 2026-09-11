@@ -346,3 +346,31 @@ class UpdateTingiConfigController extends _$UpdateTingiConfigController {
     return error is Failure ? error : null;
   }
 }
+
+@riverpod
+class UpdateServiceDurationController
+    extends _$UpdateServiceDurationController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> updateServiceDuration(
+    UpdateServiceDurationRequest request,
+  ) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateServiceDuration(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}

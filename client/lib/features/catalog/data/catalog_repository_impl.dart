@@ -136,6 +136,18 @@ class CatalogRepositoryImpl implements CatalogRepository {
     return _put('/items/$itemId/tingi-config', request.toJson(), Item.fromJson);
   }
 
+  @override
+  Future<Item> updateServiceDuration(
+    String itemId,
+    UpdateServiceDurationRequest request,
+  ) {
+    return _put(
+      '/items/$itemId/service-duration',
+      request.toJson(),
+      Item.fromJson,
+    );
+  }
+
   Future<T> _post<T>(
     String path,
     Map<String, dynamic> data,

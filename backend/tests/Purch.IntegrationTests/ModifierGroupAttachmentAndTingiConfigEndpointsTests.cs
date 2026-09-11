@@ -148,6 +148,62 @@ public sealed class ModifierGroupAttachmentAndTingiConfigEndpointsTests(Postgres
         Assert.Equal(HttpStatusCode.BadRequest, configResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task Admin_can_set_service_duration_on_a_service_priced_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Haircut", null, null, null, 250m, null, PricingType.Service));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var durationResponse = await client.PutAsJsonAsync(
+            $"/items/{item!.Id}/service-duration",
+            new UpdateServiceDurationRequest(45));
+
+        Assert.Equal(HttpStatusCode.OK, durationResponse.StatusCode);
+        var updated = await durationResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        Assert.Equal(45, updated!.ServiceDurationMinutes);
+    }
+
+    [Fact]
+    public async Task Setting_service_duration_on_a_unit_priced_item_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Bottled Water", null, null, null, 15m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var durationResponse = await client.PutAsJsonAsync(
+            $"/items/{item!.Id}/service-duration",
+            new UpdateServiceDurationRequest(30));
+
+        Assert.Equal(HttpStatusCode.BadRequest, durationResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_zero_or_negative_service_duration_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Massage", null, null, null, 500m, null, PricingType.Service));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var durationResponse = await client.PutAsJsonAsync(
+            $"/items/{item!.Id}/service-duration",
+            new UpdateServiceDurationRequest(0));
+
+        Assert.Equal(HttpStatusCode.BadRequest, durationResponse.StatusCode);
+    }
+
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
     {
         var client = factory.CreateClient();

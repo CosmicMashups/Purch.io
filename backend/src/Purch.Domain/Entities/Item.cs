@@ -36,4 +36,7 @@ public class Item : TenantScopedEntity
 
     /// <summary>Used when TingiMode is FixedSizes — JSON array of decimals, e.g. [10, 25].</summary>
     public string? TingiAllowedSizesJson { get; set; }
+
+    /// <summary>B2c — appointment/service length in minutes. Meaningful only when PricingType is Service.</summary>
+    public int? ServiceDurationMinutes { get; set; }
 }

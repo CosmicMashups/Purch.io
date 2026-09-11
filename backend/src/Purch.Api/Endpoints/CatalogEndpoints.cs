@@ -90,6 +90,15 @@ public static class CatalogEndpoints
             Results.Ok(await itemService.UpdateTingiConfigAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Service duration (B2c) for service/appointment items ---
+        _ = app.MapPut("/items/{itemId:guid}/service-duration", async (
+            Guid itemId,
+            UpdateServiceDurationRequest request,
+            IItemService itemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemService.UpdateServiceDurationAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Weight/volume batches (B2a) ---
         _ = app.MapGet("/items/{itemId:guid}/batches", async (
             Guid itemId,

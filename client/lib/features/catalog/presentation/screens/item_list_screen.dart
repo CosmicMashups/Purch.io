@@ -7,15 +7,24 @@ import 'add_item_screen.dart';
 import 'bundle_rules_screen.dart';
 import 'item_batches_screen.dart';
 import 'item_modifier_groups_screen.dart';
+import 'service_duration_screen.dart';
 import 'tingi_config_screen.dart';
 import 'variants_screen.dart';
 
-enum _ItemAction { batches, bundleRules, variants, customization, tingi }
+enum _ItemAction {
+  batches,
+  bundleRules,
+  variants,
+  customization,
+  tingi,
+  serviceDuration,
+}
 
 /// B1's item catalog list. Every item can have modifier groups attached for
 /// restaurant-style customization (B5, e.g. "No Ice"); pricing-type-specific
 /// actions (weight/volume batches + tingi config (B2a), bundle rules (B2b),
-/// variants (B3)) appear alongside it via a per-row menu.
+/// service duration (B2c), variants (B3)) appear alongside it via a per-row
+/// menu.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -48,6 +57,7 @@ class ItemListScreen extends ConsumerWidget {
                 final isBundle = item.pricingType == PricingType.bundle;
                 final isVariantMatrix =
                     item.pricingType == PricingType.variantMatrix;
+                final isService = item.pricingType == PricingType.service;
 
                 return ListTile(
                   leading: CircleAvatar(
@@ -118,6 +128,13 @@ class ItemListScreen extends ConsumerWidget {
                             ),
                           );
                           break;
+                        case _ItemAction.serviceDuration:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => ServiceDurationScreen(item: item),
+                            ),
+                          );
+                          break;
                       }
                     },
                     itemBuilder:
@@ -141,6 +158,11 @@ class ItemListScreen extends ConsumerWidget {
                             const PopupMenuItem(
                               value: _ItemAction.variants,
                               child: Text('Variants'),
+                            ),
+                          if (isService)
+                            const PopupMenuItem(
+                              value: _ItemAction.serviceDuration,
+                              child: Text('Service duration'),
                             ),
                           const PopupMenuItem(
                             value: _ItemAction.customization,

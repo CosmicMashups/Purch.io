@@ -5,20 +5,20 @@ import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
 import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
-import 'package:purch_client/features/catalog/presentation/screens/tingi_config_screen.dart';
+import 'package:purch_client/features/catalog/presentation/screens/service_duration_screen.dart';
 
 import '../../../helpers/fake_catalog_repository.dart';
 
-const _riceItem = Item(
+const _haircutItem = Item(
   id: 'item-1',
-  name: 'Rice (Sack)',
+  name: 'Haircut',
   sku: null,
   barcode: null,
   categoryId: null,
-  basePrice: 60,
+  basePrice: 250,
   imageUrl: null,
-  pricingType: PricingType.weightVolume,
-  stockOnHand: 50,
+  pricingType: PricingType.service,
+  stockOnHand: 0,
   isActive: true,
   tingiMode: TingiMode.none,
   packagedSize: null,
@@ -28,8 +28,8 @@ const _riceItem = Item(
 );
 
 void main() {
-  testWidgets('setting fixed tingi sizes succeeds and pops', (tester) async {
-    final repository = FakeCatalogRepository(initialItems: [_riceItem]);
+  testWidgets('setting a valid duration succeeds and pops', (tester) async {
+    final repository = FakeCatalogRepository(initialItems: [_haircutItem]);
 
     var popped = false;
     await tester.pumpWidget(
@@ -37,61 +37,41 @@ void main() {
         overrides: [catalogRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
           navigatorObservers: [_PopObserver(onPop: () => popped = true)],
-          home: TingiConfigScreen(item: _riceItem),
+          home: ServiceDurationScreen(item: _haircutItem),
         ),
       ),
     );
 
-    await tester.tap(find.text('Fixed sizes'));
-    await tester.pumpAndSettle();
-
     await tester.enterText(
-      find.widgetWithText(
-        TextFormField,
-        'Whole pack size (e.g. 50 for a 50kg sack)',
-      ),
-      '1',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Size (e.g. 10)'),
-      '0.5',
+      find.widgetWithText(TextFormField, 'Duration (minutes)'),
+      '45',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
-    final updated = repository.items.single;
-    expect(updated.tingiMode, TingiMode.fixedSizes);
-    expect(updated.tingiAllowedSizes, [0.5]);
+    expect(repository.items.single.serviceDurationMinutes, 45);
     expect(popped, isTrue);
   });
 
-  testWidgets('submitting fixed sizes with no pack size shows a snackbar', (
-    tester,
-  ) async {
-    final repository = FakeCatalogRepository(initialItems: [_riceItem]);
+  testWidgets('a zero duration is rejected client-side', (tester) async {
+    final repository = FakeCatalogRepository(initialItems: [_haircutItem]);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [catalogRepositoryProvider.overrideWithValue(repository)],
-        child: MaterialApp(home: TingiConfigScreen(item: _riceItem)),
+        child: MaterialApp(home: ServiceDurationScreen(item: _haircutItem)),
       ),
     );
 
-    await tester.tap(find.text('Fixed sizes'));
-    await tester.pumpAndSettle();
-
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Size (e.g. 10)'),
-      '0.5',
+      find.widgetWithText(TextFormField, 'Duration (minutes)'),
+      '0',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pump();
 
-    expect(
-      find.text('Enter a valid whole pack size greater than zero.'),
-      findsOneWidget,
-    );
-    expect(repository.items.single.tingiMode, TingiMode.none);
+    expect(find.text('Enter a duration greater than zero'), findsOneWidget);
+    expect(repository.items.single.serviceDurationMinutes, isNull);
   });
 }
 

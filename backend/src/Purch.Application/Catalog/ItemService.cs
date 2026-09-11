@@ -161,6 +161,33 @@ public sealed class ItemService(
         return ToDto(item);
     }
 
+    public async Task<ItemDto> UpdateServiceDurationAsync(
+        Guid itemId,
+        UpdateServiceDurationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
+            ?? throw new NotFoundException("Item", itemId);
+
+        if (item.PricingType != PricingType.Service)
+        {
+            throw new ValidationException(
+                nameof(item.PricingType),
+                "Service duration only applies to service-priced items.");
+        }
+
+        if (request.DurationMinutes <= 0)
+        {
+            throw new ValidationException(nameof(request.DurationMinutes), "Duration must be greater than zero minutes.");
+        }
+
+        item.ServiceDurationMinutes = request.DurationMinutes;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(item);
+    }
+
     private async Task ValidateBarcodeAsync(string? barcode, CancellationToken cancellationToken)
     {
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken)
@@ -215,6 +242,7 @@ public sealed class ItemService(
         item.TingiMode,
         item.PackagedSize,
         item.TingiIncrementStep,
-        allowedSizes);
+        allowedSizes,
+        item.ServiceDurationMinutes);
     }
 }

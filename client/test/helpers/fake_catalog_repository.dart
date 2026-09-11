@@ -18,6 +18,7 @@ class FakeCatalogRepository implements CatalogRepository {
     this.createVariantFailure,
     this.attachModifierGroupFailure,
     this.updateTingiConfigFailure,
+    this.updateServiceDurationFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
@@ -42,6 +43,7 @@ class FakeCatalogRepository implements CatalogRepository {
   final Object? createVariantFailure;
   final Object? attachModifierGroupFailure;
   final Object? updateTingiConfigFailure;
+  final Object? updateServiceDurationFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
@@ -94,6 +96,7 @@ class FakeCatalogRepository implements CatalogRepository {
       packagedSize: null,
       tingiIncrementStep: null,
       tingiAllowedSizes: const [],
+      serviceDurationMinutes: null,
     );
     items.add(created);
     return created;
@@ -263,6 +266,38 @@ class FakeCatalogRepository implements CatalogRepository {
       packagedSize: request.packagedSize,
       tingiIncrementStep: request.tingiIncrementStep,
       tingiAllowedSizes: request.allowedSizes ?? const [],
+      serviceDurationMinutes: current.serviceDurationMinutes,
+    );
+    items[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<Item> updateServiceDuration(
+    String itemId,
+    UpdateServiceDurationRequest request,
+  ) async {
+    if (updateServiceDurationFailure != null) {
+      throw updateServiceDurationFailure!;
+    }
+    final index = items.indexWhere((item) => item.id == itemId);
+    final current = items[index];
+    final updated = Item(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+      basePrice: current.basePrice,
+      imageUrl: current.imageUrl,
+      pricingType: current.pricingType,
+      stockOnHand: current.stockOnHand,
+      isActive: current.isActive,
+      tingiMode: current.tingiMode,
+      packagedSize: current.packagedSize,
+      tingiIncrementStep: current.tingiIncrementStep,
+      tingiAllowedSizes: current.tingiAllowedSizes,
+      serviceDurationMinutes: request.durationMinutes,
     );
     items[index] = updated;
     return updated;

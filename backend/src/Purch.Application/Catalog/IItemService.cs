@@ -9,4 +9,6 @@ public interface IItemService
     Task<ItemDto> UpdateAsync(Guid itemId, UpdateItemRequest request, CancellationToken cancellationToken = default);
 
     Task<ItemDto> UpdateTingiConfigAsync(Guid itemId, UpdateTingiConfigRequest request, CancellationToken cancellationToken = default);
+
+    Task<ItemDto> UpdateServiceDurationAsync(Guid itemId, UpdateServiceDurationRequest request, CancellationToken cancellationToken = default);
 }

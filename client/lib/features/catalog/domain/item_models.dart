@@ -18,6 +18,7 @@ class Item {
     required this.packagedSize,
     required this.tingiIncrementStep,
     required this.tingiAllowedSizes,
+    required this.serviceDurationMinutes,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -39,6 +40,7 @@ class Item {
           (json['tingiAllowedSizes'] as List<dynamic>)
               .map((size) => (size as num).toDouble())
               .toList(),
+      serviceDurationMinutes: json['serviceDurationMinutes'] as int?,
     );
   }
 
@@ -56,6 +58,7 @@ class Item {
   final double? packagedSize;
   final double? tingiIncrementStep;
   final List<double> tingiAllowedSizes;
+  final int? serviceDurationMinutes;
 }
 
 /// Mirrors Purch.Application.Catalog.CreateItemRequest. PricingType is fixed
@@ -111,4 +114,14 @@ class UpdateTingiConfigRequest {
     'tingiIncrementStep': tingiIncrementStep,
     'allowedSizes': allowedSizes,
   };
+}
+
+/// Mirrors Purch.Application.Catalog.UpdateServiceDurationRequest. Only
+/// meaningful for service-priced items — the backend rejects it otherwise.
+class UpdateServiceDurationRequest {
+  const UpdateServiceDurationRequest({required this.durationMinutes});
+
+  final int durationMinutes;
+
+  Map<String, dynamic> toJson() => {'durationMinutes': durationMinutes};
 }

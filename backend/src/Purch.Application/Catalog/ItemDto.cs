@@ -16,4 +16,5 @@ public sealed record ItemDto(
     TingiMode TingiMode,
     decimal? PackagedSize,
     decimal? TingiIncrementStep,
-    IReadOnlyList<decimal> TingiAllowedSizes);
+    IReadOnlyList<decimal> TingiAllowedSizes,
+    int? ServiceDurationMinutes);
