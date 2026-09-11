@@ -69,6 +69,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<ReceiptSequence> ReceiptSequences => Set<ReceiptSequence>();
 
+    public DbSet<Shift> Shifts => Set<Shift>();
+
     public DbSet<TenantMetering> TenantMeterings => Set<TenantMetering>();
 
     public DbSet<SyncedRecord> SyncedRecords => Set<SyncedRecord>();

@@ -10,6 +10,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Shifts;
 using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
@@ -77,6 +78,8 @@ builder.Services.AddScoped<ITransactionRepository, EfTransactionRepository>();
 builder.Services.AddScoped<IPaymentRepository, EfPaymentRepository>();
 builder.Services.AddScoped<IReceiptSequenceRepository, EfReceiptSequenceRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IShiftRepository, EfShiftRepository>();
+builder.Services.AddScoped<IShiftService, ShiftService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
@@ -124,6 +127,7 @@ app.MapAuthEndpoints();
 app.MapOnboardingEndpoints();
 app.MapCatalogEndpoints();
 app.MapPosEndpoints();
+app.MapShiftEndpoints();
 
 app.Run();
 
