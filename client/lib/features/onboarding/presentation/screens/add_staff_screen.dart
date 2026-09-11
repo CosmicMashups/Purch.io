@@ -1,33 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
-import '../providers/auth_providers.dart';
+import '../../domain/onboarding_enums.dart';
+import '../../domain/staff_models.dart';
+import '../providers/onboarding_providers.dart';
 
-/// The first screen any staff member sees on a paired device. Deliberately
-/// minimal per the design brief: one primary action (Log In), large touch
-/// targets, no dense menus — a cashier with no training should be able to
-/// use this without guidance.
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key, required this.onLoggedIn});
-
-  /// Called once login succeeds. Kept as a callback rather than baking in
-  /// go_router navigation here, since the full route tree isn't built yet —
-  /// this screen shouldn't need to change when it is.
-  final VoidCallback onLoggedIn;
+/// Creates a tenant-wide staff account (A4). Branch-scoped staff creation
+/// (assigning a specific branch/ScopeType.branch) is added once the branch
+/// management screen exists to pick a branch from.
+class AddStaffScreen extends ConsumerStatefulWidget {
+  const AddStaffScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<AddStaffScreen> createState() => _AddStaffScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _pairingCodeController = TextEditingController();
+  final _nameController = TextEditingController();
   final _pinController = TextEditingController();
+  StaffRole _role = StaffRole.cashier;
 
   @override
   void dispose() {
-    _pairingCodeController.dispose();
+    _nameController.dispose();
     _pinController.dispose();
     super.dispose();
   }
@@ -37,62 +33,78 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    final controller = ref.read(loginControllerProvider.notifier);
-    await controller.login(
-      devicePairingCode: _pairingCodeController.text.trim(),
-      pin: _pinController.text.trim(),
+    final controller = ref.read(createStaffControllerProvider.notifier);
+    final succeeded = await controller.create(
+      CreateStaffRequest(
+        name: _nameController.text.trim(),
+        role: _role,
+        pin: _pinController.text.trim(),
+      ),
     );
 
     if (!mounted) {
       return;
     }
 
-    final succeeded = !ref.read(loginControllerProvider).hasError;
     if (succeeded) {
-      widget.onLoggedIn();
+      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final loginState = ref.watch(loginControllerProvider);
-    final isLoading = loginState.isLoading;
-    final failure = ref.read(loginControllerProvider.notifier).currentFailure;
+    final createState = ref.watch(createStaffControllerProvider);
+    final isLoading = createState.isLoading;
+    final failure =
+        ref.read(createStaffControllerProvider.notifier).currentFailure;
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Add Staff')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(32),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.storefront, size: 64),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Purch.io',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 32),
                     TextFormField(
-                      controller: _pairingCodeController,
+                      controller: _nameController,
                       enabled: !isLoading,
                       decoration: const InputDecoration(
-                        labelText: 'Device pairing code',
+                        labelText: 'Full name',
                         border: OutlineInputBorder(),
                       ),
-                      textInputAction: TextInputAction.next,
                       validator:
                           (value) =>
                               (value == null || value.trim().isEmpty)
                                   ? 'Required'
                                   : null,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<StaffRole>(
+                      value: _role,
+                      decoration: const InputDecoration(
+                        labelText: 'Role',
+                        border: OutlineInputBorder(),
+                      ),
+                      items:
+                          StaffRole.values
+                              .map(
+                                (role) => DropdownMenuItem(
+                                  value: role,
+                                  child: Text(_label(role)),
+                                ),
+                              )
+                              .toList(),
+                      onChanged:
+                          isLoading
+                              ? null
+                              : (value) =>
+                                  setState(() => _role = value ?? _role),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -104,8 +116,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       keyboardType: TextInputType.number,
                       obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
                       validator:
                           (value) =>
                               (value == null || value.trim().isEmpty)
@@ -124,8 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ],
                     const SizedBox(height: 24),
                     SizedBox(
-                      height:
-                          56, // >= 48dp minimum touch target, per design brief
+                      height: 56,
                       child: FilledButton(
                         onPressed: isLoading ? null : _submit,
                         child:
@@ -137,20 +146,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     strokeWidth: 2.5,
                                   ),
                                 )
-                                : const Text('Log In'),
+                                : const Text('Add Staff Member'),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed:
-                          isLoading
-                              ? null
-                              : () => Navigator.of(context).push<void>(
-                                MaterialPageRoute(
-                                  builder: (_) => const BootstrapScreen(),
-                                ),
-                              ),
-                      child: const Text('Set up a new business'),
                     ),
                   ],
                 ),
@@ -161,4 +158,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+
+  String _label(StaffRole role) => switch (role) {
+    StaffRole.admin => 'Admin',
+    StaffRole.manager => 'Manager',
+    StaffRole.cashier => 'Cashier',
+    StaffRole.warehouse => 'Warehouse',
+  };
 }

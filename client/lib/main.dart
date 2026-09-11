@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/onboarding/presentation/screens/staff_list_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: PurchApp()));
@@ -65,12 +66,25 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Purch.io')),
       body: Center(
-        child: FilledButton(
-          onPressed: () async {
-            await ref.read(authRepositoryProvider).logout();
-            ref.invalidate(hasStoredSessionProvider);
-          },
-          child: const Text('Log Out'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const StaffListScreen()),
+                  ),
+              child: const Text('Manage Staff'),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () async {
+                await ref.read(authRepositoryProvider).logout();
+                ref.invalidate(hasStoredSessionProvider);
+              },
+              child: const Text('Log Out'),
+            ),
+          ],
         ),
       ),
     );
