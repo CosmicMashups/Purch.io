@@ -81,6 +81,36 @@ public static class CatalogEndpoints
             Results.Ok(await itemBatchService.ReceiveAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Bundle promo rules (B2b) ---
+        _ = app.MapGet("/items/{itemId:guid}/bundle-rules", async (
+            Guid itemId,
+            IBundlePromoRuleService bundlePromoRuleService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await bundlePromoRuleService.ListForItemAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/items/{itemId:guid}/bundle-rules", async (
+            Guid itemId,
+            CreateBundlePromoRuleRequest request,
+            IBundlePromoRuleService bundlePromoRuleService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await bundlePromoRuleService.CreateAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Variant matrix (B3) ---
+        _ = app.MapGet("/items/{itemId:guid}/variants", async (
+            Guid itemId,
+            IItemVariantService itemVariantService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemVariantService.ListForItemAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/items/{itemId:guid}/variants", async (
+            Guid itemId,
+            CreateItemVariantRequest request,
+            IItemVariantService itemVariantService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemVariantService.CreateAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         return app;
     }
 }

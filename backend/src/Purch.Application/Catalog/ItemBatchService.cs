@@ -13,7 +13,7 @@ public sealed class ItemBatchService(
 {
     public async Task<IReadOnlyList<ItemBatchDto>> ListForItemAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
-        _ = await GetWeightVolumeItemAsync(itemId, cancellationToken);
+        _ = await itemRepository.RequirePricingTypeAsync(itemId, PricingType.WeightVolume, cancellationToken);
 
         var batches = await itemBatchRepository.ListByItemAsync(itemId, cancellationToken);
         return [.. batches.Select(ToDto)];
@@ -31,7 +31,7 @@ public sealed class ItemBatchService(
             throw new ValidationException(nameof(request.QuantityReceived), "Quantity received must be greater than zero.");
         }
 
-        var item = await GetWeightVolumeItemAsync(itemId, cancellationToken);
+        var item = await itemRepository.RequirePricingTypeAsync(itemId, PricingType.WeightVolume, cancellationToken);
 
         var batch = new ItemBatch
         {
@@ -52,18 +52,6 @@ public sealed class ItemBatchService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return ToDto(batch);
-    }
-
-    private async Task<Item> GetWeightVolumeItemAsync(Guid itemId, CancellationToken cancellationToken)
-    {
-        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
-            ?? throw new NotFoundException("Item", itemId);
-
-        return item.PricingType != PricingType.WeightVolume
-            ? throw new ValidationException(
-                "ItemId",
-                "Batches can only be recorded against a weight/volume-priced item.")
-            : item;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
