@@ -66,6 +66,30 @@ public static class CatalogEndpoints
             Results.Ok(await modifierGroupService.AddModifierAsync(groupId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Item modifier group attachment (B5, item-scoped customization e.g. "No Ice") ---
+        _ = app.MapGet("/items/{itemId:guid}/modifier-groups", async (
+            Guid itemId,
+            IItemModifierGroupService itemModifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemModifierGroupService.ListForItemAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/items/{itemId:guid}/modifier-groups", async (
+            Guid itemId,
+            AttachModifierGroupRequest request,
+            IItemModifierGroupService itemModifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemModifierGroupService.AttachAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Tingi (sub-unit) selling config for weight/volume items ---
+        _ = app.MapPut("/items/{itemId:guid}/tingi-config", async (
+            Guid itemId,
+            UpdateTingiConfigRequest request,
+            IItemService itemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemService.UpdateTingiConfigAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Weight/volume batches (B2a) ---
         _ = app.MapGet("/items/{itemId:guid}/batches", async (
             Guid itemId,

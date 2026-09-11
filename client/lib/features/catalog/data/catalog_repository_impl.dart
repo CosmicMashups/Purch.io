@@ -111,6 +111,31 @@ class CatalogRepositoryImpl implements CatalogRepository {
     );
   }
 
+  @override
+  Future<List<ModifierGroup>> listModifierGroupsForItem(String itemId) {
+    return _getList('/items/$itemId/modifier-groups', ModifierGroup.fromJson);
+  }
+
+  @override
+  Future<ModifierGroup> attachModifierGroup(
+    String itemId,
+    AttachModifierGroupRequest request,
+  ) {
+    return _post(
+      '/items/$itemId/modifier-groups',
+      request.toJson(),
+      ModifierGroup.fromJson,
+    );
+  }
+
+  @override
+  Future<Item> updateTingiConfig(
+    String itemId,
+    UpdateTingiConfigRequest request,
+  ) {
+    return _put('/items/$itemId/tingi-config', request.toJson(), Item.fromJson);
+  }
+
   Future<T> _post<T>(
     String path,
     Map<String, dynamic> data,
@@ -118,6 +143,22 @@ class CatalogRepositoryImpl implements CatalogRepository {
   ) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        path,
+        data: data,
+      );
+      return fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  Future<T> _put<T>(
+    String path,
+    Map<String, dynamic> data,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    try {
+      final response = await _apiClient.dio.put<Map<String, dynamic>>(
         path,
         data: data,
       );

@@ -24,4 +24,16 @@ public class Item : TenantScopedEntity
     public bool IsActive { get; set; } = true;
 
     public Guid? DepartmentId { get; set; }
+
+    /// <summary>Tingi (sub-unit) selling config — meaningful only when PricingType is WeightVolume.</summary>
+    public TingiMode TingiMode { get; set; } = TingiMode.None;
+
+    /// <summary>The whole/original pack size (e.g. 50 for a 50kg sack) — also sellable as-is alongside any tingi sizes.</summary>
+    public decimal? PackagedSize { get; set; }
+
+    /// <summary>Used when TingiMode is Increment — customer may order any whole multiple of this, up to PackagedSize.</summary>
+    public decimal? TingiIncrementStep { get; set; }
+
+    /// <summary>Used when TingiMode is FixedSizes — JSON array of decimals, e.g. [10, 25].</summary>
+    public string? TingiAllowedSizesJson { get; set; }
 }

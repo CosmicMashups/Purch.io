@@ -279,3 +279,70 @@ class CreateVariantController extends _$CreateVariantController {
     return error is Failure ? error : null;
   }
 }
+
+/// One list per item (Riverpod family, inferred from the `itemId` parameter)
+/// — the modifier groups attached to that item, e.g. "Ice Level" on a drink.
+@riverpod
+class ItemModifierGroupList extends _$ItemModifierGroupList {
+  @override
+  Future<List<ModifierGroup>> build(String itemId) {
+    return ref
+        .watch(catalogRepositoryProvider)
+        .listModifierGroupsForItem(itemId);
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+@riverpod
+class AttachModifierGroupController extends _$AttachModifierGroupController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> attach(AttachModifierGroupRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.attachModifierGroup(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemModifierGroupListProvider(itemId).notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+@riverpod
+class UpdateTingiConfigController extends _$UpdateTingiConfigController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> updateTingiConfig(UpdateTingiConfigRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateTingiConfig(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}

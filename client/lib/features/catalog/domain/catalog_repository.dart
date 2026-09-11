@@ -5,8 +5,10 @@ import 'item_models.dart';
 import 'item_variant_models.dart';
 import 'modifier_models.dart';
 
-/// B1/B2's base item form + B5 (categories, modifier groups) + B2a
-/// (weight/volume batches) + B2b (bundle rules) + B3 (variant matrix).
+/// B1/B2's base item form + B5 (categories, modifier groups, item-scoped
+/// modifier group attachment for restaurant-style customization e.g. "No
+/// Ice"/"No Pickles") + B2a (weight/volume batches, incl. tingi/sub-unit
+/// selling config) + B2b (bundle rules) + B3 (variant matrix).
 /// Remaining pricing-type sub-resources: B2c (service duration), B4 (combo).
 abstract class CatalogRepository {
   Future<List<Category>> listCategories();
@@ -42,5 +44,17 @@ abstract class CatalogRepository {
   Future<ItemVariant> createVariant(
     String itemId,
     CreateItemVariantRequest request,
+  );
+
+  Future<List<ModifierGroup>> listModifierGroupsForItem(String itemId);
+
+  Future<ModifierGroup> attachModifierGroup(
+    String itemId,
+    AttachModifierGroupRequest request,
+  );
+
+  Future<Item> updateTingiConfig(
+    String itemId,
+    UpdateTingiConfigRequest request,
   );
 }

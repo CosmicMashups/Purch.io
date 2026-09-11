@@ -6,12 +6,16 @@ import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
 import 'bundle_rules_screen.dart';
 import 'item_batches_screen.dart';
+import 'item_modifier_groups_screen.dart';
+import 'tingi_config_screen.dart';
 import 'variants_screen.dart';
 
-/// B1's item catalog list. Tapping a weight/volume item opens its batches
-/// (B2a), a bundle item opens its bundle rules (B2b), and a variant-matrix
-/// item opens its variants (B3) — other pricing types have no sub-resource
-/// screen yet, so tapping them is a no-op for now.
+enum _ItemAction { batches, bundleRules, variants, customization, tingi }
+
+/// B1's item catalog list. Every item can have modifier groups attached for
+/// restaurant-style customization (B5, e.g. "No Ice"); pricing-type-specific
+/// actions (weight/volume batches + tingi config (B2a), bundle rules (B2b),
+/// variants (B3)) appear alongside it via a per-row menu.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -44,8 +48,6 @@ class ItemListScreen extends ConsumerWidget {
                 final isBundle = item.pricingType == PricingType.bundle;
                 final isVariantMatrix =
                     item.pricingType == PricingType.variantMatrix;
-                final hasSubResourceScreen =
-                    isWeightVolume || isBundle || isVariantMatrix;
 
                 return ListTile(
                   leading: CircleAvatar(
@@ -61,13 +63,12 @@ class ItemListScreen extends ConsumerWidget {
                         ? '₱${item.basePrice.toStringAsFixed(2)} · ${item.stockOnHand} in stock'
                         : '₱${item.basePrice.toStringAsFixed(2)}',
                   ),
-                  trailing:
-                      hasSubResourceScreen
-                          ? const Icon(Icons.chevron_right)
-                          : null,
-                  onTap:
-                      isWeightVolume
-                          ? () => Navigator.of(context).push<void>(
+                  trailing: PopupMenuButton<_ItemAction>(
+                    tooltip: 'Item actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _ItemAction.batches:
+                          Navigator.of(context).push<void>(
                             MaterialPageRoute(
                               builder:
                                   (_) => ItemBatchesScreen(
@@ -75,9 +76,10 @@ class ItemListScreen extends ConsumerWidget {
                                     itemName: item.name,
                                   ),
                             ),
-                          )
-                          : isBundle
-                          ? () => Navigator.of(context).push<void>(
+                          );
+                          break;
+                        case _ItemAction.bundleRules:
+                          Navigator.of(context).push<void>(
                             MaterialPageRoute(
                               builder:
                                   (_) => BundleRulesScreen(
@@ -85,9 +87,10 @@ class ItemListScreen extends ConsumerWidget {
                                     itemName: item.name,
                                   ),
                             ),
-                          )
-                          : isVariantMatrix
-                          ? () => Navigator.of(context).push<void>(
+                          );
+                          break;
+                        case _ItemAction.variants:
+                          Navigator.of(context).push<void>(
                             MaterialPageRoute(
                               builder:
                                   (_) => VariantsScreen(
@@ -95,8 +98,56 @@ class ItemListScreen extends ConsumerWidget {
                                     itemName: item.name,
                                   ),
                             ),
-                          )
-                          : null,
+                          );
+                          break;
+                        case _ItemAction.customization:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ItemModifierGroupsScreen(
+                                    itemId: item.id,
+                                    itemName: item.name,
+                                  ),
+                            ),
+                          );
+                          break;
+                        case _ItemAction.tingi:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => TingiConfigScreen(item: item),
+                            ),
+                          );
+                          break;
+                      }
+                    },
+                    itemBuilder:
+                        (context) => [
+                          if (isWeightVolume)
+                            const PopupMenuItem(
+                              value: _ItemAction.batches,
+                              child: Text('Batches'),
+                            ),
+                          if (isWeightVolume)
+                            const PopupMenuItem(
+                              value: _ItemAction.tingi,
+                              child: Text('Tingi selling'),
+                            ),
+                          if (isBundle)
+                            const PopupMenuItem(
+                              value: _ItemAction.bundleRules,
+                              child: Text('Bundle rules'),
+                            ),
+                          if (isVariantMatrix)
+                            const PopupMenuItem(
+                              value: _ItemAction.variants,
+                              child: Text('Variants'),
+                            ),
+                          const PopupMenuItem(
+                            value: _ItemAction.customization,
+                            child: Text('Customization'),
+                          ),
+                        ],
+                  ),
                 );
               },
             ),

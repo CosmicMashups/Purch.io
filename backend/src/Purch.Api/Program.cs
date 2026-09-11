@@ -59,6 +59,8 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IModifierGroupRepository, EfModifierGroupRepository>();
 builder.Services.AddScoped<IModifierGroupService, ModifierGroupService>();
+builder.Services.AddScoped<IItemModifierGroupRepository, EfItemModifierGroupRepository>();
+builder.Services.AddScoped<IItemModifierGroupService, ItemModifierGroupService>();
 builder.Services.AddScoped<IItemBatchRepository, EfItemBatchRepository>();
 builder.Services.AddScoped<IItemBatchService, ItemBatchService>();
 builder.Services.AddScoped<IBundlePromoRuleRepository, EfBundlePromoRuleRepository>();

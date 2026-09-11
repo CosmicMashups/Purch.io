@@ -76,3 +76,14 @@ class CreateItemModifierRequest {
 
   Map<String, dynamic> toJson() => {'name': name, 'priceDelta': priceDelta};
 }
+
+/// Mirrors Purch.Application.Catalog.AttachModifierGroupRequest — attaches an
+/// existing (possibly shared) modifier group to a specific item, e.g.
+/// attaching "Ice Level" to every cold drink.
+class AttachModifierGroupRequest {
+  const AttachModifierGroupRequest({required this.modifierGroupId});
+
+  final String modifierGroupId;
+
+  Map<String, dynamic> toJson() => {'modifierGroupId': modifierGroupId};
+}

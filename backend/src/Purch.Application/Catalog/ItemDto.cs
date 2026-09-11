@@ -12,4 +12,8 @@ public sealed record ItemDto(
     string? ImageUrl,
     PricingType PricingType,
     decimal StockOnHand,
-    bool IsActive);
+    bool IsActive,
+    TingiMode TingiMode,
+    decimal? PackagedSize,
+    decimal? TingiIncrementStep,
+    IReadOnlyList<decimal> TingiAllowedSizes);

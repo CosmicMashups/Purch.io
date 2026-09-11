@@ -5,6 +5,7 @@ import 'package:purch_client/features/catalog/domain/item_batch_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/item_variant_models.dart';
 import 'package:purch_client/features/catalog/domain/modifier_models.dart';
+import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
 
 class FakeCatalogRepository implements CatalogRepository {
   FakeCatalogRepository({
@@ -15,18 +16,22 @@ class FakeCatalogRepository implements CatalogRepository {
     this.receiveBatchFailure,
     this.createBundleRuleFailure,
     this.createVariantFailure,
+    this.attachModifierGroupFailure,
+    this.updateTingiConfigFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
     List<ItemBatch>? initialBatches,
     List<BundlePromoRule>? initialBundleRules,
     List<ItemVariant>? initialVariants,
+    Map<String, List<ModifierGroup>>? initialItemModifierGroups,
   }) : categories = initialCategories ?? [],
        items = initialItems ?? [],
        modifierGroups = initialModifierGroups ?? [],
        batches = initialBatches ?? [],
        bundleRules = initialBundleRules ?? [],
-       variants = initialVariants ?? [];
+       variants = initialVariants ?? [],
+       itemModifierGroups = initialItemModifierGroups ?? {};
 
   final Object? createCategoryFailure;
   final Object? createItemFailure;
@@ -35,12 +40,15 @@ class FakeCatalogRepository implements CatalogRepository {
   final Object? receiveBatchFailure;
   final Object? createBundleRuleFailure;
   final Object? createVariantFailure;
+  final Object? attachModifierGroupFailure;
+  final Object? updateTingiConfigFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
   final List<ItemBatch> batches;
   final List<BundlePromoRule> bundleRules;
   final List<ItemVariant> variants;
+  final Map<String, List<ModifierGroup>> itemModifierGroups;
 
   CreateItemRequest? lastCreateItemRequest;
   CreateItemBatchRequest? lastReceiveBatchRequest;
@@ -82,6 +90,10 @@ class FakeCatalogRepository implements CatalogRepository {
       pricingType: request.pricingType,
       stockOnHand: 0,
       isActive: true,
+      tingiMode: TingiMode.none,
+      packagedSize: null,
+      tingiIncrementStep: null,
+      tingiAllowedSizes: const [],
     );
     items.add(created);
     return created;
@@ -202,5 +214,55 @@ class FakeCatalogRepository implements CatalogRepository {
     );
     variants.add(created);
     return created;
+  }
+
+  @override
+  Future<List<ModifierGroup>> listModifierGroupsForItem(String itemId) async =>
+      itemModifierGroups[itemId] ?? [];
+
+  @override
+  Future<ModifierGroup> attachModifierGroup(
+    String itemId,
+    AttachModifierGroupRequest request,
+  ) async {
+    if (attachModifierGroupFailure != null) {
+      throw attachModifierGroupFailure!;
+    }
+    final group = modifierGroups.firstWhere(
+      (group) => group.id == request.modifierGroupId,
+    );
+    final attached = itemModifierGroups.putIfAbsent(itemId, () => []);
+    attached.add(group);
+    return group;
+  }
+
+  @override
+  Future<Item> updateTingiConfig(
+    String itemId,
+    UpdateTingiConfigRequest request,
+  ) async {
+    if (updateTingiConfigFailure != null) {
+      throw updateTingiConfigFailure!;
+    }
+    final index = items.indexWhere((item) => item.id == itemId);
+    final current = items[index];
+    final updated = Item(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+      basePrice: current.basePrice,
+      imageUrl: current.imageUrl,
+      pricingType: current.pricingType,
+      stockOnHand: current.stockOnHand,
+      isActive: current.isActive,
+      tingiMode: request.tingiMode,
+      packagedSize: request.packagedSize,
+      tingiIncrementStep: request.tingiIncrementStep,
+      tingiAllowedSizes: request.allowedSizes ?? const [],
+    );
+    items[index] = updated;
+    return updated;
   }
 }

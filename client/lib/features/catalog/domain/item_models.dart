@@ -1,4 +1,5 @@
 import 'pricing_type.dart';
+import 'tingi_mode.dart';
 
 /// Mirrors Purch.Application.Catalog.ItemDto.
 class Item {
@@ -13,6 +14,10 @@ class Item {
     required this.pricingType,
     required this.stockOnHand,
     required this.isActive,
+    required this.tingiMode,
+    required this.packagedSize,
+    required this.tingiIncrementStep,
+    required this.tingiAllowedSizes,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -27,6 +32,13 @@ class Item {
       pricingType: PricingType.values[json['pricingType'] as int],
       stockOnHand: (json['stockOnHand'] as num).toDouble(),
       isActive: json['isActive'] as bool,
+      tingiMode: TingiMode.values[json['tingiMode'] as int],
+      packagedSize: (json['packagedSize'] as num?)?.toDouble(),
+      tingiIncrementStep: (json['tingiIncrementStep'] as num?)?.toDouble(),
+      tingiAllowedSizes:
+          (json['tingiAllowedSizes'] as List<dynamic>)
+              .map((size) => (size as num).toDouble())
+              .toList(),
     );
   }
 
@@ -40,6 +52,10 @@ class Item {
   final PricingType pricingType;
   final double stockOnHand;
   final bool isActive;
+  final TingiMode tingiMode;
+  final double? packagedSize;
+  final double? tingiIncrementStep;
+  final List<double> tingiAllowedSizes;
 }
 
 /// Mirrors Purch.Application.Catalog.CreateItemRequest. PricingType is fixed
@@ -71,5 +87,28 @@ class CreateItemRequest {
     'basePrice': basePrice,
     'imageUrl': imageUrl,
     'pricingType': pricingType.index,
+  };
+}
+
+/// Mirrors Purch.Application.Catalog.UpdateTingiConfigRequest. Only meaningful
+/// for weight/volume items — the backend rejects it otherwise.
+class UpdateTingiConfigRequest {
+  const UpdateTingiConfigRequest({
+    required this.tingiMode,
+    this.packagedSize,
+    this.tingiIncrementStep,
+    this.allowedSizes,
+  });
+
+  final TingiMode tingiMode;
+  final double? packagedSize;
+  final double? tingiIncrementStep;
+  final List<double>? allowedSizes;
+
+  Map<String, dynamic> toJson() => {
+    'tingiMode': tingiMode.index,
+    'packagedSize': packagedSize,
+    'tingiIncrementStep': tingiIncrementStep,
+    'allowedSizes': allowedSizes,
   };
 }
