@@ -100,6 +100,13 @@ public static class OnboardingEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await settingsService.UpdateBarcodeSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // --- Credit ledger ("utang") toggle (B7) — full checkout enforcement (credit limits, due dates) is Phase 9 ---
+        _ = app.MapPut("/tenant/settings/credit-ledger", async (
+            UpdateCreditLedgerSettingRequest request,
+            ITenantSettingsService settingsService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settingsService.UpdateCreditLedgerSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
         // --- Security & access: audit log viewer (A6) ---
         _ = app.MapGet("/audit-logs", async (
             Guid? actorUserId,

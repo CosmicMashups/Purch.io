@@ -9,4 +9,6 @@ public interface ITenantSettingsService
     Task<TenantSettingsDto> UpdateBirSettingsAsync(UpdateBirSettingsRequest request, CancellationToken cancellationToken = default);
 
     Task<TenantSettingsDto> UpdateBarcodeSettingAsync(UpdateBarcodeSettingRequest request, CancellationToken cancellationToken = default);
+
+    Task<TenantSettingsDto> UpdateCreditLedgerSettingAsync(UpdateCreditLedgerSettingRequest request, CancellationToken cancellationToken = default);
 }

@@ -51,10 +51,32 @@ void main() {
     await tester.pumpWidget(_wrap(repository));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.byType(SwitchListTile));
-    await tester.tap(find.byType(SwitchListTile));
+    final barcodeSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Require a barcode for every item',
+    );
+    await tester.ensureVisible(barcodeSwitch);
+    await tester.tap(barcodeSwitch);
     await tester.pumpAndSettle();
 
     expect(repository.settings.requiresBarcodePerItem, isTrue);
+  });
+
+  testWidgets('toggling the credit ledger setting saves immediately', (
+    tester,
+  ) async {
+    final repository = FakeOnboardingRepository();
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    final creditLedgerSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Offer utang / credit sales',
+    );
+    await tester.ensureVisible(creditLedgerSwitch);
+    await tester.tap(creditLedgerSwitch);
+    await tester.pumpAndSettle();
+
+    expect(repository.settings.creditLedgerEnabled, isTrue);
   });
 }

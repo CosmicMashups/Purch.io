@@ -41,6 +41,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
     registeredBusinessName: null,
     registeredAddress: null,
     creditLedgerRetentionDays: null,
+    creditLedgerEnabled: false,
   );
 
   final Object? bootstrapFailure;
@@ -171,6 +172,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredBusinessName: settings.registeredBusinessName,
       registeredAddress: settings.registeredAddress,
       creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+      creditLedgerEnabled: settings.creditLedgerEnabled,
     );
     return settings;
   }
@@ -191,6 +193,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredBusinessName: request.registeredBusinessName,
       registeredAddress: request.registeredAddress,
       creditLedgerRetentionDays: request.creditLedgerRetentionDays,
+      creditLedgerEnabled: settings.creditLedgerEnabled,
     );
     return settings;
   }
@@ -211,6 +214,28 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredBusinessName: settings.registeredBusinessName,
       registeredAddress: settings.registeredAddress,
       creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+      creditLedgerEnabled: settings.creditLedgerEnabled,
+    );
+    return settings;
+  }
+
+  @override
+  Future<TenantSettings> updateCreditLedgerSetting(
+    bool creditLedgerEnabled,
+  ) async {
+    settings = TenantSettings(
+      id: settings.id,
+      name: settings.name,
+      businessType: settings.businessType,
+      brandingLogoUrl: settings.brandingLogoUrl,
+      brandingThemeColorHex: settings.brandingThemeColorHex,
+      brandingFontFamily: settings.brandingFontFamily,
+      requiresBarcodePerItem: settings.requiresBarcodePerItem,
+      tin: settings.tin,
+      registeredBusinessName: settings.registeredBusinessName,
+      registeredAddress: settings.registeredAddress,
+      creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+      creditLedgerEnabled: creditLedgerEnabled,
     );
     return settings;
   }

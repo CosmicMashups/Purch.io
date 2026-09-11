@@ -111,6 +111,13 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
+  Future<TenantSettings> updateCreditLedgerSetting(bool creditLedgerEnabled) {
+    return _put('/tenant/settings/credit-ledger', {
+      'creditLedgerEnabled': creditLedgerEnabled,
+    }, TenantSettings.fromJson);
+  }
+
+  @override
   Future<List<AuditLogEntry>> listAuditLogs() {
     return _getList('/audit-logs', AuditLogEntry.fromJson);
   }

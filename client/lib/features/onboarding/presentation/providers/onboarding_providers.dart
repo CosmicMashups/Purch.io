@@ -182,7 +182,8 @@ class CreateDeviceController extends _$CreateDeviceController {
   }
 }
 
-/// Loads and refreshes the tenant settings (A2 branding, A5 BIR, barcode toggle).
+/// Loads and refreshes the tenant settings (A2 branding, A5 BIR, barcode
+/// toggle, B7 credit ledger toggle).
 @riverpod
 class TenantSettingsNotifier extends _$TenantSettingsNotifier {
   @override
@@ -198,6 +199,10 @@ class TenantSettingsNotifier extends _$TenantSettingsNotifier {
 
   Future<bool> updateBarcodeSetting(bool requiresBarcodePerItem) => _update(
     (repository) => repository.updateBarcodeSetting(requiresBarcodePerItem),
+  );
+
+  Future<bool> updateCreditLedgerSetting(bool creditLedgerEnabled) => _update(
+    (repository) => repository.updateCreditLedgerSetting(creditLedgerEnabled),
   );
 
   Future<bool> _update(

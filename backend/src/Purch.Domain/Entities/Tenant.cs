@@ -33,4 +33,7 @@ public class Tenant : Entity
 
     // --- Utang ledger retention (NFR10) ---
     public int? CreditLedgerRetentionDays { get; set; }
+
+    /// <summary>B7 — whether this shop offers "utang"/credit sales at all. Off by default: credit limit checks and the ledger UI stay hidden until an admin opts in.</summary>
+    public bool CreditLedgerEnabled { get; set; }
 }

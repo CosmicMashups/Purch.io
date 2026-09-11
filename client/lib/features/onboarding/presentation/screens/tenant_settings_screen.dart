@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/tenant_settings_models.dart';
 import '../providers/onboarding_providers.dart';
 
-/// A2 (branding) + A5 (BIR/compliance) + the barcode-requirement toggle, all
-/// on one screen since they're all "tenant settings" from the same GET/PUT
-/// group of endpoints. Each section saves independently (its own button),
-/// matching how the backend exposes them as three separate PUT endpoints
-/// rather than one big form submission.
+/// A2 (branding) + A5 (BIR/compliance) + the barcode-requirement toggle + B7's
+/// credit ledger ("utang") toggle, all on one screen since they're all
+/// "tenant settings" from the same GET/PUT group of endpoints. Each section
+/// saves independently (its own button), matching how the backend exposes
+/// them as separate PUT endpoints rather than one big form submission.
 class TenantSettingsScreen extends ConsumerWidget {
   const TenantSettingsScreen({super.key});
 
@@ -63,6 +63,7 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     text: widget.initial.registeredAddress,
   );
   late bool _requiresBarcode = widget.initial.requiresBarcodePerItem;
+  late bool _creditLedgerEnabled = widget.initial.creditLedgerEnabled;
 
   @override
   void dispose() {
@@ -122,6 +123,13 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     await ref
         .read(tenantSettingsNotifierProvider.notifier)
         .updateBarcodeSetting(value);
+  }
+
+  Future<void> _toggleCreditLedger(bool value) async {
+    setState(() => _creditLedgerEnabled = value);
+    await ref
+        .read(tenantSettingsNotifierProvider.notifier)
+        .updateCreditLedgerSetting(value);
   }
 
   @override
@@ -224,6 +232,15 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                   title: const Text('Require a barcode for every item'),
                   value: _requiresBarcode,
                   onChanged: isSaving ? null : _toggleBarcodeRequirement,
+                ),
+                SwitchListTile(
+                  title: const Text('Offer utang / credit sales'),
+                  subtitle: const Text(
+                    'Lets cashiers record sales against a customer\'s credit '
+                    'ledger instead of collecting payment immediately.',
+                  ),
+                  value: _creditLedgerEnabled,
+                  onChanged: isSaving ? null : _toggleCreditLedger,
                 ),
               ],
             ),

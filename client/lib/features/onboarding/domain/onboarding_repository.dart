@@ -36,6 +36,8 @@ abstract class OnboardingRepository {
 
   Future<TenantSettings> updateBarcodeSetting(bool requiresBarcodePerItem);
 
+  Future<TenantSettings> updateCreditLedgerSetting(bool creditLedgerEnabled);
+
   Future<List<AuditLogEntry>> listAuditLogs();
 
   Future<List<Department>> listDepartments(String branchId);

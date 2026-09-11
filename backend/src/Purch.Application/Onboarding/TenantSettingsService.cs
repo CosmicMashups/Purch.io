@@ -59,6 +59,15 @@ public sealed partial class TenantSettingsService(
         return ToDto(tenant);
     }
 
+    public async Task<TenantSettingsDto> UpdateCreditLedgerSettingAsync(UpdateCreditLedgerSettingRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetCurrentTenantAsync(cancellationToken);
+        tenant.CreditLedgerEnabled = request.CreditLedgerEnabled;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return ToDto(tenant);
+    }
+
     private async Task<Domain.Entities.Tenant> GetCurrentTenantAsync(CancellationToken cancellationToken)
     {
         var tenantId = currentTenantProvider.TenantId
@@ -81,7 +90,8 @@ public sealed partial class TenantSettingsService(
         tenant.Tin,
         tenant.RegisteredBusinessName,
         tenant.RegisteredAddress,
-        tenant.CreditLedgerRetentionDays);
+        tenant.CreditLedgerRetentionDays,
+        tenant.CreditLedgerEnabled);
     }
 
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]

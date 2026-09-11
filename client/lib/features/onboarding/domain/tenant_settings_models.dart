@@ -14,6 +14,7 @@ class TenantSettings {
     required this.registeredBusinessName,
     required this.registeredAddress,
     required this.creditLedgerRetentionDays,
+    required this.creditLedgerEnabled,
   });
 
   factory TenantSettings.fromJson(Map<String, dynamic> json) {
@@ -29,6 +30,7 @@ class TenantSettings {
       registeredBusinessName: json['registeredBusinessName'] as String?,
       registeredAddress: json['registeredAddress'] as String?,
       creditLedgerRetentionDays: json['creditLedgerRetentionDays'] as int?,
+      creditLedgerEnabled: json['creditLedgerEnabled'] as bool,
     );
   }
 
@@ -43,6 +45,7 @@ class TenantSettings {
   final String? registeredBusinessName;
   final String? registeredAddress;
   final int? creditLedgerRetentionDays;
+  final bool creditLedgerEnabled;
 }
 
 /// Mirrors Purch.Application.Onboarding.UpdateBrandingRequest. logoUrl is an
@@ -85,4 +88,15 @@ class UpdateBirSettingsRequest {
     'registeredAddress': registeredAddress,
     'creditLedgerRetentionDays': creditLedgerRetentionDays,
   };
+}
+
+/// Mirrors Purch.Application.Onboarding.UpdateCreditLedgerSettingRequest —
+/// B7's toggle. Off by default: full checkout enforcement (credit limits,
+/// due-date reminders) is a Phase 9 concern once transaction data exists.
+class UpdateCreditLedgerSettingRequest {
+  const UpdateCreditLedgerSettingRequest({required this.creditLedgerEnabled});
+
+  final bool creditLedgerEnabled;
+
+  Map<String, dynamic> toJson() => {'creditLedgerEnabled': creditLedgerEnabled};
 }

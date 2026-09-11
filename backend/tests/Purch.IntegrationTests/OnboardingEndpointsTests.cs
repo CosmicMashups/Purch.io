@@ -137,6 +137,32 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Admin_can_toggle_the_credit_ledger_setting_and_it_defaults_to_off()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var settings = await client.GetFromJsonAsync<TenantSettingsDto>("/tenant/settings", JsonOptions);
+        Assert.False(settings!.CreditLedgerEnabled);
+
+        var enableResponse = await client.PutAsJsonAsync(
+            "/tenant/settings/credit-ledger",
+            new UpdateCreditLedgerSettingRequest(true));
+        Assert.Equal(HttpStatusCode.OK, enableResponse.StatusCode);
+        var afterEnable = await enableResponse.Content.ReadFromJsonAsync<TenantSettingsDto>(JsonOptions);
+        Assert.True(afterEnable!.CreditLedgerEnabled);
+
+        var disableResponse = await client.PutAsJsonAsync(
+            "/tenant/settings/credit-ledger",
+            new UpdateCreditLedgerSettingRequest(false));
+        var afterDisable = await disableResponse.Content.ReadFromJsonAsync<TenantSettingsDto>(JsonOptions);
+        Assert.False(afterDisable!.CreditLedgerEnabled);
+    }
+
+    [Fact]
     public async Task Invalid_theme_color_is_rejected_with_400()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

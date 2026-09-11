@@ -13,4 +13,5 @@ public sealed record TenantSettingsDto(
     string? Tin,
     string? RegisteredBusinessName,
     string? RegisteredAddress,
-    int? CreditLedgerRetentionDays);
+    int? CreditLedgerRetentionDays,
+    bool CreditLedgerEnabled);
