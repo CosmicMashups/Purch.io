@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/onboarding/presentation/screens/audit_log_screen.dart';
+import 'features/onboarding/presentation/screens/branch_list_screen.dart';
+import 'features/onboarding/presentation/screens/device_list_screen.dart';
 import 'features/onboarding/presentation/screens/staff_list_screen.dart';
+import 'features/onboarding/presentation/screens/tenant_settings_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: PurchApp()));
@@ -75,6 +79,40 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const StaffListScreen()),
                   ),
               child: const Text('Manage Staff'),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const BranchListScreen()),
+                  ),
+              child: const Text('Manage Branches'),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const DeviceListScreen()),
+                  ),
+              child: const Text('Manage Devices'),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const TenantSettingsScreen(),
+                    ),
+                  ),
+              child: const Text('Business Settings'),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const AuditLogScreen()),
+                  ),
+              child: const Text('Audit Log'),
             ),
             const SizedBox(height: 16),
             OutlinedButton(

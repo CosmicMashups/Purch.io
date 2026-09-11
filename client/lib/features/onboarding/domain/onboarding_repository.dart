@@ -1,12 +1,10 @@
+import 'audit_log_models.dart';
 import 'bootstrap_models.dart';
+import 'branch_models.dart';
+import 'device_models.dart';
 import 'staff_models.dart';
+import 'tenant_settings_models.dart';
 
-/// Covers the onboarding screens built so far (A1–A3 bootstrap, A4 staff).
-/// Branch/device management, tenant settings, and the audit log viewer have
-/// working backend endpoints already (see backend/src/Purch.Api/Endpoints/
-/// OnboardingEndpoints.cs) but no client screens yet — their repository
-/// methods land alongside those screens rather than being added speculatively
-/// ahead of any UI that would call them.
 abstract class OnboardingRepository {
   Future<BootstrapResult> bootstrap(BootstrapRequest request);
 
@@ -15,4 +13,27 @@ abstract class OnboardingRepository {
   Future<StaffMember> createStaff(CreateStaffRequest request);
 
   Future<StaffMember> updateStaff(String staffId, UpdateStaffRequest request);
+
+  Future<List<Branch>> listBranches();
+
+  Future<Branch> createBranch(CreateBranchRequest request);
+
+  Future<Branch> updateBranchHardwareSettings(
+    String branchId,
+    UpdateBranchHardwareSettingsRequest request,
+  );
+
+  Future<List<Device>> listDevices();
+
+  Future<Device> createDevice(CreateDeviceRequest request);
+
+  Future<TenantSettings> getTenantSettings();
+
+  Future<TenantSettings> updateBranding(UpdateBrandingRequest request);
+
+  Future<TenantSettings> updateBirSettings(UpdateBirSettingsRequest request);
+
+  Future<TenantSettings> updateBarcodeSetting(bool requiresBarcodePerItem);
+
+  Future<List<AuditLogEntry>> listAuditLogs();
 }

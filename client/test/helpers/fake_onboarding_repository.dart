@@ -1,21 +1,58 @@
+import 'package:purch_client/features/onboarding/domain/audit_log_models.dart';
 import 'package:purch_client/features/onboarding/domain/bootstrap_models.dart';
+import 'package:purch_client/features/onboarding/domain/branch_models.dart';
+import 'package:purch_client/features/onboarding/domain/device_models.dart';
+import 'package:purch_client/features/onboarding/domain/hardware_enums.dart';
 import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
 import 'package:purch_client/features/onboarding/domain/onboarding_repository.dart';
 import 'package:purch_client/features/onboarding/domain/staff_models.dart';
+import 'package:purch_client/features/onboarding/domain/tenant_settings_models.dart';
 
 class FakeOnboardingRepository implements OnboardingRepository {
   FakeOnboardingRepository({
     this.bootstrapFailure,
     this.createStaffFailure,
+    this.createBranchFailure,
+    this.createDeviceFailure,
     List<StaffMember>? initialStaff,
-  }) : staff = initialStaff ?? [];
+    List<Branch>? initialBranches,
+    List<Device>? initialDevices,
+    TenantSettings? initialSettings,
+    List<AuditLogEntry>? initialAuditLogs,
+  }) : staff = initialStaff ?? [],
+       branches = initialBranches ?? [],
+       devices = initialDevices ?? [],
+       settings = initialSettings ?? _defaultSettings,
+       auditLogs = initialAuditLogs ?? [];
+
+  static const _defaultSettings = TenantSettings(
+    id: 'tenant-1',
+    name: 'Test Tenant',
+    businessType: BusinessType.convenienceStore,
+    brandingLogoUrl: null,
+    brandingThemeColorHex: null,
+    brandingFontFamily: null,
+    requiresBarcodePerItem: false,
+    tin: null,
+    registeredBusinessName: null,
+    registeredAddress: null,
+    creditLedgerRetentionDays: null,
+  );
 
   final Object? bootstrapFailure;
   final Object? createStaffFailure;
+  final Object? createBranchFailure;
+  final Object? createDeviceFailure;
   final List<StaffMember> staff;
+  final List<Branch> branches;
+  final List<Device> devices;
+  TenantSettings settings;
+  final List<AuditLogEntry> auditLogs;
 
   BootstrapRequest? lastBootstrapRequest;
   CreateStaffRequest? lastCreateStaffRequest;
+  CreateBranchRequest? lastCreateBranchRequest;
+  CreateDeviceRequest? lastCreateDeviceRequest;
 
   @override
   Future<BootstrapResult> bootstrap(BootstrapRequest request) async {
@@ -61,4 +98,117 @@ class FakeOnboardingRepository implements OnboardingRepository {
   ) async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<List<Branch>> listBranches() async => branches;
+
+  @override
+  Future<Branch> createBranch(CreateBranchRequest request) async {
+    lastCreateBranchRequest = request;
+    if (createBranchFailure != null) {
+      throw createBranchFailure!;
+    }
+    final created = Branch(
+      id: 'branch-${branches.length + 1}',
+      name: request.name,
+      address: request.address,
+      receiptPrinterProfile: ReceiptPrinterProfile.none,
+      cashDrawerEnabled: false,
+      cashDrawerPolicy: CashDrawerPolicy.kickOnSaleOnly,
+    );
+    branches.add(created);
+    return created;
+  }
+
+  @override
+  Future<Branch> updateBranchHardwareSettings(
+    String branchId,
+    UpdateBranchHardwareSettingsRequest request,
+  ) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Device>> listDevices() async => devices;
+
+  @override
+  Future<Device> createDevice(CreateDeviceRequest request) async {
+    lastCreateDeviceRequest = request;
+    if (createDeviceFailure != null) {
+      throw createDeviceFailure!;
+    }
+    final created = Device(
+      id: 'device-${devices.length + 1}',
+      branchId: request.branchId,
+      pairingCode: 'CODE${devices.length + 1}',
+      deviceIdentifier: request.deviceIdentifier,
+      lastSeenAt: null,
+    );
+    devices.add(created);
+    return created;
+  }
+
+  @override
+  Future<TenantSettings> getTenantSettings() async => settings;
+
+  @override
+  Future<TenantSettings> updateBranding(UpdateBrandingRequest request) async {
+    settings = TenantSettings(
+      id: settings.id,
+      name: settings.name,
+      businessType: settings.businessType,
+      brandingLogoUrl: request.logoUrl,
+      brandingThemeColorHex: request.themeColorHex,
+      brandingFontFamily: request.fontFamily,
+      requiresBarcodePerItem: settings.requiresBarcodePerItem,
+      tin: settings.tin,
+      registeredBusinessName: settings.registeredBusinessName,
+      registeredAddress: settings.registeredAddress,
+      creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+    );
+    return settings;
+  }
+
+  @override
+  Future<TenantSettings> updateBirSettings(
+    UpdateBirSettingsRequest request,
+  ) async {
+    settings = TenantSettings(
+      id: settings.id,
+      name: settings.name,
+      businessType: settings.businessType,
+      brandingLogoUrl: settings.brandingLogoUrl,
+      brandingThemeColorHex: settings.brandingThemeColorHex,
+      brandingFontFamily: settings.brandingFontFamily,
+      requiresBarcodePerItem: settings.requiresBarcodePerItem,
+      tin: request.tin,
+      registeredBusinessName: request.registeredBusinessName,
+      registeredAddress: request.registeredAddress,
+      creditLedgerRetentionDays: request.creditLedgerRetentionDays,
+    );
+    return settings;
+  }
+
+  @override
+  Future<TenantSettings> updateBarcodeSetting(
+    bool requiresBarcodePerItem,
+  ) async {
+    settings = TenantSettings(
+      id: settings.id,
+      name: settings.name,
+      businessType: settings.businessType,
+      brandingLogoUrl: settings.brandingLogoUrl,
+      brandingThemeColorHex: settings.brandingThemeColorHex,
+      brandingFontFamily: settings.brandingFontFamily,
+      requiresBarcodePerItem: requiresBarcodePerItem,
+      tin: settings.tin,
+      registeredBusinessName: settings.registeredBusinessName,
+      registeredAddress: settings.registeredAddress,
+      creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+    );
+    return settings;
+  }
+
+  @override
+  Future<List<AuditLogEntry>> listAuditLogs() async => auditLogs;
 }
