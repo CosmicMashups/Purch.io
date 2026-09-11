@@ -10,4 +10,9 @@ public interface IBranchService
         Guid branchId,
         UpdateBranchHardwareSettingsRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<BranchDto> UpdateManualGcashQrSettingsAsync(
+        Guid branchId,
+        UpdateManualGcashQrSettingsRequest request,
+        CancellationToken cancellationToken = default);
 }

@@ -63,6 +63,35 @@ public sealed class BranchService(
         return ToDto(branch);
     }
 
+    public async Task<BranchDto> UpdateManualGcashQrSettingsAsync(
+        Guid branchId,
+        UpdateManualGcashQrSettingsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var branch = await branchRepository.GetByIdAsync(branchId, cancellationToken)
+            ?? throw new NotFoundException("Branch", branchId);
+
+        // A QR image with no account name/number to double-check against is a
+        // support headache waiting to happen — the cashier has nothing to read
+        // back to the customer if the scan doesn't look right.
+        if (!string.IsNullOrWhiteSpace(request.QrImageUrl) &&
+            string.IsNullOrWhiteSpace(request.AccountName) &&
+            string.IsNullOrWhiteSpace(request.AccountNumber))
+        {
+            throw new ValidationException(
+                nameof(request.AccountName),
+                "Add the GCash account name or number so staff can verify the QR matches.");
+        }
+
+        branch.ManualGcashQrImageUrl = request.QrImageUrl?.Trim();
+        branch.ManualGcashAccountName = request.AccountName?.Trim();
+        branch.ManualGcashAccountNumber = request.AccountNumber?.Trim();
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(branch);
+    }
+
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Branch management requires an authenticated tenant context.");
 
@@ -74,6 +103,9 @@ public sealed class BranchService(
         branch.Address,
         branch.ReceiptPrinterProfile,
         branch.CashDrawerEnabled,
-        branch.CashDrawerPolicy);
+        branch.CashDrawerPolicy,
+        branch.ManualGcashQrImageUrl,
+        branch.ManualGcashAccountName,
+        branch.ManualGcashAccountNumber);
     }
 }

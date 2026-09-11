@@ -15,6 +15,9 @@ const _mainBranch = Branch(
   receiptPrinterProfile: ReceiptPrinterProfile.none,
   cashDrawerEnabled: false,
   cashDrawerPolicy: CashDrawerPolicy.kickOnSaleOnly,
+  manualGcashQrImageUrl: null,
+  manualGcashAccountName: null,
+  manualGcashAccountNumber: null,
 );
 
 Widget _wrap(FakeOnboardingRepository repository) {

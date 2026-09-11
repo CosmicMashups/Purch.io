@@ -9,6 +9,9 @@ class Branch {
     required this.receiptPrinterProfile,
     required this.cashDrawerEnabled,
     required this.cashDrawerPolicy,
+    required this.manualGcashQrImageUrl,
+    required this.manualGcashAccountName,
+    required this.manualGcashAccountNumber,
   });
 
   factory Branch.fromJson(Map<String, dynamic> json) {
@@ -21,6 +24,9 @@ class Branch {
       cashDrawerEnabled: json['cashDrawerEnabled'] as bool,
       cashDrawerPolicy:
           CashDrawerPolicy.values[json['cashDrawerPolicy'] as int],
+      manualGcashQrImageUrl: json['manualGcashQrImageUrl'] as String?,
+      manualGcashAccountName: json['manualGcashAccountName'] as String?,
+      manualGcashAccountNumber: json['manualGcashAccountNumber'] as String?,
     );
   }
 
@@ -30,6 +36,13 @@ class Branch {
   final ReceiptPrinterProfile receiptPrinterProfile;
   final bool cashDrawerEnabled;
   final CashDrawerPolicy cashDrawerPolicy;
+
+  /// D5 — a merchant-uploaded static QR Ph code (e.g. GCash's own "receive
+  /// money" QR), paid directly into the tenant's own account with no gateway
+  /// fee and no webhook confirmation. Independent of Xendit's dynamic QR Ph.
+  final String? manualGcashQrImageUrl;
+  final String? manualGcashAccountName;
+  final String? manualGcashAccountNumber;
 }
 
 /// Mirrors Purch.Application.Onboarding.CreateBranchRequest.
@@ -61,5 +74,27 @@ class UpdateBranchHardwareSettingsRequest {
     'receiptPrinterProfile': receiptPrinterProfile.index,
     'cashDrawerEnabled': cashDrawerEnabled,
     'cashDrawerPolicy': cashDrawerPolicy.index,
+  };
+}
+
+/// Mirrors Purch.Application.Onboarding.UpdateManualGcashQrSettingsRequest.
+/// qrImageUrl is an already-hosted URL, not a file upload — same convention
+/// as branding's logo. The backend rejects a QR image with no account name
+/// or number to verify it against.
+class UpdateManualGcashQrSettingsRequest {
+  const UpdateManualGcashQrSettingsRequest({
+    this.qrImageUrl,
+    this.accountName,
+    this.accountNumber,
+  });
+
+  final String? qrImageUrl;
+  final String? accountName;
+  final String? accountNumber;
+
+  Map<String, dynamic> toJson() => {
+    'qrImageUrl': qrImageUrl,
+    'accountName': accountName,
+    'accountNumber': accountNumber,
   };
 }

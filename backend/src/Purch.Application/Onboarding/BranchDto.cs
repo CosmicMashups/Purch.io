@@ -8,4 +8,7 @@ public sealed record BranchDto(
     string? Address,
     ReceiptPrinterProfile ReceiptPrinterProfile,
     bool CashDrawerEnabled,
-    CashDrawerPolicy CashDrawerPolicy);
+    CashDrawerPolicy CashDrawerPolicy,
+    string? ManualGcashQrImageUrl,
+    string? ManualGcashAccountName,
+    string? ManualGcashAccountNumber);

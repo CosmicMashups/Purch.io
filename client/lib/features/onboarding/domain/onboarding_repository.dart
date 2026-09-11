@@ -24,6 +24,11 @@ abstract class OnboardingRepository {
     UpdateBranchHardwareSettingsRequest request,
   );
 
+  Future<Branch> updateManualGcashQrSettings(
+    String branchId,
+    UpdateManualGcashQrSettingsRequest request,
+  );
+
   Future<List<Device>> listDevices();
 
   Future<Device> createDevice(CreateDeviceRequest request);

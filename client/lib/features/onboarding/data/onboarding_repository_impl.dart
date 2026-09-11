@@ -64,6 +64,18 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
+  Future<Branch> updateManualGcashQrSettings(
+    String branchId,
+    UpdateManualGcashQrSettingsRequest request,
+  ) {
+    return _put(
+      '/branches/$branchId/manual-gcash-qr',
+      request.toJson(),
+      Branch.fromJson,
+    );
+  }
+
+  @override
   Future<List<Device>> listDevices() {
     return _getList('/devices', Device.fromJson);
   }

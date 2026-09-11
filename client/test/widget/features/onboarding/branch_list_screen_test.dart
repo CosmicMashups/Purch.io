@@ -42,4 +42,28 @@ void main() {
 
     expect(find.text('North Branch'), findsOneWidget);
   });
+
+  testWidgets('a branch row offers Manual GCash QR in its action menu', (
+    tester,
+  ) async {
+    final repository = FakeOnboardingRepository();
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Branch name'),
+      'South Branch',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Branch'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byWidgetPredicate((widget) => widget is PopupMenuButton),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Manual GCash QR'), findsOneWidget);
+  });
 }

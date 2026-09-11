@@ -145,6 +145,36 @@ class BranchHardwareSettingsController
   }
 }
 
+/// Drives editing a single branch's manual GCash QR (D5) settings.
+@riverpod
+class ManualGcashQrSettingsController
+    extends _$ManualGcashQrSettingsController {
+  @override
+  FutureOr<void> build() {}
+
+  Future<bool> updateSettings(
+    String branchId,
+    UpdateManualGcashQrSettingsRequest request,
+  ) async {
+    state = const AsyncLoading();
+    final repository = ref.read(onboardingRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateManualGcashQrSettings(branchId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(branchListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
 /// Loads and refreshes the device list (A3).
 @riverpod
 class DeviceList extends _$DeviceList {

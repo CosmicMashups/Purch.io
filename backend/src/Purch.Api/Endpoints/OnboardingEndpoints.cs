@@ -54,6 +54,15 @@ public static class OnboardingEndpoints
             Results.Ok(await branchService.UpdateHardwareSettingsAsync(branchId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // --- Manual GCash QR (D5) — a merchant-uploaded static QR Ph code, no gateway/fee ---
+        _ = app.MapPut("/branches/{branchId:guid}/manual-gcash-qr", async (
+            Guid branchId,
+            UpdateManualGcashQrSettingsRequest request,
+            IBranchService branchService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await branchService.UpdateManualGcashQrSettingsAsync(branchId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(admin));
+
         // --- Departments / concessionaires (B6) ---
         _ = app.MapGet("/branches/{branchId:guid}/departments", async (
             Guid branchId,

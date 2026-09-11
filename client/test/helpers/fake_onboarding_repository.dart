@@ -16,6 +16,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
     this.createBranchFailure,
     this.createDeviceFailure,
     this.createDepartmentFailure,
+    this.updateManualGcashQrSettingsFailure,
     List<StaffMember>? initialStaff,
     List<Branch>? initialBranches,
     List<Device>? initialDevices,
@@ -49,6 +50,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
   final Object? createBranchFailure;
   final Object? createDeviceFailure;
   final Object? createDepartmentFailure;
+  final Object? updateManualGcashQrSettingsFailure;
   final List<StaffMember> staff;
   final List<Branch> branches;
   final List<Device> devices;
@@ -122,6 +124,9 @@ class FakeOnboardingRepository implements OnboardingRepository {
       receiptPrinterProfile: ReceiptPrinterProfile.none,
       cashDrawerEnabled: false,
       cashDrawerPolicy: CashDrawerPolicy.kickOnSaleOnly,
+      manualGcashQrImageUrl: null,
+      manualGcashAccountName: null,
+      manualGcashAccountNumber: null,
     );
     branches.add(created);
     return created;
@@ -133,6 +138,31 @@ class FakeOnboardingRepository implements OnboardingRepository {
     UpdateBranchHardwareSettingsRequest request,
   ) async {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<Branch> updateManualGcashQrSettings(
+    String branchId,
+    UpdateManualGcashQrSettingsRequest request,
+  ) async {
+    if (updateManualGcashQrSettingsFailure != null) {
+      throw updateManualGcashQrSettingsFailure!;
+    }
+    final index = branches.indexWhere((branch) => branch.id == branchId);
+    final current = branches[index];
+    final updated = Branch(
+      id: current.id,
+      name: current.name,
+      address: current.address,
+      receiptPrinterProfile: current.receiptPrinterProfile,
+      cashDrawerEnabled: current.cashDrawerEnabled,
+      cashDrawerPolicy: current.cashDrawerPolicy,
+      manualGcashQrImageUrl: request.qrImageUrl,
+      manualGcashAccountName: request.accountName,
+      manualGcashAccountNumber: request.accountNumber,
+    );
+    branches[index] = updated;
+    return updated;
   }
 
   @override

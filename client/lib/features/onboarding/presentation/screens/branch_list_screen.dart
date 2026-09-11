@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/onboarding_providers.dart';
 import 'add_branch_screen.dart';
 import 'department_list_screen.dart';
+import 'manual_gcash_qr_settings_screen.dart';
+
+enum _BranchAction { departments, manualGcashQr }
 
 /// A3's branch list — multi-branch from the start (not single-enforced), per
-/// the implementation plan. Tapping a branch opens its departments (B6).
+/// the implementation plan. Each branch offers its departments (B6) and its
+/// manual GCash QR payment settings (D5) via a per-row menu.
 class BranchListScreen extends ConsumerWidget {
   const BranchListScreen({super.key});
 
@@ -39,17 +43,45 @@ class BranchListScreen extends ConsumerWidget {
                   title: Text(branch.name),
                   subtitle:
                       branch.address == null ? null : Text(branch.address!),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap:
-                      () => Navigator.of(context).push<void>(
-                        MaterialPageRoute(
-                          builder:
-                              (_) => DepartmentListScreen(
-                                branchId: branch.id,
-                                branchName: branch.name,
-                              ),
-                        ),
-                      ),
+                  trailing: PopupMenuButton<_BranchAction>(
+                    tooltip: 'Branch actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _BranchAction.departments:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => DepartmentListScreen(
+                                    branchId: branch.id,
+                                    branchName: branch.name,
+                                  ),
+                            ),
+                          );
+                          break;
+                        case _BranchAction.manualGcashQr:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ManualGcashQrSettingsScreen(
+                                    branch: branch,
+                                  ),
+                            ),
+                          );
+                          break;
+                      }
+                    },
+                    itemBuilder:
+                        (context) => const [
+                          PopupMenuItem(
+                            value: _BranchAction.departments,
+                            child: Text('Departments'),
+                          ),
+                          PopupMenuItem(
+                            value: _BranchAction.manualGcashQr,
+                            child: Text('Manual GCash QR'),
+                          ),
+                        ],
+                  ),
                 );
               },
             ),

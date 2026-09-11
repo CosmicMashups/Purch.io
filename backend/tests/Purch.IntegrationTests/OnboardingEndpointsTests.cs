@@ -198,6 +198,50 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Admin_can_set_the_manual_gcash_qr_for_a_branch()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+
+        var response = await client.PutAsJsonAsync(
+            $"/branches/{branchId}/manual-gcash-qr",
+            new UpdateManualGcashQrSettingsRequest(
+                "https://cdn.example.com/gcash-qr.png",
+                "Ana Dela Cruz",
+                "0917-000-0000"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<BranchDto>(JsonOptions);
+        Assert.Equal("https://cdn.example.com/gcash-qr.png", updated!.ManualGcashQrImageUrl);
+        Assert.Equal("Ana Dela Cruz", updated.ManualGcashAccountName);
+    }
+
+    [Fact]
+    public async Task Setting_a_manual_gcash_qr_image_with_no_account_name_or_number_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+
+        var response = await client.PutAsJsonAsync(
+            $"/branches/{branchId}/manual-gcash-qr",
+            new UpdateManualGcashQrSettingsRequest("https://cdn.example.com/gcash-qr.png", null, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Audit_log_endpoint_is_reachable_by_admin_and_returns_an_empty_list_before_any_sensitive_action()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
