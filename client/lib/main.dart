@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/catalog/presentation/screens/category_list_screen.dart';
+import 'features/catalog/presentation/screens/item_list_screen.dart';
 import 'features/onboarding/presentation/screens/audit_log_screen.dart';
 import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
@@ -70,59 +72,86 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Purch.io')),
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const StaffListScreen()),
-                  ),
-              child: const Text('Manage Staff'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const BranchListScreen()),
-                  ),
-              child: const Text('Manage Branches'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const DeviceListScreen()),
-                  ),
-              child: const Text('Manage Devices'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => const TenantSettingsScreen(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const StaffListScreen(),
+                      ),
                     ),
-                  ),
-              child: const Text('Business Settings'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed:
-                  () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const AuditLogScreen()),
-                  ),
-              child: const Text('Audit Log'),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () async {
-                await ref.read(authRepositoryProvider).logout();
-                ref.invalidate(hasStoredSessionProvider);
-              },
-              child: const Text('Log Out'),
-            ),
-          ],
+                child: const Text('Manage Staff'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const BranchListScreen(),
+                      ),
+                    ),
+                child: const Text('Manage Branches'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const DeviceListScreen(),
+                      ),
+                    ),
+                child: const Text('Manage Devices'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const TenantSettingsScreen(),
+                      ),
+                    ),
+                child: const Text('Business Settings'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(builder: (_) => const AuditLogScreen()),
+                    ),
+                child: const Text('Audit Log'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const CategoryListScreen(),
+                      ),
+                    ),
+                child: const Text('Manage Categories'),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(builder: (_) => const ItemListScreen()),
+                    ),
+                child: const Text('Manage Items'),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () async {
+                  await ref.read(authRepositoryProvider).logout();
+                  ref.invalidate(hasStoredSessionProvider);
+                },
+                child: const Text('Log Out'),
+              ),
+            ],
+          ),
         ),
       ),
     );
