@@ -9,6 +9,7 @@ using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Onboarding;
+using Purch.Application.Pos;
 using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<IDeploymentContext, ConfigDeploymentContext>();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
+builder.Services.AddScoped<ICurrentActorProvider, HttpContextCurrentActorProvider>();
 
 builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 {
@@ -71,6 +73,8 @@ builder.Services.AddScoped<IItemVariantRepository, EfItemVariantRepository>();
 builder.Services.AddScoped<IItemVariantService, ItemVariantService>();
 builder.Services.AddScoped<IItemComboComponentRepository, EfItemComboComponentRepository>();
 builder.Services.AddScoped<IItemComboComponentService, ItemComboComponentService>();
+builder.Services.AddScoped<ITransactionRepository, EfTransactionRepository>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
@@ -117,6 +121,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
 app.MapOnboardingEndpoints();
 app.MapCatalogEndpoints();
+app.MapPosEndpoints();
 
 app.Run();
 

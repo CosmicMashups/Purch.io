@@ -11,6 +11,7 @@ import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
 import 'features/onboarding/presentation/screens/staff_list_screen.dart';
 import 'features/onboarding/presentation/screens/tenant_settings_screen.dart';
+import 'features/pos/presentation/screens/item_grid_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: PurchApp()));
@@ -78,6 +79,14 @@ class _PlaceholderHomeScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(builder: (_) => const ItemGridScreen()),
+                    ),
+                child: const Text('New Sale'),
+              ),
+              const SizedBox(height: 16),
               FilledButton(
                 onPressed:
                     () => Navigator.of(context).push<void>(

@@ -12,7 +12,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
 {
     private readonly IConfiguration _configuration = configuration;
 
-    public string IssueAccessToken(User user)
+    public string IssueAccessToken(User user, Device device)
     {
         var signingKey = _configuration["JWT_SIGNING_KEY"]
             ?? throw new InvalidOperationException("JWT_SIGNING_KEY is not configured.");
@@ -24,16 +24,16 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             new(JwtClaimTypes.TenantId, user.TenantId.ToString()),
             new(JwtClaimTypes.Role, user.Role.ToString()),
             new(JwtClaimTypes.ScopeType, user.ScopeType.ToString()),
+            new(JwtClaimTypes.DeviceId, device.Id.ToString()),
+            // The device's own branch, not the user's — a tenant-scoped staff
+            // member's User.BranchId is null, but a transaction always happens
+            // at one physical terminal's branch.
+            new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
         };
 
         if (user.ScopeId is { } scopeId)
         {
             claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
-        }
-
-        if (user.BranchId is { } branchId)
-        {
-            claims.Add(new Claim(JwtClaimTypes.BranchId, branchId.ToString()));
         }
 
         var credentials = new SigningCredentials(

@@ -83,7 +83,7 @@ public sealed class LoginServiceValidationTests
 
     private sealed class NeverCalledJwtTokenService : IJwtTokenService
     {
-        public string IssueAccessToken(User user)
+        public string IssueAccessToken(User user, Device device)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

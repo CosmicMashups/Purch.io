@@ -26,7 +26,7 @@ public sealed class LoginService(
             return new LoginResult.InvalidPin();
         }
 
-        var accessToken = jwtTokenService.IssueAccessToken(matchedUser);
+        var accessToken = jwtTokenService.IssueAccessToken(matchedUser, device);
         return new LoginResult.Success(accessToken);
     }
 

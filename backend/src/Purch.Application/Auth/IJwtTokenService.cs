@@ -4,5 +4,6 @@ namespace Purch.Application.Auth;
 
 public interface IJwtTokenService
 {
-    string IssueAccessToken(User user);
+    /// <summary>device is the physical terminal being logged into — its BranchId is the ground truth for where a transaction happens, since a tenant-scoped staff member's own User.BranchId can be null.</summary>
+    string IssueAccessToken(User user, Device device);
 }

@@ -7,6 +7,11 @@ namespace Purch.Infrastructure.Repositories;
 
 public sealed class EfItemVariantRepository(PurchDbContext dbContext) : IItemVariantRepository
 {
+    public Task<ItemVariant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.ItemVariants.FirstOrDefaultAsync(variant => variant.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ItemVariant>> ListByItemAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         return await dbContext.ItemVariants
