@@ -19,6 +19,9 @@ class Transaction {
     required this.promoDiscountAmount,
     required this.totalAmount,
     required this.receiptNumber,
+    this.orderType,
+    this.originatedFromKiosk = false,
+    this.kioskPrepNumber,
     required this.payments,
   });
 
@@ -40,6 +43,9 @@ class Transaction {
       promoDiscountAmount: (json['promoDiscountAmount'] as num).toDouble(),
       totalAmount: (json['totalAmount'] as num).toDouble(),
       receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
+      orderType: json['orderType'] as String?,
+      originatedFromKiosk: json['originatedFromKiosk'] as bool,
+      kioskPrepNumber: (json['kioskPrepNumber'] as num?)?.toInt(),
       payments:
           (json['payments'] as List<dynamic>)
               .cast<Map<String, dynamic>>()
@@ -60,6 +66,9 @@ class Transaction {
   final double promoDiscountAmount;
   final double totalAmount;
   final int? receiptNumber;
+  final String? orderType;
+  final bool originatedFromKiosk;
+  final int? kioskPrepNumber;
   final List<Payment> payments;
 
   int get itemCount =>
@@ -244,4 +253,14 @@ class ApplyPromoCodeRequest {
   final String? code;
 
   Map<String, dynamic> toJson() => {'code': code};
+}
+
+/// Mirrors Purch.Application.Pos.SetOrderTypeRequest — E4's fulfillment
+/// choice (e.g. "Dine In"/"Take Out"). Free-form, not a fixed enum.
+class SetOrderTypeRequest {
+  const SetOrderTypeRequest({required this.orderType});
+
+  final String orderType;
+
+  Map<String, dynamic> toJson() => {'orderType': orderType};
 }

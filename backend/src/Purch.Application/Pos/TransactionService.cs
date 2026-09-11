@@ -16,6 +16,7 @@ public sealed class TransactionService(
     ITransactionRepository transactionRepository,
     IPaymentRepository paymentRepository,
     IReceiptSequenceRepository receiptSequenceRepository,
+    IKioskPrepSequenceRepository kioskPrepSequenceRepository,
     IItemRepository itemRepository,
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
@@ -326,6 +327,86 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
+    public async Task<TransactionDto> SetOrderTypeAsync(SetOrderTypeRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.OrderType))
+        {
+            throw new ValidationException(nameof(request.OrderType), "Order type is required.");
+        }
+
+        var deviceId = CurrentDeviceId;
+        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open cart", deviceId);
+
+        cart.OrderType = request.OrderType.Trim();
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    public async Task<TransactionDto> SubmitKioskOrderAsync(CancellationToken cancellationToken = default)
+    {
+        var deviceId = CurrentDeviceId;
+        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open cart", deviceId);
+
+        if (cart.TotalAmount <= 0)
+        {
+            throw new ValidationException(nameof(cart.TotalAmount), "Add at least one item before submitting your order.");
+        }
+
+        cart.OriginatedFromKiosk = true;
+        cart.Status = TransactionStatus.AwaitingPayment;
+
+        var sequence = await kioskPrepSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, CurrentBranchId, cancellationToken);
+        sequence.LastIssuedNumber += 1;
+        cart.KioskPrepNumber = sequence.LastIssuedNumber;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default)
+    {
+        var pending = await transactionRepository.ListPendingKioskOrdersByBranchAsync(branchId, cancellationToken);
+        var dtos = new List<TransactionDto>();
+        foreach (var order in pending)
+        {
+            dtos.Add(await ToDtoAsync(order, cancellationToken));
+        }
+
+        return dtos;
+    }
+
+    public async Task<TransactionDto> ClaimKioskOrderAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        var order = await transactionRepository.GetByIdAsync(transactionId, cancellationToken);
+        if (order is null
+            || order.TenantId != CurrentTenantId
+            || order.BranchId != CurrentBranchId
+            || !order.OriginatedFromKiosk
+            || order.Status != TransactionStatus.AwaitingPayment)
+        {
+            throw new NotFoundException("Pending kiosk order", transactionId);
+        }
+
+        var deviceId = CurrentDeviceId;
+        var existingCart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken);
+        if (existingCart is not null)
+        {
+            throw new ValidationException(nameof(transactionId), "Finish or void your current cart before claiming a kiosk order.");
+        }
+
+        order.DeviceId = deviceId;
+        order.StaffUserId = CurrentUserId;
+        order.Status = TransactionStatus.Open;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(order, cancellationToken);
+    }
+
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
     {
         var line = await transactionRepository.GetLineAsync(lineId, cancellationToken)
@@ -351,7 +432,7 @@ public sealed class TransactionService(
             TenantId = CurrentTenantId,
             BranchId = CurrentBranchId,
             DeviceId = deviceId,
-            StaffUserId = CurrentUserId,
+            StaffUserId = currentActorProvider.UserId,
             Status = TransactionStatus.Open,
         };
 
@@ -454,6 +535,9 @@ public sealed class TransactionService(
             transaction.PromoDiscountAmount,
             transaction.TotalAmount,
             transaction.ReceiptNumber == 0 ? null : transaction.ReceiptNumber,
+            transaction.OrderType,
+            transaction.OriginatedFromKiosk,
+            transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,
             paymentDtos);
     }
 

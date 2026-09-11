@@ -13,6 +13,7 @@ import 'features/inventory/presentation/screens/inventory_dashboard_screen.dart'
 import 'features/inventory/presentation/screens/movement_log_screen.dart';
 import 'features/inventory/presentation/screens/purchase_order_list_screen.dart';
 import 'features/inventory/presentation/screens/supplier_list_screen.dart';
+import 'features/kiosk/presentation/screens/kiosk_landing_screen.dart';
 import 'features/onboarding/presentation/screens/audit_log_screen.dart';
 import 'features/onboarding/presentation/screens/branch_list_screen.dart';
 import 'features/onboarding/presentation/screens/device_list_screen.dart';
@@ -55,6 +56,12 @@ class _StartupGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasSession = ref.watch(hasStoredSessionProvider);
+    final role = ref.watch(storedSessionRoleProvider);
+
+    void reevaluateSession() {
+      ref.invalidate(hasStoredSessionProvider);
+      ref.invalidate(storedSessionRoleProvider);
+    }
 
     return hasSession.when(
       loading:
@@ -63,13 +70,28 @@ class _StartupGate extends ConsumerWidget {
       error:
           (error, stackTrace) =>
               Scaffold(body: Center(child: Text('Startup failed: $error'))),
-      data:
-          (loggedIn) =>
-              loggedIn
-                  ? const _PlaceholderHomeScreen()
-                  : LoginScreen(
-                    onLoggedIn: () => ref.invalidate(hasStoredSessionProvider),
-                  ),
+      data: (loggedIn) {
+        if (!loggedIn) {
+          return LoginScreen(onLoggedIn: reevaluateSession);
+        }
+
+        // A Kiosk-role token routes to the portrait kiosk shell instead of
+        // the staff app shell — a separate route tree entirely, see Phase 7.
+        return role.when(
+          loading:
+              () => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (error, stackTrace) =>
+                  Scaffold(body: Center(child: Text('Startup failed: $error'))),
+          data:
+              (roleValue) =>
+                  roleValue == 'Kiosk'
+                      ? const KioskLandingScreen()
+                      : const _PlaceholderHomeScreen(),
+        );
+      },
     );
   }
 }

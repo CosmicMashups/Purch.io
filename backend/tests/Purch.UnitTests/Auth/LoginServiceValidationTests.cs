@@ -92,5 +92,10 @@ public sealed class LoginServiceValidationTests
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
+
+        public string IssueKioskAccessToken(Device device)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
     }
 }

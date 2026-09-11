@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/auth/jwt_claims.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_token_storage.dart';
@@ -32,6 +33,15 @@ AuthRepository authRepository(Ref ref) {
 @riverpod
 Future<bool> hasStoredSession(Ref ref) {
   return ref.watch(authRepositoryProvider).hasStoredSession();
+}
+
+/// The stored token's "role" claim, read directly off the token rather than
+/// a second stored flag — a Kiosk-role token routes the app to the kiosk
+/// shell at startup instead of the staff app shell (see PurchApp).
+@riverpod
+Future<String?> storedSessionRole(Ref ref) async {
+  final token = await ref.watch(secureTokenStorageProvider).readAccessToken();
+  return token == null ? null : roleClaimFromJwt(token);
 }
 
 /// Drives the login screen: call `login(...)`, watch this provider's

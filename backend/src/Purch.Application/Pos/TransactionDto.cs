@@ -15,6 +15,9 @@ public sealed record TransactionDto(
     decimal PromoDiscountAmount,
     decimal TotalAmount,
     long? ReceiptNumber,
+    string? OrderType,
+    bool OriginatedFromKiosk,
+    long? KioskPrepNumber,
     IReadOnlyList<PaymentDto> Payments);
 
 public sealed record TransactionLineDto(

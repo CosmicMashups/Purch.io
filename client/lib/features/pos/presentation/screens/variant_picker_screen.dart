@@ -10,9 +10,14 @@ import '../providers/pos_providers.dart';
 /// PricingType.variantMatrix item to add, since the backend prices and
 /// tracks stock per variant rather than per item.
 class VariantPickerScreen extends ConsumerWidget {
-  const VariantPickerScreen({super.key, required this.item});
+  const VariantPickerScreen({super.key, required this.item, this.addLine});
 
   final Item item;
+
+  /// Overrides how an add-to-cart is performed — defaults to the POS cart
+  /// (cartNotifierProvider) when omitted. The kiosk feature passes its own
+  /// kioskCartNotifierProvider-backed callback to reuse this screen as-is.
+  final Future<bool> Function(AddTransactionLineRequest)? addLine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,8 +51,12 @@ class VariantPickerScreen extends ConsumerWidget {
                     variant.sku != null ? Text('SKU: ${variant.sku}') : null,
                 trailing: Text('₱${price.toStringAsFixed(2)}'),
                 onTap: () async {
-                  final controller = ref.read(cartNotifierProvider.notifier);
-                  final succeeded = await controller.addLine(
+                  final add =
+                      addLine ??
+                      (request) => ref
+                          .read(cartNotifierProvider.notifier)
+                          .addLine(request);
+                  final succeeded = await add(
                     AddTransactionLineRequest(
                       itemId: item.id,
                       itemVariantId: variant.id,

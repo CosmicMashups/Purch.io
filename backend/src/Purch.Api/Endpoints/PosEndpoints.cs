@@ -65,6 +65,29 @@ public static class PosEndpoints
             Results.Ok(await transactionService.ApplyPromoCodeAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapPut("/transactions/cart/order-type", async (
+            SetOrderTypeRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.SetOrderTypeAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
+        // --- Kiosk order pickup — a cashier POS claims a pending kiosk order,
+        // then finishes it through the exact same payment/discount pipeline above ---
+        _ = app.MapGet("/transactions/kiosk-pending", async (
+            Guid branchId,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
+        _ = app.MapPost("/transactions/kiosk-pending/{transactionId:guid}/claim", async (
+            Guid transactionId,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.ClaimKioskOrderAsync(transactionId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         return app;
     }
 }

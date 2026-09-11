@@ -77,6 +77,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<SyncedRecord> SyncedRecords => Set<SyncedRecord>();
 
+    public DbSet<KioskPrepSequence> KioskPrepSequences => Set<KioskPrepSequence>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);

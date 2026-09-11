@@ -21,6 +21,9 @@ public interface ITransactionRepository
     /// <summary>Voided carts on this device since the given time — voided carts never get a receipt number, so they can't be selected by range.</summary>
     Task<IReadOnlyList<Transaction>> ListVoidedByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
 
+    /// <summary>Kiosk orders submitted at this branch, awaiting pickup by a cashier — see TransactionService.SubmitKioskOrderAsync/ClaimKioskOrderAsync.</summary>
+    Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
+
     void Add(Transaction transaction);
 
     void AddLine(TransactionLine line);

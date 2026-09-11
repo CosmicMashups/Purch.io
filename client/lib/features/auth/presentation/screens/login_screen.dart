@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../kiosk/presentation/screens/kiosk_pairing_screen.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
 import '../providers/auth_providers.dart';
 
@@ -64,7 +65,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(32),
               child: Form(
                 key: _formKey,
@@ -151,6 +152,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                       child: const Text('Set up a new business'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => KioskPairingScreen(
+                                        onPaired: widget.onLoggedIn,
+                                      ),
+                                ),
+                              ),
+                      child: const Text('Set up as a self-order kiosk'),
                     ),
                   ],
                 ),

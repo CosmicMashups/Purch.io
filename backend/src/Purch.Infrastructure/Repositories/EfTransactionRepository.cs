@@ -61,6 +61,17 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Transactions
+            .Where(transaction =>
+                transaction.BranchId == branchId
+                && transaction.OriginatedFromKiosk
+                && transaction.Status == TransactionStatus.AwaitingPayment)
+            .OrderBy(transaction => transaction.KioskPrepNumber)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(Transaction transaction)
     {
         _ = dbContext.Transactions.Add(transaction);

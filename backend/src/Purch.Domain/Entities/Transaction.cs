@@ -12,7 +12,10 @@ public class Transaction : TenantScopedEntity
     /// <summary>Sequential per branch/device, server-generated — see ReceiptSequence.</summary>
     public long ReceiptNumber { get; set; }
 
-    public Guid StaffUserId { get; set; }
+    /// <summary>Null until a kiosk-originated order is claimed by a cashier — a kiosk
+    /// terminal has no staff user, so this can't be required at creation time the
+    /// way a POS-originated cart's is.</summary>
+    public Guid? StaffUserId { get; set; }
 
     public TransactionStatus Status { get; set; } = TransactionStatus.Open;
 
@@ -33,4 +36,10 @@ public class Transaction : TenantScopedEntity
 
     /// <summary>Kiosk-originated orders are prep-only — set true, payment always finalized at cashier POS.</summary>
     public bool OriginatedFromKiosk { get; set; }
+
+    /// <summary>Customer-facing pickup number issued when a kiosk order is submitted
+    /// (see KioskPrepSequence) — a separate series from ReceiptNumber, since a prep
+    /// number is issued before payment and ReceiptNumber must only ever correspond
+    /// to a completed, paid sale (BIR requirement). 0 means unissued.</summary>
+    public long KioskPrepNumber { get; set; }
 }

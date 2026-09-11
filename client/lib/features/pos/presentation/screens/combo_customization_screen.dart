@@ -15,9 +15,14 @@ import '../providers/pos_providers.dart';
 /// upcharge as a flat amount rather than per specific component, see
 /// TransactionService.ResolveComboSelectionsAsync's doc comment.
 class ComboCustomizationScreen extends ConsumerStatefulWidget {
-  const ComboCustomizationScreen({super.key, required this.item});
+  const ComboCustomizationScreen({super.key, required this.item, this.addLine});
 
   final Item item;
+
+  /// Overrides how an add-to-cart is performed — defaults to the POS cart
+  /// (cartNotifierProvider) when omitted. The kiosk feature passes its own
+  /// kioskCartNotifierProvider-backed callback to reuse this screen as-is.
+  final Future<bool> Function(AddTransactionLineRequest)? addLine;
 
   @override
   ConsumerState<ComboCustomizationScreen> createState() =>
@@ -55,8 +60,10 @@ class _ComboCustomizationScreenState
           ComboSelectionRequest(slotId: slot.id, selectedItemId: itemId),
     ];
 
-    final controller = ref.read(cartNotifierProvider.notifier);
-    final succeeded = await controller.addLine(
+    final add =
+        widget.addLine ??
+        (request) => ref.read(cartNotifierProvider.notifier).addLine(request);
+    final succeeded = await add(
       AddTransactionLineRequest(
         itemId: widget.item.id,
         quantity: 1,
