@@ -153,6 +153,128 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.NotEqual(original!.Id, fresh!.Id);
     }
 
+    [Fact]
+    public async Task Paying_cash_with_enough_tendered_completes_the_sale_and_issues_a_receipt_number()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Soft Drink", null, null, null, 25m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 2m));
+
+        var paymentResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/payments",
+            new RecordPaymentRequest(PaymentMethod.Cash, 100m));
+
+        Assert.Equal(HttpStatusCode.OK, paymentResponse.StatusCode);
+        var completed = await paymentResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(TransactionStatus.Completed, completed!.Status);
+        Assert.Equal(1, completed.ReceiptNumber);
+        var payment = Assert.Single(completed.Payments);
+        Assert.Equal(50m, payment.Amount);
+        Assert.Equal(50m, payment.ChangeGiven);
+
+        var nextCart = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+        Assert.NotEqual(completed.Id, nextCart!.Id);
+    }
+
+    [Fact]
+    public async Task Cash_tendered_less_than_the_total_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Energy Drink", null, null, null, 60m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var paymentResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/payments",
+            new RecordPaymentRequest(PaymentMethod.Cash, 10m));
+
+        Assert.Equal(HttpStatusCode.BadRequest, paymentResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Paying_with_manual_gcash_qr_completes_the_sale_without_requiring_tendered_amount()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Notebook", null, null, null, 45m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var paymentResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/payments",
+            new RecordPaymentRequest(PaymentMethod.ManualGcashQr, null));
+
+        Assert.Equal(HttpStatusCode.OK, paymentResponse.StatusCode);
+        var completed = await paymentResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(TransactionStatus.Completed, completed!.Status);
+    }
+
+    [Fact]
+    public async Task Paying_via_qr_ph_is_rejected_as_not_yet_available()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Umbrella", null, null, null, 199m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item!.Id, null, 1m));
+
+        var paymentResponse = await client.PostAsJsonAsync(
+            "/transactions/cart/payments",
+            new RecordPaymentRequest(PaymentMethod.QrPh, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, paymentResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Receipt_numbers_increment_sequentially_per_device_across_separate_sales()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Pen", null, null, null, 10m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item!.Id, null, 1m));
+        var firstPayment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 10m));
+        var firstCompleted = await firstPayment.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        var secondPayment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 10m));
+        var secondCompleted = await secondPayment.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(1, firstCompleted!.ReceiptNumber);
+        Assert.Equal(2, secondCompleted!.ReceiptNumber);
+    }
+
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
     {
         var client = factory.CreateClient();

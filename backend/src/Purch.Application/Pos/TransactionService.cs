@@ -13,12 +13,22 @@ namespace Purch.Application.Pos;
 /// </summary>
 public sealed class TransactionService(
     ITransactionRepository transactionRepository,
+    IPaymentRepository paymentRepository,
+    IReceiptSequenceRepository receiptSequenceRepository,
     IItemRepository itemRepository,
     IItemVariantRepository itemVariantRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
 {
+    private static readonly HashSet<PaymentMethod> SupportedPaymentMethods =
+    [
+        PaymentMethod.Cash,
+        PaymentMethod.BankTransfer,
+        PaymentMethod.ManualGcashQr,
+    ];
+
+
     public async Task<TransactionDto> GetOrCreateOpenCartAsync(CancellationToken cancellationToken = default)
     {
         var transaction = await GetOrCreateOpenTransactionAsync(cancellationToken);
@@ -130,6 +140,56 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
+    public async Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!SupportedPaymentMethods.Contains(request.Method))
+        {
+            throw new ValidationException(
+                nameof(request.Method),
+                $"{request.Method} isn't available for checkout yet — only Cash, Bank Transfer, and Manual GCash QR are supported so far.");
+        }
+
+        var deviceId = CurrentDeviceId;
+        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open cart", deviceId);
+
+        if (cart.TotalAmount <= 0)
+        {
+            throw new ValidationException(nameof(request.Method), "The cart is empty — add an item before recording a payment.");
+        }
+
+        decimal? changeGiven = null;
+        if (request.Method == PaymentMethod.Cash)
+        {
+            if (request.AmountTendered is not { } tendered || tendered < cart.TotalAmount)
+            {
+                throw new ValidationException(nameof(request.AmountTendered), "Cash tendered must cover the total amount.");
+            }
+
+            changeGiven = tendered - cart.TotalAmount;
+        }
+
+        paymentRepository.Add(new Payment
+        {
+            TenantId = CurrentTenantId,
+            TransactionId = cart.Id,
+            Method = request.Method,
+            Status = PaymentStatus.Confirmed,
+            Amount = cart.TotalAmount,
+            AmountTendered = request.AmountTendered,
+            ChangeGiven = changeGiven,
+        });
+
+        var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, cart.BranchId, cart.DeviceId, cancellationToken);
+        sequence.LastIssuedNumber += 1;
+        cart.ReceiptNumber = sequence.LastIssuedNumber;
+        cart.Status = TransactionStatus.Completed;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
     {
         var line = await transactionRepository.GetLineAsync(lineId, cancellationToken)
@@ -195,6 +255,11 @@ public sealed class TransactionService(
 
         var subtotal = lineDtos.Sum(line => line.LineTotal);
 
+        var payments = await paymentRepository.ListByTransactionAsync(transaction.Id, cancellationToken);
+        var paymentDtos = payments
+            .Select(payment => new PaymentDto(payment.Id, payment.Method, payment.Status, payment.Amount, payment.AmountTendered, payment.ChangeGiven))
+            .ToList();
+
         return new TransactionDto(
             transaction.Id,
             transaction.BranchId,
@@ -203,7 +268,9 @@ public sealed class TransactionService(
             lineDtos,
             subtotal,
             transaction.DiscountAmount,
-            transaction.TotalAmount);
+            transaction.TotalAmount,
+            transaction.ReceiptNumber == 0 ? null : transaction.ReceiptNumber,
+            paymentDtos);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

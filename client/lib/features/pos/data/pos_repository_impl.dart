@@ -46,6 +46,15 @@ class PosRepositoryImpl implements PosRepository {
     return _post('/transactions/cart/void', const {}, Transaction.fromJson);
   }
 
+  @override
+  Future<Transaction> recordPayment(RecordPaymentRequest request) {
+    return _post(
+      '/transactions/cart/payments',
+      request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
   Future<T> _get<T>(
     String path,
     T Function(Map<String, dynamic>) fromJson,

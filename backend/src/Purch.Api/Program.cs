@@ -74,6 +74,8 @@ builder.Services.AddScoped<IItemVariantService, ItemVariantService>();
 builder.Services.AddScoped<IItemComboComponentRepository, EfItemComboComponentRepository>();
 builder.Services.AddScoped<IItemComboComponentService, ItemComboComponentService>();
 builder.Services.AddScoped<ITransactionRepository, EfTransactionRepository>();
+builder.Services.AddScoped<IPaymentRepository, EfPaymentRepository>();
+builder.Services.AddScoped<IReceiptSequenceRepository, EfReceiptSequenceRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";

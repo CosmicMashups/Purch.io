@@ -1,3 +1,4 @@
+import 'package:purch_client/features/pos/domain/payment_method.dart';
 import 'package:purch_client/features/pos/domain/pos_repository.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 
@@ -7,6 +8,7 @@ class FakePosRepository implements PosRepository {
     this.updateLineFailure,
     this.removeLineFailure,
     this.voidCartFailure,
+    this.recordPaymentFailure,
     Transaction? initialCart,
   }) : cart = initialCart ?? _emptyCart('cart-1');
 
@@ -19,15 +21,20 @@ class FakePosRepository implements PosRepository {
     subtotal: 0,
     discountAmount: 0,
     totalAmount: 0,
+    receiptNumber: null,
+    payments: const [],
   );
 
   final Object? addLineFailure;
   final Object? updateLineFailure;
   final Object? removeLineFailure;
   final Object? voidCartFailure;
+  final Object? recordPaymentFailure;
 
   Transaction cart;
   int voidCallCount = 0;
+  int nextReceiptNumber = 1;
+  RecordPaymentRequest? lastRecordPaymentRequest;
 
   @override
   Future<Transaction> getOrCreateOpenCart() async => cart;
@@ -119,6 +126,39 @@ class FakePosRepository implements PosRepository {
     return cart;
   }
 
+  @override
+  Future<Transaction> recordPayment(RecordPaymentRequest request) async {
+    lastRecordPaymentRequest = request;
+    if (recordPaymentFailure != null) {
+      throw recordPaymentFailure!;
+    }
+    final changeGiven =
+        request.method == PaymentMethod.cash && request.amountTendered != null
+            ? request.amountTendered! - cart.totalAmount
+            : null;
+    final payment = Payment(
+      id: 'payment-1',
+      method: request.method,
+      status: PaymentStatus.confirmed,
+      amount: cart.totalAmount,
+      amountTendered: request.amountTendered,
+      changeGiven: changeGiven,
+    );
+    cart = Transaction(
+      id: cart.id,
+      branchId: cart.branchId,
+      deviceId: cart.deviceId,
+      status: TransactionStatus.completed,
+      lines: cart.lines,
+      subtotal: cart.subtotal,
+      discountAmount: cart.discountAmount,
+      totalAmount: cart.totalAmount,
+      receiptNumber: nextReceiptNumber++,
+      payments: [payment],
+    );
+    return cart;
+  }
+
   Transaction _withLines(List<TransactionLine> lines) {
     final subtotal = lines.fold(0.0, (total, line) => total + line.lineTotal);
     return Transaction(
@@ -130,6 +170,8 @@ class FakePosRepository implements PosRepository {
       subtotal: subtotal,
       discountAmount: cart.discountAmount,
       totalAmount: subtotal - cart.discountAmount,
+      receiptNumber: cart.receiptNumber,
+      payments: cart.payments,
     );
   }
 }

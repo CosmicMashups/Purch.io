@@ -14,4 +14,6 @@ abstract class PosRepository {
   Future<Transaction> removeLine(String lineId);
 
   Future<Transaction> voidCart();
+
+  Future<Transaction> recordPayment(RecordPaymentRequest request);
 }

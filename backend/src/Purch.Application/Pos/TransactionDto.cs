@@ -10,7 +10,9 @@ public sealed record TransactionDto(
     IReadOnlyList<TransactionLineDto> Lines,
     decimal Subtotal,
     decimal DiscountAmount,
-    decimal TotalAmount);
+    decimal TotalAmount,
+    long? ReceiptNumber,
+    IReadOnlyList<PaymentDto> Payments);
 
 public sealed record TransactionLineDto(
     Guid Id,

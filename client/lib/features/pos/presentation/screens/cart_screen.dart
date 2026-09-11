@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
+import 'payment_screen.dart';
 
-/// D1's cart review — quantity adjustment and line removal. Discount
-/// auto-recalculation, promo codes, and the payment method tabs (D5) land
-/// once the cart engine itself is settled.
+/// D1's cart review — quantity adjustment and line removal, plus a way into
+/// D5's payment method tabs. Discount auto-recalculation and promo codes
+/// aren't modeled yet.
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
 
@@ -107,6 +108,21 @@ class CartScreen extends ConsumerWidget {
                       label: 'Total',
                       amount: cart.totalAmount,
                       emphasize: true,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 56,
+                      child: FilledButton(
+                        onPressed:
+                            () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder:
+                                    (_) =>
+                                        PaymentScreen(total: cart.totalAmount),
+                              ),
+                            ),
+                        child: const Text('Pay'),
+                      ),
                     ),
                   ],
                 ),

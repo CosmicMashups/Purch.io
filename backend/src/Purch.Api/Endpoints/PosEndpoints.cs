@@ -44,6 +44,13 @@ public static class PosEndpoints
             Results.Ok(await transactionService.VoidCartAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapPost("/transactions/cart/payments", async (
+            RecordPaymentRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.RecordPaymentAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         return app;
     }
 }

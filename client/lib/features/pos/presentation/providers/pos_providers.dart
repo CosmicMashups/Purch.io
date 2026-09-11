@@ -52,6 +52,18 @@ class CartNotifier extends _$CartNotifier {
     return true;
   }
 
+  /// Records a full payment. On success the cart moves to Completed with its
+  /// receipt number — the caller shows that as a receipt before calling
+  /// [startNewSale] to fetch the fresh cart that replaces it.
+  Future<bool> recordPayment(RecordPaymentRequest request) =>
+      _mutate((repository) => repository.recordPayment(request));
+
+  /// Call once the completed sale's receipt has been shown/acknowledged.
+  Future<void> startNewSale() async {
+    ref.invalidateSelf();
+    await future;
+  }
+
   Future<bool> _mutate(
     Future<Transaction> Function(PosRepository) action,
   ) async {
