@@ -17,6 +17,7 @@ void main() {
           id: 'group-1',
           name: 'Add-ons',
           allowMultipleSelection: true,
+          isRequired: false,
           modifiers: [],
         ),
       ],

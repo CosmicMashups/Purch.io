@@ -23,7 +23,7 @@ public sealed class ModifierAndBatchEndpointsTests(PostgresContainerFixture post
 
         var groupResponse = await client.PostAsJsonAsync(
             "/modifier-groups",
-            new CreateModifierGroupRequest("Add-ons", true));
+            new CreateModifierGroupRequest("Add-ons", true, false));
         Assert.Equal(HttpStatusCode.OK, groupResponse.StatusCode);
         var group = await groupResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
         Assert.Empty(group!.Modifiers);
@@ -36,6 +36,31 @@ public sealed class ModifierAndBatchEndpointsTests(PostgresContainerFixture post
 
         _ = Assert.Single(updatedGroup!.Modifiers);
         Assert.Equal("Extra Cheese", updatedGroup.Modifiers[0].Name);
+    }
+
+    [Fact]
+    public async Task A_required_modifier_group_round_trips_through_creation_and_item_attachment()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var groupResponse = await client.PostAsJsonAsync(
+            "/modifier-groups",
+            new CreateModifierGroupRequest("Sugar Level", false, true));
+        var group = await groupResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
+        Assert.True(group!.IsRequired);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Iced Coffee", null, null, null, 89m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var attachResponse = await client.PostAsJsonAsync(
+            $"/items/{item!.Id}/modifier-groups",
+            new AttachModifierGroupRequest(group.Id));
+        var attached = await attachResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
+
+        Assert.True(attached!.IsRequired);
     }
 
     [Fact]

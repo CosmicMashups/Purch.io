@@ -63,6 +63,7 @@ public sealed class ItemModifierGroupService(
         group.Id,
         group.Name,
         group.AllowMultipleSelection,
+        group.IsRequired,
         [.. modifiers.Select(m => new ItemModifierDto(m.Id, m.Name, m.PriceDelta))]);
     }
 }

@@ -28,7 +28,7 @@ public sealed class ModifierGroupAttachmentAndTingiConfigEndpointsTests(Postgres
 
         var groupResponse = await client.PostAsJsonAsync(
             "/modifier-groups",
-            new CreateModifierGroupRequest("Ice Level", false));
+            new CreateModifierGroupRequest("Ice Level", false, false));
         var group = await groupResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
 
         var attachResponse = await client.PostAsJsonAsync(
@@ -57,7 +57,7 @@ public sealed class ModifierGroupAttachmentAndTingiConfigEndpointsTests(Postgres
 
         var groupResponse = await client.PostAsJsonAsync(
             "/modifier-groups",
-            new CreateModifierGroupRequest("No Pickles", false));
+            new CreateModifierGroupRequest("No Pickles", false, false));
         var group = await groupResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
 
         _ = await client.PostAsJsonAsync($"/items/{item!.Id}/modifier-groups", new AttachModifierGroupRequest(group!.Id));

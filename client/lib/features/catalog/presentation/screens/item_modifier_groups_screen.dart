@@ -53,9 +53,12 @@ class ItemModifierGroupsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.tune),
                   title: Text(group.name),
                   subtitle: Text(
-                    group.allowMultipleSelection
-                        ? 'Multiple selections allowed'
-                        : 'Single selection',
+                    [
+                      group.allowMultipleSelection
+                          ? 'Multiple selections allowed'
+                          : 'Single selection',
+                      if (group.isRequired) 'Required',
+                    ].join(' · '),
                   ),
                   children: [
                     if (group.modifiers.isEmpty)

@@ -37,9 +37,12 @@ class ModifierGroupListScreen extends ConsumerWidget {
                 return ExpansionTile(
                   title: Text(group.name),
                   subtitle: Text(
-                    group.allowMultipleSelection
-                        ? 'Multiple choices allowed'
-                        : 'Single choice only',
+                    [
+                      group.allowMultipleSelection
+                          ? 'Multiple choices allowed'
+                          : 'Single choice only',
+                      if (group.isRequired) 'Required',
+                    ].join(' · '),
                   ),
                   children: [
                     for (final modifier in group.modifiers)

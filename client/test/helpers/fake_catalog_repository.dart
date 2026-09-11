@@ -113,6 +113,7 @@ class FakeCatalogRepository implements CatalogRepository {
       id: 'group-${modifierGroups.length + 1}',
       name: request.name,
       allowMultipleSelection: request.allowMultipleSelection,
+      isRequired: request.isRequired,
       modifiers: const [],
     );
     modifierGroups.add(created);
@@ -133,6 +134,7 @@ class FakeCatalogRepository implements CatalogRepository {
       id: group.id,
       name: group.name,
       allowMultipleSelection: group.allowMultipleSelection,
+      isRequired: group.isRequired,
       modifiers: [
         ...group.modifiers,
         ItemModifierOption(

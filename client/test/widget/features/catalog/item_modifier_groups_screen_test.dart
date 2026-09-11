@@ -38,6 +38,7 @@ void main() {
             id: 'group-1',
             name: 'Ice Level',
             allowMultipleSelection: false,
+            isRequired: false,
             modifiers: [],
           ),
         ],

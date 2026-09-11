@@ -17,6 +17,7 @@ class _AddModifierGroupScreenState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   bool _allowMultipleSelection = false;
+  bool _isRequired = false;
 
   @override
   void dispose() {
@@ -34,6 +35,7 @@ class _AddModifierGroupScreenState
       CreateModifierGroupRequest(
         name: _nameController.text.trim(),
         allowMultipleSelection: _allowMultipleSelection,
+        isRequired: _isRequired,
       ),
     );
 
@@ -88,6 +90,18 @@ class _AddModifierGroupScreenState
                               : (value) => setState(
                                 () => _allowMultipleSelection = value,
                               ),
+                    ),
+                    SwitchListTile(
+                      title: const Text('Require a selection'),
+                      subtitle: const Text(
+                        'Checkout must capture a choice before this item can '
+                        'be added to the cart (e.g. sugar level on a drink).',
+                      ),
+                      value: _isRequired,
+                      onChanged:
+                          isLoading
+                              ? null
+                              : (value) => setState(() => _isRequired = value),
                     ),
                     if (failure != null) ...[
                       const SizedBox(height: 16),

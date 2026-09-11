@@ -27,6 +27,7 @@ public sealed class ModifierGroupService(
             TenantId = CurrentTenantId,
             Name = request.Name.Trim(),
             AllowMultipleSelection = request.AllowMultipleSelection,
+            IsRequired = request.IsRequired,
         };
 
         modifierGroupRepository.Add(group);
@@ -73,6 +74,7 @@ public sealed class ModifierGroupService(
         group.Id,
         group.Name,
         group.AllowMultipleSelection,
+        group.IsRequired,
         [.. modifiers.Select(m => new ItemModifierDto(m.Id, m.Name, m.PriceDelta))]);
     }
 }

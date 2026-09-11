@@ -26,6 +26,7 @@ class ModifierGroup {
     required this.id,
     required this.name,
     required this.allowMultipleSelection,
+    required this.isRequired,
     required this.modifiers,
   });
 
@@ -34,6 +35,7 @@ class ModifierGroup {
       id: json['id'] as String,
       name: json['name'] as String,
       allowMultipleSelection: json['allowMultipleSelection'] as bool,
+      isRequired: json['isRequired'] as bool,
       modifiers:
           (json['modifiers'] as List<dynamic>)
               .cast<Map<String, dynamic>>()
@@ -45,6 +47,11 @@ class ModifierGroup {
   final String id;
   final String name;
   final bool allowMultipleSelection;
+
+  /// When true, checkout (Phase 4) must require a selection from this group
+  /// before the item can be added to the cart — e.g. a coffee shop making
+  /// sugar level mandatory rather than skippable.
+  final bool isRequired;
   final List<ItemModifierOption> modifiers;
 }
 
@@ -53,14 +60,17 @@ class CreateModifierGroupRequest {
   const CreateModifierGroupRequest({
     required this.name,
     required this.allowMultipleSelection,
+    required this.isRequired,
   });
 
   final String name;
   final bool allowMultipleSelection;
+  final bool isRequired;
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'allowMultipleSelection': allowMultipleSelection,
+    'isRequired': isRequired,
   };
 }
 
