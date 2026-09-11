@@ -14,4 +14,5 @@ public sealed record CreateItemRequest(
     Guid? CategoryId,
     decimal BasePrice,
     string? ImageUrl,
-    PricingType PricingType);
+    PricingType PricingType,
+    Guid? DepartmentId = null);

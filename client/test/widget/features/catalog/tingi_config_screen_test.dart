@@ -25,6 +25,7 @@ const _riceItem = Item(
   tingiIncrementStep: null,
   tingiAllowedSizes: [],
   serviceDurationMinutes: null,
+  departmentId: null,
 );
 
 void main() {

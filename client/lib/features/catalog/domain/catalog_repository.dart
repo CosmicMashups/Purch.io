@@ -10,7 +10,9 @@ import 'modifier_models.dart';
 /// modifier group attachment for restaurant-style customization e.g. "No
 /// Ice"/"No Pickles") + B2a (weight/volume batches, incl. tingi/sub-unit
 /// selling config) + B2b (bundle rules) + B2c (service duration) + B3
-/// (variant matrix) + B4 (combo/meal builder slots).
+/// (variant matrix) + B4 (combo/meal builder slots) + B6 (department/
+/// concessionaire assignment — departments themselves live in the onboarding
+/// feature since they belong to a branch, not the catalog).
 abstract class CatalogRepository {
   Future<List<Category>> listCategories();
 
@@ -69,5 +71,10 @@ abstract class CatalogRepository {
   Future<ItemComboComponent> createComboComponent(
     String itemId,
     CreateItemComboComponentRequest request,
+  );
+
+  Future<Item> updateItemDepartment(
+    String itemId,
+    UpdateItemDepartmentRequest request,
   );
 }

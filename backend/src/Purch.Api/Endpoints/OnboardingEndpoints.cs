@@ -54,6 +54,21 @@ public static class OnboardingEndpoints
             Results.Ok(await branchService.UpdateHardwareSettingsAsync(branchId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // --- Departments / concessionaires (B6) ---
+        _ = app.MapGet("/branches/{branchId:guid}/departments", async (
+            Guid branchId,
+            IDepartmentService departmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await departmentService.ListForBranchAsync(branchId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPost("/branches/{branchId:guid}/departments", async (
+            Guid branchId,
+            CreateDepartmentRequest request,
+            IDepartmentService departmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await departmentService.CreateAsync(branchId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(admin));
+
         _ = app.MapGet("/devices", async (IDeviceManagementService deviceService, CancellationToken cancellationToken) =>
             Results.Ok(await deviceService.ListAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 

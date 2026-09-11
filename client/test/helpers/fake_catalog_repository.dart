@@ -21,6 +21,7 @@ class FakeCatalogRepository implements CatalogRepository {
     this.updateTingiConfigFailure,
     this.updateServiceDurationFailure,
     this.createComboComponentFailure,
+    this.updateItemDepartmentFailure,
     List<Category>? initialCategories,
     List<Item>? initialItems,
     List<ModifierGroup>? initialModifierGroups,
@@ -49,6 +50,7 @@ class FakeCatalogRepository implements CatalogRepository {
   final Object? updateTingiConfigFailure;
   final Object? updateServiceDurationFailure;
   final Object? createComboComponentFailure;
+  final Object? updateItemDepartmentFailure;
   final List<Category> categories;
   final List<Item> items;
   final List<ModifierGroup> modifierGroups;
@@ -103,6 +105,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiIncrementStep: null,
       tingiAllowedSizes: const [],
       serviceDurationMinutes: null,
+      departmentId: null,
     );
     items.add(created);
     return created;
@@ -273,6 +276,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiIncrementStep: request.tingiIncrementStep,
       tingiAllowedSizes: request.allowedSizes ?? const [],
       serviceDurationMinutes: current.serviceDurationMinutes,
+      departmentId: current.departmentId,
     );
     items[index] = updated;
     return updated;
@@ -304,6 +308,7 @@ class FakeCatalogRepository implements CatalogRepository {
       tingiIncrementStep: current.tingiIncrementStep,
       tingiAllowedSizes: current.tingiAllowedSizes,
       serviceDurationMinutes: request.durationMinutes,
+      departmentId: current.departmentId,
     );
     items[index] = updated;
     return updated;
@@ -334,5 +339,37 @@ class FakeCatalogRepository implements CatalogRepository {
     );
     comboComponents.add(created);
     return created;
+  }
+
+  @override
+  Future<Item> updateItemDepartment(
+    String itemId,
+    UpdateItemDepartmentRequest request,
+  ) async {
+    if (updateItemDepartmentFailure != null) {
+      throw updateItemDepartmentFailure!;
+    }
+    final index = items.indexWhere((item) => item.id == itemId);
+    final current = items[index];
+    final updated = Item(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      barcode: current.barcode,
+      categoryId: current.categoryId,
+      basePrice: current.basePrice,
+      imageUrl: current.imageUrl,
+      pricingType: current.pricingType,
+      stockOnHand: current.stockOnHand,
+      isActive: current.isActive,
+      tingiMode: current.tingiMode,
+      packagedSize: current.packagedSize,
+      tingiIncrementStep: current.tingiIncrementStep,
+      tingiAllowedSizes: current.tingiAllowedSizes,
+      serviceDurationMinutes: current.serviceDurationMinutes,
+      departmentId: request.departmentId,
+    );
+    items[index] = updated;
+    return updated;
   }
 }

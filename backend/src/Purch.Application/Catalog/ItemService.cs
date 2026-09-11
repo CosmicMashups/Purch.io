@@ -11,6 +11,7 @@ public sealed class ItemService(
     IItemRepository itemRepository,
     ICategoryRepository categoryRepository,
     ITenantRepository tenantRepository,
+    IDepartmentRepository departmentRepository,
     ICurrentTenantProvider currentTenantProvider,
     IUnitOfWork unitOfWork) : IItemService
 {
@@ -34,6 +35,7 @@ public sealed class ItemService(
 
         await ValidateBarcodeAsync(request.Barcode, cancellationToken);
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
+        await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
 
         var item = new Item
         {
@@ -45,6 +47,7 @@ public sealed class ItemService(
             BasePrice = request.BasePrice,
             ImageUrl = request.ImageUrl,
             PricingType = request.PricingType,
+            DepartmentId = request.DepartmentId,
             IsActive = true,
         };
 
@@ -75,6 +78,7 @@ public sealed class ItemService(
         }
 
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
+        await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
 
         item.Name = request.Name.Trim();
         item.Sku = request.Sku?.Trim();
@@ -83,6 +87,7 @@ public sealed class ItemService(
         item.BasePrice = request.BasePrice;
         item.ImageUrl = request.ImageUrl;
         item.IsActive = request.IsActive;
+        item.DepartmentId = request.DepartmentId;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -217,6 +222,34 @@ public sealed class ItemService(
             ?? throw new NotFoundException("Category", categoryId.Value);
     }
 
+    public async Task<ItemDto> UpdateDepartmentAsync(
+        Guid itemId,
+        UpdateItemDepartmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
+            ?? throw new NotFoundException("Item", itemId);
+
+        await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
+
+        item.DepartmentId = request.DepartmentId;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(item);
+    }
+
+    private async Task ValidateDepartmentAsync(Guid? departmentId, CancellationToken cancellationToken)
+    {
+        if (departmentId is null)
+        {
+            return;
+        }
+
+        _ = await departmentRepository.GetByIdAsync(departmentId.Value, cancellationToken)
+            ?? throw new NotFoundException("Department", departmentId.Value);
+    }
+
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Catalog management requires an authenticated tenant context.");
 
@@ -243,6 +276,7 @@ public sealed class ItemService(
         item.PackagedSize,
         item.TingiIncrementStep,
         allowedSizes,
-        item.ServiceDurationMinutes);
+        item.ServiceDurationMinutes,
+        item.DepartmentId);
     }
 }

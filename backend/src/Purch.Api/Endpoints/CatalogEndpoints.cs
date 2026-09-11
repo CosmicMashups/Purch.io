@@ -99,6 +99,15 @@ public static class CatalogEndpoints
             Results.Ok(await itemService.UpdateServiceDurationAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // --- Department/concessionaire assignment (B6) ---
+        _ = app.MapPut("/items/{itemId:guid}/department", async (
+            Guid itemId,
+            UpdateItemDepartmentRequest request,
+            IItemService itemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemService.UpdateDepartmentAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Weight/volume batches (B2a) ---
         _ = app.MapGet("/items/{itemId:guid}/batches", async (
             Guid itemId,

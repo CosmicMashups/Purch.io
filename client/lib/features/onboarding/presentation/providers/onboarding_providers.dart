@@ -7,6 +7,7 @@ import '../../data/onboarding_repository_impl.dart';
 import '../../domain/audit_log_models.dart';
 import '../../domain/bootstrap_models.dart';
 import '../../domain/branch_models.dart';
+import '../../domain/department_models.dart';
 import '../../domain/device_models.dart';
 import '../../domain/onboarding_repository.dart';
 import '../../domain/staff_models.dart';
@@ -230,5 +231,45 @@ class AuditLogList extends _$AuditLogList {
   Future<void> refresh() async {
     ref.invalidateSelf();
     await future;
+  }
+}
+
+/// One list per branch (Riverpod family, inferred from the `branchId`
+/// parameter) — B6's departments/concessionaires.
+@riverpod
+class DepartmentList extends _$DepartmentList {
+  @override
+  Future<List<Department>> build(String branchId) {
+    return ref.watch(onboardingRepositoryProvider).listDepartments(branchId);
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+@riverpod
+class CreateDepartmentController extends _$CreateDepartmentController {
+  @override
+  FutureOr<void> build(String branchId) {}
+
+  Future<bool> create(CreateDepartmentRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(onboardingRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.createDepartment(branchId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(departmentListProvider(branchId).notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
   }
 }

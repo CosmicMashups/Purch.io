@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/onboarding_providers.dart';
 import 'add_branch_screen.dart';
+import 'department_list_screen.dart';
 
 /// A3's branch list — multi-branch from the start (not single-enforced), per
-/// the implementation plan.
+/// the implementation plan. Tapping a branch opens its departments (B6).
 class BranchListScreen extends ConsumerWidget {
   const BranchListScreen({super.key});
 
@@ -38,6 +39,17 @@ class BranchListScreen extends ConsumerWidget {
                   title: Text(branch.name),
                   subtitle:
                       branch.address == null ? null : Text(branch.address!),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap:
+                      () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder:
+                              (_) => DepartmentListScreen(
+                                branchId: branch.id,
+                                branchName: branch.name,
+                              ),
+                        ),
+                      ),
                 );
               },
             ),

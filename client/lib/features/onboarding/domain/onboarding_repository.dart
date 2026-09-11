@@ -1,6 +1,7 @@
 import 'audit_log_models.dart';
 import 'bootstrap_models.dart';
 import 'branch_models.dart';
+import 'department_models.dart';
 import 'device_models.dart';
 import 'staff_models.dart';
 import 'tenant_settings_models.dart';
@@ -36,4 +37,11 @@ abstract class OnboardingRepository {
   Future<TenantSettings> updateBarcodeSetting(bool requiresBarcodePerItem);
 
   Future<List<AuditLogEntry>> listAuditLogs();
+
+  Future<List<Department>> listDepartments(String branchId);
+
+  Future<Department> createDepartment(
+    String branchId,
+    CreateDepartmentRequest request,
+  );
 }

@@ -12,6 +12,8 @@ import '../../domain/item_combo_component_models.dart';
 import '../../domain/item_models.dart';
 import '../../domain/item_variant_models.dart';
 import '../../domain/modifier_models.dart';
+import '../../../onboarding/domain/department_models.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 
 part 'catalog_providers.g.dart';
 
@@ -413,4 +415,44 @@ class CreateComboComponentController extends _$CreateComboComponentController {
     final error = state.error;
     return error is Failure ? error : null;
   }
+}
+
+@riverpod
+class UpdateItemDepartmentController extends _$UpdateItemDepartmentController {
+  @override
+  FutureOr<void> build(String itemId) {}
+
+  Future<bool> updateDepartment(UpdateItemDepartmentRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateItemDepartment(itemId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+/// Flattens departments across every branch for the item department picker —
+/// most tenants have a single branch, so this keeps the picker simple rather
+/// than requiring the cashier/admin to pick a branch first.
+@riverpod
+Future<List<Department>> allDepartments(Ref ref) async {
+  final onboardingRepository = ref.watch(onboardingRepositoryProvider);
+  final branches = await onboardingRepository.listBranches();
+
+  final departments = <Department>[];
+  for (final branch in branches) {
+    departments.addAll(await onboardingRepository.listDepartments(branch.id));
+  }
+  return departments;
 }

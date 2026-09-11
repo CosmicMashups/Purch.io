@@ -5,6 +5,7 @@ import '../../../core/network/failure_mapper.dart';
 import '../domain/audit_log_models.dart';
 import '../domain/bootstrap_models.dart';
 import '../domain/branch_models.dart';
+import '../domain/department_models.dart';
 import '../domain/device_models.dart';
 import '../domain/onboarding_repository.dart';
 import '../domain/staff_models.dart';
@@ -112,6 +113,23 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   @override
   Future<List<AuditLogEntry>> listAuditLogs() {
     return _getList('/audit-logs', AuditLogEntry.fromJson);
+  }
+
+  @override
+  Future<List<Department>> listDepartments(String branchId) {
+    return _getList('/branches/$branchId/departments', Department.fromJson);
+  }
+
+  @override
+  Future<Department> createDepartment(
+    String branchId,
+    CreateDepartmentRequest request,
+  ) {
+    return _post(
+      '/branches/$branchId/departments',
+      request.toJson(),
+      Department.fromJson,
+    );
   }
 
   Future<T> _post<T>(

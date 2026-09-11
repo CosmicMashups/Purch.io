@@ -7,4 +7,5 @@ public sealed record UpdateItemRequest(
     Guid? CategoryId,
     decimal BasePrice,
     string? ImageUrl,
-    bool IsActive);
+    bool IsActive,
+    Guid? DepartmentId = null);

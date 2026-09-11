@@ -1,6 +1,7 @@
 import 'package:purch_client/features/onboarding/domain/audit_log_models.dart';
 import 'package:purch_client/features/onboarding/domain/bootstrap_models.dart';
 import 'package:purch_client/features/onboarding/domain/branch_models.dart';
+import 'package:purch_client/features/onboarding/domain/department_models.dart';
 import 'package:purch_client/features/onboarding/domain/device_models.dart';
 import 'package:purch_client/features/onboarding/domain/hardware_enums.dart';
 import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
@@ -14,16 +15,19 @@ class FakeOnboardingRepository implements OnboardingRepository {
     this.createStaffFailure,
     this.createBranchFailure,
     this.createDeviceFailure,
+    this.createDepartmentFailure,
     List<StaffMember>? initialStaff,
     List<Branch>? initialBranches,
     List<Device>? initialDevices,
     TenantSettings? initialSettings,
     List<AuditLogEntry>? initialAuditLogs,
+    Map<String, List<Department>>? initialDepartments,
   }) : staff = initialStaff ?? [],
        branches = initialBranches ?? [],
        devices = initialDevices ?? [],
        settings = initialSettings ?? _defaultSettings,
-       auditLogs = initialAuditLogs ?? [];
+       auditLogs = initialAuditLogs ?? [],
+       departmentsByBranch = initialDepartments ?? {};
 
   static const _defaultSettings = TenantSettings(
     id: 'tenant-1',
@@ -43,11 +47,13 @@ class FakeOnboardingRepository implements OnboardingRepository {
   final Object? createStaffFailure;
   final Object? createBranchFailure;
   final Object? createDeviceFailure;
+  final Object? createDepartmentFailure;
   final List<StaffMember> staff;
   final List<Branch> branches;
   final List<Device> devices;
   TenantSettings settings;
   final List<AuditLogEntry> auditLogs;
+  final Map<String, List<Department>> departmentsByBranch;
 
   BootstrapRequest? lastBootstrapRequest;
   CreateStaffRequest? lastCreateStaffRequest;
@@ -211,4 +217,27 @@ class FakeOnboardingRepository implements OnboardingRepository {
 
   @override
   Future<List<AuditLogEntry>> listAuditLogs() async => auditLogs;
+
+  @override
+  Future<List<Department>> listDepartments(String branchId) async =>
+      departmentsByBranch[branchId] ?? [];
+
+  @override
+  Future<Department> createDepartment(
+    String branchId,
+    CreateDepartmentRequest request,
+  ) async {
+    if (createDepartmentFailure != null) {
+      throw createDepartmentFailure!;
+    }
+    final list = departmentsByBranch.putIfAbsent(branchId, () => []);
+    final created = Department(
+      id: 'department-${list.length + 1}',
+      branchId: branchId,
+      name: request.name,
+      concessionaireContactInfo: request.concessionaireContactInfo,
+    );
+    list.add(created);
+    return created;
+  }
 }

@@ -19,6 +19,7 @@ class Item {
     required this.tingiIncrementStep,
     required this.tingiAllowedSizes,
     required this.serviceDurationMinutes,
+    required this.departmentId,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -41,6 +42,7 @@ class Item {
               .map((size) => (size as num).toDouble())
               .toList(),
       serviceDurationMinutes: json['serviceDurationMinutes'] as int?,
+      departmentId: json['departmentId'] as String?,
     );
   }
 
@@ -59,6 +61,7 @@ class Item {
   final double? tingiIncrementStep;
   final List<double> tingiAllowedSizes;
   final int? serviceDurationMinutes;
+  final String? departmentId;
 }
 
 /// Mirrors Purch.Application.Catalog.CreateItemRequest. PricingType is fixed
@@ -124,4 +127,15 @@ class UpdateServiceDurationRequest {
   final int durationMinutes;
 
   Map<String, dynamic> toJson() => {'durationMinutes': durationMinutes};
+}
+
+/// Mirrors Purch.Application.Catalog.UpdateItemDepartmentRequest — B6's
+/// department/concessionaire assignment. A null departmentId clears the
+/// assignment; an item doesn't have to belong to a department.
+class UpdateItemDepartmentRequest {
+  const UpdateItemDepartmentRequest({this.departmentId});
+
+  final String? departmentId;
+
+  Map<String, dynamic> toJson() => {'departmentId': departmentId};
 }

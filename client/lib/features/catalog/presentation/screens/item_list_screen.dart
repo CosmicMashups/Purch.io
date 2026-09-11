@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
 import 'add_item_screen.dart';
+import 'assign_department_screen.dart';
 import 'bundle_rules_screen.dart';
 import 'combo_components_screen.dart';
 import 'item_batches_screen.dart';
@@ -20,13 +21,15 @@ enum _ItemAction {
   tingi,
   serviceDuration,
   comboComponents,
+  department,
 }
 
 /// B1's item catalog list. Every item can have modifier groups attached for
-/// restaurant-style customization (B5, e.g. "No Ice"); pricing-type-specific
-/// actions (weight/volume batches + tingi config (B2a), bundle rules (B2b),
-/// service duration (B2c), variants (B3), combo slots (B4)) appear alongside
-/// it via a per-row menu.
+/// restaurant-style customization (B5, e.g. "No Ice") and a department/
+/// concessionaire assigned (B6); pricing-type-specific actions (weight/
+/// volume batches + tingi config (B2a), bundle rules (B2b), service duration
+/// (B2c), variants (B3), combo slots (B4)) appear alongside it via a per-row
+/// menu.
 class ItemListScreen extends ConsumerWidget {
   const ItemListScreen({super.key});
 
@@ -149,6 +152,14 @@ class ItemListScreen extends ConsumerWidget {
                             ),
                           );
                           break;
+                        case _ItemAction.department:
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => AssignDepartmentScreen(item: item),
+                            ),
+                          );
+                          break;
                       }
                     },
                     itemBuilder:
@@ -186,6 +197,10 @@ class ItemListScreen extends ConsumerWidget {
                           const PopupMenuItem(
                             value: _ItemAction.customization,
                             child: Text('Customization'),
+                          ),
+                          const PopupMenuItem(
+                            value: _ItemAction.department,
+                            child: Text('Assign department'),
                           ),
                         ],
                   ),
