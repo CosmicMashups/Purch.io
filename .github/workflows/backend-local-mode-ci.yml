@@ -1,0 +1,88 @@
+name: backend-local-mode-ci
+
+# Simulates the on-prem installer end to end (see installer/README.md and
+# Program.cs's Local-mode auto-migration from Phase 10): publishes the
+# backend self-contained, boots it against a real Postgres with no schema
+# yet, and proves it migrates itself and can actually take a write — not
+# just that /health responds, which touches no database at all.
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "installer/**"
+      - ".github/workflows/backend-local-mode-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "installer/**"
+
+jobs:
+  local-mode-smoke-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: purch
+          POSTGRES_USER: purch
+          POSTGRES_PASSWORD: purch_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U purch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish self-contained (linux-x64 — proves the publish config itself is sound; the real installer targets win-x64, see installer/publish-self-contained.ps1)
+        working-directory: backend
+        run: dotnet publish src/Purch.Api -c Release -r linux-x64 --self-contained true -o dist
+
+      - name: Boot the published binary in Local mode against the CI Postgres
+        working-directory: backend/dist
+        env:
+          PURCH_DEPLOYMENT_MODE: Local
+          LOCAL_DB_CONNECTION_STRING: "Host=localhost;Port=5432;Database=purch;Username=purch;Password=purch_ci_password"
+          LOCAL_STORAGE_PATH: /tmp/purch-storage
+          JWT_SIGNING_KEY: "ci-only-signing-key-not-a-secret-0123456789"
+          JWT_ISSUER: purch.io
+          ASPNETCORE_URLS: http://+:8080
+        run: |
+          mkdir -p /tmp/purch-storage
+          chmod +x ./Purch.Api
+          ./Purch.Api > /tmp/purch-api.log 2>&1 &
+          echo $! > /tmp/purch-api.pid
+
+      - name: Wait for self-migration, then prove a real write succeeds
+        run: |
+          status=000
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /tmp/bootstrap-response.json -w "%{http_code}" \
+              -X POST http://localhost:8080/onboarding/bootstrap \
+              -H "Content-Type: application/json" \
+              -d '{"tenantName":"CI Smoke Test","businessType":0,"branchName":"Main Branch","adminName":"CI Admin","pin":"1234"}') || status=000
+            if [ "$status" = "200" ]; then
+              echo "Bootstrap succeeded on attempt $i:"
+              cat /tmp/bootstrap-response.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend never accepted a bootstrap write — last status: $status"
+          echo "--- response body ---"
+          cat /tmp/bootstrap-response.json 2>/dev/null || true
+          echo "--- backend log ---"
+          cat /tmp/purch-api.log 2>/dev/null || true
+          exit 1
+
+      - name: Stop the backend
+        if: always()
+        run: kill "$(cat /tmp/purch-api.pid)" 2>/dev/null || true

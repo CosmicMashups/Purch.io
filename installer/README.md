@@ -88,3 +88,15 @@ Single-branch, single-LAN per installation (see the implementation plan) —
 a tenant with multiple physical branches under Local mode needs either a
 separate installation per branch (no cross-branch reporting) or a VPN
 tunnel back to a primary server. Not solved here.
+
+## The Dockerfile is shared with Cloud mode
+
+`backend/Dockerfile` (not `installer/`) builds the same image `render.yaml`
+uses for the Cloud deployment mode — one image, entirely env-var driven
+(`IDeploymentContext` picks Cloud vs. Local at startup from
+`PURCH_DEPLOYMENT_MODE`), so there's nothing Local-specific to duplicate.
+`.github/workflows/backend-local-mode-ci.yml` runs this whole flow in CI on
+every backend change: publish self-contained, boot against a schema-less
+Postgres, and prove `Database.MigrateAsync()` actually ran by completing a
+real onboarding bootstrap write — not just that `/health` responds, which
+touches no database at all.

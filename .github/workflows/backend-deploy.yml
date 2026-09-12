@@ -10,7 +10,15 @@ jobs:
   deploy:
     needs: []
     runs-on: ubuntu-latest
-    if: false # disabled until backend-ci is green and Render service/render.yaml exist (Phase 12)
+    # Render deploys automatically from render.yaml (a "Blueprint") once this
+    # repo is connected in the Render dashboard — Render watches the repo
+    # itself and doesn't need a GitHub Actions step to trigger a deploy.
+    # This job stays disabled/placeholder rather than pretending to deploy
+    # something no Render account has actually been connected to yet; flip
+    # `if: false` only once that connection is made, and only for a real
+    # step (e.g. a post-deploy smoke test hitting the live /health endpoint),
+    # not a no-op echo.
+    if: false
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Deploy to Render — wired up in Phase 12"
+      - run: echo "See render.yaml — Render deploys via its own Blueprint sync, not this workflow."

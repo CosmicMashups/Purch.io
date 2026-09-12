@@ -1,0 +1,41 @@
+# Render Blueprint for the Cloud deployment mode — see docs/ARCHITECTURE.md
+# and the implementation plan's "Deployment Modes" section. Render deploys
+# automatically from this file once the repo is connected as a Blueprint in
+# the Render dashboard (https://dashboard.render.com/blueprints); nothing in
+# .github/workflows triggers it — that's Render's own mechanism, not
+# GitHub Actions (see backend-deploy.yml for why that workflow stays a
+# documented placeholder rather than a real deploy step).
+#
+# Postgres/storage are Supabase, not a Render-managed database — Cloud mode
+# is Render (compute) + Supabase (data), same split described throughout
+# the plan. Fill in the `sync: false` secrets in the Render dashboard after
+# the first Blueprint sync; Render refuses to deploy until they're set.
+
+services:
+  - type: web
+    name: purch-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      - key: PURCH_DEPLOYMENT_MODE
+        value: Cloud
+      - key: SUPABASE_DB_CONNECTION_STRING
+        sync: false
+      - key: SUPABASE_STORAGE_URL
+        sync: false
+      - key: SUPABASE_STORAGE_KEY
+        sync: false
+      - key: JWT_SIGNING_KEY
+        generateValue: true
+      - key: JWT_ISSUER
+        value: purch.io
+      - key: XENDIT_API_KEY
+        sync: false
+      - key: XENDIT_WEBHOOK_SECRET
+        sync: false
+      - key: BILL_PAYMENT_PROVIDER_API_KEY
+        sync: false
