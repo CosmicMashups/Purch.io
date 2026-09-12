@@ -8,7 +8,10 @@ plugins {
 android {
     namespace = "io.purch.purch_client"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Flutter's default NDK doesn't match what connectivity_plus/flutter_secure_storage/
+    // mobile_scanner/path_provider_android/sqlite3_flutter_libs actually require —
+    // pinned to the highest version any plugin asks for (NDKs are backward compatible).
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -24,7 +27,9 @@ android {
         applicationId = "io.purch.purch_client"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // mobile_scanner's camera-core dependency requires 23+; Flutter's own
+        // default (21) is too low for it.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
