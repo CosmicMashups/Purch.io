@@ -38,7 +38,11 @@ class _KioskLandingScreenState extends State<KioskLandingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.storefront, size: 96),
+                Image.asset(
+                  'assets/wordmark.png',
+                  height: 96,
+                  semanticLabel: 'Purch.io',
+                ),
                 const SizedBox(height: 24),
                 Text(
                   'Welcome!',

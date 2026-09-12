@@ -74,12 +74,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.storefront, size: 64),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Purch.io',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium,
+                    Image.asset(
+                      'assets/wordmark.png',
+                      height: 64,
+                      semanticLabel: 'Purch.io',
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
