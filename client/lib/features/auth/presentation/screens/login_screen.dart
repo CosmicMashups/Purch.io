@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../kiosk/presentation/screens/kiosk_pairing_screen.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
+import '../../../onboarding/presentation/screens/server_connection_screen.dart';
 import '../providers/auth_providers.dart';
 
 /// The first screen any staff member sees on a paired device. Deliberately
@@ -166,6 +167,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                       child: const Text('Set up as a self-order kiosk'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => const ServerConnectionScreen(),
+                                ),
+                              ),
+                      child: const Text('Connect to a local server'),
                     ),
                   ],
                 ),

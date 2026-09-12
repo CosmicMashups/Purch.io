@@ -17,6 +17,7 @@ using Purch.Application.Promotions;
 using Purch.Application.Reporting;
 using Purch.Application.Shifts;
 using Purch.Application.Sync;
+using Purch.Domain.Enums;
 using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
@@ -137,6 +138,20 @@ builder.Services
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Local/on-prem installs have no separate CI/CD migration step (Cloud's
+// migrations run as part of the Render deploy pipeline) — a store owner
+// running the installer shouldn't need the EF Core CLI, so a Local-mode
+// instance migrates its own database once at startup instead.
+using (var startupScope = app.Services.CreateScope())
+{
+    var deploymentContext = startupScope.ServiceProvider.GetRequiredService<IDeploymentContext>();
+    if (deploymentContext.Mode == DeploymentMode.Local)
+    {
+        var dbContext = startupScope.ServiceProvider.GetRequiredService<PurchDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
+}
 
 // Must be first: wraps every later middleware/endpoint so any thrown exception
 // (including ones from TenantResolutionMiddleware or endpoint handlers) is caught

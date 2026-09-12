@@ -1,0 +1,52 @@
+# Local/on-prem deployment mode — one Postgres + one Purch.io backend
+# container, both on the store's own machine, reachable by every POS device
+# on the same LAN. Run from this `installer/` directory:
+#
+#   docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+#
+# See README.md for the full setup walkthrough, including how to point
+# client devices at this server (Settings → Business Settings →
+# "Local Server Connection", or the login screen's "Connect to a local
+# server" link).
+name: purch-local
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-purch}
+      POSTGRES_USER: ${POSTGRES_USER:-purch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.local}
+    volumes:
+      - purch_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-purch}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../installer/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # The port every POS device's "Connect to a local server" address
+      # points at, e.g. 192.168.1.50:8080.
+      - "${PURCH_PORT:-8080}:8080"
+    environment:
+      PURCH_DEPLOYMENT_MODE: Local
+      LOCAL_DB_CONNECTION_STRING: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-purch};Username=${POSTGRES_USER:-purch};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.local}"
+      LOCAL_STORAGE_PATH: /data/storage
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env.local}
+      JWT_ISSUER: purch.io
+    volumes:
+      - purch_storage_data:/data/storage
+
+volumes:
+  purch_postgres_data:
+  purch_storage_data:

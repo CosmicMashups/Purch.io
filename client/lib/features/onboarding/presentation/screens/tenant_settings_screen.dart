@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/tenant_settings_models.dart';
 import '../providers/onboarding_providers.dart';
+import 'server_connection_screen.dart';
 
 /// A2 (branding) + A5 (BIR/compliance) + the barcode-requirement toggle + B7's
 /// credit ledger ("utang") toggle, all on one screen since they're all
@@ -241,6 +242,16 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                   ),
                   value: _creditLedgerEnabled,
                   onChanged: isSaving ? null : _toggleCreditLedger,
+                ),
+                const SizedBox(height: 32),
+                OutlinedButton(
+                  onPressed:
+                      () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => const ServerConnectionScreen(),
+                        ),
+                      ),
+                  child: const Text('Local Server Connection'),
                 ),
               ],
             ),

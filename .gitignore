@@ -21,10 +21,14 @@ backend/.vs/
 
 # --- Env / secrets ---
 .env
+.env.local
 appsettings.Development.json
 appsettings.Local.json
 *.pfx
 *.key
+
+# --- Installer build output (see installer/README.md) ---
+installer/dist/
 
 # --- IDE ---
 .idea/

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/config/app_config.dart';
+import 'core/storage/server_connection_storage.dart';
 import 'core/sync/presentation/flagged_sync_screen.dart';
 import 'core/sync/sync_providers.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
@@ -30,7 +32,14 @@ import 'features/reports/presentation/screens/inventory_reports_screen.dart';
 import 'features/reports/presentation/screens/sales_dashboard_screen.dart';
 import 'features/reports/presentation/screens/staff_performance_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Restore a manually-entered Local/on-prem server address, if this device
+  // has one saved — see AppConfig's doc comment and ServerConnectionScreen.
+  final savedBaseUrl = await ServerConnectionStorage().readBaseUrl();
+  AppConfig.setApiBaseUrlOverride(savedBaseUrl);
+
   runApp(const ProviderScope(child: PurchApp()));
 }
 
