@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../theming/app_tokens.dart';
+import '../../theming/app_tokens.dart';
 import '../sync_dto.dart';
 import '../sync_providers.dart';
 import '../../widgets/empty_state_view.dart';
