@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -55,6 +56,14 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
             ForbiddenException forbiddenException => (
                 StatusCodes.Status403Forbidden,
                 BuildProblemDetails(StatusCodes.Status403Forbidden, "Forbidden.", forbiddenException.Message, httpContext)),
+
+            // A missing/malformed required route, query, or body parameter (e.g. a
+            // required Guid query param the caller forgot to send) — a caller
+            // mistake, not a server bug, so it belongs in the 400 family rather
+            // than falling through to the generic 500 below.
+            BadHttpRequestException badRequestException => (
+                badRequestException.StatusCode,
+                BuildProblemDetails(badRequestException.StatusCode, "Bad request.", badRequestException.Message, httpContext)),
 
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => (
                 StatusCodes.Status409Conflict,
