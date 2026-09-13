@@ -35,6 +35,7 @@ Every catalog item carries a `pricing_type`: `unit | weight_volume | bundle | se
 - **BIR compliance staged deliberately**: v1 ships sequential, server-generated, gap-auditable receipt numbers; Z/X-reading and Senior/PWD discount automation were scoped for phase 2 but the schema was built to support them from day one, avoiding a compliance retrofit.
 - **Monetization deferred without foreclosing options**: a `tenants.license_status` field and a transaction-count metering table are populated from day one regardless of pricing model, so subscription, one-time+support, or per-transaction billing all remain configuration decisions rather than re-architecture.
 - **Documented tradeoffs via ADRs**: architecture decisions (EF Core over Dapper, hosting provider choice, offline-sync boundary, bill-payment provider selection, BIR format review status, data-privacy registration tracking) are recorded as individual ADRs rather than left as implicit team knowledge.
+- **Role-aware navigation shell**: the client's staff app runs on a single `go_router` `StatefulShellRoute.indexedStack`, with which of its five bottom-nav tabs render driven by the same `StaffRole` claim the backend already enforces — a Cashier's device physically doesn't render the Inventory/Reports/Business tabs, a Warehouse device doesn't render Sell/Reports/Business, and so on. This is presentation-layer convenience only: every underlying action stays independently authorized server-side, so a hidden tab is never the actual security boundary.
 
 ## Build sequence (phased delivery)
 
@@ -42,7 +43,7 @@ The system was built in explicit phases, each shipping backend and client change
 
 1. **Phase 0** — monorepo scaffold, ASP.NET Core solution bootstrap.
 2. **Phase 1** — full domain model, tenant isolation, JWT auth, PIN login, RBAC and tenant-isolation tests, global error handling, offline drift schema on the client.
-3. **Phase 2** — onboarding flows (bootstrap, staff/branch/device management), tenant settings, audit log.
+3. **Phase 2** — onboarding flows (bootstrap, staff/branch/device management), tenant settings, audit log. Later revisited as a guided wizard (business → branch → admin) with a Terms of Service/Privacy Policy acceptance gate, a branded splash screen, and a redesigned login screen — reachable afterward from Business Settings.
 4. **Phase 3** — catalog engine: categories/items/unit pricing, modifier groups, weight/volume batching, bundle promo rules, variant matrices, combo/meal builder slots, service-duration pricing, department/concessionaire assignment, credit ledger ("utang") toggle, barcode scanner hardware integration.
 5. **Phase 4** — checkout/transaction engine: cart and transaction processing, Senior/PWD discount auto-recalculation, combo/variant customization at checkout, multiple payment method tabs (cash, bank transfer, manual GCash QR), minimal BIR-style receipt numbering, BIR X/Z-reading report generation.
 6. **Phase 5** — inventory: stock movement log with full type taxonomy, low-stock dashboard, multi-branch stock transfer, supplier & purchase order management.
@@ -61,7 +62,9 @@ The system was built in explicit phases, each shipping backend and client change
 - Enforced RBAC at two orthogonal axes — Role (what) and ScopeType/ScopeId (which data) — so a multi-branch reporting surface can't leak another branch's numbers to a scoped manager.
 - Structurally excluded an entire class of unattended-terminal risk (kiosk can't pay, discount, or charge to credit) by never granting that role access to the relevant endpoints, rather than relying on client-side UI hiding.
 - Treated regulatory compliance (BIR receipts, Senior/PWD discounts, NPC data-privacy registration) as first-class schema concerns from Phase 1 instead of a late bolt-on.
+- Replaced the client's original flat, ungrouped button list with a role-filtered five-tab dashboard shell (Home/Sell/Reports/Inventory/Business) built on `go_router`, so the same login screen produces a visibly different, minimal app for a Cashier than for an Admin without a second client build.
 - Used ADRs to make infrastructure and compliance tradeoffs (hosting provider, ORM choice, payment provider, sync engine's actual scope boundary) explicit and revisitable as the build progressed, not just at the start.
+- Gated tenant creation on an explicit Terms of Service/Privacy Policy acceptance step, with both documents kept reachable post-setup from Business Settings rather than a one-time, un-revisitable checkbox.
 
 ## Suggested resume bullets
 

@@ -63,6 +63,8 @@ void main() {
       find.widgetWithText(TextFormField, 'Choose a PIN'),
       '1234',
     );
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
     await tester.tap(find.text('Create Business'));
     await tester.pumpAndSettle();
 
@@ -88,9 +90,38 @@ void main() {
       find.widgetWithText(TextFormField, 'Choose a PIN'),
       '1234',
     );
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
     await tester.tap(find.text('Create Business'));
     await tester.pumpAndSettle();
 
     expect(find.text('That business name is already taken.'), findsOneWidget);
   });
+
+  testWidgets(
+    'reaching the admin step without checking the legal agreement shows an error and never submits',
+    (tester) async {
+      final repository = FakeOnboardingRepository();
+      await tester.pumpWidget(_wrap(repository));
+
+      await _advanceToAdminStep(tester, businessName: "Ana's Store");
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Ana Reyes',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Choose a PIN'),
+        '1234',
+      );
+      await tester.tap(find.text('Create Business'));
+      await tester.pump();
+
+      expect(
+        find.text('Please review and accept to continue.'),
+        findsOneWidget,
+      );
+      expect(repository.lastBootstrapRequest, isNull);
+    },
+  );
 }

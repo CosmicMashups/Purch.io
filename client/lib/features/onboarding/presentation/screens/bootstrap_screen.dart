@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../legal/presentation/widgets/legal_agreement_checkbox.dart';
 import '../../domain/bootstrap_models.dart';
 import '../../domain/onboarding_enums.dart';
 import '../providers/onboarding_providers.dart';
@@ -31,6 +32,8 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
   final _adminPinController = TextEditingController();
   BusinessType _businessType = BusinessType.convenienceStore;
   int _currentStep = 0;
+  bool _agreedToLegalTerms = false;
+  bool _showAgreementError = false;
 
   @override
   void dispose() {
@@ -53,9 +56,13 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
     }
     if (_currentStep < _stepLabels.length - 1) {
       setState(() => _currentStep += 1);
-    } else {
-      _submit();
+      return;
     }
+    if (!_agreedToLegalTerms) {
+      setState(() => _showAgreementError = true);
+      return;
+    }
+    _submit();
   }
 
   void _goBack() {
@@ -248,6 +255,13 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
                             isLoading: isLoading,
                             adminNameController: _adminNameController,
                             adminPinController: _adminPinController,
+                            agreedToLegalTerms: _agreedToLegalTerms,
+                            showAgreementError: _showAgreementError,
+                            onAgreementChanged:
+                                (value) => setState(() {
+                                  _agreedToLegalTerms = value;
+                                  _showAgreementError = false;
+                                }),
                           ),
                         },
                       ),
@@ -500,12 +514,18 @@ class _AdminStep extends StatelessWidget {
     required this.isLoading,
     required this.adminNameController,
     required this.adminPinController,
+    required this.agreedToLegalTerms,
+    required this.showAgreementError,
+    required this.onAgreementChanged,
   });
 
   final GlobalKey<FormState> formKey;
   final bool isLoading;
   final TextEditingController adminNameController;
   final TextEditingController adminPinController;
+  final bool agreedToLegalTerms;
+  final bool showAgreementError;
+  final ValueChanged<bool> onAgreementChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -540,6 +560,16 @@ class _AdminStep extends StatelessWidget {
             keyboardType: TextInputType.number,
             obscureText: true,
             validator: _requiredValidator,
+          ),
+          const SizedBox(height: 12),
+          LegalAgreementCheckbox(
+            value: agreedToLegalTerms,
+            enabled: !isLoading,
+            onChanged: onAgreementChanged,
+            errorText:
+                showAgreementError
+                    ? 'Please review and accept to continue.'
+                    : null,
           ),
         ],
       ),

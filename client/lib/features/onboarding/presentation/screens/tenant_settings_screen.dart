@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/purch_image.dart';
+import '../../../legal/presentation/screens/privacy_policy_screen.dart';
+import '../../../legal/presentation/screens/terms_of_service_screen.dart';
 import '../../domain/tenant_settings_models.dart';
 import '../providers/onboarding_providers.dart';
 import 'server_connection_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// A2 (branding) + A5 (BIR/compliance) + the barcode-requirement toggle + B7's
 /// credit ledger ("utang") toggle, all on one screen since they're all
@@ -25,7 +28,7 @@ class TenantSettingsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
             (error, stackTrace) =>
-                Center(child: Text('Could not load settings: $error')),
+                Center(child: Text('Could not load settings: ${describeError(error)}')),
         // Keyed by tenant id so the form's local controllers only re-seed if
         // we somehow load a genuinely different tenant, not on every rebuild.
         data:
@@ -396,6 +399,54 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                       shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
                     ),
                     child: const Text('Local Server Connection'),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Card(
+                    elevation: 0,
+                    color: AppColors.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdBorder,
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.privacy_tip_outlined,
+                            color: AppColors.textSecondary,
+                          ),
+                          title: const Text('Privacy Policy'),
+                          trailing: const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                          onTap:
+                              () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder: (_) => const PrivacyPolicyScreen(),
+                                ),
+                              ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.gavel_outlined,
+                            color: AppColors.textSecondary,
+                          ),
+                          title: const Text('Terms of Service'),
+                          trailing: const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                          onTap:
+                              () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder: (_) => const TermsOfServiceScreen(),
+                                ),
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
