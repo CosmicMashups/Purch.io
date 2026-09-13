@@ -18,25 +18,47 @@ backend/**/bin/
 backend/**/obj/
 backend/**/*.user
 backend/.vs/
+TestResults/
+*.suo
+*.userprefs
+*.sln.docstates
 
-# --- Env / secrets ---
+# --- Dynamic Tenant Uploads ---
+backend/**/wwwroot/uploads/*
+!backend/**/wwwroot/uploads/.gitkeep
+
+# --- Databases & Local Storage ---
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --- Env / Secrets ---
 .env
-.env.local
+.env.*
+!.env.example
 appsettings.Development.json
 appsettings.Local.json
 *.pfx
 *.key
 
-# --- Installer build output (see installer/README.md) ---
+# --- Installer Build Output (see installer/README.md) ---
 installer/dist/
 
-# --- IDE ---
+# --- IDE & Editors ---
 .idea/
 *.iml
 .vscode/*
 !.vscode/launch.json
 !.vscode/extensions.json
+*.swp
+*.swo
 
-# --- OS ---
+# --- OS & Logs ---
 .DS_Store
 Thumbs.db
+*.log
+
+# --- Local Tooling & Cache ---
+.impeccable/
