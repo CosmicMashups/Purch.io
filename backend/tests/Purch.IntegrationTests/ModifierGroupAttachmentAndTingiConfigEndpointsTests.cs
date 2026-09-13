@@ -212,7 +212,7 @@ public sealed class ModifierGroupAttachmentAndTingiConfigEndpointsTests(Postgres
             "/onboarding/bootstrap",
             new BootstrapTenantRequest(
                 $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
+                BusinessType.SariSariStore,
                 "Main Branch",
                 "Admin User",
                 "1234"));

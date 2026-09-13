@@ -128,7 +128,7 @@ public sealed class DepartmentEndpointsTests(PostgresContainerFixture postgres)
             "/onboarding/bootstrap",
             new BootstrapTenantRequest(
                 $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
+                BusinessType.SariSariStore,
                 "Main Branch",
                 "Admin User",
                 "1234"));
