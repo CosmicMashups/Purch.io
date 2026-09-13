@@ -6,6 +6,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'add_category_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B5's category half.
 class CategoryListScreen extends ConsumerWidget {
@@ -23,7 +24,7 @@ class CategoryListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load categories: $error',
+          message: 'Could not load categories: ${describeError(error)}',
           onRetry: () => ref.read(categoryListProvider.notifier).refresh(),
         ),
         data: (categories) {

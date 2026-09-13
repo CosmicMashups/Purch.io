@@ -6,6 +6,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/supplier_providers.dart';
 import 'add_supplier_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// C4's supplier directory.
 class SupplierListScreen extends ConsumerWidget {
@@ -28,7 +29,7 @@ class SupplierListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load suppliers: $error',
+          message: 'Could not load suppliers: ${describeError(error)}',
           onRetry: () => ref.read(supplierListProvider.notifier).refresh(),
         ),
         data: (suppliers) {

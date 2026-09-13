@@ -5,6 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../providers/catalog_providers.dart';
 import 'add_modifier_group_screen.dart';
 import 'add_modifier_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B5's modifier groups half (categories are on their own screen).
 class ModifierGroupListScreen extends ConsumerWidget {
@@ -25,7 +26,7 @@ class ModifierGroupListScreen extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Text(
-                  'Could not load modifier groups: $error',
+                  'Could not load modifier groups: ${describeError(error)}',
                   style: const TextStyle(color: AppColors.error),
                   textAlign: TextAlign.center,
                 ),

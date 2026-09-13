@@ -126,7 +126,11 @@
 
 ## D. Point of Sale — Cashier View (Tablet, primary daily-use screen)
 
-### D1. POS Home / Item Grid
+### D0. Home Tab (bottom nav, tab 1 — every role) *(shipped)*
+- Launchpad, not a list: greeting header, a large "New Sale" CTA card, a couple of quick-action shortcuts (Shift/Drawer, Payment Reminders)
+- "Needs your attention" section surfaces unsynced/flagged records only when there are any — no empty banner when there's nothing to review
+
+### D1. POS Home / Item Grid (reached via the Sell tab)
 - Category tab bar (top, scrollable)
 - Item grid (large tiles, image + name + price)
 - Order summary sidebar (running cart, quantity steppers, subtotal)
@@ -211,7 +215,7 @@
 
 ## G. Shared / System-Wide Components
 
-- **App shell / navigation**: side nav (tablet) collapsing to bottom nav on smaller devices; role-based menu visibility
+- **App shell / navigation** *(shipped)*: a persistent Material 3 bottom `NavigationBar` with up to five tabs — Home, Sell, Reports, Inventory, Business — each keeping its own independent navigation stack. Which tabs appear is role-based and server-claim-driven, not just hidden client-side: Admin and Manager see all five (Manager loses two Admin-only tiles under Business); Cashier sees only Home + Sell; Warehouse sees only Home + Inventory. Dense tabs (Inventory, Business) group their destinations into labeled sections rather than one flat list.
 - **Offline indicator banner**: persistent small banner when device is offline, with pending-sync count
 - **Confirmation modal**: reusable for all destructive/critical actions
 - **Empty states**: illustrated, plain-language (e.g. "No items yet — tap + to add your first item")

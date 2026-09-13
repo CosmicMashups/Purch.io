@@ -36,6 +36,7 @@ public sealed class ItemService(
         await ValidateBarcodeAsync(request.Barcode, cancellationToken);
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
         await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
+        await ValidatePricingTypeAsync(request.PricingType, cancellationToken);
 
         var item = new Item
         {
@@ -208,6 +209,24 @@ public sealed class ItemService(
         if (!string.IsNullOrWhiteSpace(barcode) && await itemRepository.BarcodeExistsAsync(CurrentTenantId, barcode, cancellationToken))
         {
             throw new ConflictException($"An item with barcode '{barcode}' already exists.");
+        }
+    }
+
+    private async Task ValidatePricingTypeAsync(PricingType pricingType, CancellationToken cancellationToken)
+    {
+        if (pricingType != PricingType.WeightVolume)
+        {
+            return;
+        }
+
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken)
+            ?? throw new NotFoundException("Tenant", CurrentTenantId);
+
+        if (tenant.BusinessType != BusinessType.SariSariStore)
+        {
+            throw new ValidationException(
+                nameof(CreateItemRequest.PricingType),
+                "Weight/volume (tingi) pricing is only available for sari-sari store businesses.");
         }
     }
 

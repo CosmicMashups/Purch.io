@@ -7,6 +7,7 @@ import '../../domain/payment_method.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'receipt_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D5's payment method tabs. Cash, bank transfer, manual GCash QR, and
 /// Utang/Credit (Phase 9) have a working checkout flow — the rest are listed
@@ -471,7 +472,7 @@ class _CreditLedgerPicker extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error:
           (error, stackTrace) =>
-              Text('Could not load customer accounts: $error'),
+              Text('Could not load customer accounts: ${describeError(error)}'),
       data: (ledgers) {
         if (ledgers.isEmpty) {
           return const Text(

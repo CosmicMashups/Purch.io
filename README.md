@@ -16,7 +16,7 @@ Built for mission-critical operations, Purch.io features offline-resilient local
   - **Bundles & Tiered Volume Pricing**: Mix-and-match bundle rules, buy-X-get-Y, and automatic basket discounts.
   - **Timed Services**: Time-based service tracking with practitioner scheduling and duration-based rates.
 - **Dual Form-Factor Client**:
-  - **Landscape Staff Shell**: Rapid-scan cashier POS, split-pane manager console, live shift drawer audits, and stock movement logging.
+  - **Landscape Staff Shell**: A role-filtered, five-tab bottom-navigation dashboard (Home, Sell, Reports, Inventory, Business) built on `go_router`, wrapping rapid-scan cashier POS, split-pane manager console, live shift drawer audits, and stock movement logging. Which tabs render is driven by the signed-in staff member's role — a Cashier only ever sees Home + Sell, a Warehouse account only Home + Inventory.
   - **Portrait Self-Service Kiosk**: Customer-facing ordering terminal with customizable 16:9 promotional hero posters, visual category carousels, and order ticket dispatch.
 - **Offline-First Resilience & Sync**:
   - SQLite local database powered by Drift for zero-latency cashier interactions during connectivity dropouts.
@@ -155,7 +155,7 @@ Every installation operates in one of two deployment modes, controlled by the `P
    ```bash
    flutter run -d windows --dart-define=PURCH_API_BASE_URL=https://localhost:5001
    ```
-   *(Replace target with `chrome`, `android`, or macOS as required. The API endpoint can also be reconfigured on the fly within the application's connection settings.)*
+   *(Replace target with `android` or macOS as required. The API endpoint can also be reconfigured on the fly within the application's connection settings. Note: Chrome/web is **not** a supported target — `sqlite3_flutter_libs`, used for the offline Drift database, isn't web-compatible. The Windows desktop target additionally requires the "C++ ATL for latest v14x build tools" component installed alongside Visual Studio's Desktop development with C++ workload, for `flutter_secure_storage`.)*
 
 ---
 

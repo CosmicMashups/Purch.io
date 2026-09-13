@@ -7,6 +7,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/branch_transfer_providers.dart';
 import 'create_branch_transfer_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// C5's branch transfer list.
 class BranchTransferListScreen extends ConsumerWidget {
@@ -28,7 +29,7 @@ class BranchTransferListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load transfers: $error',
+          message: 'Could not load transfers: ${describeError(error)}',
           onRetry: () =>
               ref.read(branchTransferListProvider.notifier).refresh(),
         ),

@@ -6,6 +6,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'receive_batch_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B2a — weight/volume batch/lot tracking. Only reachable for items whose
 /// pricingType is weightVolume (see ItemListScreen), matching the backend's
@@ -31,7 +32,7 @@ class ItemBatchesScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load batches: $error',
+          message: 'Could not load batches: ${describeError(error)}',
           onRetry: () =>
               ref.read(itemBatchListProvider(itemId).notifier).refresh(),
         ),

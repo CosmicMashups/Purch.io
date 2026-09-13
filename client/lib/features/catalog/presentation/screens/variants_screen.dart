@@ -6,6 +6,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'add_variant_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B2's variant matrix half.
 class VariantsScreen extends ConsumerWidget {
@@ -30,7 +31,7 @@ class VariantsScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load variants: $error',
+          message: 'Could not load variants: ${describeError(error)}',
           onRetry: () =>
               ref.read(itemVariantListProvider(itemId).notifier).refresh(),
         ),

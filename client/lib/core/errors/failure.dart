@@ -56,3 +56,12 @@ final class NetworkFailure extends Failure {
 final class UnknownFailure extends Failure {
   const UnknownFailure(super.message);
 }
+
+/// Unwraps a caught error down to a user-facing message. AsyncValue.when's
+/// `error` callback hands back whatever was thrown, typed as `Object` — for
+/// this app that's always a `Failure` (repositories only ever throw those),
+/// but the type isn't visible at the call site without this check, so
+/// screens were falling back to `'$error'`, which prints `Instance of
+/// 'ForbiddenFailure'` instead of the actual detail.
+String describeError(Object error) =>
+    error is Failure ? error.message : error.toString();

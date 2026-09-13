@@ -7,6 +7,7 @@ import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D2 — the combo/meal builder customization sheet.
 class ComboCustomizationScreen extends ConsumerStatefulWidget {
@@ -88,7 +89,7 @@ class _ComboCustomizationScreenState
         error:
             (error, stackTrace) => Center(
               child: Text(
-                'Could not load this combo: $error',
+                'Could not load this combo: ${describeError(error)}',
                 style: const TextStyle(color: AppColors.error),
               ),
             ),
@@ -130,7 +131,7 @@ class _ComboCustomizationScreenState
             error:
                 (error, stackTrace) => Center(
                   child: Text(
-                    'Could not load items: $error',
+                    'Could not load items: ${describeError(error)}',
                     style: const TextStyle(color: AppColors.error),
                   ),
                 ),

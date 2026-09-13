@@ -29,6 +29,7 @@ The **Purch.io Client** is a high-performance, cross-platform **Flutter** applic
 ```
 
 ### 1. Landscape Staff Shell (Cashier & Store Management)
+- **Role-Filtered Bottom Navigation**: A `go_router` `StatefulShellRoute` drives a five-tab dashboard — Home, Sell, Reports, Inventory, Business — each tab keeping its own navigation stack. Tab visibility is role-driven (Admin/Manager see all five; Cashier sees Home + Sell; Warehouse sees Home + Inventory), and the Home tab surfaces a "New Sale" launch action plus anything needing attention (unsynced conflicts, overdue customer payments).
 - **High-Throughput Point of Sale**: Split-pane layout with rapid item scanning, unit/variant/combo selections, line-item adjustments, and instant discount vouchers.
 - **Cash Drawer & Shift Auditing**: Shift opening cash count, mid-day cash-drops, cash drawers, and closing balance variance reporting.
 - **Inventory & Stock Management**: In-app purchase orders, receiving logs, inter-branch stock transfers, supplier management, and low-stock threshold alerts.
@@ -70,7 +71,8 @@ The client UI is driven by a centralized design token system ([`lib/core/theming
 
 ### Prerequisites
 - [Flutter SDK](https://docs.flutter.dev/) (3.24 or newer)
-- Android SDK (for mobile/tablet targets) or Visual Studio C++ toolchain (for Windows desktop target)
+- Android SDK (for mobile/tablet targets) or Visual Studio 2022 with the "Desktop development with C++" workload **plus** the "C++ ATL for latest v14x build tools" individual component (for the Windows desktop target — `flutter_secure_storage_windows` won't compile without it)
+- Web (`chrome`/`web-server`) is **not** a supported target: `sqlite3_flutter_libs`, backing the offline Drift database, has no web implementation and the build will fail at compile time.
 
 ---
 
@@ -102,12 +104,9 @@ flutter run -d windows --dart-define=PURCH_API_BASE_URL=https://localhost:5001
 flutter run -d <device-id> --dart-define=PURCH_API_BASE_URL=http://10.0.2.2:5000
 ```
 
-**Web Browser**:
-```bash
-flutter run -d chrome --dart-define=PURCH_API_BASE_URL=http://localhost:5000
-```
-
 > **Tip**: If `--dart-define=PURCH_API_BASE_URL` is omitted, the app defaults to `https://localhost:5001`. You can also switch the target server address at any time via the "Connect to a local server" button on the login screen.
+>
+> **Web is not supported** (`flutter run -d chrome`/`web-server` will fail to compile) — see Prerequisites above.
 
 ---
 

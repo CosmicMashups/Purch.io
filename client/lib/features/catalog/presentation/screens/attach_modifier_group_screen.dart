@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../domain/modifier_models.dart';
 import '../providers/catalog_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 class AttachModifierGroupScreen extends ConsumerStatefulWidget {
   const AttachModifierGroupScreen({
@@ -85,7 +86,7 @@ class _AttachModifierGroupScreenState
                         border: Border.all(color: AppColors.error),
                       ),
                       child: Text(
-                        'Could not load modifier groups: $error',
+                        'Could not load modifier groups: ${describeError(error)}',
                         style: const TextStyle(color: AppColors.error),
                       ),
                     ),

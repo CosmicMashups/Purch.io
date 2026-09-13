@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../domain/shift_models.dart';
 import '../providers/shift_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D7 — opening/closing the device's cash-drawer session and reconciling the
 /// actual count against what cash sales say should be in the drawer. A
@@ -30,7 +31,7 @@ class ShiftScreen extends ConsumerWidget {
                 error:
                     (error, stackTrace) => Center(
                       child: Text(
-                        'Could not load the shift: $error',
+                        'Could not load the shift: ${describeError(error)}',
                         style: const TextStyle(color: AppColors.error),
                       ),
                     ),

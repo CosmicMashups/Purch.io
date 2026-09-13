@@ -7,6 +7,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_combo_component_models.dart';
 import '../providers/catalog_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 class AddComboComponentScreen extends ConsumerStatefulWidget {
   const AddComboComponentScreen({
@@ -193,7 +194,7 @@ class _AddComboComponentScreenState
                           loading: () => const LinearProgressIndicator(),
                           error:
                               (error, stackTrace) =>
-                                  Text('Could not load categories: $error'),
+                                  Text('Could not load categories: ${describeError(error)}'),
                           data:
                               (categories) => DropdownButtonFormField<String>(
                                 value: _selectedCategoryId,

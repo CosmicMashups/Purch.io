@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../providers/reports_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// F4 — sales per cashier + shift attendance summary over a date range.
 class StaffPerformanceScreen extends ConsumerStatefulWidget {
@@ -65,7 +66,7 @@ class _StaffPerformanceScreenState
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
             (error, stackTrace) =>
-                Center(child: Text('Could not load the report: $error', style: Theme.of(context).textTheme.bodyMedium)),
+                Center(child: Text('Could not load the report: ${describeError(error)}', style: Theme.of(context).textTheme.bodyMedium)),
         data: (report) {
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),

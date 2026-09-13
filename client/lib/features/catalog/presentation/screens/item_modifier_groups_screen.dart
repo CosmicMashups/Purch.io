@@ -7,6 +7,7 @@ import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/modifier_models.dart';
 import '../providers/catalog_providers.dart';
 import 'attach_modifier_group_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// Restaurant-style item customization (e.g. "Ice Level" on a drink, "No
 /// Pickles" on a burger) — shows which modifier groups are attached to this
@@ -33,7 +34,7 @@ class ItemModifierGroupsScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load modifier groups: $error',
+          message: 'Could not load modifier groups: ${describeError(error)}',
           onRetry: () =>
               ref.read(itemModifierGroupListProvider(itemId).notifier).refresh(),
         ),

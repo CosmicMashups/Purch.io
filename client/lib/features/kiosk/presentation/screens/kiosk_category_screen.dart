@@ -8,6 +8,7 @@ import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../providers/kiosk_providers.dart';
 import 'kiosk_cart_screen.dart';
 import 'kiosk_item_list_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// E2 — Kiosk category browsing screen.
 /// Large, tactile 2-column cards with responsive tap targets and order bag badge.
@@ -68,7 +69,7 @@ class KioskCategoryScreen extends ConsumerWidget {
             child: CircularProgressIndicator(color: AppColors.brandPrimary),
           ),
           error: (error, stackTrace) => ErrorStateView(
-            message: 'Could not load the menu: $error',
+            message: 'Could not load the menu: ${describeError(error)}',
             onRetry: () => ref.read(categoryListProvider.notifier).refresh(),
           ),
           data: (categories) {

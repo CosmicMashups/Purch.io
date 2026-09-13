@@ -8,6 +8,7 @@ import '../../../onboarding/domain/branch_models.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../domain/inventory_movement_models.dart';
 import '../providers/inventory_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// C3 — records one stock movement, adjusting the item's stock on hand in
 /// the same operation. Spoiled requires a reason category, For Return
@@ -126,7 +127,7 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
                         loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
                         error:
                             (error, stackTrace) =>
-                                Text('Could not load items: $error', style: const TextStyle(color: AppColors.error)),
+                                Text('Could not load items: ${describeError(error)}', style: const TextStyle(color: AppColors.error)),
                         data: (items) {
                           // The dropdown compares values by identity, but a
                           // preset item (from the dashboard's reorder
@@ -183,7 +184,7 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
                         loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
                         error:
                             (error, stackTrace) =>
-                                Text('Could not load branches: $error', style: const TextStyle(color: AppColors.error)),
+                                Text('Could not load branches: ${describeError(error)}', style: const TextStyle(color: AppColors.error)),
                         data:
                             (branches) => DropdownButtonFormField<Branch>(
                               value: _selectedBranch,

@@ -95,6 +95,58 @@ abstract class AppShadows {
 }
 
 abstract class AppTypography {
+  // General hierarchy — added for the dashboard/tab-shell surfaces, which
+  // need real heading weight beyond the price-specific styles below.
+  static const TextStyle headlineLg = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
+    letterSpacing: -0.4,
+    height: 1.15,
+  );
+
+  static const TextStyle headlineSm = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
+    letterSpacing: -0.3,
+    height: 1.2,
+  );
+
+  static const TextStyle titleMd = TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+    letterSpacing: -0.1,
+  );
+
+  static const TextStyle sectionLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textSecondary,
+    letterSpacing: 0.4,
+  );
+
+  static const TextStyle body = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textSecondary,
+    height: 1.4,
+  );
+
+  static const TextStyle bodySm = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textMuted,
+    height: 1.3,
+  );
+
+  static const TextStyle labelMd = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+  );
+
   static const TextStyle priceHero = TextStyle(
     fontSize: 32,
     fontWeight: FontWeight.w700,

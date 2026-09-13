@@ -13,6 +13,7 @@ import '../providers/pos_providers.dart';
 import 'cart_screen.dart';
 import 'combo_customization_screen.dart';
 import 'variant_picker_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D1 — the POS item grid. PricingType.unit items are addable directly;
 /// PricingType.combo (D2) and PricingType.variantMatrix (D3) open
@@ -58,7 +59,7 @@ class ItemGridScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load items: $error',
+          message: 'Could not load items: ${describeError(error)}',
           onRetry: () => ref.read(itemListProvider.notifier).refresh(),
         ),
         data: (items) {

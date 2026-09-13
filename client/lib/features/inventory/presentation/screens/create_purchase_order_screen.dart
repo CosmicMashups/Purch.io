@@ -10,6 +10,7 @@ import '../../domain/purchase_order_models.dart';
 import '../../domain/supplier_models.dart';
 import '../providers/purchase_order_providers.dart';
 import '../providers/supplier_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 class CreatePurchaseOrderScreen extends ConsumerStatefulWidget {
   const CreatePurchaseOrderScreen({super.key});
@@ -122,7 +123,7 @@ class _CreatePurchaseOrderScreenState
                       loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
                       error:
                           (error, stackTrace) =>
-                              Text('Could not load suppliers: $error', style: const TextStyle(color: AppColors.error)),
+                              Text('Could not load suppliers: ${describeError(error)}', style: const TextStyle(color: AppColors.error)),
                       data:
                           (suppliers) => DropdownButtonFormField<Supplier>(
                             value: _matchSupplier(suppliers, _supplier?.id),
@@ -168,7 +169,7 @@ class _CreatePurchaseOrderScreenState
                       loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
                       error:
                           (error, stackTrace) =>
-                              Text('Could not load branches: $error', style: const TextStyle(color: AppColors.error)),
+                              Text('Could not load branches: ${describeError(error)}', style: const TextStyle(color: AppColors.error)),
                       data:
                           (branches) => DropdownButtonFormField<Branch>(
                             value: _matchBranch(branches, _branch?.id),
@@ -222,7 +223,7 @@ class _CreatePurchaseOrderScreenState
                       loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
                       error:
                           (error, stackTrace) =>
-                              Text('Could not load items: $error', style: const TextStyle(color: AppColors.error)),
+                              Text('Could not load items: ${describeError(error)}', style: const TextStyle(color: AppColors.error)),
                       data:
                           (items) => Column(
                             children: [

@@ -13,6 +13,7 @@ import '../../../pos/presentation/screens/combo_customization_screen.dart';
 import '../../../pos/presentation/screens/variant_picker_screen.dart';
 import '../providers/kiosk_providers.dart';
 import 'kiosk_cart_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// Bridges E2 (category carousel) to E3 (item customize) — reuses the exact
 /// same VariantPickerScreen/ComboCustomizationScreen D2/D3 logic the cashier
@@ -76,7 +77,7 @@ class KioskItemListScreen extends ConsumerWidget {
             child: CircularProgressIndicator(color: AppColors.brandPrimary),
           ),
           error: (error, stackTrace) => ErrorStateView(
-            message: 'Could not load menu items: $error',
+            message: 'Could not load menu items: ${describeError(error)}',
             onRetry: () => ref.read(itemListProvider.notifier).refresh(),
           ),
           data: (items) {

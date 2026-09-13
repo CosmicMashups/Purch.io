@@ -8,6 +8,7 @@ import '../../domain/purchase_order_models.dart';
 import '../providers/purchase_order_providers.dart';
 import 'create_purchase_order_screen.dart';
 import 'receive_purchase_order_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// C5 — the PO list with its status tracker (Draft → Sent → Partially
 /// Received/Received, or Cancelled from Draft/Sent).
@@ -26,7 +27,7 @@ class PurchaseOrderListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load purchase orders: $error',
+          message: 'Could not load purchase orders: ${describeError(error)}',
           onRetry: () =>
               ref.read(purchaseOrderListProvider.notifier).refresh(),
         ),

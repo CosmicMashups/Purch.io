@@ -6,6 +6,7 @@ import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D3 — lets the cashier pick which variant (size/color/etc.) of a
 /// PricingType.variantMatrix item to add.
@@ -31,7 +32,7 @@ class VariantPickerScreen extends ConsumerWidget {
         error:
             (error, stackTrace) => Center(
               child: Text(
-                'Could not load variants: $error',
+                'Could not load variants: ${describeError(error)}',
                 style: const TextStyle(color: AppColors.error),
               ),
             ),

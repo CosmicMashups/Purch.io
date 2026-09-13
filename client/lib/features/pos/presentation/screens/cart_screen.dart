@@ -7,6 +7,7 @@ import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'payment_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// D1's cart review — quantity adjustment and line removal, plus a way into
 /// D5's payment method tabs. Also D4's Senior/PWD toggle and promo code entry.
@@ -85,7 +86,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load the cart: $error',
+          message: 'Could not load the cart: ${describeError(error)}',
           onRetry: () => ref.refresh(cartNotifierProvider),
         ),
         data: (cart) {

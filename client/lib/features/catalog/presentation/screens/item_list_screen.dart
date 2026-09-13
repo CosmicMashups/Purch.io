@@ -18,6 +18,7 @@ import 'low_stock_threshold_screen.dart';
 import 'service_duration_screen.dart';
 import 'tingi_config_screen.dart';
 import 'variants_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 enum _ItemAction {
   batches,
@@ -56,7 +57,7 @@ class ItemListScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: AppColors.brandPrimary),
         ),
         error: (error, stackTrace) => ErrorStateView(
-          message: 'Could not load items: $error',
+          message: 'Could not load items: ${describeError(error)}',
           onRetry: () => ref.read(itemListProvider.notifier).refresh(),
         ),
         data: (items) {

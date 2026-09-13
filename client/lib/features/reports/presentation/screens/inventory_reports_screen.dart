@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../inventory/domain/inventory_movement_models.dart';
 import '../providers/reports_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// F3 — stock movement summary by type over a date range, plus the
 /// low-stock/reorder CSV export.
@@ -86,7 +87,7 @@ class _InventoryReportsScreenState
             ),
             error:
                 (error, stackTrace) =>
-                    Text('Could not load the movement summary: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                    Text('Could not load the movement summary: ${describeError(error)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
             data: (summary) {
               final nonZeroRows =
                   summary.byType.where((row) => row.movementCount > 0).toList();

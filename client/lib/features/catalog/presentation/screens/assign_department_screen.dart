@@ -5,6 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../onboarding/domain/department_models.dart';
 import '../../domain/item_models.dart';
 import '../providers/catalog_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B6 — assigns (or clears) an item's department/concessionaire. Departments
 /// themselves are managed per-branch in the onboarding feature; this screen
@@ -91,7 +92,7 @@ class _AssignDepartmentScreenState
                     ),
                     error:
                         (error, stackTrace) =>
-                            Text('Could not load departments: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                            Text('Could not load departments: ${describeError(error)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
                     data: (departments) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,

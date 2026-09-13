@@ -6,6 +6,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'add_bundle_rule_screen.dart';
+import '../../../../core/errors/failure.dart';
 
 /// B2b — bundle promo rules. Only reachable for items whose pricingType is
 /// bundle (see ItemListScreen), matching the backend's own rejection of
@@ -37,7 +38,7 @@ class BundleRulesScreen extends ConsumerWidget {
         ),
         error:
             (error, stackTrace) => ErrorStateView(
-              message: 'Could not load bundle rules: $error',
+              message: 'Could not load bundle rules: ${describeError(error)}',
               onRetry:
                   () =>
                       ref.read(bundleRuleListProvider(itemId).notifier).refresh(),

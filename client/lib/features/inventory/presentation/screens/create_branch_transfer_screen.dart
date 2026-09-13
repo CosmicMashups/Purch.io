@@ -8,6 +8,7 @@ import '../../../onboarding/domain/branch_models.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../domain/branch_transfer_models.dart';
 import '../providers/branch_transfer_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 class CreateBranchTransferScreen extends ConsumerStatefulWidget {
   const CreateBranchTransferScreen({super.key});
@@ -125,7 +126,7 @@ class _CreateBranchTransferScreenState
                         loading: () => const LinearProgressIndicator(),
                         error:
                             (error, stackTrace) =>
-                                Text('Could not load branches: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                                Text('Could not load branches: ${describeError(error)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
                         data:
                             (branches) => DropdownButtonFormField<Branch>(
                               value: _matchBranch(branches, _sourceBranch),
@@ -154,7 +155,7 @@ class _CreateBranchTransferScreenState
                         loading: () => const LinearProgressIndicator(),
                         error:
                             (error, stackTrace) =>
-                                Text('Could not load branches: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                                Text('Could not load branches: ${describeError(error)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
                         data:
                             (branches) => DropdownButtonFormField<Branch>(
                               value: _matchBranch(branches, _destinationBranch),
@@ -204,7 +205,7 @@ class _CreateBranchTransferScreenState
                         loading: () => const LinearProgressIndicator(),
                         error:
                             (error, stackTrace) =>
-                                Text('Could not load items: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                                Text('Could not load items: ${describeError(error)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
                         data:
                             (items) => Column(
                               children: [
