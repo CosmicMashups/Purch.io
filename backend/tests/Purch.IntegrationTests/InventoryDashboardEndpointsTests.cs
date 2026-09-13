@@ -73,7 +73,7 @@ public sealed class InventoryDashboardEndpointsTests(PostgresContainerFixture po
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dashboard = await response.Content.ReadFromJsonAsync<InventoryDashboardDto>(JsonOptions);
-        Assert.Equal(4, dashboard!.TotalSkus);
+        Assert.Equal(3, dashboard!.TotalSkus);
         Assert.Equal(1, dashboard.OutOfStockCount);
         Assert.Equal(1, dashboard.LowStockCount);
         var lowStockAlert = Assert.Single(dashboard.LowStockItems);

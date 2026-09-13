@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Purch.Application.Reporting;
 using Purch.Domain.Enums;
 
@@ -33,8 +34,8 @@ public static class ReportingEndpoints
         // --- F3 — inventory reports ---
         _ = app.MapGet("/reports/inventory/movement-summary", async (
             Guid? branchId,
-            DateTimeOffset fromUtc,
-            DateTimeOffset toUtc,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
             IInventoryReportService inventoryReportService,
             CancellationToken cancellationToken) =>
             Results.Ok(await inventoryReportService.GetMovementSummaryAsync(branchId, fromUtc, toUtc, cancellationToken)))
@@ -51,8 +52,8 @@ public static class ReportingEndpoints
         // --- F4 — staff performance ---
         _ = app.MapGet("/reports/staff-performance", async (
             Guid? branchId,
-            DateTimeOffset fromUtc,
-            DateTimeOffset toUtc,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
             IStaffPerformanceService staffPerformanceService,
             CancellationToken cancellationToken) =>
             Results.Ok(await staffPerformanceService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
@@ -61,8 +62,8 @@ public static class ReportingEndpoints
         // --- B6 — department/concessionaire split sales-attribution report ---
         _ = app.MapGet("/reports/department-sales", async (
             Guid? branchId,
-            DateTimeOffset fromUtc,
-            DateTimeOffset toUtc,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
             IDepartmentSalesReportService departmentSalesReportService,
             CancellationToken cancellationToken) =>
             Results.Ok(await departmentSalesReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))

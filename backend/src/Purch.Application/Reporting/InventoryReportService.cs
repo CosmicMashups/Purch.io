@@ -1,13 +1,15 @@
 using System.Globalization;
 using System.Text;
-using Purch.Application.Inventory;
+using Purch.Application.Catalog;
+using Purch.Application.Common;
 using Purch.Domain.Enums;
 
 namespace Purch.Application.Reporting;
 
 public sealed class InventoryReportService(
     IReportingRepository reportingRepository,
-    IInventoryDashboardService inventoryDashboardService,
+    IItemRepository itemRepository,
+    ICurrentTenantProvider currentTenantProvider,
     IReportScopeResolver reportScopeResolver) : IInventoryReportService
 {
     public async Task<MovementSummaryDto> GetMovementSummaryAsync(
@@ -35,19 +37,29 @@ public sealed class InventoryReportService(
 
     public async Task<string> GenerateLowStockReorderCsvAsync(CancellationToken cancellationToken = default)
     {
-        var dashboard = await inventoryDashboardService.GetDashboardAsync(cancellationToken);
+        var tenantId = currentTenantProvider.TenantId
+            ?? throw new InvalidOperationException("The low-stock export requires an authenticated tenant context.");
+        var items = await itemRepository.ListByTenantAsync(tenantId, cancellationToken);
+
+        // Unlike the dashboard's LowStockItems (which excludes zero-stock items
+        // into its own OutOfStockCount bucket), a reorder report needs every item
+        // at or under its threshold — an item at zero stock needs reordering too.
+        var reorderItems = items
+            .Where(item => item.IsActive && item.LowStockThreshold is { } threshold && item.StockOnHand <= threshold)
+            .OrderBy(item => item.StockOnHand);
 
         var csv = new StringBuilder();
         _ = csv.AppendLine("Item,Stock On Hand,Low Stock Threshold,Suggested Reorder Quantity");
 
-        foreach (var item in dashboard.LowStockItems)
+        foreach (var item in reorderItems)
         {
-            var suggestedReorderQuantity = Math.Max(item.LowStockThreshold - item.StockOnHand, 0);
+            var threshold = item.LowStockThreshold!.Value;
+            var suggestedReorderQuantity = Math.Max(threshold - item.StockOnHand, 0);
             _ = csv.AppendLine(string.Join(
                 ',',
-                CsvField(item.ItemName),
+                CsvField(item.Name),
                 item.StockOnHand.ToString(CultureInfo.InvariantCulture),
-                item.LowStockThreshold.ToString(CultureInfo.InvariantCulture),
+                threshold.ToString(CultureInfo.InvariantCulture),
                 suggestedReorderQuantity.ToString(CultureInfo.InvariantCulture)));
         }
 

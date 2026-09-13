@@ -11,7 +11,12 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         _ = builder.Property(t => t.TotalAmount).HasPrecision(12, 2);
         _ = builder.Property(t => t.DiscountAmount).HasPrecision(12, 2);
 
-        // Matches ReceiptSequence's own per-(branch,device) uniqueness.
-        _ = builder.HasIndex(t => new { t.TenantId, t.BranchId, t.DeviceId, t.ReceiptNumber }).IsUnique();
+        // Matches ReceiptSequence's own per-(branch,device) uniqueness. Filtered to
+        // issued receipts only — Postgres already treats NULLs as distinct for a
+        // unique index, but this is explicit about the intent and matches
+        // ReceiptNumber now being nullable rather than a 0-sentinel.
+        _ = builder.HasIndex(t => new { t.TenantId, t.BranchId, t.DeviceId, t.ReceiptNumber })
+            .IsUnique()
+            .HasFilter("\"ReceiptNumber\" IS NOT NULL");
     }
 }

@@ -9,8 +9,11 @@ public class Transaction : TenantScopedEntity
 
     public Guid DeviceId { get; set; }
 
-    /// <summary>Sequential per branch/device, server-generated — see ReceiptSequence.</summary>
-    public long ReceiptNumber { get; set; }
+    /// <summary>Sequential per branch/device, server-generated — see ReceiptSequence.
+    /// Null until payment, so more than one open/voided/kiosk-pending transaction
+    /// can coexist per device without tripping the (TenantId, BranchId, DeviceId,
+    /// ReceiptNumber) uniqueness, which is only meant to guard issued receipts.</summary>
+    public long? ReceiptNumber { get; set; }
 
     /// <summary>Null until a kiosk-originated order is claimed by a cashier — a kiosk
     /// terminal has no staff user, so this can't be required at creation time the

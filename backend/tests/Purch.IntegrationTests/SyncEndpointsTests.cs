@@ -107,7 +107,10 @@ public sealed class SyncEndpointsTests(PostgresContainerFixture postgres)
 
         var flagged = await deviceA.GetFromJsonAsync<List<FlaggedSyncRecordDto>>("/sync/flagged", JsonOptions);
         var flaggedRecord = Assert.Single(flagged!);
-        Assert.Equal(later, flaggedRecord.ClientTimestamp);
+        // Postgres timestamptz only keeps microsecond precision, one digit less
+        // than a .NET tick — a round trip through the database loses that last
+        // digit, so compare with a tolerance rather than exact equality.
+        Assert.Equal(later, flaggedRecord.ClientTimestamp, TimeSpan.FromMicroseconds(1));
     }
 
     [Fact]

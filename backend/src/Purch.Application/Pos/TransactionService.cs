@@ -96,6 +96,10 @@ public sealed class TransactionService(
                 });
             }
 
+            // RecalculateTotalAsync re-queries lines from the database, which
+            // wouldn't see the line just added above until it's flushed — save
+            // first so the total isn't computed one line behind.
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
             await RecalculateTotalAsync(cart, cancellationToken);
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -139,6 +143,9 @@ public sealed class TransactionService(
             });
         }
 
+        // Same flush-before-recalculate ordering as the combo branch above —
+        // RecalculateTotalAsync's line query otherwise misses this add/update.
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -210,6 +217,10 @@ public sealed class TransactionService(
 
         var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
             ?? throw new NotFoundException("Transaction", line.TransactionId);
+
+        // Flush the quantity/LineTotal change above before recalculating — its
+        // line query would otherwise still see the old quantity.
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -354,9 +365,10 @@ public sealed class TransactionService(
 
     public async Task<TransactionDto> ApplyPromoCodeAsync(ApplyPromoCodeRequest request, CancellationToken cancellationToken = default)
     {
-        var deviceId = CurrentDeviceId;
-        var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
-            ?? throw new NotFoundException("Open cart", deviceId);
+        // Auto-creates the cart like AddLineAsync — a cashier can key in a promo
+        // code before scanning the first item, so requiring an existing open
+        // cart here would reject that as a 404 instead of validating the code.
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.Code))
         {
@@ -586,7 +598,7 @@ public sealed class TransactionService(
             transaction.PromoCode,
             transaction.PromoDiscountAmount,
             transaction.TotalAmount,
-            transaction.ReceiptNumber == 0 ? null : transaction.ReceiptNumber,
+            transaction.ReceiptNumber,
             transaction.OrderType,
             transaction.OriginatedFromKiosk,
             transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,

@@ -13,7 +13,16 @@ public static class ShiftEndpoints
         _ = app.MapGet("/shifts/current", async (
             IShiftService shiftService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await shiftService.GetCurrentShiftAsync(cancellationToken)))
+            {
+                var shift = await shiftService.GetCurrentShiftAsync(cancellationToken);
+                // Results.Ok/Json(null) writes an empty body instead of the JSON
+                // literal "null" — a client deserializing into a nullable DTO
+                // would throw on that empty response instead of getting back
+                // "no open shift", so write the literal explicitly.
+                return shift is null
+                    ? Results.Text("null", "application/json")
+                    : Results.Ok(shift);
+            })
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         _ = app.MapPost("/shifts/open", async (

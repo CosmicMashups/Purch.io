@@ -112,13 +112,24 @@ builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<ISyncedRecordRepository, EfSyncedRecordRepository>();
 builder.Services.AddScoped<ISyncService, SyncService>();
 
-var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Read lazily (not into locals above builder.Build()): WebApplicationFactory
+        // splices its test config overrides into builder.Configuration at Build()-time,
+        // so capturing these values any earlier reads stale defaults during tests while
+        // JwtTokenService (DI-injected IConfiguration, read post-Build) signs with the
+        // real values — a signing-key/issuer mismatch that 401s every authenticated call.
+        var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
+        var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
+
+        // JwtSecurityTokenHandler otherwise remaps short claim names it recognizes
+        // (like "role") to legacy long-form XML-namespace URIs before the
+        // ClaimsIdentity is built, so no claim literally named "role" would exist
+        // for RoleClaimType below to match — every RequireRole() check would 403.
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
