@@ -8,6 +8,9 @@ public static class PosEndpoints
     public static IEndpointRouteBuilder MapPosEndpoints(this IEndpointRouteBuilder app)
     {
         var posOperator = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Cashier) };
+        // Voiding a sale and applying an after-the-fact discount are sensitive,
+        // audit-trailed actions per docs/WORKFLOW.md §7 — owner/manager only.
+        var posSupervisor = new[] { nameof(Role.Admin), nameof(Role.Manager) };
 
         // --- Cart engine — one in-progress Open transaction per device ---
         _ = app.MapGet("/transactions/cart", async (
@@ -42,7 +45,7 @@ public static class PosEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.VoidCartAsync(cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
 
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,
@@ -56,7 +59,7 @@ public static class PosEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.ApplySeniorPwdDiscountAsync(request, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
 
         _ = app.MapPut("/transactions/cart/promo-code", async (
             ApplyPromoCodeRequest request,

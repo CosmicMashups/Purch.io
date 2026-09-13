@@ -303,9 +303,31 @@ public sealed class TransactionService(
         cart.ReceiptNumber = sequence.LastIssuedNumber;
         cart.Status = TransactionStatus.Completed;
 
+        await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
+
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    /// <summary>Deducts each line's quantity from its item's StockOnHand in the
+    /// same SaveChangesAsync as completing the sale, so a payment and its stock
+    /// effect can never land separately — this is the only place a completed
+    /// sale touches stock; manual InventoryMovements are for everything else
+    /// (deliveries, spoilage, corrections).</summary>
+    private async Task DecrementStockForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        foreach (var group in lines.GroupBy(line => line.ItemId))
+        {
+            var item = await itemRepository.GetByIdAsync(group.Key, cancellationToken);
+            if (item is null)
+            {
+                continue;
+            }
+
+            item.StockOnHand -= group.Sum(line => line.Quantity);
+        }
     }
 
     /// <summary>B7's checkout-side enforcement: utang is off unless the tenant
