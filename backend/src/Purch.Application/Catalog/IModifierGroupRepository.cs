@@ -6,6 +6,8 @@ public interface IModifierGroupRepository
 {
     Task<ModifierGroup?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<ItemModifier?> GetModifierByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>Each group returned with its modifiers already loaded — the client always wants both together.</summary>
     Task<IReadOnlyList<(ModifierGroup Group, IReadOnlyList<ItemModifier> Modifiers)>> ListByTenantWithModifiersAsync(
         Guid tenantId,

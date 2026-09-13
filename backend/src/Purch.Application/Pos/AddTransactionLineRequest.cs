@@ -4,7 +4,8 @@ public sealed record AddTransactionLineRequest(
     Guid ItemId,
     Guid? ItemVariantId,
     decimal Quantity,
-    IReadOnlyList<ComboSelectionRequest>? ComboSelections = null);
+    IReadOnlyList<ComboSelectionRequest>? ComboSelections = null,
+    IReadOnlyList<Guid>? SelectedModifierIds = null);
 
 public sealed record UpdateTransactionLineRequest(decimal Quantity);
 

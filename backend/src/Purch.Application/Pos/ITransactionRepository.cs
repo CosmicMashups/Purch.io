@@ -15,6 +15,8 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
+
     /// <summary>Completed sales on this device with ReceiptNumber greater than the given number, ordered ascending — the range a Z/X-reading covers.</summary>
     Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default);
 
@@ -31,4 +33,6 @@ public interface ITransactionRepository
     void RemoveLine(TransactionLine line);
 
     void AddComboSelection(TransactionLineComboSelection selection);
+
+    void AddModifierSelection(TransactionLineModifierSelection selection);
 }

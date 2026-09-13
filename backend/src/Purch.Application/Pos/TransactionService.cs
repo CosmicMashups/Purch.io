@@ -22,6 +22,8 @@ public sealed class TransactionService(
     IItemRepository itemRepository,
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
+    IItemModifierGroupRepository itemModifierGroupRepository,
+    IModifierGroupRepository modifierGroupRepository,
     IPromoCodeRepository promoCodeRepository,
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
@@ -71,7 +73,9 @@ public sealed class TransactionService(
 
         if (item.PricingType == PricingType.Combo)
         {
-            var (unitPrice, selections) = await ResolveComboSelectionsAsync(item, request.ComboSelections, cancellationToken);
+            var (comboUnitPrice, selections) = await ResolveComboSelectionsAsync(item, request.ComboSelections, cancellationToken);
+            var (comboModifierPriceDelta, comboModifierIds) = await ResolveModifierSelectionsAsync(item, request.SelectedModifierIds, cancellationToken);
+            var unitPrice = comboUnitPrice + comboModifierPriceDelta;
 
             var line = new TransactionLine
             {
@@ -93,6 +97,16 @@ public sealed class TransactionService(
                     TransactionLineId = line.Id,
                     ItemComboComponentId = selection.SlotId,
                     SelectedItemId = selection.SelectedItemId,
+                });
+            }
+
+            foreach (var modifierId in comboModifierIds)
+            {
+                transactionRepository.AddModifierSelection(new TransactionLineModifierSelection
+                {
+                    TenantId = CurrentTenantId,
+                    TransactionLineId = line.Id,
+                    ItemModifierId = modifierId,
                 });
             }
 
@@ -121,9 +135,18 @@ public sealed class TransactionService(
             resolvedUnitPrice = variant.PriceOverride ?? item.BasePrice;
         }
 
+        var (modifierPriceDelta, modifierIds) = await ResolveModifierSelectionsAsync(item, request.SelectedModifierIds, cancellationToken);
+        resolvedUnitPrice += modifierPriceDelta;
+
         var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
 
-        var existingLine = lines.FirstOrDefault(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId);
+        // Two lines for the same item/variant only merge into one when neither
+        // carries a modifier selection — a "No Ice" latte and a regular one are
+        // meaningfully different lines, so merging them would silently drop
+        // which cups actually got which modifiers.
+        var existingLine = modifierIds.Count == 0
+            ? lines.FirstOrDefault(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId)
+            : null;
         if (existingLine is not null)
         {
             existingLine.Quantity += request.Quantity;
@@ -131,7 +154,7 @@ public sealed class TransactionService(
         }
         else
         {
-            transactionRepository.AddLine(new TransactionLine
+            var line = new TransactionLine
             {
                 TenantId = CurrentTenantId,
                 TransactionId = cart.Id,
@@ -140,7 +163,18 @@ public sealed class TransactionService(
                 Quantity = request.Quantity,
                 UnitPrice = resolvedUnitPrice,
                 LineTotal = resolvedUnitPrice * request.Quantity,
-            });
+            };
+            transactionRepository.AddLine(line);
+
+            foreach (var modifierId in modifierIds)
+            {
+                transactionRepository.AddModifierSelection(new TransactionLineModifierSelection
+                {
+                    TenantId = CurrentTenantId,
+                    TransactionLineId = line.Id,
+                    ItemModifierId = modifierId,
+                });
+            }
         }
 
         // Same flush-before-recalculate ordering as the combo branch above —
@@ -201,6 +235,70 @@ public sealed class TransactionService(
 
         var unitPrice = item.BasePrice + slots.Sum(slot => slot.SubstitutionUpchargeAmount ?? 0m);
         return (unitPrice, selections);
+    }
+
+    /// <summary>Validates the caller's chosen modifiers against every modifier
+    /// group actually attached to this item: every IsRequired group needs at
+    /// least one selection, a group without AllowMultipleSelection needs at
+    /// most one, and every selected id must belong to an attached group's
+    /// modifiers — then prices the line as the sum of each choice's
+    /// PriceDelta, the same "fold into UnitPrice" approach combo substitution
+    /// upcharges already use.</summary>
+    private async Task<(decimal PriceDeltaTotal, IReadOnlyList<Guid> ModifierIds)> ResolveModifierSelectionsAsync(
+        Item item,
+        IReadOnlyList<Guid>? selectedModifierIds,
+        CancellationToken cancellationToken)
+    {
+        var attachedGroupIds = await itemModifierGroupRepository.ListGroupIdsForItemAsync(item.Id, cancellationToken);
+        if (attachedGroupIds.Count == 0)
+        {
+            if (selectedModifierIds is { Count: > 0 })
+            {
+                throw new ValidationException(
+                    nameof(AddTransactionLineRequest.SelectedModifierIds),
+                    "This item has no modifier groups to select from.");
+            }
+
+            return (0m, []);
+        }
+
+        var attachedGroups = (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken))
+            .Where(pair => attachedGroupIds.Contains(pair.Group.Id))
+            .ToList();
+
+        var selectedIds = (selectedModifierIds ?? []).ToList();
+        var selectedModifiersByGroup = attachedGroups
+            .Select(pair => (pair.Group, Selected: pair.Modifiers.Where(m => selectedIds.Contains(m.Id)).ToList()))
+            .ToList();
+
+        var recognizedModifierIds = attachedGroups.SelectMany(pair => pair.Modifiers.Select(m => m.Id)).ToHashSet();
+        var unrecognized = selectedIds.FirstOrDefault(id => !recognizedModifierIds.Contains(id));
+        if (unrecognized != Guid.Empty)
+        {
+            throw new ValidationException(
+                nameof(AddTransactionLineRequest.SelectedModifierIds),
+                "One of the selected modifiers doesn't belong to this item.");
+        }
+
+        foreach (var (group, selected) in selectedModifiersByGroup)
+        {
+            if (group.IsRequired && selected.Count == 0)
+            {
+                throw new ValidationException(
+                    nameof(AddTransactionLineRequest.SelectedModifierIds),
+                    $"Choose an option for \"{group.Name}\".");
+            }
+
+            if (!group.AllowMultipleSelection && selected.Count > 1)
+            {
+                throw new ValidationException(
+                    nameof(AddTransactionLineRequest.SelectedModifierIds),
+                    $"Only one option can be chosen for \"{group.Name}\".");
+            }
+        }
+
+        var priceDeltaTotal = selectedModifiersByGroup.SelectMany(pair => pair.Selected).Sum(m => m.PriceDelta);
+        return (priceDeltaTotal, selectedIds);
     }
 
     public async Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default)
@@ -590,6 +688,19 @@ public sealed class TransactionService(
                 }
             }
 
+            var modifierSelections = await transactionRepository.ListModifierSelectionsAsync(line.Id, cancellationToken);
+            var modifierSelectionDtos = new List<ModifierSelectionDto>();
+            foreach (var selection in modifierSelections)
+            {
+                var modifier = await modifierGroupRepository.GetModifierByIdAsync(selection.ItemModifierId, cancellationToken);
+                var group = modifier is null ? null : await modifierGroupRepository.GetByIdAsync(modifier.ModifierGroupId, cancellationToken);
+                modifierSelectionDtos.Add(new ModifierSelectionDto(
+                    selection.ItemModifierId,
+                    modifier?.Name ?? "(removed modifier)",
+                    group?.Name ?? "(removed group)",
+                    modifier?.PriceDelta ?? 0m));
+            }
+
             lineDtos.Add(new TransactionLineDto(
                 line.Id,
                 line.ItemId,
@@ -598,7 +709,8 @@ public sealed class TransactionService(
                 line.Quantity,
                 line.UnitPrice,
                 line.LineTotal,
-                comboSelectionDtos));
+                comboSelectionDtos,
+                modifierSelectionDtos));
         }
 
         var subtotal = lineDtos.Sum(line => line.LineTotal);

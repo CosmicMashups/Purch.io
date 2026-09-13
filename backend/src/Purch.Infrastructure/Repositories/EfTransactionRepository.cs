@@ -38,6 +38,13 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.TransactionLineModifierSelections
+            .Where(selection => selection.TransactionLineId == lineId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
@@ -90,5 +97,10 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
     public void AddComboSelection(TransactionLineComboSelection selection)
     {
         _ = dbContext.TransactionLineComboSelections.Add(selection);
+    }
+
+    public void AddModifierSelection(TransactionLineModifierSelection selection)
+    {
+        _ = dbContext.TransactionLineModifierSelections.Add(selection);
     }
 }

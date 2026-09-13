@@ -28,7 +28,8 @@ public sealed record TransactionLineDto(
     decimal Quantity,
     decimal UnitPrice,
     decimal LineTotal,
-    IReadOnlyList<ComboSelectionDto> ComboSelections);
+    IReadOnlyList<ComboSelectionDto> ComboSelections,
+    IReadOnlyList<ModifierSelectionDto> ModifierSelections);
 
 /// <summary>Mirrors Purch.Domain.Entities.TransactionLineComboSelection, resolved to
 /// readable slot/item names for receipt display.</summary>
@@ -37,3 +38,12 @@ public sealed record ComboSelectionDto(
     string SlotLabel,
     Guid SelectedItemId,
     string SelectedItemName);
+
+/// <summary>Mirrors Purch.Domain.Entities.TransactionLineModifierSelection, resolved
+/// to readable modifier/group names and the price delta actually charged for
+/// receipt display.</summary>
+public sealed record ModifierSelectionDto(
+    Guid ItemModifierId,
+    string ModifierName,
+    string ModifierGroupName,
+    decimal PriceDelta);

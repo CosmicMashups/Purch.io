@@ -12,6 +12,11 @@ public sealed class EfModifierGroupRepository(PurchDbContext dbContext) : IModif
         return dbContext.ModifierGroups.FirstOrDefaultAsync(group => group.Id == id, cancellationToken);
     }
 
+    public Task<ItemModifier?> GetModifierByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.ItemModifiers.FirstOrDefaultAsync(modifier => modifier.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<(ModifierGroup Group, IReadOnlyList<ItemModifier> Modifiers)>> ListByTenantWithModifiersAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)
