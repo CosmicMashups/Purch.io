@@ -7,7 +7,9 @@ plugins {
 
 android {
     namespace = "io.purch.purch_client"
-    compileSdk = flutter.compileSdkVersion
+    // mobile_scanner requires compiling against SDK 36+ (backward compatible) —
+    // flutter.compileSdkVersion currently resolves to 35.
+    compileSdk = 36
     // Flutter's default NDK doesn't match what connectivity_plus/flutter_secure_storage/
     // mobile_scanner/path_provider_android/sqlite3_flutter_libs actually require —
     // pinned to the highest version any plugin asks for (NDKs are backward compatible).

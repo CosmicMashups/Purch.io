@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../../../pos/domain/transaction_models.dart';
 import '../providers/kiosk_providers.dart';
 import 'kiosk_fulfillment_screen.dart';
@@ -17,44 +20,94 @@ class KioskCartScreen extends ConsumerWidget {
     final cartAsync = ref.watch(kioskCartNotifierProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Your Order')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Your Order'),
+        backgroundColor: AppColors.surface,
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+      ),
       body: cartAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
         error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load your order: $error')),
+            (error, stackTrace) => ErrorStateView(
+              message: error.toString(),
+              onRetry: () => ref.refresh(kioskCartNotifierProvider),
+            ),
         data: (cart) {
           if (cart.lines.isEmpty) {
-            return const Center(
-              child: Text('Your order is empty — go back and add something.'),
+            return EmptyStateView(
+              icon: Icons.remove_shopping_cart_outlined,
+              title: 'Your order is empty — go back and add something.',
+              description:
+                  'Explore the kiosk menu and select items to add to your tray.',
+              actionLabel: 'Browse Menu',
+              onAction: () => Navigator.of(context).pop(),
             );
           }
 
           return Column(
             children: [
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(16),
                   itemCount: cart.lines.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final line = cart.lines[index];
-                    return ListTile(
-                      title: Text(line.itemName),
-                      subtitle: Text(
-                        '${line.quantity.toStringAsFixed(0)} × ₱${line.unitPrice.toStringAsFixed(2)}',
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: AppRadius.mdBorder,
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: AppShadows.subtle,
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('₱${line.lineTotal.toStringAsFixed(2)}'),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: 'Remove',
-                            onPressed:
-                                () => ref
-                                    .read(kioskCartNotifierProvider.notifier)
-                                    .removeLine(line.id),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        title: Text(
+                          line.itemName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
-                        ],
+                        ),
+                        subtitle: Text(
+                          '${line.quantity.toStringAsFixed(0)} × ₱${line.unitPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₱${line.lineTotal.toStringAsFixed(2)}',
+                              style: AppTypography.priceLine.copyWith(
+                                fontSize: 17,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.error,
+                              ),
+                              tooltip: 'Remove',
+                              onPressed:
+                                  () => ref
+                                      .read(kioskCartNotifierProvider.notifier)
+                                      .removeLine(line.id),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -76,41 +129,64 @@ class _TotalBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total', style: TextStyle(fontSize: 18)),
-                Text(
-                  '₱${cart.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          top: BorderSide(color: AppColors.border, width: 1.2),
+        ),
+        boxShadow: AppShadows.card,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total', style: TextStyle(fontSize: 18)),
+                  Text(
+                    '₱${cart.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: const BoxDecoration(
+                  boxShadow: AppShadows.tactileButton,
+                  borderRadius: AppRadius.mdBorder,
+                ),
+                child: SizedBox(
+                  height: 56,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brandPrimary,
+                      foregroundColor: AppColors.onBrandPrimary,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: AppRadius.mdBorder,
+                      ),
+                    ),
+                    onPressed:
+                        cart.lines.isEmpty
+                            ? null
+                            : () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const KioskFulfillmentScreen(),
+                              ),
+                            ),
+                    child: const Text('Continue'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 56,
-              child: FilledButton(
-                onPressed:
-                    cart.lines.isEmpty
-                        ? null
-                        : () => Navigator.of(context).push<void>(
-                          MaterialPageRoute(
-                            builder: (_) => const KioskFulfillmentScreen(),
-                          ),
-                        ),
-                child: const Text('Continue'),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

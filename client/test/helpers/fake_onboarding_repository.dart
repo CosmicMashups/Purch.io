@@ -43,6 +43,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
     registeredAddress: null,
     creditLedgerRetentionDays: null,
     creditLedgerEnabled: false,
+    kioskPosterImageUrl: null,
   );
 
   final Object? bootstrapFailure;
@@ -203,6 +204,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredAddress: settings.registeredAddress,
       creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
       creditLedgerEnabled: settings.creditLedgerEnabled,
+      kioskPosterImageUrl: request.kioskPosterImageUrl,
     );
     return settings;
   }
@@ -224,6 +226,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredAddress: request.registeredAddress,
       creditLedgerRetentionDays: request.creditLedgerRetentionDays,
       creditLedgerEnabled: settings.creditLedgerEnabled,
+      kioskPosterImageUrl: settings.kioskPosterImageUrl,
     );
     return settings;
   }
@@ -245,6 +248,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredAddress: settings.registeredAddress,
       creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
       creditLedgerEnabled: settings.creditLedgerEnabled,
+      kioskPosterImageUrl: settings.kioskPosterImageUrl,
     );
     return settings;
   }
@@ -266,6 +270,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       registeredAddress: settings.registeredAddress,
       creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
       creditLedgerEnabled: creditLedgerEnabled,
+      kioskPosterImageUrl: settings.kioskPosterImageUrl,
     );
     return settings;
   }

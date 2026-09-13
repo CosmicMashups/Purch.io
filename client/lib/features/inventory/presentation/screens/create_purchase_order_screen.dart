@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../onboarding/domain/branch_models.dart';
@@ -100,141 +101,212 @@ class _CreatePurchaseOrderScreenState
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 540),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  suppliersAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load suppliers: $error'),
-                    data:
-                        (suppliers) => DropdownButtonFormField<Supplier>(
-                          value: _matchSupplier(suppliers, _supplier?.id),
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Supplier',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            for (final supplier in suppliers)
-                              DropdownMenuItem(
-                                value: supplier,
-                                child: Text(
-                                  supplier.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.lgBorder,
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: AppShadows.subtle,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    suppliersAsync.when(
+                      loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
+                      error:
+                          (error, stackTrace) =>
+                              Text('Could not load suppliers: $error', style: const TextStyle(color: AppColors.error)),
+                      data:
+                          (suppliers) => DropdownButtonFormField<Supplier>(
+                            value: _matchSupplier(suppliers, _supplier?.id),
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: 'Supplier',
+                              labelStyle: const TextStyle(color: AppColors.textSecondary),
+                              prefixIcon: const Icon(Icons.business, color: AppColors.brandPrimary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
                               ),
-                          ],
-                          onChanged:
-                              isLoading
-                                  ? null
-                                  : (supplier) =>
-                                      setState(() => _supplier = supplier),
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  branchesAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load branches: $error'),
-                    data:
-                        (branches) => DropdownButtonFormField<Branch>(
-                          value: _matchBranch(branches, _branch?.id),
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Deliver to branch',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            for (final branch in branches)
-                              DropdownMenuItem(
-                                value: branch,
-                                child: Text(
-                                  branch.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
                               ),
-                          ],
-                          onChanged:
-                              isLoading
-                                  ? null
-                                  : (branch) =>
-                                      setState(() => _branch = branch),
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Items', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  itemsAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load items: $error'),
-                    data:
-                        (items) => Column(
-                          children: [
-                            for (var i = 0; i < _lines.length; i++)
-                              _LineRow(
-                                key: ValueKey(_lines[i]),
-                                items: items,
-                                draft: _lines[i],
-                                isLoading: isLoading,
-                                onChanged: () => setState(() {}),
-                                onRemove:
-                                    _lines.length > 1
-                                        ? () =>
-                                            setState(() => _lines.removeAt(i))
-                                        : null,
-                              ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed:
-                                    isLoading
-                                        ? null
-                                        : () => setState(
-                                          () => _lines.add(_LineDraft()),
-                                        ),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Item'),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
                               ),
                             ),
-                          ],
-                        ),
-                  ),
-                  if (failure != null) ...[
-                    const SizedBox(height: 16),
+                            items: [
+                              for (final supplier in suppliers)
+                                DropdownMenuItem(
+                                  value: supplier,
+                                  child: Text(
+                                    supplier.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged:
+                                isLoading
+                                    ? null
+                                    : (supplier) =>
+                                        setState(() => _supplier = supplier),
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    branchesAsync.when(
+                      loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
+                      error:
+                          (error, stackTrace) =>
+                              Text('Could not load branches: $error', style: const TextStyle(color: AppColors.error)),
+                      data:
+                          (branches) => DropdownButtonFormField<Branch>(
+                            value: _matchBranch(branches, _branch?.id),
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: 'Deliver to branch',
+                              labelStyle: const TextStyle(color: AppColors.textSecondary),
+                              prefixIcon: const Icon(Icons.storefront, color: AppColors.brandPrimary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                              ),
+                            ),
+                            items: [
+                              for (final branch in branches)
+                                DropdownMenuItem(
+                                  value: branch,
+                                  child: Text(
+                                    branch.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged:
+                                isLoading
+                                    ? null
+                                    : (branch) =>
+                                        setState(() => _branch = branch),
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                      'Items',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    itemsAsync.when(
+                      loading: () => const LinearProgressIndicator(color: AppColors.brandPrimary),
+                      error:
+                          (error, stackTrace) =>
+                              Text('Could not load items: $error', style: const TextStyle(color: AppColors.error)),
+                      data:
+                          (items) => Column(
+                            children: [
+                              for (var i = 0; i < _lines.length; i++)
+                                _LineRow(
+                                  key: ValueKey(_lines[i]),
+                                  items: items,
+                                  draft: _lines[i],
+                                  isLoading: isLoading,
+                                  onChanged: () => setState(() {}),
+                                  onRemove:
+                                      _lines.length > 1
+                                          ? () =>
+                                              setState(() => _lines.removeAt(i))
+                                          : null,
+                                ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed:
+                                      isLoading
+                                          ? null
+                                          : () => setState(
+                                            () => _lines.add(_LineDraft()),
+                                          ),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Add Item'),
+                                ),
+                              ),
+                            ],
+                          ),
+                    ),
+                    if (failure != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardHover,
+                          borderRadius: AppRadius.mdBorder,
+                          border: Border.all(color: AppColors.error),
+                        ),
+                        child: Text(
+                          failure.message,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.brandPrimary,
+                          foregroundColor: AppColors.onBrandPrimary,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: AppRadius.mdBorder,
+                          ),
+                        ),
+                        onPressed: (!isLoading && _canSubmit) ? _submit : null,
+                        child:
+                            isLoading
+                                ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: AppColors.onBrandPrimary,
+                                  ),
+                                )
+                                : const Text(
+                                  'Create Purchase Order',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 56,
-                    child: FilledButton(
-                      onPressed: (!isLoading && _canSubmit) ? _submit : null,
-                      child:
-                          isLoading
-                              ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                              : const Text('Create Purchase Order'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

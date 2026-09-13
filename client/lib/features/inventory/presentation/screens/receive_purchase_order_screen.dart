@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/purchase_order_models.dart';
 import '../providers/purchase_order_providers.dart';
 
@@ -103,63 +104,113 @@ class _ReceivePurchaseOrderScreenState
             .currentFailure;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Receive Stock')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Receive Stock'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final line in widget.purchaseOrder.lines)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: TextField(
-                        controller: _controllers[line.id],
-                        enabled: !isLoading && line.quantityRemaining > 0,
-                        decoration: InputDecoration(
-                          labelText: line.itemName,
-                          helperText:
-                              line.quantityRemaining > 0
-                                  ? '${line.quantityRemaining.toStringAsFixed(0)} remaining of ${line.quantityOrdered.toStringAsFixed(0)} ordered'
-                                  : 'Fully received',
-                          border: const OutlineInputBorder(),
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Card(
+                elevation: 0,
+                color: AppColors.surface,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppRadius.lgBorder,
+                  side: BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'PO #${widget.purchaseOrder.id.substring(0, widget.purchaseOrder.id.length > 8 ? 8 : widget.purchaseOrder.id.length).toUpperCase()}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                          letterSpacing: 0.5,
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        widget.purchaseOrder.supplierName,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
                         ),
-                        onChanged: (_) => setState(() {}),
                       ),
-                    ),
-                  if (failure != null) ...[
-                    Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                      const SizedBox(height: AppSpacing.lg),
+                      for (final line in widget.purchaseOrder.lines)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: TextField(
+                            controller: _controllers[line.id],
+                            enabled: !isLoading && line.quantityRemaining > 0,
+                            decoration: InputDecoration(
+                              labelText: line.itemName,
+                              helperText:
+                                  line.quantityRemaining > 0
+                                      ? '${line.quantityRemaining.toStringAsFixed(0)} remaining of ${line.quantityOrdered.toStringAsFixed(0)} ordered'
+                                      : 'Fully received',
+                              border: const OutlineInputBorder(
+                                borderRadius: AppRadius.smBorder,
+                              ),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      if (failure != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: AppRadius.smBorder,
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            failure.message,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.error,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: (!isLoading && _canSubmit) ? _submit : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.brandPrimary,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppRadius.smBorder,
+                            ),
+                          ),
+                          child:
+                              isLoading
+                                  ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : const Text('Receive'),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  SizedBox(
-                    height: 56,
-                    child: FilledButton(
-                      onPressed: (!isLoading && _canSubmit) ? _submit : null,
-                      child:
-                          isLoading
-                              ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                              : const Text('Receive'),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),

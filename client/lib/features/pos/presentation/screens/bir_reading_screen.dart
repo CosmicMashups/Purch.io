@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/bir_reading_models.dart';
 import '../providers/bir_reading_providers.dart';
 
@@ -18,6 +19,7 @@ class BirReadingScreen extends ConsumerWidget {
       context: context,
       builder:
           (context) => AlertDialog(
+            shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
             title: const Text('Generate Z-reading?'),
             content: const Text(
               'This closes out today\'s sales and advances the reset '
@@ -30,6 +32,10 @@ class BirReadingScreen extends ConsumerWidget {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                ),
                 child: const Text('Generate Z-Reading'),
               ),
             ],
@@ -52,13 +58,18 @@ class BirReadingScreen extends ConsumerWidget {
     final reading = state.valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('X / Z Reading')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('X / Z Reading'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 500),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -76,10 +87,16 @@ class BirReadingScreen extends ConsumerWidget {
                                                 .notifier,
                                           )
                                           .generateXReading(),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            side: const BorderSide(color: AppColors.brandPrimary),
+                            foregroundColor: AppColors.brandPrimary,
+                            shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                          ),
                           child: const Text('X-Reading'),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: FilledButton(
                           onPressed:
@@ -87,27 +104,41 @@ class BirReadingScreen extends ConsumerWidget {
                                   ? null
                                   : () =>
                                       _confirmAndGenerateZReading(context, ref),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            backgroundColor: AppColors.accentWarm,
+                            foregroundColor: Colors.white,
+                            shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                          ),
                           child: const Text('Z-Reading'),
                         ),
                       ),
                     ],
                   ),
                   if (failure != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                    const SizedBox(height: AppSpacing.lg),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.08),
+                        borderRadius: AppRadius.smBorder,
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
                       ),
-                      textAlign: TextAlign.center,
+                      child: Text(
+                        failure.message,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ],
                   if (isLoading) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                     const Center(child: CircularProgressIndicator()),
                   ],
                   if (reading != null) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                     _ReadingReport(reading: reading),
                   ],
                 ],
@@ -127,18 +158,54 @@ class _ReadingReport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isX = reading.type == BirReadingType.x;
     return Card(
+      elevation: 0,
+      color: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppRadius.lgBorder,
+        side: BorderSide(color: AppColors.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              reading.type == BirReadingType.x ? 'X-Reading' : 'Z-Reading',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isX ? 'X-Reading' : 'Z-Reading',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (isX ? AppColors.brandPrimary : AppColors.accentWarm).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                  child: Text(
+                    isX ? 'MID-SHIFT' : 'FINAL RESET',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isX ? AppColors.brandPrimary : AppColors.accentWarm,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Text('MIN: ${reading.machineIdentificationNumber}'),
-            Text('Generated: ${reading.generatedAt.toLocal()}'),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'MIN: ${reading.machineIdentificationNumber}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+            ),
+            Text(
+              'Generated: ${reading.generatedAt.toLocal()}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+            ),
             const Divider(height: 24),
             _Row(
               'OR# range',
@@ -207,16 +274,29 @@ class _Row extends StatelessWidget {
         emphasize
             ? Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
-            : Theme.of(context).textTheme.bodyMedium;
+            ).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.brandPrimary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            )
+            : Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(label, style: style)),
-          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: emphasize
+                  ? style?.copyWith(color: AppColors.textPrimary)
+                  : Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
           Text(value, style: style),
         ],
       ),

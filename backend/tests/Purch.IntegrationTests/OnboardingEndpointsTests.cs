@@ -123,7 +123,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var brandingResponse = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
-            new UpdateBrandingRequest("https://cdn.example.com/logo.png", "#4F46E5", "Inter"));
+            new UpdateBrandingRequest("https://cdn.example.com/logo.png", "#4F46E5", "Inter", null));
         Assert.Equal(HttpStatusCode.OK, brandingResponse.StatusCode);
         var afterBranding = await brandingResponse.Content.ReadFromJsonAsync<TenantSettingsDto>(JsonOptions);
         Assert.Equal("#4F46E5", afterBranding!.BrandingThemeColorHex);
@@ -173,7 +173,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
-            new UpdateBrandingRequest(null, "not-a-hex-color", null));
+            new UpdateBrandingRequest(null, "not-a-hex-color", null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

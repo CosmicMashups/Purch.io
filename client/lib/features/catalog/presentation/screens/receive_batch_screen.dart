@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/item_batch_models.dart';
 import '../providers/catalog_providers.dart';
 
@@ -84,83 +85,163 @@ class _ReceiveBatchScreenState extends ConsumerState<ReceiveBatchScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _lotNumberController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Lot number',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator:
-                          (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _quantityController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity received',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        final parsed = double.tryParse(value?.trim() ?? '');
-                        if (parsed == null || parsed <= 0) {
-                          return 'Enter a quantity greater than zero';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton(
-                      onPressed: isLoading ? null : _pickExpiryDate,
-                      child: Text(
-                        _expiryDate == null
-                            ? 'Set expiry date (optional)'
-                            : 'Expires: ${_expiryDate!.toLocal().toString().split(' ').first}',
-                      ),
-                    ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.lgBorder,
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: AppShadows.subtle,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: _lotNumberController,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Lot number',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          prefixIcon: const Icon(Icons.tag, color: AppColors.brandPrimary),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                          ),
                         ),
-                        textAlign: TextAlign.center,
+                        validator:
+                            (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? 'Required'
+                                    : null,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _quantityController,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Quantity received',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          prefixIcon: const Icon(Icons.numbers, color: AppColors.brandPrimary),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                          ),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          final parsed = double.tryParse(value?.trim() ?? '');
+                          if (parsed == null || parsed <= 0) {
+                            return 'Enter a quantity greater than zero';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.md,
+                          ),
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadius.mdBorder,
+                          ),
+                        ),
+                        icon: const Icon(Icons.calendar_today, size: 18, color: AppColors.brandPrimary),
+                        onPressed: isLoading ? null : _pickExpiryDate,
+                        label: Text(
+                          _expiryDate == null
+                              ? 'Set expiry date (optional)'
+                              : 'Expires: ${_expiryDate!.toLocal().toString().split(' ').first}',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (failure != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardHover,
+                            borderRadius: AppRadius.mdBorder,
+                            border: Border.all(color: AppColors.error),
+                          ),
+                          child: Text(
+                            failure.message,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.brandPrimary,
+                            foregroundColor: AppColors.onBrandPrimary,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdBorder,
+                            ),
+                          ),
+                          onPressed: isLoading ? null : _submit,
+                          child:
+                              isLoading
+                                  ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.onBrandPrimary,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Receive Stock',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child:
-                            isLoading
-                                ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                                : const Text('Receive Stock'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

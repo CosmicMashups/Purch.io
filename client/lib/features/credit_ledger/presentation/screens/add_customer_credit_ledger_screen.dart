@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/credit_ledger_models.dart';
 import '../providers/credit_ledger_providers.dart';
 
@@ -78,116 +81,255 @@ class _AddCustomerCreditLedgerScreenState
         ref.read(createCreditLedgerControllerProvider.notifier).currentFailure;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Customer Account')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Add Customer Account'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        centerTitle: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Customer full name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator:
-                          (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone number',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.phone,
-                      validator:
-                          (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _addressController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Address (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _creditLimitController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Credit limit',
-                        border: OutlineInputBorder(),
-                        prefixText: '₱ ',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        final parsed = double.tryParse(value?.trim() ?? '');
-                        if (parsed == null || parsed < 0) {
-                          return 'Enter a valid credit limit';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        _dueDate == null
-                            ? 'No due date set'
-                            : 'Due ${_dueDate!.month}/${_dueDate!.day}/${_dueDate!.year}',
-                      ),
-                      trailing: TextButton(
-                        onPressed: isLoading ? null : _pickDueDate,
-                        child: const Text('Pick due date'),
-                      ),
-                    ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Card(
+                elevation: 0,
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.lgBorder,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _nameController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Customer full name',
+                            isDense: true,
+                            hintText: 'e.g. Juan dela Cruz',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          validator:
+                              (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                      ? 'Required'
+                                      : null,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child:
-                            isLoading
-                                ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                                : const Text('Add Customer'),
-                      ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _phoneController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Phone number',
+                            isDense: true,
+                            hintText: '09xxxxxxxxx',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator:
+                              (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                      ? 'Required'
+                                      : null,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _addressController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Address (optional)',
+                            isDense: true,
+                            hintText: 'Barangay, City',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _creditLimitController,
+                          enabled: !isLoading,
+                          style: const TextStyle(
+                            fontFeatures: [FontFeature.tabularFigures()],
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Credit limit',
+                            isDense: true,
+                            hintText: '0.00',
+                            prefixText: '₱ ',
+                            prefixStyle: const TextStyle(
+                              color: AppColors.brandPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (value) {
+                            final parsed = double.tryParse(value?.trim() ?? '');
+                            if (parsed == null || parsed < 0) {
+                              return 'Enter a valid credit limit';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardHover,
+                            borderRadius: AppRadius.mdBorder,
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              _dueDate == null
+                                  ? 'No due date set'
+                                  : 'Due ${_dueDate!.month}/${_dueDate!.day}/${_dueDate!.year}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            trailing: TextButton(
+                              onPressed: isLoading ? null : _pickDueDate,
+                              child: const Text('Pick due date'),
+                            ),
+                          ),
+                        ),
+                        if (failure != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentWarm.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.mdBorder,
+                              border: Border.all(
+                                color: AppColors.accentWarm.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              failure.message,
+                              style: const TextStyle(
+                                color: AppColors.accentWarm,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.lg),
+                        SizedBox(
+                          height: 48,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                            ),
+                            onPressed: isLoading ? null : _submit,
+                            child:
+                                isLoading
+                                    ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Add Customer',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

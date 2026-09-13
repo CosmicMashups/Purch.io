@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/item_models.dart';
 import '../../domain/tingi_mode.dart';
 import '../providers/catalog_providers.dart';
@@ -156,135 +157,225 @@ class _TingiConfigScreenState extends ConsumerState<TingiConfigScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SegmentedButton<TingiMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: TingiMode.none,
-                        label: Text('Whole only'),
-                      ),
-                      ButtonSegment(
-                        value: TingiMode.fixedSizes,
-                        label: Text('Fixed sizes'),
-                      ),
-                      ButtonSegment(
-                        value: TingiMode.increment,
-                        label: Text('Increment'),
-                      ),
-                    ],
-                    selected: {_mode},
-                    onSelectionChanged:
-                        isLoading
-                            ? null
-                            : (selection) =>
-                                setState(() => _mode = selection.first),
-                  ),
-                  if (_mode != TingiMode.none) ...[
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _packagedSizeController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Whole pack size (e.g. 50 for a 50kg sack)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                    ),
-                  ],
-                  if (_mode == TingiMode.fixedSizes) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Allowed sizes',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    for (var index = 0; index < _sizeRows.length; index++) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _sizeRows[index].controller,
-                              enabled: !isLoading,
-                              decoration: const InputDecoration(
-                                labelText: 'Size (e.g. 10)',
-                                border: OutlineInputBorder(),
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                            ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.lgBorder,
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: AppShadows.subtle,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<TingiMode>(
+                      style: const ButtonStyle(
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: AppRadius.mdBorder,
                           ),
-                          IconButton(
-                            onPressed:
-                                isLoading || _sizeRows.length == 1
-                                    ? null
-                                    : () => _removeSizeRow(index),
-                            icon: const Icon(Icons.remove_circle_outline),
-                            tooltip: 'Remove size',
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: isLoading ? null : _addSizeRow,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add size'),
-                      ),
-                    ),
-                  ],
-                  if (_mode == TingiMode.increment) ...[
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _incrementStepController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Increment step (e.g. 5)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                    ),
-                  ],
-                  if (failure != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 56,
-                    child: FilledButton(
-                      onPressed: isLoading ? null : _submit,
-                      child:
+                      segments: const [
+                        ButtonSegment(
+                          value: TingiMode.none,
+                          label: Text('Whole only'),
+                        ),
+                        ButtonSegment(
+                          value: TingiMode.fixedSizes,
+                          label: Text('Fixed sizes'),
+                        ),
+                        ButtonSegment(
+                          value: TingiMode.increment,
+                          label: Text('Increment'),
+                        ),
+                      ],
+                      selected: {_mode},
+                      onSelectionChanged:
                           isLoading
-                              ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                              : const Text('Save'),
+                              ? null
+                              : (selection) =>
+                                  setState(() => _mode = selection.first),
                     ),
-                  ),
-                ],
+                    if (_mode != TingiMode.none) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _packagedSizeController,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Whole pack size (e.g. 50 for a 50kg sack)',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          prefixIcon: const Icon(Icons.inventory, color: AppColors.brandPrimary),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                          ),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                    ],
+                    if (_mode == TingiMode.fixedSizes) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      const Text(
+                        'Allowed sizes',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (var index = 0; index < _sizeRows.length; index++) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _sizeRows[index].controller,
+                                enabled: !isLoading,
+                                decoration: InputDecoration(
+                                  labelText: 'Size (e.g. 10)',
+                                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  border: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                                  ),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed:
+                                  isLoading || _sizeRows.length == 1
+                                      ? null
+                                      : () => _removeSizeRow(index),
+                              icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
+                              tooltip: 'Remove size',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: isLoading ? null : _addSizeRow,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add size'),
+                        ),
+                      ),
+                    ],
+                    if (_mode == TingiMode.increment) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _incrementStepController,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Increment step (e.g. 5)',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          prefixIcon: const Icon(Icons.straighten, color: AppColors.brandPrimary),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                          ),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                    ],
+                    if (failure != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardHover,
+                          borderRadius: AppRadius.mdBorder,
+                          border: Border.all(color: AppColors.error),
+                        ),
+                        child: Text(
+                          failure.message,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.brandPrimary,
+                          foregroundColor: AppColors.onBrandPrimary,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: AppRadius.mdBorder,
+                          ),
+                        ),
+                        onPressed: isLoading ? null : _submit,
+                        child:
+                            isLoading
+                                ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: AppColors.onBrandPrimary,
+                                  ),
+                                )
+                                : const Text(
+                                  'Save',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

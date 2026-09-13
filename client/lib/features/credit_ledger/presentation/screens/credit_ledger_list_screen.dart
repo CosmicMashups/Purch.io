@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/credit_ledger_models.dart';
 import '../providers/credit_ledger_providers.dart';
 import 'add_customer_credit_ledger_screen.dart';
@@ -16,16 +19,34 @@ class CreditLedgerListScreen extends ConsumerWidget {
     final ledgersAsync = ref.watch(creditLedgerListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customer Accounts')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Customer Accounts'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
       body: ledgersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load customer accounts: $error')),
+            (error, stackTrace) => ErrorStateView(
+              message: error.toString(),
+              onRetry:
+                  () => ref.read(creditLedgerListProvider.notifier).refresh(),
+            ),
         data: (ledgers) {
           if (ledgers.isEmpty) {
-            return const Center(
-              child: Text('No customer accounts yet — tap + to add one.'),
+            return EmptyStateView(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'No customer accounts yet — tap + to add one.',
+              description:
+                  'Manage store credit (utang), set credit limits, track balances, and record customer repayments.',
+              actionLabel: 'Add Customer Account',
+              onAction:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const AddCustomerCreditLedgerScreen(),
+                    ),
+                  ),
             );
           }
 
@@ -33,29 +54,58 @@ class CreditLedgerListScreen extends ConsumerWidget {
             onRefresh:
                 () => ref.read(creditLedgerListProvider.notifier).refresh(),
             child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
               itemCount: ledgers.length,
               itemBuilder: (context, index) {
                 final ledger = ledgers[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(ledger.customerFullName),
-                  subtitle: Text(
-                    'Balance: ₱${ledger.balance.toStringAsFixed(2)} / '
-                    '₱${ledger.creditLimit.toStringAsFixed(2)} limit'
-                    '${ledger.dueDate != null ? ' — due ${ledger.dueDate!.month}/${ledger.dueDate!.day}/${ledger.dueDate!.year}' : ''}',
+                return Card(
+                  elevation: 0,
+                  color: AppColors.surface,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: AppRadius.mdBorder,
+                    side: BorderSide(color: AppColors.border),
                   ),
-                  trailing:
-                      ledger.balance > 0
-                          ? TextButton(
-                            onPressed:
-                                () => _showRecordPaymentDialog(
-                                  context,
-                                  ref,
-                                  ledger,
-                                ),
-                            child: const Text('Record Payment'),
-                          )
-                          : null,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+                    leading: CircleAvatar(
+                      backgroundColor: ledger.balance > 0 ? AppColors.accentWarmContainer : AppColors.cardHover,
+                      foregroundColor: ledger.balance > 0 ? AppColors.accentWarm : AppColors.textMuted,
+                      child: const Icon(Icons.person_outline, size: 20),
+                    ),
+                    title: Text(
+                      ledger.customerFullName,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Balance: ₱${ledger.balance.toStringAsFixed(2)} / '
+                      '₱${ledger.creditLimit.toStringAsFixed(2)} limit'
+                      '${ledger.dueDate != null ? ' — due ${ledger.dueDate!.month}/${ledger.dueDate!.day}/${ledger.dueDate!.year}' : ''}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: ledger.balance > 0 ? AppColors.accentWarm : AppColors.textSecondary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    trailing:
+                        ledger.balance > 0
+                            ? TextButton(
+                              onPressed:
+                                  () => _showRecordPaymentDialog(
+                                    context,
+                                    ref,
+                                    ledger,
+                                  ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.brandPrimary,
+                                textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              child: const Text('Record Payment'),
+                            )
+                            : null,
+                  ),
                 );
               },
             ),
@@ -69,6 +119,8 @@ class CreditLedgerListScreen extends ConsumerWidget {
                 builder: (_) => const AddCustomerCreditLedgerScreen(),
               ),
             ),
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: Colors.white,
         tooltip: 'Add customer',
         child: const Icon(Icons.add),
       ),
@@ -87,6 +139,7 @@ class CreditLedgerListScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
           title: Text('Record Payment — ${ledger.customerFullName}'),
           content: Form(
             key: formKey,
@@ -96,6 +149,7 @@ class CreditLedgerListScreen extends ConsumerWidget {
               decoration: const InputDecoration(
                 labelText: 'Amount',
                 prefixText: '₱ ',
+                border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -135,6 +189,10 @@ class CreditLedgerListScreen extends ConsumerWidget {
                   Navigator.of(dialogContext).pop();
                 }
               },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brandPrimary,
+                shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+              ),
               child: const Text('Record'),
             ),
           ],

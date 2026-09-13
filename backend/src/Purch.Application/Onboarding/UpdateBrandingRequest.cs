@@ -8,4 +8,4 @@ namespace Purch.Application.Onboarding;
 /// receipts — a thermal printer's built-in font set can't render an arbitrary
 /// custom font (see the plan's Key Architecture Decisions).
 /// </summary>
-public sealed record UpdateBrandingRequest(string? LogoUrl, string? ThemeColorHex, string? FontFamily);
+public sealed record UpdateBrandingRequest(string? LogoUrl, string? ThemeColorHex, string? FontFamily, string? KioskPosterImageUrl);

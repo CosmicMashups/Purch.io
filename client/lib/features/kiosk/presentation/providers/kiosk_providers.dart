@@ -4,8 +4,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../pos/domain/transaction_models.dart';
+import '../../data/kiosk_branding_repository_impl.dart';
 import '../../data/kiosk_cart_repository_impl.dart';
 import '../../data/kiosk_session_repository_impl.dart';
+import '../../domain/kiosk_branding_repository.dart';
 import '../../domain/kiosk_cart_repository.dart';
 import '../../domain/kiosk_session_repository.dart';
 
@@ -22,6 +24,19 @@ KioskSessionRepository kioskSessionRepository(Ref ref) {
 @Riverpod(keepAlive: true)
 KioskCartRepository kioskCartRepository(Ref ref) {
   return KioskCartRepositoryImpl(apiClient: ref.watch(apiClientProvider));
+}
+
+@Riverpod(keepAlive: true)
+KioskBrandingRepository kioskBrandingRepository(Ref ref) {
+  return KioskBrandingRepositoryImpl(apiClient: ref.watch(apiClientProvider));
+}
+
+/// Fetches the kiosk branding (poster image URL) on mount.
+/// keepAlive = false so it is re-fetched each time the kiosk landing screen
+/// is entered (the tenant may have updated the poster between sessions).
+@riverpod
+Future<KioskBranding> kioskBranding(Ref ref) {
+  return ref.watch(kioskBrandingRepositoryProvider).getBranding();
 }
 
 /// Drives the pairing screen: call `pair(...)`, watch this provider's

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/purch_image.dart';
 import '../../domain/tenant_settings_models.dart';
 import '../providers/onboarding_providers.dart';
 import 'server_connection_screen.dart';
@@ -56,6 +58,9 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
   late final _fontFamilyController = TextEditingController(
     text: widget.initial.brandingFontFamily,
   );
+  late final _kioskPosterUrlController = TextEditingController(
+    text: widget.initial.kioskPosterImageUrl,
+  );
   late final _tinController = TextEditingController(text: widget.initial.tin);
   late final _businessNameController = TextEditingController(
     text: widget.initial.registeredBusinessName,
@@ -71,6 +76,7 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     _logoUrlController.dispose();
     _themeColorController.dispose();
     _fontFamilyController.dispose();
+    _kioskPosterUrlController.dispose();
     _tinController.dispose();
     _businessNameController.dispose();
     _addressController.dispose();
@@ -94,6 +100,10 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                 _fontFamilyController.text.trim().isEmpty
                     ? null
                     : _fontFamilyController.text.trim(),
+            kioskPosterImageUrl:
+                _kioskPosterUrlController.text.trim().isEmpty
+                    ? null
+                    : _kioskPosterUrlController.text.trim(),
           ),
         );
   }
@@ -139,121 +149,256 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     final failure =
         ref.read(tenantSettingsNotifierProvider.notifier).currentFailure;
 
-    return SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (failure != null) ...[
-                  Text(
-                    failure.message,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                Text('Branding', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _logoUrlController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'Logo URL',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _themeColorController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'Theme color (e.g. #4F46E5)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _fontFamilyController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'Font family',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: isSaving ? null : _saveBranding,
-                  child: const Text('Save Branding'),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  'BIR / Compliance',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _tinController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'TIN',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _businessNameController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'Registered business name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _addressController,
-                  enabled: !isSaving,
-                  decoration: const InputDecoration(
-                    labelText: 'Registered address',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: isSaving ? null : _saveBirSettings,
-                  child: const Text('Save BIR Settings'),
-                ),
-                const SizedBox(height: 32),
-                SwitchListTile(
-                  title: const Text('Require a barcode for every item'),
-                  value: _requiresBarcode,
-                  onChanged: isSaving ? null : _toggleBarcodeRequirement,
-                ),
-                SwitchListTile(
-                  title: const Text('Offer utang / credit sales'),
-                  subtitle: const Text(
-                    'Lets cashiers record sales against a customer\'s credit '
-                    'ledger instead of collecting payment immediately.',
-                  ),
-                  value: _creditLedgerEnabled,
-                  onChanged: isSaving ? null : _toggleCreditLedger,
-                ),
-                const SizedBox(height: 32),
-                OutlinedButton(
-                  onPressed:
-                      () => Navigator.of(context).push<void>(
-                        MaterialPageRoute(
-                          builder: (_) => const ServerConnectionScreen(),
-                        ),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Business Settings'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (failure != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.08),
+                        borderRadius: AppRadius.smBorder,
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
                       ),
-                  child: const Text('Local Server Connection'),
-                ),
-              ],
+                      child: Text(
+                        failure.message,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  Card(
+                    elevation: 0,
+                    color: AppColors.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdBorder,
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Branding',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _logoUrlController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'Logo URL',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _themeColorController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'Theme color (e.g. #4F46E5)',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _fontFamilyController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'Font family',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _kioskPosterUrlController,
+                            enabled: !isSaving,
+                            decoration: InputDecoration(
+                              labelText: 'Kiosk poster image URL',
+                              helperText:
+                                  'Hero image on kiosk screen. Supports remote URL, /uploads/..., or assets/images/kiosk_poster_default.jpg',
+                              helperMaxLines: 2,
+                              suffixIcon: _kioskPosterUrlController.text.isEmpty
+                                  ? TextButton(
+                                      onPressed: () {
+                                        _kioskPosterUrlController.text =
+                                            'assets/images/kiosk_poster_default.jpg';
+                                        setState(() {});
+                                      },
+                                      child: const Text(
+                                        'Use Default',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    )
+                                  : null,
+                              border: const OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          // Live 16:9 preview of the poster URL
+                          if (_kioskPosterUrlController.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            ClipRRect(
+                              borderRadius: AppRadius.smBorder,
+                              child: AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: PurchImage(
+                                  imageUrlOrPath:
+                                      _kioskPosterUrlController.text.trim(),
+                                  fit: BoxFit.cover,
+                                  errorWidget: Container(
+                                    color: AppColors.cardHover,
+                                    child: const Center(
+                                      child: Text(
+                                        'Image could not be loaded.\nCheck the URL.',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton(
+                            onPressed: isSaving ? null : _saveBranding,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                            child: const Text('Save Branding'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Card(
+                    elevation: 0,
+                    color: AppColors.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdBorder,
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'BIR / Compliance',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _tinController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'TIN',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _businessNameController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'Registered business name',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _addressController,
+                            enabled: !isSaving,
+                            decoration: const InputDecoration(
+                              labelText: 'Registered address',
+                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton(
+                            onPressed: isSaving ? null : _saveBirSettings,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                            ),
+                            child: const Text('Save BIR Settings'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Card(
+                    elevation: 0,
+                    color: AppColors.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdBorder,
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          title: const Text('Require a barcode for every item'),
+                          value: _requiresBarcode,
+                          activeColor: AppColors.brandPrimary,
+                          onChanged: isSaving ? null : _toggleBarcodeRequirement,
+                        ),
+                        const Divider(height: 1),
+                        SwitchListTile(
+                          title: const Text('Offer utang / credit sales'),
+                          subtitle: const Text(
+                            'Lets cashiers record sales against a customer\'s credit '
+                            'ledger instead of collecting payment immediately.',
+                          ),
+                          value: _creditLedgerEnabled,
+                          activeColor: AppColors.brandPrimary,
+                          onChanged: isSaving ? null : _toggleCreditLedger,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  OutlinedButton(
+                    onPressed:
+                        () => Navigator.of(context).push<void>(
+                          MaterialPageRoute(
+                            builder: (_) => const ServerConnectionScreen(),
+                          ),
+                        ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.brandPrimary,
+                      side: const BorderSide(color: AppColors.border),
+                      shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                    ),
+                    child: const Text('Local Server Connection'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

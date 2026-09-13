@@ -15,6 +15,7 @@ class TenantSettings {
     required this.registeredAddress,
     required this.creditLedgerRetentionDays,
     required this.creditLedgerEnabled,
+    required this.kioskPosterImageUrl,
   });
 
   factory TenantSettings.fromJson(Map<String, dynamic> json) {
@@ -31,6 +32,7 @@ class TenantSettings {
       registeredAddress: json['registeredAddress'] as String?,
       creditLedgerRetentionDays: json['creditLedgerRetentionDays'] as int?,
       creditLedgerEnabled: json['creditLedgerEnabled'] as bool,
+      kioskPosterImageUrl: json['kioskPosterImageUrl'] as String?,
     );
   }
 
@@ -46,6 +48,10 @@ class TenantSettings {
   final String? registeredAddress;
   final int? creditLedgerRetentionDays;
   final bool creditLedgerEnabled;
+
+  /// URL to the promotional poster image shown full-bleed on the kiosk
+  /// landing screen (E1). Null = show the wordmark card fallback.
+  final String? kioskPosterImageUrl;
 }
 
 /// Mirrors Purch.Application.Onboarding.UpdateBrandingRequest. logoUrl is an
@@ -55,16 +61,21 @@ class UpdateBrandingRequest {
     this.logoUrl,
     this.themeColorHex,
     this.fontFamily,
+    this.kioskPosterImageUrl,
   });
 
   final String? logoUrl;
   final String? themeColorHex;
   final String? fontFamily;
 
+  /// Hosted URL for the kiosk landing screen poster image. Null clears it.
+  final String? kioskPosterImageUrl;
+
   Map<String, dynamic> toJson() => {
     'logoUrl': logoUrl,
     'themeColorHex': themeColorHex,
     'fontFamily': fontFamily,
+    'kioskPosterImageUrl': kioskPosterImageUrl,
   };
 }
 

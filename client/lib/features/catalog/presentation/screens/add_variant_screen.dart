@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/item_variant_models.dart';
 import '../providers/catalog_providers.dart';
 
@@ -114,130 +117,294 @@ class _AddVariantScreenState extends ConsumerState<AddVariantScreen> {
             .currentFailure;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Add Variant: ${widget.itemName}')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Add Variant: ${widget.itemName}'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        centerTitle: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 540),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Attributes',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    for (
-                      var index = 0;
-                      index < _attributeRows.length;
-                      index++
-                    ) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _attributeRows[index].keyController,
-                              enabled: !isLoading,
-                              decoration: const InputDecoration(
-                                labelText: 'Attribute (e.g. Size)',
-                                border: OutlineInputBorder(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xl,
+              ),
+              child: Card(
+                elevation: 0,
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.lgBorder,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandPrimaryContainer,
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                              child: const Icon(
+                                Icons.style_outlined,
+                                color: AppColors.brandPrimary,
+                                size: 24,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _attributeRows[index].valueController,
-                              enabled: !isLoading,
-                              decoration: const InputDecoration(
-                                labelText: 'Value (e.g. Large)',
-                                border: OutlineInputBorder(),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'New Item Variant',
+                                    style: Theme.of(context).textTheme.titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Define options (e.g. Size, Color) for ${widget.itemName}',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: AppColors.textSecondary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Text(
+                          'Attributes',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        for (
+                          var index = 0;
+                          index < _attributeRows.length;
+                          index++
+                        ) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _attributeRows[index].keyController,
+                                  enabled: !isLoading,
+                                  decoration: InputDecoration(
+                                    labelText: 'Attribute (e.g. Size)',
+                                    border: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(
+                                        color: AppColors.brandPrimary,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: AppColors.cardHover,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _attributeRows[index].valueController,
+                                  enabled: !isLoading,
+                                  decoration: InputDecoration(
+                                    labelText: 'Value (e.g. Large)',
+                                    border: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                      borderSide: const BorderSide(
+                                        color: AppColors.brandPrimary,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: AppColors.cardHover,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed:
+                                    isLoading || _attributeRows.length == 1
+                                        ? null
+                                        : () => _removeAttributeRow(index),
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: AppColors.accentWarm,
+                                ),
+                                tooltip: 'Remove attribute',
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed:
-                                isLoading || _attributeRows.length == 1
-                                    ? null
-                                    : () => _removeAttributeRow(index),
-                            icon: const Icon(Icons.remove_circle_outline),
-                            tooltip: 'Remove attribute',
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: isLoading ? null : _addAttributeRow,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add attribute'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.brandPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _skuController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'SKU (optional)',
+                            hintText: 'e.g. TSHIRT-LRG-RED',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        TextFormField(
+                          controller: _priceOverrideController,
+                          enabled: !isLoading,
+                          style: const TextStyle(
+                            fontFeatures: [FontFeature.tabularFigures()],
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Price override (optional)',
+                            hintText: 'Leave blank to use base price',
+                            prefixText: '₱ ',
+                            prefixStyle: const TextStyle(
+                              color: AppColors.brandPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return null;
+                            }
+                            final parsed = double.tryParse(value.trim());
+                            if (parsed == null || parsed < 0) {
+                              return 'Enter a valid price';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (failure != null) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentWarm.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.mdBorder,
+                              border: Border.all(
+                                color: AppColors.accentWarm.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              failure.message,
+                              style: const TextStyle(
+                                color: AppColors.accentWarm,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: isLoading ? null : _addAttributeRow,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add attribute'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _skuController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'SKU (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _priceOverrideController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Price override (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return null;
-                        }
-                        final parsed = double.tryParse(value.trim());
-                        if (parsed == null || parsed < 0) {
-                          return 'Enter a valid price';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(
+                          height: 52,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                            ),
+                            onPressed: isLoading ? null : _submit,
+                            child:
+                                isLoading
+                                    ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Add Variant',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                          ),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child:
-                            isLoading
-                                ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                                : const Text('Add Variant'),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'add_combo_component_screen.dart';
 
-/// B4 — combo/meal builder slots. Only reachable for items whose pricingType
-/// is combo (see ItemListScreen), matching the backend's own rejection of
-/// combo slots against any other pricing type.
+/// B4 — combo components / slots for a combo item.
 class ComboComponentsScreen extends ConsumerWidget {
   const ComboComponentsScreen({
     super.key,
@@ -22,16 +23,34 @@ class ComboComponentsScreen extends ConsumerWidget {
     final componentsAsync = ref.watch(itemComboComponentListProvider(itemId));
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Combo Slots: $itemName')),
       body: componentsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load combo slots: $error')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
+        error: (error, stackTrace) => ErrorStateView(
+          message: 'Could not load combo slots: $error',
+          onRetry: () => ref
+              .read(itemComboComponentListProvider(itemId).notifier)
+              .refresh(),
+        ),
         data: (components) {
           if (components.isEmpty) {
-            return const Center(
-              child: Text('No combo slots yet — tap + to add one.'),
+            return EmptyStateView(
+              icon: Icons.set_meal_outlined,
+              title: 'No combo slots yet — tap + to add one.',
+              description:
+                  'Define choice slots (e.g. Drink, Side, Main) and allowed item options.',
+              actionLabel: 'Add Combo Slot',
+              onAction: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => AddComboComponentScreen(
+                    itemId: itemId,
+                    itemName: itemName,
+                  ),
+                ),
+              ),
             );
           }
 
@@ -41,16 +60,49 @@ class ComboComponentsScreen extends ConsumerWidget {
                     ref
                         .read(itemComboComponentListProvider(itemId).notifier)
                         .refresh(),
-            child: ListView.builder(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               itemCount: components.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final component = components[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.set_meal)),
-                  title: Text(component.slotLabel),
-                  subtitle: Text(
-                    'From ${component.componentCategoryName} · qty ${component.quantity}'
-                    '${component.substitutionUpchargeAmount != null ? ' · +₱${component.substitutionUpchargeAmount!.toStringAsFixed(2)} to substitute' : ''}',
+                return Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.mdBorder,
+                    boxShadow: AppShadows.subtle,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimaryContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: const Icon(
+                        Icons.set_meal_rounded,
+                        color: AppColors.brandPrimary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      component.slotLabel,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'From ${component.componentCategoryName} · qty ${component.quantity}'
+                      '${component.substitutionUpchargeAmount != null ? ' · +₱${component.substitutionUpchargeAmount!.toStringAsFixed(2)} to substitute' : ''}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 );
               },
@@ -59,6 +111,8 @@ class ComboComponentsScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: AppColors.onBrandPrimary,
         onPressed:
             () => Navigator.of(context).push<void>(
               MaterialPageRoute(
@@ -75,3 +129,4 @@ class ComboComponentsScreen extends ConsumerWidget {
     );
   }
 }
+

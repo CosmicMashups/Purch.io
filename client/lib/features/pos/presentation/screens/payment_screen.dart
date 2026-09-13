@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../../credit_ledger/presentation/providers/credit_ledger_providers.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/transaction_models.dart';
@@ -9,9 +10,7 @@ import 'receipt_screen.dart';
 
 /// D5's payment method tabs. Cash, bank transfer, manual GCash QR, and
 /// Utang/Credit (Phase 9) have a working checkout flow — the rest are listed
-/// but disabled with an explanation, since faking a confirmation for
-/// something that touches real money (a gateway webhook, a biller API)
-/// would be worse than just saying it isn't ready yet.
+/// but disabled with an explanation.
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({super.key, required this.total});
 
@@ -85,26 +84,70 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _selectedLedgerId != null);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Payment')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 500),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Total: ₱${widget.total.toStringAsFixed(2)}',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
+                  // Total due card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: AppRadius.lgBorder,
+                      boxShadow: AppShadows.subtle,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'AMOUNT DUE',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: ₱${widget.total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.brandPrimary,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Select Payment Method',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Cash
                   _MethodTile(
                     method: PaymentMethod.cash,
                     label: 'Cash',
-                    icon: Icons.payments,
+                    icon: Icons.payments_rounded,
                     isSelected: _selectedMethod == PaymentMethod.cash,
                     isEnabled: !isLoading,
                     onSelected:
@@ -113,32 +156,70 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                   ),
                   if (_selectedMethod == PaymentMethod.cash) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _tenderedController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Cash tendered',
-                        border: OutlineInputBorder(),
-                        prefixText: '₱ ',
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: AppRadius.mdBorder,
+                        border: Border.all(
+                          color: AppColors.brandPrimary.withAlpha(60),
+                        ),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: _tenderedController,
+                            enabled: !isLoading,
+                            decoration: const InputDecoration(
+                              labelText: 'Cash tendered',
+                              border: OutlineInputBorder(),
+                              prefixText: '₱ ',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  _change != null
+                                      ? AppColors.accentEmeraldContainer
+                                      : AppColors.cardHover,
+                              borderRadius: AppRadius.smBorder,
+                            ),
+                            child: Text(
+                              _change != null
+                                  ? 'Change: ₱${_change!.toStringAsFixed(2)}'
+                                  : 'Enter an amount of at least the total.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color:
+                                    _change != null
+                                        ? AppColors.onAccentEmeraldContainer
+                                        : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _change != null
-                          ? 'Change: ₱${_change!.toStringAsFixed(2)}'
-                          : 'Enter an amount of at least the total.',
                     ),
                   ],
                   const SizedBox(height: 8),
+
+                  // Bank Transfer
                   _MethodTile(
                     method: PaymentMethod.bankTransfer,
                     label: 'Bank Transfer',
-                    icon: Icons.account_balance,
+                    icon: Icons.account_balance_rounded,
                     isSelected: _selectedMethod == PaymentMethod.bankTransfer,
                     isEnabled: !isLoading,
                     onSelected:
@@ -148,16 +229,29 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   if (_selectedMethod == PaymentMethod.bankTransfer) ...[
                     const SizedBox(height: 8),
-                    const Text(
-                      'Confirm only after you\'ve verified the transfer '
-                      'landed in your bank account.',
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardHover,
+                        borderRadius: AppRadius.smBorder,
+                      ),
+                      child: const Text(
+                        'Confirm only after you\'ve verified the transfer '
+                        'landed in your bank account.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 8),
+
+                  // GCash
                   _MethodTile(
                     method: PaymentMethod.manualGcashQr,
                     label: 'GCash (Manual QR)',
-                    icon: Icons.qr_code,
+                    icon: Icons.qr_code_rounded,
                     isSelected: _selectedMethod == PaymentMethod.manualGcashQr,
                     isEnabled: !isLoading,
                     onSelected:
@@ -167,16 +261,30 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                   if (_selectedMethod == PaymentMethod.manualGcashQr) ...[
                     const SizedBox(height: 8),
-                    const Text(
-                      'Show your GCash QR (Business Settings → Branches → '
-                      'Manual GCash QR) and confirm only after you\'ve '
-                      'verified the payment landed in your account.',
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardHover,
+                        borderRadius: AppRadius.smBorder,
+                      ),
+                      child: const Text(
+                        'Show your GCash QR (Business Settings → Branches → '
+                        'Manual GCash QR) and confirm only after you\'ve '
+                        'verified the payment landed in your account.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
                   ],
+                  const SizedBox(height: 8),
+
+                  // Utang / Credit
                   _MethodTile(
                     method: PaymentMethod.utangCredit,
                     label: 'Utang / Credit',
-                    icon: Icons.book,
+                    icon: Icons.menu_book_rounded,
                     isSelected: _selectedMethod == PaymentMethod.utangCredit,
                     isEnabled: !isLoading,
                     onSelected:
@@ -192,49 +300,91 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       onChanged: (id) => setState(() => _selectedLedgerId = id),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  const Divider(),
+
+                  const SizedBox(height: 20),
+                  const Divider(color: AppColors.border, height: 1),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Other Channels',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                   const SizedBox(height: 8),
+
+                  // Disabled methods
                   _DisabledMethodTile(
                     label: 'QR Ph',
-                    icon: Icons.qr_code_2,
+                    icon: Icons.qr_code_2_rounded,
                     reason: 'needs a live Xendit connection',
                   ),
+                  const SizedBox(height: 6),
                   _DisabledMethodTile(
                     label: 'Bill Payment / E-Load',
-                    icon: Icons.receipt_long,
+                    icon: Icons.receipt_long_rounded,
                     reason: 'needs the Dragonpay integration',
                   ),
+                  const SizedBox(height: 6),
                   _DisabledMethodTile(
                     label: 'Split Payment',
-                    icon: Icons.call_split,
+                    icon: Icons.call_split_rounded,
                     reason: 'not built yet',
                   ),
+
                   if (failure != null) ...[
                     const SizedBox(height: 16),
-                    Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withAlpha(20),
+                        borderRadius: AppRadius.smBorder,
+                        border: Border.all(
+                          color: AppColors.error.withAlpha(60),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
+                      child: Text(
+                        failure.message,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),
                   SizedBox(
-                    height: 56,
+                    height: 52,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.brandPrimary,
+                        foregroundColor: AppColors.onBrandPrimary,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: AppRadius.mdBorder,
+                        ),
+                      ),
                       onPressed: canConfirm ? _confirm : null,
                       child:
                           isLoading
                               ? const SizedBox(
-                                height: 24,
-                                width: 24,
+                                height: 20,
+                                width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
+                                  color: AppColors.onBrandPrimary,
                                 ),
                               )
-                              : const Text('Confirm Payment'),
+                              : const Text(
+                                'Confirm Payment',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                     ),
                   ),
                 ],
@@ -266,22 +416,42 @@ class _MethodTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+    return Container(
+      decoration: BoxDecoration(
+        color:
+            isSelected ? AppColors.brandPrimaryContainer : AppColors.surface,
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(
+          color: isSelected ? AppColors.brandPrimary : AppColors.border,
+          width: isSelected ? 1.5 : 1.0,
+        ),
+        boxShadow: isSelected ? AppShadows.subtle : null,
+      ),
       child: ListTile(
-        leading: Icon(icon),
-        title: Text(label),
-        trailing: isSelected ? const Icon(Icons.check_circle) : null,
+        leading: Icon(
+          icon,
+          color: isSelected ? AppColors.brandPrimary : AppColors.textSecondary,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppColors.brandPrimary : AppColors.textPrimary,
+          ),
+        ),
+        trailing:
+            isSelected
+                ? const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.brandPrimary,
+                )
+                : null,
         onTap: isEnabled ? onSelected : null,
       ),
     );
   }
 }
 
-/// Picks which customer account a Utang/Credit sale is charged against —
-/// only accounts with enough remaining credit for a customer to actually
-/// use are worth surfacing here, but the backend is the source of truth on
-/// the exact limit check at payment time.
 class _CreditLedgerPicker extends ConsumerWidget {
   const _CreditLedgerPicker({
     required this.selectedLedgerId,
@@ -347,15 +517,27 @@ class _DisabledMethodTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.5,
-      child: Card(
-        child: ListTile(
-          leading: Icon(icon),
-          title: Text(label),
-          subtitle: Text('Not yet available — $reason'),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardHover.withAlpha(120),
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(color: AppColors.border.withAlpha(120)),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.textMuted),
+        title: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Text(
+          'Not yet available — $reason',
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),
       ),
     );
   }
 }
+

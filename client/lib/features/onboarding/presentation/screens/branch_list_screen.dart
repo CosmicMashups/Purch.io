@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../providers/onboarding_providers.dart';
 import 'add_branch_screen.dart';
 import 'department_list_screen.dart';
@@ -19,68 +22,147 @@ class BranchListScreen extends ConsumerWidget {
     final branchesAsync = ref.watch(branchListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Branches')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Branches'),
+        elevation: 0,
+      ),
       body: branchesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load branches: $error')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
+        error: (error, stackTrace) => ErrorStateView(
+          message: error.toString(),
+          onRetry: () => ref.read(branchListProvider.notifier).refresh(),
+        ),
         data: (branches) {
           if (branches.isEmpty) {
-            return const Center(
-              child: Text('No branches yet — tap + to add one.'),
+            return EmptyStateView(
+              icon: Icons.store_outlined,
+              title: 'No branches yet — tap + to add one.',
+              description:
+                  'Set up your physical stores or pop-up branches to manage departmental inventory, terminals, and staff.',
+              actionLabel: 'Add Branch',
+              onAction:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const AddBranchScreen()),
+                  ),
             );
           }
 
           return RefreshIndicator(
+            color: AppColors.brandPrimary,
             onRefresh: () => ref.read(branchListProvider.notifier).refresh(),
-            child: ListView.builder(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: branches.length,
+              separatorBuilder: (context, index) =>
+                  const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final branch = branches[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.store)),
-                  title: Text(branch.name),
-                  subtitle:
-                      branch.address == null ? null : Text(branch.address!),
-                  trailing: PopupMenuButton<_BranchAction>(
-                    tooltip: 'Branch actions',
-                    onSelected: (action) {
-                      switch (action) {
-                        case _BranchAction.departments:
-                          Navigator.of(context).push<void>(
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => DepartmentListScreen(
-                                    branchId: branch.id,
-                                    branchName: branch.name,
-                                  ),
+                return Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.mdBorder,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimaryContainer,
+                        borderRadius: AppRadius.smBorder,
+                      ),
+                      child: const Icon(
+                        Icons.storefront_rounded,
+                        color: AppColors.brandPrimary,
+                      ),
+                    ),
+                    title: Text(
+                      branch.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: branch.address != null
+                        ? Text(
+                            branch.address!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
                             ),
-                          );
-                          break;
-                        case _BranchAction.manualGcashQr:
-                          Navigator.of(context).push<void>(
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => ManualGcashQrSettingsScreen(
-                                    branch: branch,
-                                  ),
-                            ),
-                          );
-                          break;
-                      }
-                    },
-                    itemBuilder:
-                        (context) => const [
-                          PopupMenuItem(
-                            value: _BranchAction.departments,
-                            child: Text('Departments'),
+                          )
+                        : null,
+                    trailing: PopupMenuButton<_BranchAction>(
+                      tooltip: 'Branch actions',
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: AppColors.textSecondary,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.smBorder,
+                      ),
+                      onSelected: (action) {
+                        switch (action) {
+                          case _BranchAction.departments:
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => DepartmentListScreen(
+                                  branchId: branch.id,
+                                  branchName: branch.name,
+                                ),
+                              ),
+                            );
+                            break;
+                          case _BranchAction.manualGcashQr:
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => ManualGcashQrSettingsScreen(
+                                  branch: branch,
+                                ),
+                              ),
+                            );
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _BranchAction.departments,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.category_outlined,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(width: AppSpacing.sm),
+                              Text('Departments'),
+                            ],
                           ),
-                          PopupMenuItem(
-                            value: _BranchAction.manualGcashQr,
-                            child: Text('Manual GCash QR'),
+                        ),
+                        PopupMenuItem(
+                          value: _BranchAction.manualGcashQr,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(width: AppSpacing.sm),
+                              Text('Manual GCash QR'),
+                            ],
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -89,13 +171,15 @@ class BranchListScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed:
-            () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const AddBranchScreen()),
-            ),
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: Colors.white,
+        onPressed: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const AddBranchScreen()),
+        ),
         tooltip: 'Add branch',
         child: const Icon(Icons.add),
       ),
     );
   }
 }
+

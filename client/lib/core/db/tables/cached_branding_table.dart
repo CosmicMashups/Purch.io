@@ -9,6 +9,10 @@ class CachedBranding extends Table {
   TextColumn get logoUrl => text().nullable()();
   TextColumn get themeColorHex => text().nullable()();
   TextColumn get fontFamily => text().nullable()();
+
+  /// Promotional poster shown on the kiosk landing screen (E1). Null = wordmark fallback.
+  TextColumn get kioskPosterImageUrl => text().nullable()();
+
   DateTimeColumn get lastSyncedAt => dateTime()();
 
   @override

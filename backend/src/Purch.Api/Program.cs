@@ -163,6 +163,19 @@ app.UseExceptionHandler();
 // in a ProblemDetails body for those too, so no error response is ever silently empty.
 app.UseStatusCodePages();
 
+var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+if (!Directory.Exists(webRootPath))
+{
+    Directory.CreateDirectory(webRootPath);
+}
+var defaultUploadsPath = Path.Combine(webRootPath, "uploads");
+if (!Directory.Exists(defaultUploadsPath))
+{
+    Directory.CreateDirectory(defaultUploadsPath);
+}
+
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
@@ -179,6 +192,7 @@ app.MapReportingEndpoints();
 app.MapCreditLedgerEndpoints();
 app.MapInventoryEndpoints();
 app.MapSyncEndpoints();
+app.MapUploadEndpoints();
 
 app.Run();
 

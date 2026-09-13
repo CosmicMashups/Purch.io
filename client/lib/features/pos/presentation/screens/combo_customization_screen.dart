@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_combo_component_models.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 
-/// D2 — the combo/meal builder customization sheet. Each slot
-/// (Purch.Domain.Entities.ItemComboComponent) requires picking exactly
-/// `quantity` items from its category; a slot with a configured
-/// substitutionUpchargeAmount always adds that flat amount to the combo's
-/// price once every required slot is filled — the backend prices a slot's
-/// upcharge as a flat amount rather than per specific component, see
-/// TransactionService.ResolveComboSelectionsAsync's doc comment.
+/// D2 — the combo/meal builder customization sheet.
 class ComboCustomizationScreen extends ConsumerStatefulWidget {
   const ComboCustomizationScreen({super.key, required this.item, this.addLine});
 
@@ -86,59 +81,119 @@ class _ComboCustomizationScreenState
     final itemsAsync = ref.watch(itemListProvider);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: Text(widget.item.name)),
       body: slotsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load this combo: $error')),
+            (error, stackTrace) => Center(
+              child: Text(
+                'Could not load this combo: $error',
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
         data: (slots) {
           if (slots.isEmpty) {
-            return const Center(
-              child: Text('No slots have been configured for this combo yet.'),
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.cardHover,
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                    ),
+                    child: const Icon(
+                      Icons.set_meal_outlined,
+                      size: 32,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No slots have been configured for this combo yet.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             );
           }
 
           return itemsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
-                (error, stackTrace) =>
-                    Center(child: Text('Could not load items: $error')),
+                (error, stackTrace) => Center(
+                  child: Text(
+                    'Could not load items: $error',
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
             data: (items) {
               return Column(
                 children: [
                   Expanded(
                     child: ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       children: [
                         for (final slot in slots)
-                          _SlotSection(
-                            slot: slot,
-                            candidateItems:
-                                items
-                                    .where(
-                                      (item) =>
-                                          item.categoryId ==
-                                              slot.componentCategoryId &&
-                                          item.isActive,
-                                    )
-                                    .toList(),
-                            selectedItemIds:
-                                _selectedItemIdsBySlot[slot.id] ?? const [],
-                            onToggle:
-                                (itemId) => _toggleSelection(slot, itemId),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _SlotSection(
+                              slot: slot,
+                              candidateItems:
+                                  items
+                                      .where(
+                                        (item) =>
+                                            item.categoryId ==
+                                                slot.componentCategoryId &&
+                                            item.isActive,
+                                      )
+                                      .toList(),
+                              selectedItemIds:
+                                  _selectedItemIdsBySlot[slot.id] ?? const [],
+                              onToggle:
+                                  (itemId) => _toggleSelection(slot, itemId),
+                            ),
                           ),
                       ],
                     ),
                   ),
-                  Padding(
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      boxShadow: AppShadows.card,
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
                     padding: const EdgeInsets.all(16),
                     child: SizedBox(
-                      height: 56,
+                      height: 52,
                       width: double.infinity,
                       child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.brandPrimary,
+                          foregroundColor: AppColors.onBrandPrimary,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: AppRadius.mdBorder,
+                          ),
+                        ),
                         onPressed:
                             _isComplete(slots) ? () => _addToCart(slots) : null,
-                        child: const Text('Add to Cart'),
+                        child: const Text(
+                          'Add to Cart',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -167,28 +222,76 @@ class _SlotSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            '${slot.slotLabel} (choose ${slot.quantity})',
-            style: Theme.of(context).textTheme.titleMedium,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.mdBorder,
+        boxShadow: AppShadows.subtle,
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${slot.slotLabel} (choose ${slot.quantity})',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (slot.substitutionUpchargeAmount != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentWarmContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Text(
+                      '+₱${slot.substitutionUpchargeAmount!.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.onAccentWarmContainer,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-        if (candidateItems.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text('No items are available in this slot\'s category yet.'),
-          ),
-        for (final item in candidateItems)
-          CheckboxListTile(
-            value: selectedItemIds.contains(item.id),
-            onChanged: (_) => onToggle(item.id),
-            title: Text(item.name),
-          ),
-      ],
+          if (candidateItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'No items are available in this slot\'s category yet.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ),
+          for (final item in candidateItems)
+            CheckboxListTile(
+              value: selectedItemIds.contains(item.id),
+              activeColor: AppColors.brandPrimary,
+              onChanged: (_) => onToggle(item.id),
+              title: Text(
+                item.name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
+

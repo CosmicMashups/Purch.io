@@ -26,6 +26,7 @@ public sealed partial class TenantSettingsService(
         tenant.BrandingLogoUrl = request.LogoUrl;
         tenant.BrandingThemeColorHex = request.ThemeColorHex;
         tenant.BrandingFontFamily = request.FontFamily;
+        tenant.KioskPosterImageUrl = request.KioskPosterImageUrl;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToDto(tenant);
@@ -91,7 +92,8 @@ public sealed partial class TenantSettingsService(
         tenant.RegisteredBusinessName,
         tenant.RegisteredAddress,
         tenant.CreditLedgerRetentionDays,
-        tenant.CreditLedgerEnabled);
+        tenant.CreditLedgerEnabled,
+        tenant.KioskPosterImageUrl);
     }
 
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]

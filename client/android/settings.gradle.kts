@@ -19,7 +19,9 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.7.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.8.22" apply false
+    // mobile_scanner ships Kotlin stdlib classes compiled with 2.1.0 — the
+    // Kotlin compiler must be at least that new to read them.
+    id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 }
 
 include(":app")

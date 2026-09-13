@@ -1,4 +1,5 @@
 using Purch.Application.Kiosk;
+using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
 
@@ -79,6 +80,17 @@ public static class KioskEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.SubmitKioskOrderAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
+
+        // Kiosk branding — poster image URL for the landing screen (E1).
+        // Scoped to Role.Kiosk (not Admin) because the terminal fetches it on boot,
+        // before any staff interaction. No sensitive data: just a nullable URL.
+        _ = app.MapGet("/kiosk/branding", async (
+            ITenantSettingsService settingsService,
+            CancellationToken cancellationToken) =>
+        {
+            var settings = await settingsService.GetAsync(cancellationToken);
+            return Results.Ok(new { kioskPosterImageUrl = settings.KioskPosterImageUrl });
+        }).RequireAuthorization(policy => policy.RequireRole(kioskOnly));
 
         return app;
     }

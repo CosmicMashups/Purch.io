@@ -1141,6 +1141,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("KioskPosterImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<int>("LicenseStatus")
                         .HasColumnType("integer");
 

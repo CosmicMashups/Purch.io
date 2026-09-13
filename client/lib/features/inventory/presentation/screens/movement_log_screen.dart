@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/inventory_movement_models.dart';
 import '../providers/inventory_providers.dart';
 import 'record_movement_screen.dart';
@@ -22,11 +25,16 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
     final movementsAsync = ref.watch(movementLogProvider(type: _typeFilter));
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Stock Movement Log')),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
+          Container(
+            color: AppColors.surface,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -34,13 +42,43 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
                   ChoiceChip(
                     label: const Text('All'),
                     selected: _typeFilter == null,
+                    selectedColor: AppColors.brandPrimaryContainer,
+                    labelStyle: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _typeFilter == null
+                          ? AppColors.brandPrimary
+                          : AppColors.textSecondary,
+                    ),
+                    side: BorderSide(
+                      color: _typeFilter == null
+                          ? AppColors.brandPrimary
+                          : AppColors.border,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                    ),
                     onSelected: (_) => setState(() => _typeFilter = null),
                   ),
                   for (final type in MovementType.values) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     ChoiceChip(
                       label: Text(type.label),
                       selected: _typeFilter == type,
+                      selectedColor: AppColors.brandPrimaryContainer,
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _typeFilter == type
+                            ? AppColors.brandPrimary
+                            : AppColors.textSecondary,
+                      ),
+                      side: BorderSide(
+                        color: _typeFilter == type
+                            ? AppColors.brandPrimary
+                            : AppColors.border,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                      ),
                       onSelected: (_) => setState(() => _typeFilter = type),
                     ),
                   ],
@@ -48,22 +86,41 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
               ),
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AppColors.borderSubtle),
           Expanded(
             child: movementsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.brandPrimary),
+              ),
               error:
-                  (error, stackTrace) =>
-                      Center(child: Text('Could not load movements: $error')),
+                  (error, stackTrace) => ErrorStateView(
+                    message: error.toString(),
+                    onRetry:
+                        () => ref.refresh(
+                          movementLogProvider(type: _typeFilter),
+                        ),
+                  ),
               data: (movements) {
                 if (movements.isEmpty) {
-                  return const Center(
-                    child: Text('No movements recorded yet.'),
+                  return EmptyStateView(
+                    icon: Icons.history_toggle_off_rounded,
+                    title: 'No movements recorded yet.',
+                    description:
+                        'Log received deliveries, damaged goods, waste, transfers, or cycle count adjustments.',
+                    actionLabel: 'Record Stock Movement',
+                    onAction:
+                        () => Navigator.of(context).push<void>(
+                          MaterialPageRoute(
+                            builder: (_) => const RecordMovementScreen(),
+                          ),
+                        ),
                   );
                 }
 
-                return ListView.builder(
+                return ListView.separated(
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   itemCount: movements.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, index) {
                     final movement = movements[index];
                     final isIncrease =
@@ -71,25 +128,79 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
                         (movement.type == MovementType.adjustment &&
                             movement.quantity > 0);
 
-                    return ListTile(
-                      leading: Icon(
-                        isIncrease
-                            ? Icons.arrow_circle_up
-                            : Icons.arrow_circle_down,
-                        color: isIncrease ? Colors.green : Colors.red,
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: AppRadius.lgBorder,
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: AppShadows.subtle,
                       ),
-                      title: Text(movement.itemName),
-                      subtitle: Text(
-                        '${movement.type.label} · ${movement.branchName} · '
-                        '${movement.staffUserName}'
-                        '${movement.note != null ? ' · ${movement.note}' : ''}',
-                      ),
-                      trailing: Text(
-                        movement.quantity.toStringAsFixed(
-                          movement.quantity.truncateToDouble() ==
-                                  movement.quantity
-                              ? 0
-                              : 2,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: isIncrease
+                                ? AppColors.accentEmeraldContainer
+                                : AppColors.cardHover,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Icon(
+                            isIncrease
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
+                            color: isIncrease
+                                ? AppColors.accentEmerald
+                                : AppColors.error,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          movement.itemName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${movement.type.label} · ${movement.branchName} · '
+                          '${movement.staffUserName}'
+                          '${movement.note != null ? ' · ${movement.note}' : ''}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isIncrease
+                                ? AppColors.accentEmeraldContainer
+                                : AppColors.cardHover,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Text(
+                            movement.quantity.toStringAsFixed(
+                              movement.quantity.truncateToDouble() ==
+                                      movement.quantity
+                                  ? 0
+                                  : 2,
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                              color: isIncrease
+                                  ? AppColors.accentEmerald
+                                  : AppColors.error,
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -106,6 +217,8 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
               MaterialPageRoute(builder: (_) => const RecordMovementScreen()),
             ),
         tooltip: 'Record movement',
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: AppColors.onBrandPrimary,
         child: const Icon(Icons.add),
       ),
     );

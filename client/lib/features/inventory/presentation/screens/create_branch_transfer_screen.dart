@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../onboarding/domain/branch_models.dart';
@@ -88,138 +89,186 @@ class _CreateBranchTransferScreenState
             .currentFailure;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New Stock Transfer')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('New Stock Transfer'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 540),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  branchesAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load branches: $error'),
-                    data:
-                        (branches) => DropdownButtonFormField<Branch>(
-                          value: _matchBranch(branches, _sourceBranch),
-                          decoration: const InputDecoration(
-                            labelText: 'Source branch',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            for (final branch in branches)
-                              DropdownMenuItem(
-                                value: branch,
-                                child: Text(branch.name),
-                              ),
-                          ],
-                          onChanged:
-                              isLoading
-                                  ? null
-                                  : (branch) =>
-                                      setState(() => _sourceBranch = branch),
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Card(
+                elevation: 0,
+                color: AppColors.surface,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppRadius.lgBorder,
+                  side: BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Transfer Details',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
                         ),
-                  ),
-                  const SizedBox(height: 16),
-                  branchesAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load branches: $error'),
-                    data:
-                        (branches) => DropdownButtonFormField<Branch>(
-                          value: _matchBranch(branches, _destinationBranch),
-                          decoration: const InputDecoration(
-                            labelText: 'Destination branch',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            for (final branch in branches)
-                              DropdownMenuItem(
-                                value: branch,
-                                child: Text(branch.name),
-                              ),
-                          ],
-                          onChanged:
-                              isLoading
-                                  ? null
-                                  : (branch) => setState(
-                                    () => _destinationBranch = branch,
-                                  ),
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Items', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  itemsAsync.when(
-                    loading: () => const LinearProgressIndicator(),
-                    error:
-                        (error, stackTrace) =>
-                            Text('Could not load items: $error'),
-                    data:
-                        (items) => Column(
-                          children: [
-                            for (var i = 0; i < _lines.length; i++)
-                              _LineRow(
-                                key: ValueKey(_lines[i]),
-                                items: items,
-                                draft: _lines[i],
-                                isLoading: isLoading,
-                                onChanged: () => setState(() {}),
-                                onRemove:
-                                    _lines.length > 1
-                                        ? () =>
-                                            setState(() => _lines.removeAt(i))
-                                        : null,
-                              ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed:
-                                    isLoading
-                                        ? null
-                                        : () => setState(
-                                          () => _lines.add(_LineDraft()),
-                                        ),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Item'),
-                              ),
-                            ),
-                          ],
-                        ),
-                  ),
-                  if (failure != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      failure.message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 56,
-                    child: FilledButton(
-                      onPressed: (!isLoading && _canSubmit) ? _submit : null,
-                      child:
-                          isLoading
-                              ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
+                      const SizedBox(height: AppSpacing.md),
+                      branchesAsync.when(
+                        loading: () => const LinearProgressIndicator(),
+                        error:
+                            (error, stackTrace) =>
+                                Text('Could not load branches: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                        data:
+                            (branches) => DropdownButtonFormField<Branch>(
+                              value: _matchBranch(branches, _sourceBranch),
+                              decoration: const InputDecoration(
+                                labelText: 'Source branch',
+                                border: OutlineInputBorder(
+                                  borderRadius: AppRadius.smBorder,
                                 ),
-                              )
-                              : const Text('Create Transfer'),
-                    ),
+                              ),
+                              items: [
+                                for (final branch in branches)
+                                  DropdownMenuItem(
+                                    value: branch,
+                                    child: Text(branch.name),
+                                  ),
+                              ],
+                              onChanged:
+                                  isLoading
+                                      ? null
+                                      : (branch) =>
+                                          setState(() => _sourceBranch = branch),
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      branchesAsync.when(
+                        loading: () => const LinearProgressIndicator(),
+                        error:
+                            (error, stackTrace) =>
+                                Text('Could not load branches: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                        data:
+                            (branches) => DropdownButtonFormField<Branch>(
+                              value: _matchBranch(branches, _destinationBranch),
+                              decoration: const InputDecoration(
+                                labelText: 'Destination branch',
+                                border: OutlineInputBorder(
+                                  borderRadius: AppRadius.smBorder,
+                                ),
+                              ),
+                              items: [
+                                for (final branch in branches)
+                                  DropdownMenuItem(
+                                    value: branch,
+                                    child: Text(branch.name),
+                                  ),
+                              ],
+                              onChanged:
+                                  isLoading
+                                      ? null
+                                      : (branch) => setState(
+                                        () => _destinationBranch = branch,
+                                      ),
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Items', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          TextButton.icon(
+                            onPressed:
+                                isLoading
+                                    ? null
+                                    : () => setState(
+                                      () => _lines.add(_LineDraft()),
+                                    ),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Item'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.brandPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      itemsAsync.when(
+                        loading: () => const LinearProgressIndicator(),
+                        error:
+                            (error, stackTrace) =>
+                                Text('Could not load items: $error', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error)),
+                        data:
+                            (items) => Column(
+                              children: [
+                                for (var i = 0; i < _lines.length; i++)
+                                  _LineRow(
+                                    key: ValueKey(_lines[i]),
+                                    items: items,
+                                    draft: _lines[i],
+                                    isLoading: isLoading,
+                                    onChanged: () => setState(() {}),
+                                    onRemove:
+                                        _lines.length > 1
+                                            ? () =>
+                                                setState(() => _lines.removeAt(i))
+                                            : null,
+                                  ),
+                              ],
+                            ),
+                      ),
+                      if (failure != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: AppRadius.smBorder,
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            failure.message,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.error,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: (!isLoading && _canSubmit) ? _submit : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.brandPrimary,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppRadius.smBorder,
+                            ),
+                          ),
+                          child:
+                              isLoading
+                                  ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : const Text('Create Transfer'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -273,7 +322,7 @@ class _LineRow extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -284,7 +333,9 @@ class _LineRow extends StatelessWidget {
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Item',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.smBorder,
+                ),
                 isDense: true,
               ),
               items: [
@@ -303,14 +354,16 @@ class _LineRow extends StatelessWidget {
                       },
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: TextField(
               controller: draft.quantityController,
               enabled: !isLoading,
               decoration: const InputDecoration(
                 labelText: 'Qty',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.smBorder,
+                ),
                 isDense: true,
               ),
               keyboardType: const TextInputType.numberWithOptions(
@@ -322,7 +375,7 @@ class _LineRow extends StatelessWidget {
           if (onRemove != null)
             IconButton(
               onPressed: isLoading ? null : onRemove,
-              icon: const Icon(Icons.remove_circle_outline),
+              icon: const Icon(Icons.remove_circle_outline, color: AppColors.textMuted),
               tooltip: 'Remove item',
             ),
         ],

@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Every API call the app makes (auth, catalog, POS, sync, reporting) needs
+         this — without it Android silently blocks all network requests, which
+         surfaces in-app as a generic "Could not reach server" failure regardless
+         of whether the backend itself is reachable. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Camera-based barcode scanning (mobile_scanner) — item barcode scan-to-fill. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

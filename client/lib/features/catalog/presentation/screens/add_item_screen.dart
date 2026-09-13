@@ -1,7 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/hardware/barcode_scanner_screen.dart';
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/purch_image.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
@@ -24,6 +28,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   final _skuController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _priceController = TextEditingController();
+  final _imageUrlController = TextEditingController();
   Category? _selectedCategory;
   PricingType _pricingType = PricingType.unit;
 
@@ -33,6 +38,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     _skuController.dispose();
     _barcodeController.dispose();
     _priceController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -64,6 +70,10 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                 : _barcodeController.text.trim(),
         categoryId: _selectedCategory?.id,
         basePrice: double.parse(_priceController.text.trim()),
+        imageUrl:
+            _imageUrlController.text.trim().isEmpty
+                ? null
+                : _imageUrlController.text.trim(),
         pricingType: _pricingType,
       ),
     );
@@ -86,167 +96,399 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
         ref.read(createItemControllerProvider.notifier).currentFailure;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Item')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Add Item'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        centerTitle: false,
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 540),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Item name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator:
-                          (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _priceController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        border: OutlineInputBorder(),
-                        prefixText: '₱ ',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        final parsed = double.tryParse(value?.trim() ?? '');
-                        if (parsed == null) {
-                          return 'Enter a valid amount';
-                        }
-                        if (parsed < 0) {
-                          return 'Price cannot be negative';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<PricingType>(
-                      value: _pricingType,
-                      decoration: const InputDecoration(
-                        labelText: 'Pricing type',
-                        border: OutlineInputBorder(),
-                      ),
-                      items:
-                          PricingType.values
-                              .map(
-                                (type) => DropdownMenuItem(
-                                  value: type,
-                                  child: Text(_pricingLabel(type)),
-                                ),
-                              )
-                              .toList(),
-                      onChanged:
-                          isLoading
-                              ? null
-                              : (value) => setState(
-                                () => _pricingType = value ?? _pricingType,
-                              ),
-                    ),
-                    if (_pricingType != PricingType.unit) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Only Unit pricing is fully usable in the POS right now — '
-                        'the ${_pricingLabel(_pricingType)} setup screens aren\'t built yet.',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    categoriesAsync.when(
-                      loading: () => const LinearProgressIndicator(),
-                      error: (error, stackTrace) => const SizedBox.shrink(),
-                      data:
-                          (categories) => DropdownButtonFormField<Category?>(
-                            value: _selectedCategory,
-                            decoration: const InputDecoration(
-                              labelText: 'Category (optional)',
-                              border: OutlineInputBorder(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Card(
+                elevation: 0,
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.lgBorder,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _nameController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Item name',
+                            isDense: true,
+                            hintText: 'e.g. Bottled Water 500ml',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
                             ),
-                            items: [
-                              const DropdownMenuItem<Category?>(
-                                value: null,
-                                child: Text('None'),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
                               ),
-                              ...categories.map(
-                                (category) => DropdownMenuItem(
-                                  value: category,
-                                  child: Text(category.name),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          validator:
+                              (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                      ? 'Required'
+                                      : null,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _priceController,
+                          enabled: !isLoading,
+                          style: const TextStyle(
+                            fontFeatures: [FontFeature.tabularFigures()],
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Price',
+                            isDense: true,
+                            hintText: '0.00',
+                            prefixText: '₱ ',
+                            prefixStyle: const TextStyle(
+                              color: AppColors.brandPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (value) {
+                            final parsed = double.tryParse(value?.trim() ?? '');
+                            if (parsed == null) {
+                              return 'Enter a valid amount';
+                            }
+                            if (parsed < 0) {
+                              return 'Price cannot be negative';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        DropdownButtonFormField<PricingType>(
+                          value: _pricingType,
+                          decoration: InputDecoration(
+                            labelText: 'Pricing type',
+                            isDense: true,
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                          items:
+                              PricingType.values
+                                  .map(
+                                    (type) => DropdownMenuItem(
+                                      value: type,
+                                      child: Text(_pricingLabel(type)),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged:
+                              isLoading
+                                  ? null
+                                  : (value) => setState(
+                                    () => _pricingType = value ?? _pricingType,
+                                  ),
+                        ),
+                        if (_pricingType != PricingType.unit) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              'Only Unit pricing is fully usable in the POS right now — '
+                              'the ${_pricingLabel(_pricingType)} setup screens aren\'t built yet.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.accentWarm),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.sm),
+                        categoriesAsync.when(
+                          loading: () => const LinearProgressIndicator(),
+                          error: (error, stackTrace) => const SizedBox.shrink(),
+                          data:
+                              (categories) => DropdownButtonFormField<Category?>(
+                                value: _selectedCategory,
+                                decoration: InputDecoration(
+                                  labelText: 'Category (optional)',
+                                  isDense: true,
+                                  border: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: AppRadius.mdBorder,
+                                    borderSide: const BorderSide(
+                                      color: AppColors.brandPrimary,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: AppColors.cardHover,
                                 ),
+                                items: [
+                                  const DropdownMenuItem<Category?>(
+                                    value: null,
+                                    child: Text('None'),
+                                  ),
+                                  ...categories.map(
+                                    (category) => DropdownMenuItem(
+                                      value: category,
+                                      child: Text(category.name),
+                                    ),
+                                  ),
+                                ],
+                                onChanged:
+                                    isLoading
+                                        ? null
+                                        : (value) => setState(
+                                          () => _selectedCategory = value,
+                                        ),
                               ),
-                            ],
-                            onChanged:
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _skuController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'SKU (optional)',
+                            isDense: true,
+                            hintText: 'e.g. SKU-BEV-001',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _barcodeController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Barcode (optional)',
+                            isDense: true,
+                            hintText: 'Scan or type barcode',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                            suffixIcon: IconButton(
+                              onPressed: isLoading ? null : _scanBarcode,
+                              icon: const Icon(
+                                Icons.qr_code_scanner,
+                                color: AppColors.brandPrimary,
+                              ),
+                              tooltip: 'Scan barcode',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _imageUrlController,
+                          enabled: !isLoading,
+                          decoration: InputDecoration(
+                            labelText: 'Image URL (optional)',
+                            isDense: true,
+                            hintText: 'e.g. /uploads/... or https://... or assets/images/...',
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: AppRadius.mdBorder,
+                              borderSide: const BorderSide(
+                                color: AppColors.brandPrimary,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppColors.cardHover,
+                            prefixIcon: _imageUrlController.text.trim().isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: PurchImage(
+                                      imageUrlOrPath: _imageUrlController.text.trim(),
+                                      width: 32,
+                                      height: 32,
+                                      borderRadius: AppRadius.smBorder,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : const Icon(Icons.image_outlined, color: AppColors.textSecondary),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            ActionChip(
+                              label: const Text('Rice Bowl', style: TextStyle(fontSize: 11)),
+                              avatar: const Icon(Icons.lunch_dining_rounded, size: 14),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                _imageUrlController.text = 'assets/images/combo_rice_bowl.jpg';
+                                setState(() {});
+                              },
+                            ),
+                            ActionChip(
+                              label: const Text('Iced Latte', style: TextStyle(fontSize: 11)),
+                              avatar: const Icon(Icons.local_cafe_rounded, size: 14),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                _imageUrlController.text = 'assets/images/beverage_iced_latte.jpg';
+                                setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                        if (failure != null) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentWarm.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.mdBorder,
+                              border: Border.all(
+                                color: AppColors.accentWarm.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              failure.message,
+                              style: const TextStyle(
+                                color: AppColors.accentWarm,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(
+                          height: 52,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                            ),
+                            onPressed: isLoading ? null : _submit,
+                            child:
                                 isLoading
-                                    ? null
-                                    : (value) => setState(
-                                      () => _selectedCategory = value,
+                                    ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Add Item',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                           ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _skuController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'SKU (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _barcodeController,
-                      enabled: !isLoading,
-                      decoration: InputDecoration(
-                        labelText: 'Barcode (optional)',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          onPressed: isLoading ? null : _scanBarcode,
-                          icon: const Icon(Icons.qr_code_scanner),
-                          tooltip: 'Scan barcode',
                         ),
-                      ),
+                      ],
                     ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child:
-                            isLoading
-                                ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                                : const Text('Add Item'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

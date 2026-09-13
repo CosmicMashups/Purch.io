@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
 import '../../domain/item_models.dart';
 import '../providers/catalog_providers.dart';
 
@@ -75,58 +76,108 @@ class _ServiceDurationScreenState extends ConsumerState<ServiceDurationScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _durationController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Duration (minutes)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        final parsed = int.tryParse(value?.trim() ?? '');
-                        if (parsed == null || parsed <= 0) {
-                          return 'Enter a duration greater than zero';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.lgBorder,
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: AppShadows.subtle,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: _durationController,
+                        enabled: !isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'Duration (minutes)',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          prefixIcon: const Icon(Icons.schedule, color: AppColors.brandPrimary),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
+                          ),
                         ),
-                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final parsed = int.tryParse(value?.trim() ?? '');
+                          if (parsed == null || parsed <= 0) {
+                            return 'Enter a duration greater than zero';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (failure != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardHover,
+                            borderRadius: AppRadius.mdBorder,
+                            border: Border.all(color: AppColors.error),
+                          ),
+                          child: Text(
+                            failure.message,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.brandPrimary,
+                            foregroundColor: AppColors.onBrandPrimary,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdBorder,
+                            ),
+                          ),
+                          onPressed: isLoading ? null : _submit,
+                          child:
+                              isLoading
+                                  ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.onBrandPrimary,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Save',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton(
-                        onPressed: isLoading ? null : _submit,
-                        child:
-                            isLoading
-                                ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                                : const Text('Save'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

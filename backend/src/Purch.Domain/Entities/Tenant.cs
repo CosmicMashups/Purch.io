@@ -36,4 +36,7 @@ public class Tenant : Entity
 
     /// <summary>B7 — whether this shop offers "utang"/credit sales at all. Off by default: credit limit checks and the ledger UI stay hidden until an admin opts in.</summary>
     public bool CreditLedgerEnabled { get; set; }
+
+    /// <summary>Kiosk landing screen promotional poster — a URL to a hosted image displayed full-bleed as the hero on the customer-facing kiosk (E1). Null falls back to the wordmark card.</summary>
+    public string? KioskPosterImageUrl { get; set; }
 }

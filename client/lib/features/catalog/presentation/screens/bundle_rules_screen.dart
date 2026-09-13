@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/empty_state_view.dart';
+import '../../../../core/widgets/error_state_view.dart';
 import '../providers/catalog_providers.dart';
 import 'add_bundle_rule_screen.dart';
 
@@ -22,16 +25,41 @@ class BundleRulesScreen extends ConsumerWidget {
     final rulesAsync = ref.watch(bundleRuleListProvider(itemId));
 
     return Scaffold(
-      appBar: AppBar(title: Text('Bundle Rules: $itemName')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Bundle Rules: $itemName'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+      ),
       body: rulesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
         error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load bundle rules: $error')),
+            (error, stackTrace) => ErrorStateView(
+              message: 'Could not load bundle rules: $error',
+              onRetry:
+                  () =>
+                      ref.read(bundleRuleListProvider(itemId).notifier).refresh(),
+            ),
         data: (rules) {
           if (rules.isEmpty) {
-            return const Center(
-              child: Text('No bundle rules yet — tap + to add one.'),
+            return EmptyStateView(
+              icon: Icons.inventory_2_outlined,
+              title: 'No bundle rules yet — tap + to add one.',
+              description:
+                  'Offer bulk savings (e.g. Buy 3 for ₱100) calculated automatically at checkout.',
+              actionLabel: 'Add Bundle Rule',
+              onAction:
+                  () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder:
+                          (_) => AddBundleRuleScreen(
+                            itemId: itemId,
+                            itemName: itemName,
+                          ),
+                    ),
+                  ),
             );
           }
 
@@ -40,15 +68,43 @@ class BundleRulesScreen extends ConsumerWidget {
                 () =>
                     ref.read(bundleRuleListProvider(itemId).notifier).refresh(),
             child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
               itemCount: rules.length,
               itemBuilder: (context, index) {
                 final rule = rules[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.local_offer)),
-                  title: Text(rule.description),
-                  subtitle: Text(
-                    'Buy ${rule.triggerQuantity} for ₱${rule.bundlePrice.toStringAsFixed(2)}'
-                    '${rule.isActive ? '' : ' · inactive'}',
+                return Card(
+                  elevation: 0,
+                  color: AppColors.surface,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: AppRadius.mdBorder,
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: AppColors.brandPrimaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.local_offer, size: 18, color: AppColors.brandPrimary),
+                    ),
+                    title: Text(
+                      rule.description,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Buy ${rule.triggerQuantity} for ₱${rule.bundlePrice.toStringAsFixed(2)}'
+                      '${rule.isActive ? '' : ' · inactive'}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 );
               },
@@ -65,6 +121,8 @@ class BundleRulesScreen extends ConsumerWidget {
                         AddBundleRuleScreen(itemId: itemId, itemName: itemName),
               ),
             ),
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: Colors.white,
         tooltip: 'Add bundle rule',
         child: const Icon(Icons.add),
       ),

@@ -22,7 +22,20 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // v1 → v2: add kioskPosterImageUrl to cached_branding.
+        await m.addColumn(
+          cachedBranding,
+          cachedBranding.kioskPosterImageUrl,
+        );
+      }
+    },
+  );
 }
 
 LazyDatabase _openConnection() {

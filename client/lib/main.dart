@@ -5,6 +5,7 @@ import 'core/config/app_config.dart';
 import 'core/storage/server_connection_storage.dart';
 import 'core/sync/presentation/flagged_sync_screen.dart';
 import 'core/sync/sync_providers.dart';
+import 'core/theming/app_theme.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/catalog/presentation/screens/category_list_screen.dart';
@@ -50,12 +51,7 @@ class PurchApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Purch.io',
-      // Placeholder seed color — real per-tenant branding (logo, theme color,
-      // font) is built at runtime from CachedBranding once onboarding (Phase 2)
-      // lands. See core/theming/theme_builder.dart (not yet built).
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-      ),
+      theme: AppTheme.staffTheme(),
       home: const _StartupGate(),
     );
   }

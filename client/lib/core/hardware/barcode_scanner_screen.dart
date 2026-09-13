@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../theming/app_tokens.dart';
+
 /// Camera-based barcode scanning, shared across any screen that needs to
 /// scan-to-fill or scan-to-look-up a barcode (e.g. AddItemScreen). Pops with
 /// the scanned code as a String once one is found — the caller never has to
@@ -21,6 +23,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _handled = false;
+  bool _torchOn = false;
 
   @override
   void dispose() {
@@ -46,31 +49,105 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Scan Barcode'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
-            onPressed: () => _controller.toggleTorch(),
-            icon: const Icon(Icons.flash_on),
+            onPressed: () {
+              _controller.toggleTorch();
+              setState(() => _torchOn = !_torchOn);
+            },
+            icon: Icon(
+              _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              color: _torchOn ? AppColors.accentWarm : Colors.white,
+            ),
             tooltip: 'Toggle flash',
           ),
         ],
       ),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect: _onDetect,
-        errorBuilder: (context, error, child) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Could not access the camera: ${error.errorDetails?.message ?? error.errorCode}',
-                textAlign: TextAlign.center,
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Container(
+                  margin: const EdgeInsets.all(AppSpacing.xl),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.mdBorder,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.camera_alt_outlined,
+                        size: 44,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Could not access the camera: ${error.errorDetails?.message ?? error.errorCode}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          Center(
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: AppColors.brandPrimary.withOpacity(0.8),
+                  width: 2.5,
+                ),
+                borderRadius: AppRadius.lgBorder,
               ),
             ),
-          );
-        },
+          ),
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.65),
+                  borderRadius: AppRadius.smBorder,
+                ),
+                child: const Text(
+                  'Point camera at product barcode',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
