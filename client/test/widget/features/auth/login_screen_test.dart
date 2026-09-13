@@ -23,6 +23,7 @@ void main() {
         _wrap(LoginScreen(onLoggedIn: () {}), repository: repository),
       );
 
+      await tester.ensureVisible(find.text('Log In'));
       await tester.tap(find.text('Log In'));
       await tester.pump();
 
@@ -49,6 +50,7 @@ void main() {
         'DEVICE-1',
       );
       await tester.enterText(find.widgetWithText(TextFormField, 'PIN'), '1234');
+      await tester.ensureVisible(find.text('Log In'));
       await tester.tap(find.text('Log In'));
       await tester.pumpAndSettle();
 
@@ -80,6 +82,7 @@ void main() {
         'DEVICE-1',
       );
       await tester.enterText(find.widgetWithText(TextFormField, 'PIN'), '9999');
+      await tester.ensureVisible(find.text('Log In'));
       await tester.tap(find.text('Log In'));
       await tester.pumpAndSettle();
 

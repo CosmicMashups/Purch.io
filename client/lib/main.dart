@@ -32,6 +32,8 @@ import 'features/reports/presentation/screens/department_sales_screen.dart';
 import 'features/reports/presentation/screens/inventory_reports_screen.dart';
 import 'features/reports/presentation/screens/sales_dashboard_screen.dart';
 import 'features/reports/presentation/screens/staff_performance_screen.dart';
+import 'features/splash/presentation/screens/splash_screen.dart';
+import 'core/errors/failure.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,12 +77,10 @@ class _StartupGate extends ConsumerWidget {
     }
 
     return hasSession.when(
-      loading:
-          () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const SplashScreen(),
       error:
           (error, stackTrace) =>
-              Scaffold(body: Center(child: Text('Startup failed: $error'))),
+              Scaffold(body: Center(child: Text('Startup failed: ${describeError(error)}'))),
       data: (loggedIn) {
         if (!loggedIn) {
           return LoginScreen(onLoggedIn: reevaluateSession);
@@ -89,13 +89,10 @@ class _StartupGate extends ConsumerWidget {
         // A Kiosk-role token routes to the portrait kiosk shell instead of
         // the staff app shell — a separate route tree entirely, see Phase 7.
         return role.when(
-          loading:
-              () => const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              ),
+          loading: () => const SplashScreen(),
           error:
               (error, stackTrace) =>
-                  Scaffold(body: Center(child: Text('Startup failed: $error'))),
+                  Scaffold(body: Center(child: Text('Startup failed: ${describeError(error)}'))),
           data:
               (roleValue) =>
                   roleValue == 'Kiosk'

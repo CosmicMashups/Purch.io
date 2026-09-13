@@ -14,14 +14,32 @@ Widget _wrap(FakeOnboardingRepository repository) {
   );
 }
 
+/// Step 1 -> Step 2 of the wizard: fills the business name and taps
+/// Continue, then taps Continue again to leave the branch step's default
+/// branch name untouched.
+Future<void> _advanceToAdminStep(
+  WidgetTester tester, {
+  required String businessName,
+}) async {
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'Business name'),
+    businessName,
+  );
+  await tester.tap(find.text('Continue'));
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.text('Continue'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
-    'submitting with empty fields shows validation errors and never calls the repository',
+    'submitting step 1 with an empty business name shows a validation error and never calls the repository',
     (tester) async {
       final repository = FakeOnboardingRepository();
       await tester.pumpWidget(_wrap(repository));
 
-      await tester.tap(find.text('Create Business'));
+      await tester.tap(find.text('Continue'));
       await tester.pump();
 
       expect(find.text('Required'), findsWidgets);
@@ -35,10 +53,8 @@ void main() {
     final repository = FakeOnboardingRepository();
     await tester.pumpWidget(_wrap(repository));
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Business name'),
-      "Ana's Store",
-    );
+    await _advanceToAdminStep(tester, businessName: "Ana's Store");
+
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Your name'),
       'Ana Reyes',
@@ -62,10 +78,8 @@ void main() {
     );
     await tester.pumpWidget(_wrap(repository));
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Business name'),
-      'Duplicate',
-    );
+    await _advanceToAdminStep(tester, businessName: 'Duplicate');
+
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Your name'),
       'Ana Reyes',

@@ -5,6 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../domain/branch_models.dart';
 import '../../domain/device_models.dart';
 import '../providers/onboarding_providers.dart';
+import '../../../../core/errors/failure.dart';
 
 class AddDeviceScreen extends ConsumerStatefulWidget {
   const AddDeviceScreen({super.key});
@@ -61,7 +62,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pair a Device'),
+        title: const Text('Set Up This Device'),
         elevation: 0,
       ),
       body: SafeArea(
@@ -71,20 +72,62 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
-                vertical: AppSpacing.md,
+                vertical: AppSpacing.lg,
               ),
               child: Form(
                 key: _formKey,
                 child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: AppRadius.mdBorder,
+                    borderRadius: AppRadius.lgBorder,
+                    boxShadow: AppShadows.card,
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.brandPrimaryContainer,
+                              borderRadius: AppRadius.mdBorder,
+                            ),
+                            child: const Icon(
+                              Icons.tablet_mac_rounded,
+                              color: AppColors.brandPrimary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pair this device',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  'Choose a branch to get a pairing code for the login screen',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
                       branchesAsync.when(
                         loading:
                             () => const Center(
@@ -94,7 +137,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                             ),
                         error:
                             (error, stackTrace) => Text(
-                              'Could not load branches: $error',
+                              'Could not load branches: ${describeError(error)}',
                               style: const TextStyle(color: AppColors.error),
                             ),
                         data: (branches) {
