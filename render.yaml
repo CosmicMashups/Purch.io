@@ -20,6 +20,12 @@ services:
     plan: starter
     region: singapore
     healthCheckPath: /health
+    # Runs the same published image with an extra "migrate" arg before the
+    # new deploy goes live (see Program.cs) — applies any pending EF Core
+    # migrations against SUPABASE_DB_CONNECTION_STRING and exits. A failed
+    # migration fails the deploy instead of serving traffic against a
+    # stale/half-migrated schema.
+    preDeployCommand: "dotnet Purch.Api.dll migrate"
     envVars:
       - key: PURCH_DEPLOYMENT_MODE
         value: Cloud

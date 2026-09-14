@@ -150,10 +150,25 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Local/on-prem installs have no separate CI/CD migration step (Cloud's
-// migrations run as part of the Render deploy pipeline) — a store owner
-// running the installer shouldn't need the EF Core CLI, so a Local-mode
-// instance migrates its own database once at startup instead.
+// Render's preDeployCommand (see render.yaml) runs this exact published
+// image with an extra "migrate" argument before the new deploy goes live —
+// there's no SDK/dotnet-ef in the runtime image (see Dockerfile), so this
+// reuses the app's own already-wired DbContext/connection string instead of
+// requiring a second toolchain. Exits immediately after, never starting the
+// web server, so a migration failure fails the deploy instead of serving
+// traffic against a stale/half-migrated schema.
+if (args is ["migrate"])
+{
+    using var migrateScope = app.Services.CreateScope();
+    var migrateDbContext = migrateScope.ServiceProvider.GetRequiredService<PurchDbContext>();
+    await migrateDbContext.Database.MigrateAsync();
+    return;
+}
+
+// Local/on-prem installs have no separate CI/CD migration step — a store
+// owner running the installer shouldn't need the EF Core CLI, so a
+// Local-mode instance migrates its own database once at startup instead;
+// Cloud's migrations run via the "migrate" preDeployCommand above.
 using (var startupScope = app.Services.CreateScope())
 {
     var deploymentContext = startupScope.ServiceProvider.GetRequiredService<IDeploymentContext>();
