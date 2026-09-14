@@ -157,10 +157,35 @@ var app = builder.Build();
 using (var startupScope = app.Services.CreateScope())
 {
     var deploymentContext = startupScope.ServiceProvider.GetRequiredService<IDeploymentContext>();
+    var dbContext = startupScope.ServiceProvider.GetRequiredService<PurchDbContext>();
+
     if (deploymentContext.Mode == DeploymentMode.Local)
     {
-        var dbContext = startupScope.ServiceProvider.GetRequiredService<PurchDbContext>();
         await dbContext.Database.MigrateAsync();
+    }
+
+    // Every table has Row Level Security enabled with no policies (see the
+    // EnableRowLevelSecurity migration) — deliberately, since this app never
+    // uses Supabase Auth/PostgREST and this backend is the only thing that
+    // should ever touch these rows. That's only safe because this connection
+    // always authenticates as a role that bypasses RLS (Cloud/Supabase's
+    // postgres role, or Local mode's Postgres superuser). If a future
+    // connection string ever used a lower-privileged role instead, every
+    // read would silently return zero rows and every write would fail with
+    // an opaque RLS-violation error — while JWT auth kept working fine,
+    // making it look like a data bug rather than a role misconfiguration.
+    // Fail loudly at startup instead of letting that happen silently.
+    var bypassesRls = await dbContext.Database
+        .SqlQueryRaw<bool>("SELECT rolbypassrls AS \"Value\" FROM pg_roles WHERE rolname = current_user")
+        .SingleAsync();
+
+    if (!bypassesRls)
+    {
+        throw new InvalidOperationException(
+            "This backend's database connection does not bypass Row Level Security — its role lacks " +
+            "BYPASSRLS/superuser. Every table has RLS enabled with no policies, so a non-bypassing connection " +
+            "would silently return zero rows on every read and fail every write. Reconnect using a role with " +
+            "BYPASSRLS (Supabase's postgres role, or the Postgres superuser in Local mode) before starting the app.");
     }
 }
 
