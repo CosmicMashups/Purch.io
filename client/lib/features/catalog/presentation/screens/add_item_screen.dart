@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
-import '../../../../core/widgets/purch_image.dart';
+import '../../../../core/widgets/image_upload_field.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
@@ -368,45 +368,13 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
+                        const SizedBox(height: AppSpacing.md),
+                        ImageUploadField(
                           controller: _imageUrlController,
+                          label: 'Item image (optional)',
                           enabled: !isLoading,
-                          decoration: InputDecoration(
-                            labelText: 'Image URL (optional)',
-                            isDense: true,
-                            hintText: 'e.g. /uploads/... or https://... or assets/images/...',
-                            border: OutlineInputBorder(
-                              borderRadius: AppRadius.mdBorder,
-                              borderSide: const BorderSide(color: AppColors.border),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: AppRadius.mdBorder,
-                              borderSide: const BorderSide(color: AppColors.border),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: AppRadius.mdBorder,
-                              borderSide: const BorderSide(
-                                color: AppColors.brandPrimary,
-                                width: 2,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: AppColors.cardHover,
-                            prefixIcon: _imageUrlController.text.trim().isNotEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.all(6),
-                                    child: PurchImage(
-                                      imageUrlOrPath: _imageUrlController.text.trim(),
-                                      width: 32,
-                                      height: 32,
-                                      borderRadius: AppRadius.smBorder,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : const Icon(Icons.image_outlined, color: AppColors.textSecondary),
-                          ),
-                          onChanged: (_) => setState(() {}),
+                          hintText: 'e.g. /uploads/... or https://... or assets/images/...',
+                          onChanged: () => setState(() {}),
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Wrap(

@@ -84,6 +84,8 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'New Sale'));
     await tester.pumpAndSettle();
 
-    expect(find.text('New Sale'), findsWidgets);
+    // "New Sale" now lands on the merged Cashier screen rather than the
+    // standalone item grid.
+    expect(find.text('Cashier'), findsWidgets);
   });
 }

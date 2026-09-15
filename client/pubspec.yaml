@@ -60,6 +60,15 @@ dependencies:
   # emit fast keystrokes into whatever text field has focus.
   mobile_scanner: ^6.0.2
 
+  # Native file picker for image uploads (branding logo, category image,
+  # item image) — chosen over image_picker since this app also targets
+  # Windows desktop tablets, which image_picker doesn't support.
+  file_picker: ^8.1.6
+
+  # Charts (Home dashboard: sales trend, movement summary, low-stock,
+  # staff/cashier performance, shift attendance, department/category sales)
+  fl_chart: ^0.69.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

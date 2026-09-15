@@ -14,10 +14,7 @@ import '../../features/home/presentation/screens/app_shell_screen.dart';
 import '../../features/home/presentation/screens/business_tab_screen.dart';
 import '../../features/home/presentation/screens/home_tab_screen.dart';
 import '../../features/home/presentation/screens/inventory_tab_screen.dart';
-import '../../features/home/presentation/screens/reports_tab_screen.dart';
-import '../../features/home/presentation/screens/sell_tab_screen.dart';
 import '../../features/inventory/presentation/screens/branch_transfer_list_screen.dart';
-import '../../features/inventory/presentation/screens/inventory_dashboard_screen.dart';
 import '../../features/inventory/presentation/screens/movement_log_screen.dart';
 import '../../features/inventory/presentation/screens/purchase_order_list_screen.dart';
 import '../../features/inventory/presentation/screens/supplier_list_screen.dart';
@@ -28,15 +25,12 @@ import '../../features/onboarding/presentation/screens/device_list_screen.dart';
 import '../../features/onboarding/presentation/screens/staff_list_screen.dart';
 import '../../features/onboarding/presentation/screens/tenant_settings_screen.dart';
 import '../../features/pos/presentation/screens/bir_reading_screen.dart';
-import '../../features/pos/presentation/screens/item_grid_screen.dart';
+import '../../features/pos/presentation/screens/cashier_screen.dart';
 import '../../features/pos/presentation/screens/promo_code_list_screen.dart';
 import '../../features/pos/presentation/screens/shift_screen.dart';
-import '../../features/reports/presentation/screens/department_sales_screen.dart';
-import '../../features/reports/presentation/screens/inventory_reports_screen.dart';
-import '../../features/reports/presentation/screens/sales_dashboard_screen.dart';
-import '../../features/reports/presentation/screens/staff_performance_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../sync/presentation/flagged_sync_screen.dart';
+import '../theming/theme_builder.dart';
 
 /// Notifies go_router to re-run its `redirect` whenever [authGateProvider]
 /// changes — e.g. right after login or logout — since go_router itself has
@@ -48,8 +42,12 @@ class _AuthRefreshNotifier extends ChangeNotifier {
 }
 
 /// The one GoRouter for the whole app: a splash/login/kiosk top level, and a
-/// [StatefulShellRoute] for the staff app shell's five (role-filtered)
+/// [StatefulShellRoute] for the staff app shell's four (role-filtered)
 /// bottom-nav tabs, each with its own navigation stack.
+///
+/// The Reports tab was removed: its four screens were flat text reports, and
+/// Home now renders the same data as charts. The reports *domain/data* layer
+/// is unchanged — Home consumes it directly.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRefreshNotifier(ref);
 
@@ -92,7 +90,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/kiosk',
-        builder: (context, state) => const KioskLandingScreen(),
+        // The kiosk subtree runs the tactile customer-facing theme rather
+        // than the staff one, rebuilt live from the tenant's branding.
+        builder:
+            (context, state) => Consumer(
+              builder:
+                  (context, ref, child) => Theme(
+                    data: ref.watch(kioskThemeProvider),
+                    child: child!,
+                  ),
+              child: const KioskLandingScreen(),
+            ),
       ),
       StatefulShellRoute.indexedStack(
         builder:
@@ -107,7 +115,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'new-sale',
-                    builder: (context, state) => const ItemGridScreen(),
+                    builder: (context, state) => const CashierScreen(),
                   ),
                   GoRoute(
                     path: 'shift',
@@ -127,14 +135,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
+              // Renamed from `/sell` along with the tab label. A repo-wide
+              // search found the old segment referenced only by this router
+              // and the (now deleted) Sell landing screen — no deep links,
+              // tests or stored state depended on it — so the path was
+              // renamed with the label rather than left to drift.
               GoRoute(
-                path: '/sell',
-                builder: (context, state) => const SellTabScreen(),
+                path: '/cashier',
+                builder: (context, state) => const CashierScreen(),
                 routes: [
-                  GoRoute(
-                    path: 'new-sale',
-                    builder: (context, state) => const ItemGridScreen(),
-                  ),
                   GoRoute(
                     path: 'shift',
                     builder: (context, state) => const ShiftScreen(),
@@ -146,34 +155,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'bir-reading',
                     builder: (context, state) => const BirReadingScreen(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/reports',
-                builder: (context, state) => const ReportsTabScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'sales-dashboard',
-                    builder: (context, state) => const SalesDashboardScreen(),
-                  ),
-                  GoRoute(
-                    path: 'inventory-reports',
-                    builder:
-                        (context, state) => const InventoryReportsScreen(),
-                  ),
-                  GoRoute(
-                    path: 'staff-performance',
-                    builder:
-                        (context, state) => const StaffPerformanceScreen(),
-                  ),
-                  GoRoute(
-                    path: 'department-sales',
-                    builder: (context, state) => const DepartmentSalesScreen(),
                   ),
                 ],
               ),
@@ -197,11 +178,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'modifier-groups',
                     builder:
                         (context, state) => const ModifierGroupListScreen(),
-                  ),
-                  GoRoute(
-                    path: 'dashboard',
-                    builder:
-                        (context, state) => const InventoryDashboardScreen(),
                   ),
                   GoRoute(
                     path: 'movements',
@@ -273,10 +249,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-const _staffShellPaths = [
-  '/home',
-  '/sell',
-  '/reports',
-  '/inventory',
-  '/business',
-];
+const _staffShellPaths = ['/home', '/cashier', '/inventory', '/business'];

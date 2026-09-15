@@ -74,6 +74,8 @@ The client UI is driven by a centralized design token system ([`lib/core/theming
 - Android SDK (for mobile/tablet targets) or Visual Studio 2022 with the "Desktop development with C++" workload **plus** the "C++ ATL for latest v14x build tools" individual component (for the Windows desktop target — `flutter_secure_storage_windows` won't compile without it)
 - Web (`chrome`/`web-server`) is **not** a supported target: `sqlite3_flutter_libs`, backing the offline Drift database, has no web implementation and the build will fail at compile time.
 
+> **Windows toolset gotcha**: even with ATL installed, `flutter run -d windows` can still fail with `error C1083: Cannot open include file: 'atlstr.h'`. This happens when VS's default `v143` toolset resolves to an *older* MSVC version than the one ATL got installed against (common after a VS update). Use [`tool/run_windows.ps1`](tool/run_windows.ps1) instead of calling `flutter run -d windows` directly — it auto-detects the newest MSVC toolset that actually has ATL and builds against that.
+
 ---
 
 ### Installation & Code Generation
@@ -95,9 +97,10 @@ The client UI is driven by a centralized design token system ([`lib/core/theming
 Launch the application targeting your preferred device or emulator:
 
 **Windows Desktop (Recommended for Cashier POS testing)**:
-```bash
-flutter run -d windows --dart-define=PURCH_API_BASE_URL=https://localhost:5001
+```powershell
+.\tool\run_windows.ps1 --dart-define=PURCH_API_BASE_URL=https://localhost:5001
 ```
+*(Or `flutter run -d windows` directly, once you know your VS install doesn't have the toolset/ATL version mismatch described above.)*
 
 **Android Tablet / Mobile**:
 ```bash

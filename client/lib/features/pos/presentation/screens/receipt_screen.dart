@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../providers/pos_providers.dart';
-import 'item_grid_screen.dart';
+import 'cashier_screen.dart';
 
 /// D6, minimal slice — shows the just-completed sale's sequential BIR
 /// receipt number and a summary.
@@ -16,7 +16,7 @@ class ReceiptScreen extends ConsumerWidget {
       return;
     }
     await Navigator.of(context).pushAndRemoveUntil<void>(
-      MaterialPageRoute(builder: (_) => const ItemGridScreen()),
+      MaterialPageRoute(builder: (_) => const CashierScreen()),
       (route) => route.isFirst,
     );
   }

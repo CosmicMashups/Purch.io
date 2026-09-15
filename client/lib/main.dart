@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_config.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/server_connection_storage.dart';
-import 'core/theming/app_theme.dart';
+import 'core/theming/theme_builder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +24,9 @@ class PurchApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'Purch.io',
-      theme: AppTheme.staffTheme(),
+      // Built at runtime from the tenant's cached branding colours, so an
+      // admin's Business Settings change re-themes the app immediately.
+      theme: ref.watch(staffThemeProvider),
       routerConfig: ref.watch(appRouterProvider),
     );
   }

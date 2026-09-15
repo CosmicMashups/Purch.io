@@ -17,14 +17,17 @@ public sealed partial class TenantSettingsService(
 
     public async Task<TenantSettingsDto> UpdateBrandingAsync(UpdateBrandingRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.ThemeColorHex is { } hex && !HexColorPattern().IsMatch(hex))
-        {
-            throw new ValidationException(nameof(request.ThemeColorHex), "Theme color must be a hex value like #4F46E5.");
-        }
+        ValidateHex(request.BackgroundColorHex, nameof(request.BackgroundColorHex), "Background color");
+        ValidateHex(request.AccentColorHex, nameof(request.AccentColorHex), "Accent color");
+        ValidateHex(request.PrimaryTextColorHex, nameof(request.PrimaryTextColorHex), "Primary text color");
+        ValidateHex(request.SecondaryTextColorHex, nameof(request.SecondaryTextColorHex), "Secondary text color");
 
         var tenant = await GetCurrentTenantAsync(cancellationToken);
         tenant.BrandingLogoUrl = request.LogoUrl;
-        tenant.BrandingThemeColorHex = request.ThemeColorHex;
+        tenant.BrandingBackgroundColorHex = request.BackgroundColorHex;
+        tenant.BrandingAccentColorHex = request.AccentColorHex;
+        tenant.BrandingPrimaryTextColorHex = request.PrimaryTextColorHex;
+        tenant.BrandingSecondaryTextColorHex = request.SecondaryTextColorHex;
         tenant.BrandingFontFamily = request.FontFamily;
         tenant.KioskPosterImageUrl = request.KioskPosterImageUrl;
 
@@ -85,7 +88,10 @@ public sealed partial class TenantSettingsService(
         tenant.Name,
         tenant.BusinessType,
         tenant.BrandingLogoUrl,
-        tenant.BrandingThemeColorHex,
+        tenant.BrandingBackgroundColorHex,
+        tenant.BrandingAccentColorHex,
+        tenant.BrandingPrimaryTextColorHex,
+        tenant.BrandingSecondaryTextColorHex,
         tenant.BrandingFontFamily,
         tenant.RequiresBarcodePerItem,
         tenant.Tin,
@@ -94,6 +100,14 @@ public sealed partial class TenantSettingsService(
         tenant.CreditLedgerRetentionDays,
         tenant.CreditLedgerEnabled,
         tenant.KioskPosterImageUrl);
+    }
+
+    private static void ValidateHex(string? value, string field, string label)
+    {
+        if (value is { } hex && !HexColorPattern().IsMatch(hex))
+        {
+            throw new ValidationException(field, $"{label} must be a hex value like #4F46E5.");
+        }
     }
 
     [GeneratedRegex("^#[0-9A-Fa-f]{6}$")]

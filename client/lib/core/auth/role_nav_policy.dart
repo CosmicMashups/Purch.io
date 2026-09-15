@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../features/onboarding/domain/onboarding_enums.dart';
 
-/// The five sections of the staff app shell's bottom navigation. Not every
+/// The four sections of the staff app shell's bottom navigation. Not every
 /// role sees every tab — see [tabsForRole].
-enum AppTab { home, sell, reports, inventory, business }
+///
+/// `reports` was removed with the Reports tab: Home now carries that
+/// reporting surface as charts, and it is gated inside Home by role rather
+/// than by a tab of its own.
+enum AppTab { home, cashier, inventory, business }
 
 class TabSpec {
   const TabSpec({
@@ -27,17 +31,11 @@ const Map<AppTab, TabSpec> _tabSpecs = {
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_rounded,
   ),
-  AppTab.sell: TabSpec(
-    tab: AppTab.sell,
-    label: 'Sell',
+  AppTab.cashier: TabSpec(
+    tab: AppTab.cashier,
+    label: 'Cashier',
     icon: Icons.point_of_sale_outlined,
     selectedIcon: Icons.point_of_sale_rounded,
-  ),
-  AppTab.reports: TabSpec(
-    tab: AppTab.reports,
-    label: 'Reports',
-    icon: Icons.insights_outlined,
-    selectedIcon: Icons.insights_rounded,
   ),
   AppTab.inventory: TabSpec(
     tab: AppTab.inventory,
@@ -64,17 +62,16 @@ List<AppTab> tabsForRole(StaffRole? role) {
     case StaffRole.manager:
       return const [
         AppTab.home,
-        AppTab.sell,
-        AppTab.reports,
+        AppTab.cashier,
         AppTab.inventory,
         AppTab.business,
       ];
     case StaffRole.cashier:
-      return const [AppTab.home, AppTab.sell];
+      return const [AppTab.home, AppTab.cashier];
     case StaffRole.warehouse:
       return const [AppTab.home, AppTab.inventory];
     case null:
-      return const [AppTab.home, AppTab.sell];
+      return const [AppTab.home, AppTab.cashier];
   }
 }
 

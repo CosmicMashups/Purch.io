@@ -6,6 +6,7 @@ import '../domain/department_sales_models.dart';
 import '../domain/inventory_report_models.dart';
 import '../domain/reports_repository.dart';
 import '../domain/sales_dashboard_models.dart';
+import '../domain/sales_trend_models.dart';
 import '../domain/staff_performance_models.dart';
 
 class ReportsRepositoryImpl implements ReportsRepository {
@@ -25,6 +26,34 @@ class ReportsRepositoryImpl implements ReportsRepository {
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
     }
+  }
+
+  /// There is no `/reports/sales-trend` endpoint yet (see
+  /// `backend/src/Purch.Api/Endpoints/ReportingEndpoints.cs` — the reporting
+  /// surface is sales-dashboard / movement-summary / low-stock-export /
+  /// staff-performance / department-sales). The sales dashboard already
+  /// returns a daily revenue series, and every coarser bucket is a fold over
+  /// it, so the trend is aggregated here from that one call.
+  ///
+  /// Consequence to be aware of: the trend can only reach as far back as the
+  /// dashboard's own daily window. [SalesTrendSeries] reports the window it
+  /// actually covered, and Home says so in the chart subtitle rather than
+  /// drawing a flat line over months the server never sent. Swapping this for
+  /// a real endpoint is a change to this method only.
+  @override
+  Future<SalesTrendSeries> getSalesTrend({
+    String? branchId,
+    required DateTime from,
+    required DateTime to,
+    required SalesTrendGranularity granularity,
+  }) async {
+    final dashboard = await getSalesDashboard(branchId: branchId);
+    return SalesTrendSeries.fromDailyPoints(
+      dashboard.trend,
+      granularity: granularity,
+      from: from,
+      to: to,
+    );
   }
 
   @override

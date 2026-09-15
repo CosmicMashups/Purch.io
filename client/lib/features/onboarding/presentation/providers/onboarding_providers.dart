@@ -1,7 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/db/app_database.dart';
 import '../../../../core/errors/failure.dart';
+import '../../../../core/sync/sync_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/onboarding_repository_impl.dart';
 import '../../domain/audit_log_models.dart';
@@ -217,8 +220,39 @@ class CreateDeviceController extends _$CreateDeviceController {
 @riverpod
 class TenantSettingsNotifier extends _$TenantSettingsNotifier {
   @override
-  Future<TenantSettings> build() {
-    return ref.watch(onboardingRepositoryProvider).getTenantSettings();
+  Future<TenantSettings> build() async {
+    final settings =
+        await ref.watch(onboardingRepositoryProvider).getTenantSettings();
+    await _cacheBranding(settings);
+    return settings;
+  }
+
+  /// Mirrors the tenant's branding into the device-local cache, which is what
+  /// core/theming/theme_builder.dart watches to build the live ThemeData. Best
+  /// effort: a cache write failure must never fail a settings load or save.
+  Future<void> _cacheBranding(TenantSettings settings) async {
+    try {
+      final db = ref.read(appDatabaseProvider);
+      await db
+          .into(db.cachedBranding)
+          .insertOnConflictUpdate(
+            CachedBrandingCompanion.insert(
+              tenantId: settings.id,
+              logoUrl: Value(settings.brandingLogoUrl),
+              backgroundColorHex: Value(settings.brandingBackgroundColorHex),
+              accentColorHex: Value(settings.brandingAccentColorHex),
+              primaryTextColorHex: Value(settings.brandingPrimaryTextColorHex),
+              secondaryTextColorHex: Value(
+                settings.brandingSecondaryTextColorHex,
+              ),
+              fontFamily: Value(settings.brandingFontFamily),
+              kioskPosterImageUrl: Value(settings.kioskPosterImageUrl),
+              lastSyncedAt: DateTime.now(),
+            ),
+          );
+    } catch (_) {
+      // Offline/unavailable local DB — the app just keeps its current theme.
+    }
   }
 
   Future<bool> updateBranding(UpdateBrandingRequest request) =>
@@ -243,6 +277,10 @@ class TenantSettingsNotifier extends _$TenantSettingsNotifier {
     state = const AsyncLoading();
     final next = await AsyncValue.guard(() => action(repository));
     state = next;
+
+    if (next.valueOrNull case final settings?) {
+      await _cacheBranding(settings);
+    }
 
     return !next.hasError;
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/theming/theme_builder.dart';
+import '../../../../core/widgets/image_upload_field.dart';
 import '../../../../core/widgets/purch_image.dart';
 import '../../../legal/presentation/screens/privacy_policy_screen.dart';
 import '../../../legal/presentation/screens/terms_of_service_screen.dart';
@@ -22,20 +24,80 @@ class TenantSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsAsync = ref.watch(tenantSettingsNotifierProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Business Settings')),
-      body: settingsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error:
-            (error, stackTrace) =>
-                Center(child: Text('Could not load settings: ${describeError(error)}')),
-        // Keyed by tenant id so the form's local controllers only re-seed if
-        // we somehow load a genuinely different tenant, not on every rebuild.
-        data:
-            (settings) => _TenantSettingsForm(
-              key: ValueKey(settings.id),
-              initial: settings,
+    // _TenantSettingsForm owns the single Scaffold/AppBar for this route —
+    // this widget only exists to branch on the settings load state, so it
+    // must not add a second AppBar above it (that showed up as two "Business
+    // Settings" top bars stacked on screen).
+    return settingsAsync.when(
+      loading:
+          () => const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+      error:
+          (error, stackTrace) => Scaffold(
+            appBar: AppBar(title: const Text('Business Settings')),
+            body: Center(
+              child: Text('Could not load settings: ${describeError(error)}'),
             ),
+          ),
+      // Keyed by tenant id so the form's local controllers only re-seed if
+      // we somehow load a genuinely different tenant, not on every rebuild.
+      data:
+          (settings) => _TenantSettingsForm(
+            key: ValueKey(settings.id),
+            initial: settings,
+          ),
+    );
+  }
+}
+
+/// One branding colour input. Same visual treatment as the other fields on
+/// this form, plus a live swatch so an admin can see what they typed before
+/// saving. Blank = "use the app default"; an unparsable value simply shows no
+/// swatch (the backend rejects it on save, and the theme falls back at runtime).
+class _ColorField extends StatefulWidget {
+  const _ColorField({
+    required this.controller,
+    required this.label,
+    required this.enabled,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool enabled;
+
+  @override
+  State<_ColorField> createState() => _ColorFieldState();
+}
+
+class _ColorFieldState extends State<_ColorField> {
+  @override
+  Widget build(BuildContext context) {
+    final parsed = parseHexColor(widget.controller.text.trim());
+
+    return TextField(
+      controller: widget.controller,
+      enabled: widget.enabled,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        helperText: 'Leave blank to use the app default.',
+        border: const OutlineInputBorder(borderRadius: AppRadius.smBorder),
+        suffixIcon:
+            parsed == null
+                ? null
+                : Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: parsed,
+                      borderRadius: AppRadius.smBorder,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                  ),
+                ),
       ),
     );
   }
@@ -55,8 +117,17 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
   late final _logoUrlController = TextEditingController(
     text: widget.initial.brandingLogoUrl,
   );
-  late final _themeColorController = TextEditingController(
-    text: widget.initial.brandingThemeColorHex,
+  late final _backgroundColorController = TextEditingController(
+    text: widget.initial.brandingBackgroundColorHex,
+  );
+  late final _accentColorController = TextEditingController(
+    text: widget.initial.brandingAccentColorHex,
+  );
+  late final _primaryTextColorController = TextEditingController(
+    text: widget.initial.brandingPrimaryTextColorHex,
+  );
+  late final _secondaryTextColorController = TextEditingController(
+    text: widget.initial.brandingSecondaryTextColorHex,
   );
   late final _fontFamilyController = TextEditingController(
     text: widget.initial.brandingFontFamily,
@@ -77,13 +148,21 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
   @override
   void dispose() {
     _logoUrlController.dispose();
-    _themeColorController.dispose();
+    _backgroundColorController.dispose();
+    _accentColorController.dispose();
+    _primaryTextColorController.dispose();
+    _secondaryTextColorController.dispose();
     _fontFamilyController.dispose();
     _kioskPosterUrlController.dispose();
     _tinController.dispose();
     _businessNameController.dispose();
     _addressController.dispose();
     super.dispose();
+  }
+
+  static String? _nullIfBlank(TextEditingController controller) {
+    final trimmed = controller.text.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   Future<void> _saveBranding() async {
@@ -95,10 +174,10 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                 _logoUrlController.text.trim().isEmpty
                     ? null
                     : _logoUrlController.text.trim(),
-            themeColorHex:
-                _themeColorController.text.trim().isEmpty
-                    ? null
-                    : _themeColorController.text.trim(),
+            backgroundColorHex: _nullIfBlank(_backgroundColorController),
+            accentColorHex: _nullIfBlank(_accentColorController),
+            primaryTextColorHex: _nullIfBlank(_primaryTextColorController),
+            secondaryTextColorHex: _nullIfBlank(_secondaryTextColorController),
             fontFamily:
                 _fontFamilyController.text.trim().isEmpty
                     ? null
@@ -206,22 +285,35 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          TextField(
+                          ImageUploadField(
                             controller: _logoUrlController,
+                            label: 'Logo',
                             enabled: !isSaving,
-                            decoration: const InputDecoration(
-                              labelText: 'Logo URL',
-                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
-                            ),
+                            onChanged: () => setState(() {}),
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          TextField(
-                            controller: _themeColorController,
+                          _ColorField(
+                            controller: _backgroundColorController,
+                            label: 'Background color (e.g. #F8FAFC)',
                             enabled: !isSaving,
-                            decoration: const InputDecoration(
-                              labelText: 'Theme color (e.g. #4F46E5)',
-                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
-                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _ColorField(
+                            controller: _accentColorController,
+                            label: 'Accent color (e.g. #1E40AF)',
+                            enabled: !isSaving,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _ColorField(
+                            controller: _primaryTextColorController,
+                            label: 'Primary text color (e.g. #0F172A)',
+                            enabled: !isSaving,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _ColorField(
+                            controller: _secondaryTextColorController,
+                            label: 'Secondary text color (e.g. #475569)',
+                            enabled: !isSaving,
                           ),
                           const SizedBox(height: AppSpacing.md),
                           TextField(

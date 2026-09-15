@@ -211,6 +211,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1112,13 +1115,25 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BrandingAccentColorHex")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("BrandingBackgroundColorHex")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<string>("BrandingFontFamily")
                         .HasColumnType("text");
 
                     b.Property<string>("BrandingLogoUrl")
                         .HasColumnType("text");
 
-                    b.Property<string>("BrandingThemeColorHex")
+                    b.Property<string>("BrandingPrimaryTextColorHex")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("BrandingSecondaryTextColorHex")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
 

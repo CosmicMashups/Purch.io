@@ -41,6 +41,7 @@ void main() {
         'Bottled Water',
       );
       await tester.enterText(find.widgetWithText(TextFormField, 'Price'), '15');
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Add Item'));
       await tester.tap(find.widgetWithText(FilledButton, 'Add Item'));
       await tester.pumpAndSettle();
 
@@ -64,6 +65,7 @@ void main() {
       'Broken Item',
     );
     await tester.enterText(find.widgetWithText(TextFormField, 'Price'), '-5');
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Add Item'));
     await tester.tap(find.widgetWithText(FilledButton, 'Add Item'));
     await tester.pump();
 

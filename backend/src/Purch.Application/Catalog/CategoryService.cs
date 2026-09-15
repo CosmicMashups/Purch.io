@@ -27,6 +27,7 @@ public sealed class CategoryService(
             TenantId = CurrentTenantId,
             Name = request.Name.Trim(),
             SortOrder = request.SortOrder,
+            ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim(),
         };
 
         categoryRepository.Add(category);
@@ -47,6 +48,7 @@ public sealed class CategoryService(
 
         category.Name = request.Name.Trim();
         category.SortOrder = request.SortOrder;
+        category.ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim();
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -58,6 +60,6 @@ public sealed class CategoryService(
 
     private static CategoryDto ToDto(Category category)
     {
-        return new(category.Id, category.Name, category.SortOrder);
+        return new(category.Id, category.Name, category.SortOrder, category.ImageUrl);
     }
 }
