@@ -50,7 +50,8 @@ void main() {
               CachedBrandingCompanion.insert(
                 tenantId: tenantId,
                 lastSyncedAt: DateTime.utc(2026, 1, 1),
-                themeColorHex: const Value('#FF0000'),
+                accentColorHex: const Value('#FF0000'),
+                backgroundColorHex: const Value('#111111'),
               ),
             );
 
@@ -60,14 +61,16 @@ void main() {
               CachedBrandingCompanion.insert(
                 tenantId: tenantId,
                 lastSyncedAt: DateTime.utc(2026, 1, 2),
-                themeColorHex: const Value('#00FF00'),
+                accentColorHex: const Value('#00FF00'),
+                backgroundColorHex: const Value('#222222'),
               ),
             );
 
         final rows = await database.select(database.cachedBranding).get();
 
         expect(rows, hasLength(1)); // updated in place, not duplicated
-        expect(rows.single.themeColorHex, '#00FF00');
+        expect(rows.single.accentColorHex, '#00FF00');
+        expect(rows.single.backgroundColorHex, '#222222');
       },
     );
   });

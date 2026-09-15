@@ -7,7 +7,10 @@ class TenantSettings {
     required this.name,
     required this.businessType,
     required this.brandingLogoUrl,
-    required this.brandingThemeColorHex,
+    required this.brandingBackgroundColorHex,
+    required this.brandingAccentColorHex,
+    required this.brandingPrimaryTextColorHex,
+    required this.brandingSecondaryTextColorHex,
     required this.brandingFontFamily,
     required this.requiresBarcodePerItem,
     required this.tin,
@@ -24,7 +27,12 @@ class TenantSettings {
       name: json['name'] as String,
       businessType: BusinessType.values[json['businessType'] as int],
       brandingLogoUrl: json['brandingLogoUrl'] as String?,
-      brandingThemeColorHex: json['brandingThemeColorHex'] as String?,
+      brandingBackgroundColorHex: json['brandingBackgroundColorHex'] as String?,
+      brandingAccentColorHex: json['brandingAccentColorHex'] as String?,
+      brandingPrimaryTextColorHex:
+          json['brandingPrimaryTextColorHex'] as String?,
+      brandingSecondaryTextColorHex:
+          json['brandingSecondaryTextColorHex'] as String?,
       brandingFontFamily: json['brandingFontFamily'] as String?,
       requiresBarcodePerItem: json['requiresBarcodePerItem'] as bool,
       tin: json['tin'] as String?,
@@ -40,7 +48,10 @@ class TenantSettings {
   final String name;
   final BusinessType businessType;
   final String? brandingLogoUrl;
-  final String? brandingThemeColorHex;
+  final String? brandingBackgroundColorHex;
+  final String? brandingAccentColorHex;
+  final String? brandingPrimaryTextColorHex;
+  final String? brandingSecondaryTextColorHex;
   final String? brandingFontFamily;
   final bool requiresBarcodePerItem;
   final String? tin;
@@ -59,13 +70,19 @@ class TenantSettings {
 class UpdateBrandingRequest {
   const UpdateBrandingRequest({
     this.logoUrl,
-    this.themeColorHex,
+    this.backgroundColorHex,
+    this.accentColorHex,
+    this.primaryTextColorHex,
+    this.secondaryTextColorHex,
     this.fontFamily,
     this.kioskPosterImageUrl,
   });
 
   final String? logoUrl;
-  final String? themeColorHex;
+  final String? backgroundColorHex;
+  final String? accentColorHex;
+  final String? primaryTextColorHex;
+  final String? secondaryTextColorHex;
   final String? fontFamily;
 
   /// Hosted URL for the kiosk landing screen poster image. Null clears it.
@@ -73,7 +90,10 @@ class UpdateBrandingRequest {
 
   Map<String, dynamic> toJson() => {
     'logoUrl': logoUrl,
-    'themeColorHex': themeColorHex,
+    'backgroundColorHex': backgroundColorHex,
+    'accentColorHex': accentColorHex,
+    'primaryTextColorHex': primaryTextColorHex,
+    'secondaryTextColorHex': secondaryTextColorHex,
     'fontFamily': fontFamily,
     'kioskPosterImageUrl': kioskPosterImageUrl,
   };

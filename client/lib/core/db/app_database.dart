@@ -22,7 +22,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,6 +33,13 @@ class AppDatabase extends _$AppDatabase {
           cachedBranding,
           cachedBranding.kioskPosterImageUrl,
         );
+      }
+      if (from < 3) {
+        // v2 → v3: the single themeColorHex became four colour columns.
+        // cached_branding is a read-through cache re-fetched on login/sync,
+        // so dropping and recreating it loses nothing durable.
+        await m.deleteTable(cachedBranding.actualTableName);
+        await m.createTable(cachedBranding);
       }
     },
   );

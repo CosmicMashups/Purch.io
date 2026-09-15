@@ -1,35 +1,48 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'app_tokens.dart';
 
 /// AppTheme builds the ThemeData for Purch.io.
 /// - staffTheme: For the landscape staff tablet app (dense, high-contrast, min 48dp targets).
 /// - kioskTheme: For the portrait customer-facing self-order flow (tactile, friendly, inviting, min 64dp buttons).
+///
+/// Both accept the four tenant-configurable colours (background, accent,
+/// primary text, secondary text). Each defaults to its AppColors token, so
+/// calling them with no arguments yields exactly the built-in Purch.io look.
+/// core/theming/theme_builder.dart is what actually feeds tenant branding in —
+/// the ThemeData tree itself lives here and only here.
 abstract class AppTheme {
-  static ThemeData staffTheme() {
+  static ThemeData staffTheme({
+    Color background = AppColors.background,
+    Color accent = AppColors.brandPrimary,
+    Color primaryText = AppColors.textPrimary,
+    Color secondaryText = AppColors.textSecondary,
+  }) {
     final baseColorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.brandPrimary,
-      primary: AppColors.brandPrimary,
+      seedColor: accent,
+      primary: accent,
       onPrimary: AppColors.onBrandPrimary,
       surface: AppColors.surface,
       surfaceContainerLowest: AppColors.surface,
-      surfaceContainerLow: AppColors.background,
+      surfaceContainerLow: background,
+      onSurface: primaryText,
+      onSurfaceVariant: secondaryText,
       error: AppColors.error,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: baseColorScheme,
-      scaffoldBackgroundColor: AppColors.background,
-      appBarTheme: const AppBarTheme(
+      scaffoldBackgroundColor: background,
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: primaryText,
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: primaryText,
           letterSpacing: -0.2,
         ),
       ),
@@ -44,7 +57,7 @@ abstract class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.brandPrimary,
+          backgroundColor: accent,
           foregroundColor: AppColors.onBrandPrimary,
           shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
           minimumSize: const Size(48, 48),
@@ -59,7 +72,7 @@ abstract class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.surface,
-          foregroundColor: AppColors.brandPrimary,
+          foregroundColor: accent,
           elevation: 1,
           shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
           minimumSize: const Size(48, 48),
@@ -72,7 +85,7 @@ abstract class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.brandPrimary,
+          foregroundColor: accent,
           side: const BorderSide(color: AppColors.border),
           shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
           minimumSize: const Size(48, 48),
@@ -91,9 +104,9 @@ abstract class AppTheme {
           borderRadius: AppRadius.mdBorder,
           borderSide: BorderSide(color: AppColors.border),
         ),
-        focusedBorder: const OutlineInputBorder(
+        focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.mdBorder,
-          borderSide: BorderSide(color: AppColors.brandPrimary, width: 2),
+          borderSide: BorderSide(color: accent, width: 2),
         ),
         errorBorder: const OutlineInputBorder(
           borderRadius: AppRadius.mdBorder,
@@ -103,19 +116,29 @@ abstract class AppTheme {
     );
   }
 
-  static ThemeData kioskTheme() {
-    final staff = staffTheme();
+  static ThemeData kioskTheme({
+    Color background = AppColors.background,
+    Color accent = AppColors.brandPrimary,
+    Color primaryText = AppColors.textPrimary,
+    Color secondaryText = AppColors.textSecondary,
+  }) {
+    final staff = staffTheme(
+      background: background,
+      accent: accent,
+      primaryText: primaryText,
+      secondaryText: secondaryText,
+    );
     return staff.copyWith(
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: background,
       appBarTheme: staff.appBarTheme.copyWith(
         backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
+        foregroundColor: primaryText,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: primaryText,
           letterSpacing: -0.3,
         ),
       ),
@@ -130,7 +153,7 @@ abstract class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.brandPrimary,
+          backgroundColor: accent,
           foregroundColor: AppColors.onBrandPrimary,
           elevation: 2,
           shape: const RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),

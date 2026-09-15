@@ -7,7 +7,14 @@ import 'package:drift/drift.dart';
 class CachedBranding extends Table {
   TextColumn get tenantId => text()();
   TextColumn get logoUrl => text().nullable()();
-  TextColumn get themeColorHex => text().nullable()();
+
+  /// The four admin-configurable theme colours (hex strings like `#4F46E5`).
+  /// Null on any of them = fall back to that colour's AppColors default.
+  TextColumn get backgroundColorHex => text().nullable()();
+  TextColumn get accentColorHex => text().nullable()();
+  TextColumn get primaryTextColorHex => text().nullable()();
+  TextColumn get secondaryTextColorHex => text().nullable()();
+
   TextColumn get fontFamily => text().nullable()();
 
   /// Promotional poster shown on the kiosk landing screen (E1). Null = wordmark fallback.

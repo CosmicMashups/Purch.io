@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/image_upload_field.dart';
 import '../../domain/category_models.dart';
 import '../providers/catalog_providers.dart';
 
@@ -17,10 +18,12 @@ class AddCategoryScreen extends ConsumerStatefulWidget {
 class _AddCategoryScreenState extends ConsumerState<AddCategoryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _imageUrlController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -34,6 +37,10 @@ class _AddCategoryScreenState extends ConsumerState<AddCategoryScreen> {
       CreateCategoryRequest(
         name: _nameController.text.trim(),
         sortOrder: widget.nextSortOrder,
+        imageUrl:
+            _imageUrlController.text.trim().isEmpty
+                ? null
+                : _imageUrlController.text.trim(),
       ),
     );
 
@@ -149,6 +156,12 @@ class _AddCategoryScreenState extends ConsumerState<AddCategoryScreen> {
                                   (value == null || value.trim().isEmpty)
                                       ? 'Required'
                                       : null,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        ImageUploadField(
+                          controller: _imageUrlController,
+                          label: 'Category image (optional)',
+                          enabled: !isLoading,
                         ),
                         if (failure != null) ...[
                           const SizedBox(height: AppSpacing.lg),

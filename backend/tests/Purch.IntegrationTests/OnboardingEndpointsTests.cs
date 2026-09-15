@@ -123,10 +123,20 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var brandingResponse = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
-            new UpdateBrandingRequest("https://cdn.example.com/logo.png", "#4F46E5", "Inter", null));
+            new UpdateBrandingRequest(
+                "https://cdn.example.com/logo.png",
+                "#FFFFFF",
+                "#4F46E5",
+                "#111827",
+                "#6B7280",
+                "Inter",
+                null));
         Assert.Equal(HttpStatusCode.OK, brandingResponse.StatusCode);
         var afterBranding = await brandingResponse.Content.ReadFromJsonAsync<TenantSettingsDto>(JsonOptions);
-        Assert.Equal("#4F46E5", afterBranding!.BrandingThemeColorHex);
+        Assert.Equal("#FFFFFF", afterBranding!.BrandingBackgroundColorHex);
+        Assert.Equal("#4F46E5", afterBranding.BrandingAccentColorHex);
+        Assert.Equal("#111827", afterBranding.BrandingPrimaryTextColorHex);
+        Assert.Equal("#6B7280", afterBranding.BrandingSecondaryTextColorHex);
 
         var birResponse = await client.PutAsJsonAsync(
             "/tenant/settings/bir",
@@ -163,7 +173,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
-    public async Task Invalid_theme_color_is_rejected_with_400()
+    public async Task Invalid_branding_color_is_rejected_with_400()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = factory.CreateClient();
@@ -173,7 +183,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
-            new UpdateBrandingRequest(null, "not-a-hex-color", null, null));
+            new UpdateBrandingRequest(null, null, "not-a-hex-color", null, null, null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

@@ -8,7 +8,7 @@ import '../providers/promo_code_providers.dart';
 import 'add_promo_code_screen.dart';
 
 /// Admin/Manager promo code management — the code the cashier types in at
-/// D4's cart review. See CartScreen for where they're applied.
+/// D4's cart review. See CashierScreen's cart panel for where they're applied.
 class PromoCodeListScreen extends ConsumerWidget {
   const PromoCodeListScreen({super.key});
 

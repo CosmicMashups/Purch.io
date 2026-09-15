@@ -2,11 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../data/reports_repository_impl.dart';
+import '../../domain/category_sales_models.dart';
 import '../../domain/department_sales_models.dart';
 import '../../domain/inventory_report_models.dart';
 import '../../domain/reports_repository.dart';
 import '../../domain/sales_dashboard_models.dart';
+import '../../domain/sales_trend_models.dart';
 import '../../domain/staff_performance_models.dart';
 
 part 'reports_providers.g.dart';
@@ -21,6 +24,46 @@ Future<SalesDashboard> salesDashboard(Ref ref, {String? branchId}) {
   return ref
       .watch(reportsRepositoryProvider)
       .getSalesDashboard(branchId: branchId);
+}
+
+/// Home's trend chart — one provider instance per (granularity, range)
+/// combination, so switching Day → Week → Custom re-queries rather than
+/// re-filtering a fixed 14-day window client-side.
+@riverpod
+Future<SalesTrendSeries> salesTrend(
+  Ref ref, {
+  String? branchId,
+  required DateTime fromDate,
+  required DateTime toDate,
+  required SalesTrendGranularity granularity,
+}) {
+  return ref
+      .watch(reportsRepositoryProvider)
+      .getSalesTrend(
+        branchId: branchId,
+        from: fromDate,
+        to: toDate,
+        granularity: granularity,
+      );
+}
+
+/// Revenue by catalog category. Composed here rather than in the reports
+/// repository because the item→category mapping is a catalog concern and the
+/// backend exposes no category-sales endpoint — see [aggregateCategorySales].
+@riverpod
+Future<List<CategorySalesSummary>> categorySales(
+  Ref ref, {
+  String? branchId,
+}) async {
+  final dashboard = await ref.watch(salesDashboardProvider(branchId: branchId).future);
+  final items = await ref.watch(itemListProvider.future);
+  final categories = await ref.watch(categoryListProvider.future);
+
+  return aggregateCategorySales(
+    topSellingItems: dashboard.topSellingItems,
+    items: items,
+    categories: categories,
+  );
 }
 
 @riverpod

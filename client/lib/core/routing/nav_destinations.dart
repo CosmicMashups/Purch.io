@@ -4,8 +4,8 @@ import '../auth/role_nav_policy.dart';
 import '../../features/onboarding/domain/onboarding_enums.dart';
 
 /// One destination tile shown on a tab's landing page. [path] is relative to
-/// that tab's branch root (e.g. `sell` tab + path `promo-codes` resolves to
-/// `/sell/promo-codes`) — see [AppRouter].
+/// that tab's branch root (e.g. Cashier tab + path `promo-codes` resolves to
+/// `/cashier/promo-codes`) — see the router.
 class NavTile {
   const NavTile({
     required this.id,
@@ -32,67 +32,12 @@ class NavSection {
   final List<NavTile> tiles;
 }
 
-const List<NavTile> sellTiles = [
-  NavTile(
-    id: 'new-sale',
-    label: 'New Sale',
-    icon: Icons.point_of_sale_rounded,
-    path: 'new-sale',
-    subtitle: 'Ring up an order',
-  ),
-  NavTile(
-    id: 'shift',
-    label: 'Shift / Cash Drawer',
-    icon: Icons.point_of_sale_outlined,
-    path: 'shift',
-    subtitle: 'Open, close, and count',
-  ),
-  NavTile(
-    id: 'promo-codes',
-    label: 'Promo Codes',
-    icon: Icons.local_offer_outlined,
-    path: 'promo-codes',
-    subtitle: 'Discounts and vouchers',
-  ),
-  NavTile(
-    id: 'bir-reading',
-    label: 'X / Z Reading',
-    icon: Icons.receipt_long_outlined,
-    path: 'bir-reading',
-    subtitle: 'BIR-compliant readings',
-  ),
-];
-
-const List<NavTile> reportsTiles = [
-  NavTile(
-    id: 'sales-dashboard',
-    label: 'Sales Dashboard',
-    icon: Icons.query_stats_rounded,
-    path: 'sales-dashboard',
-    subtitle: 'Revenue at a glance',
-  ),
-  NavTile(
-    id: 'inventory-reports',
-    label: 'Inventory Reports',
-    icon: Icons.bar_chart_rounded,
-    path: 'inventory-reports',
-    subtitle: 'Stock trends and valuation',
-  ),
-  NavTile(
-    id: 'staff-performance',
-    label: 'Staff Performance',
-    icon: Icons.leaderboard_outlined,
-    path: 'staff-performance',
-    subtitle: 'Sales by staff member',
-  ),
-  NavTile(
-    id: 'department-sales',
-    label: 'Department Sales',
-    icon: Icons.pie_chart_outline_rounded,
-    path: 'department-sales',
-    subtitle: 'Revenue by department',
-  ),
-];
+// The Cashier tab has no tile list: its landing page *is* the item grid plus
+// the cart, and Shift / Promo Codes / X-Z Reading are compact secondary
+// buttons on that screen rather than full-width tiles.
+//
+// The Reports tab and its `reportsTiles` were removed entirely — Home now
+// renders that data as charts off the same reports repository.
 
 const List<NavSection> inventorySections = [
   NavSection(
@@ -121,12 +66,6 @@ const List<NavSection> inventorySections = [
   NavSection(
     title: 'Stock',
     tiles: [
-      NavTile(
-        id: 'inventory-dashboard',
-        label: 'Inventory Dashboard',
-        icon: Icons.dashboard_outlined,
-        path: 'dashboard',
-      ),
       NavTile(
         id: 'movements',
         label: 'Stock Movements',

@@ -11,8 +11,7 @@ import '../../../../core/theming/app_tokens.dart';
 /// `branches:` list in AppRouter exactly.
 const List<AppTab> _branchOrder = [
   AppTab.home,
-  AppTab.sell,
-  AppTab.reports,
+  AppTab.cashier,
   AppTab.inventory,
   AppTab.business,
 ];
@@ -20,7 +19,7 @@ const List<AppTab> _branchOrder = [
 /// The staff app shell: a persistent bottom [NavigationBar] over go_router's
 /// [StatefulNavigationShell], so each tab keeps its own navigation stack.
 /// Which tabs appear is role-dependent — see [tabsForRole] — so this widget
-/// only ever renders a subset of [_branchOrder]'s five branches.
+/// only ever renders a subset of [_branchOrder]'s four branches.
 class AppShellScreen extends ConsumerWidget {
   const AppShellScreen({super.key, required this.navigationShell});
 

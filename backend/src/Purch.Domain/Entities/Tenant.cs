@@ -13,7 +13,17 @@ public class Tenant : Entity
 
     public string? BrandingLogoUrl { get; set; }
 
-    public string? BrandingThemeColorHex { get; set; }
+    /// <summary>App background colour (hex, e.g. #F8FAFC). Null = the client's built-in default.</summary>
+    public string? BrandingBackgroundColorHex { get; set; }
+
+    /// <summary>Accent / primary action colour (hex). Null = the client's built-in default.</summary>
+    public string? BrandingAccentColorHex { get; set; }
+
+    /// <summary>Primary text colour (hex). Null = the client's built-in default.</summary>
+    public string? BrandingPrimaryTextColorHex { get; set; }
+
+    /// <summary>Secondary text colour (hex). Null = the client's built-in default.</summary>
+    public string? BrandingSecondaryTextColorHex { get; set; }
 
     public string? BrandingFontFamily { get; set; }
 
