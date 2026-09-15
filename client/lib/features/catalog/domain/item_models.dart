@@ -99,6 +99,41 @@ class CreateItemRequest {
   };
 }
 
+/// Mirrors Purch.Application.Catalog.UpdateItemRequest.
+class UpdateItemRequest {
+  const UpdateItemRequest({
+    required this.name,
+    this.sku,
+    this.barcode,
+    this.categoryId,
+    required this.basePrice,
+    this.imageUrl,
+    required this.isActive,
+    this.departmentId,
+  });
+
+  final String name;
+  final String? sku;
+  final String? barcode;
+  final String? categoryId;
+  final double basePrice;
+  final String? imageUrl;
+  final bool isActive;
+  final String? departmentId;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'sku': sku,
+    'barcode': barcode,
+    'categoryId': categoryId,
+    'basePrice': basePrice,
+    'imageUrl': imageUrl,
+    'isActive': isActive,
+    'departmentId': departmentId,
+  };
+}
+
+
 /// Mirrors Purch.Application.Catalog.UpdateTingiConfigRequest. Only meaningful
 /// for weight/volume items — the backend rejects it otherwise.
 class UpdateTingiConfigRequest {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/theming/theme_builder.dart';
@@ -316,13 +317,61 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                             enabled: !isSaving,
                           ),
                           const SizedBox(height: AppSpacing.md),
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            value: AppTypography.curatedPosFonts.contains(
+                              _fontFamilyController.text.trim(),
+                            )
+                                ? _fontFamilyController.text.trim()
+                                : (_fontFamilyController.text.trim().isEmpty
+                                    ? AppTypography.defaultFontFamily
+                                    : 'CUSTOM'),
+                            decoration: const InputDecoration(
+                              labelText: 'Curated POS Font Preset',
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.smBorder,
+                              ),
+                            ),
+                            items: [
+                              ...AppTypography.curatedPosFonts.map(
+                                (f) => DropdownMenuItem(
+                                  value: f,
+                                  child: Text(
+                                    f == AppTypography.defaultFontFamily
+                                        ? '$f (Default)'
+                                        : f,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              const DropdownMenuItem(
+                                value: 'CUSTOM',
+                                child: Text('Custom Google Font...'),
+                              ),
+                            ],
+                            onChanged:
+                                isSaving
+                                    ? null
+                                    : (val) {
+                                      if (val != null && val != 'CUSTOM') {
+                                        _fontFamilyController.text = val;
+                                        setState(() {});
+                                      }
+                                    },
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
                           TextField(
                             controller: _fontFamilyController,
                             enabled: !isSaving,
                             decoration: const InputDecoration(
                               labelText: 'Font family',
-                              border: OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                              helperText:
+                                  'Select a curated POS preset above or enter any valid Google Font name.',
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.smBorder,
+                              ),
                             ),
+                            onChanged: (_) => setState(() {}),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           TextField(
@@ -333,25 +382,30 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                               helperText:
                                   'Hero image on kiosk screen. Supports remote URL, /uploads/..., or assets/images/kiosk_poster_default.jpg',
                               helperMaxLines: 2,
-                              suffixIcon: _kioskPosterUrlController.text.isEmpty
-                                  ? TextButton(
-                                      onPressed: () {
-                                        _kioskPosterUrlController.text =
-                                            'assets/images/kiosk_poster_default.jpg';
-                                        setState(() {});
-                                      },
-                                      child: const Text(
-                                        'Use Default',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    )
-                                  : null,
-                              border: const OutlineInputBorder(borderRadius: AppRadius.smBorder),
+                              suffixIcon:
+                                  _kioskPosterUrlController.text.isEmpty
+                                      ? TextButton(
+                                        onPressed: () {
+                                          _kioskPosterUrlController.text =
+                                              'assets/images/kiosk_poster_default.jpg';
+                                          setState(() {});
+                                        },
+                                        child: const Text(
+                                          'Use Default',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      )
+                                      : null,
+                              border: const OutlineInputBorder(
+                                borderRadius: AppRadius.smBorder,
+                              ),
                             ),
                             onChanged: (_) => setState(() {}),
                           ),
                           // Live 16:9 preview of the poster URL
-                          if (_kioskPosterUrlController.text.trim().isNotEmpty) ...[
+                          if (_kioskPosterUrlController.text
+                              .trim()
+                              .isNotEmpty) ...[
                             const SizedBox(height: AppSpacing.sm),
                             ClipRRect(
                               borderRadius: AppRadius.smBorder,
@@ -379,11 +433,28 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                             onPressed: isSaving ? null : _saveBranding,
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.brandPrimary,
-                              shape: const RoundedRectangleBorder(borderRadius: AppRadius.smBorder),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppRadius.smBorder,
+                              ),
                             ),
                             child: const Text('Save Branding'),
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Card(
+                    elevation: 0,
+                    color: AppColors.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.mdBorder,
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: _TypographyPreviewCard(
+                        fontFamily: _fontFamilyController.text,
                       ),
                     ),
                   ),
@@ -549,3 +620,127 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     );
   }
 }
+
+/// Interactive live typography preview card for tenant administrators.
+class _TypographyPreviewCard extends StatelessWidget {
+  const _TypographyPreviewCard({required this.fontFamily});
+
+  final String fontFamily;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = fontFamily.trim();
+    final effectiveFamily =
+        trimmed.isEmpty ? AppTypography.defaultFontFamily : trimmed;
+
+    final headerStyle = AppTypography.getSafeGoogleFont(
+      effectiveFamily,
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+      letterSpacing: -0.2,
+    );
+
+    final bodyStyle = AppTypography.getSafeGoogleFont(
+      effectiveFamily,
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textSecondary,
+    );
+
+    final priceStyle = GoogleFonts.jetBrainsMono(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      color: AppColors.brandPrimary,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: AppRadius.smBorder,
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.font_download_outlined,
+                    size: 15,
+                    color: AppColors.textSecondary,
+                  ),
+                  SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'TYPOGRAPHY',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandPrimaryContainer,
+                    borderRadius: AppRadius.smBorder,
+                    border: Border.all(color: AppColors.infoBorder),
+                  ),
+                  child: Text(
+                    effectiveFamily,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text('Purch.io Point of Sale', style: headerStyle),
+          const SizedBox(height: 2),
+          Text(
+            'Fast touch-optimized checkout for modern Philippine retail.',
+            style: bodyStyle,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.smBorder,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text('1× Iced Spanish Latte (16oz)', style: bodyStyle),
+                ),
+                Text('₱165.00', style: priceStyle),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

@@ -6,12 +6,15 @@ import 'package:purch_client/features/catalog/domain/item_combo_component_models
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/item_variant_models.dart';
 import 'package:purch_client/features/catalog/domain/modifier_models.dart';
+import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
 
 class FakeCatalogRepository implements CatalogRepository {
   FakeCatalogRepository({
     this.createCategoryFailure,
+    this.updateCategoryFailure,
     this.createItemFailure,
+    this.updateItemFailure,
     this.createModifierGroupFailure,
     this.addModifierFailure,
     this.receiveBatchFailure,
@@ -41,7 +44,9 @@ class FakeCatalogRepository implements CatalogRepository {
        comboComponents = initialComboComponents ?? [];
 
   final Object? createCategoryFailure;
+  final Object? updateCategoryFailure;
   final Object? createItemFailure;
+  final Object? updateItemFailure;
   final Object? createModifierGroupFailure;
   final Object? addModifierFailure;
   final Object? receiveBatchFailure;
@@ -63,6 +68,9 @@ class FakeCatalogRepository implements CatalogRepository {
   final List<ItemComboComponent> comboComponents;
 
   CreateItemRequest? lastCreateItemRequest;
+  UpdateItemRequest? lastUpdateItemRequest;
+  CreateCategoryRequest? lastCreateCategoryRequest;
+  UpdateCategoryRequest? lastUpdateCategoryRequest;
   CreateItemBatchRequest? lastReceiveBatchRequest;
   UpdateLowStockThresholdRequest? lastUpdateLowStockThresholdRequest;
 
@@ -71,6 +79,7 @@ class FakeCatalogRepository implements CatalogRepository {
 
   @override
   Future<Category> createCategory(CreateCategoryRequest request) async {
+    lastCreateCategoryRequest = request;
     if (createCategoryFailure != null) {
       throw createCategoryFailure!;
     }
@@ -81,6 +90,30 @@ class FakeCatalogRepository implements CatalogRepository {
     );
     categories.add(created);
     return created;
+  }
+
+  @override
+  Future<Category> updateCategory(
+    String categoryId,
+    UpdateCategoryRequest request,
+  ) async {
+    lastUpdateCategoryRequest = request;
+    if (updateCategoryFailure != null) {
+      throw updateCategoryFailure!;
+    }
+    final index = categories.indexWhere((c) => c.id == categoryId);
+    final updated = Category(
+      id: categoryId,
+      name: request.name,
+      sortOrder: request.sortOrder,
+      imageUrl: request.imageUrl,
+    );
+    if (index >= 0) {
+      categories[index] = updated;
+    } else {
+      categories.add(updated);
+    }
+    return updated;
   }
 
   @override
@@ -113,6 +146,41 @@ class FakeCatalogRepository implements CatalogRepository {
     );
     items.add(created);
     return created;
+  }
+
+  @override
+  Future<Item> updateItem(String itemId, UpdateItemRequest request) async {
+    lastUpdateItemRequest = request;
+    if (updateItemFailure != null) {
+      throw updateItemFailure!;
+    }
+    final index = items.indexWhere((i) => i.id == itemId);
+    final existing = index >= 0 ? items[index] : null;
+    final updated = Item(
+      id: itemId,
+      name: request.name,
+      sku: request.sku,
+      barcode: request.barcode,
+      categoryId: request.categoryId,
+      basePrice: request.basePrice,
+      imageUrl: request.imageUrl,
+      pricingType: existing?.pricingType ?? PricingType.unit,
+      stockOnHand: existing?.stockOnHand ?? 0,
+      isActive: request.isActive,
+      tingiMode: existing?.tingiMode ?? TingiMode.none,
+      packagedSize: existing?.packagedSize,
+      tingiIncrementStep: existing?.tingiIncrementStep,
+      tingiAllowedSizes: existing?.tingiAllowedSizes ?? const [],
+      serviceDurationMinutes: existing?.serviceDurationMinutes,
+      departmentId: request.departmentId,
+      lowStockThreshold: existing?.lowStockThreshold,
+    );
+    if (index >= 0) {
+      items[index] = updated;
+    } else {
+      items.add(updated);
+    }
+    return updated;
   }
 
   @override

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../../../core/widgets/status_badge.dart';
 import '../providers/catalog_providers.dart';
 import 'add_category_screen.dart';
+import 'edit_category_screen.dart';
 import '../../../../core/errors/failure.dart';
 
 /// B5's category half.
@@ -51,6 +53,9 @@ class CategoryListScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final category = categories[index];
+                final colorPair = AppColors.categoryPalette[
+                    index % AppColors.categoryPalette.length];
+
                 return Container(
                   decoration: BoxDecoration(
                     color: AppColors.surface,
@@ -59,17 +64,27 @@ class CategoryListScreen extends ConsumerWidget {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.brandPrimaryContainer,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => EditCategoryScreen(category: category),
                       ),
-                      child: const Icon(
+                    ),
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: colorPair.background,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: colorPair.border),
+                      ),
+                      child: Icon(
                         Icons.category_rounded,
-                        color: AppColors.brandPrimary,
-                        size: 20,
+                        color: colorPair.foreground,
+                        size: 22,
                       ),
                     ),
                     title: Text(
@@ -79,6 +94,38 @@ class CategoryListScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
+                    ),
+                    subtitle: Text(
+                      'Sort order: ${category.sortOrder}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        StatusBadge(
+                          label: '#${category.sortOrder}',
+                          type: StatusBadgeType.info,
+                          isSmall: true,
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                          tooltip: 'Edit category',
+                          onPressed: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  EditCategoryScreen(category: category),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );

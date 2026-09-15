@@ -48,27 +48,10 @@ class ChartCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(title, style: AppTypography.titleMd),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(subtitle!, style: AppTypography.bodySm),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: AppSpacing.md),
-                trailing!,
-              ],
-            ],
+          _ChartCardHeader(
+            title: title,
+            subtitle: subtitle,
+            trailing: trailing,
           ),
           const SizedBox(height: AppSpacing.lg),
           SizedBox(height: height, child: child),
@@ -78,6 +61,79 @@ class ChartCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The card's title/subtitle block beside its optional [trailing] control.
+///
+/// A trailing control is usually a cluster of chips with a real intrinsic
+/// width (the Sales Trend range filter is five of them), so on a narrow
+/// page — a phone, or a portrait tablet where the card spans the full width
+/// — title + trailing can't share a line without the header `Row`
+/// overflowing. Below [_stackBelowWidth] the trailing block moves under the
+/// title instead, full-width and left-aligned. With no trailing, or with
+/// room for both, the header lays out exactly as it always has.
+class _ChartCardHeader extends StatelessWidget {
+  const _ChartCardHeader({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  /// Enough for a title plus a five-chip filter cluster (~350dp) with the
+  /// card's own padding already taken off.
+  static const double _stackBelowWidth = 560;
+
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title, style: AppTypography.titleMd),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(subtitle!, style: AppTypography.bodySm),
+        ],
+      ],
+    );
+
+    if (trailing == null) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [Expanded(child: titleBlock)],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth.isFinite &&
+            constraints.maxWidth < _stackBelowWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              titleBlock,
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(width: double.infinity, child: trailing),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: titleBlock),
+            const SizedBox(width: AppSpacing.md),
+            trailing!,
+          ],
+        );
+      },
     );
   }
 }

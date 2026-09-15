@@ -5,6 +5,7 @@ import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../../../core/widgets/status_badge.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
@@ -12,6 +13,7 @@ import 'add_item_screen.dart';
 import 'assign_department_screen.dart';
 import 'bundle_rules_screen.dart';
 import 'combo_components_screen.dart';
+import 'edit_item_screen.dart';
 import 'item_batches_screen.dart';
 import 'item_modifier_groups_screen.dart';
 import 'low_stock_threshold_screen.dart';
@@ -21,6 +23,7 @@ import 'variants_screen.dart';
 import '../../../../core/errors/failure.dart';
 
 enum _ItemAction {
+  edit,
   batches,
   bundleRules,
   variants,
@@ -98,6 +101,15 @@ class ItemListScreen extends ConsumerWidget {
                     border: Border.all(color: AppColors.border),
                   ),
                   child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => EditItemScreen(item: item),
+                      ),
+                    ),
                     leading: Container(
                       width: 44,
                       height: 44,
@@ -105,8 +117,13 @@ class ItemListScreen extends ConsumerWidget {
                         color:
                             item.isActive
                                 ? AppColors.brandPrimaryContainer
-                                : AppColors.cardHover,
+                                : AppColors.neutralContainer,
                         borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(
+                          color: item.isActive
+                              ? AppColors.brandPrimary.withOpacity(0.2)
+                              : AppColors.neutralBorder,
+                        ),
                       ),
                       child: Icon(
                         item.isActive
@@ -127,15 +144,42 @@ class ItemListScreen extends ConsumerWidget {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    subtitle: Text(
-                      isWeightVolume
-                          ? '₱${item.basePrice.toStringAsFixed(2)} · ${item.stockOnHand} in stock'
-                          : '₱${item.basePrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 2),
+                        Text(
+                          isWeightVolume
+                              ? '₱${item.basePrice.toStringAsFixed(2)} · ${item.stockOnHand} in stock'
+                              : '₱${item.basePrice.toStringAsFixed(2)}${item.sku != null && item.sku!.isNotEmpty ? ' · SKU: ${item.sku}' : ''}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            item.isActive
+                                ? StatusBadge.active(isSmall: true)
+                                : StatusBadge.inactive(isSmall: true),
+                            StatusBadge.stockLevel(
+                              stockOnHand: item.stockOnHand,
+                              lowStockThreshold: item.lowStockThreshold,
+                              isSmall: true,
+                            ),
+                            StatusBadge(
+                              label: item.pricingType.label,
+                              type: StatusBadgeType.info,
+                              isSmall: true,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                     trailing: PopupMenuButton<_ItemAction>(
                       icon: const Icon(
@@ -145,6 +189,13 @@ class ItemListScreen extends ConsumerWidget {
                       tooltip: 'Item actions',
                       onSelected: (action) {
                         switch (action) {
+                          case _ItemAction.edit:
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => EditItemScreen(item: item),
+                              ),
+                            );
+                            break;
                           case _ItemAction.batches:
                             Navigator.of(context).push<void>(
                               MaterialPageRoute(
@@ -235,6 +286,20 @@ class ItemListScreen extends ConsumerWidget {
                       },
                       itemBuilder:
                           (context) => [
+                            const PopupMenuItem(
+                              value: _ItemAction.edit,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                    color: AppColors.brandPrimary,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Edit details'),
+                                ],
+                              ),
+                            ),
                             if (isWeightVolume)
                               const PopupMenuItem(
                                 value: _ItemAction.batches,

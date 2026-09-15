@@ -28,6 +28,18 @@ class CatalogRepositoryImpl implements CatalogRepository {
   }
 
   @override
+  Future<Category> updateCategory(
+    String categoryId,
+    UpdateCategoryRequest request,
+  ) {
+    return _put(
+      '/categories/$categoryId',
+      request.toJson(),
+      Category.fromJson,
+    );
+  }
+
+  @override
   Future<List<Item>> listItems() {
     return _getList('/items', Item.fromJson);
   }
@@ -35,6 +47,11 @@ class CatalogRepositoryImpl implements CatalogRepository {
   @override
   Future<Item> createItem(CreateItemRequest request) {
     return _post('/items', request.toJson(), Item.fromJson);
+  }
+
+  @override
+  Future<Item> updateItem(String itemId, UpdateItemRequest request) {
+    return _put('/items/$itemId', request.toJson(), Item.fromJson);
   }
 
   @override

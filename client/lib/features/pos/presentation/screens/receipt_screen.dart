@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../providers/pos_providers.dart';
@@ -80,7 +81,7 @@ class ReceiptScreen extends ConsumerWidget {
                                   const SizedBox(height: 16),
                                   Text(
                                     'Receipt No. ${cart.receiptNumber ?? '—'}',
-                                    style: const TextStyle(
+                                    style: GoogleFonts.outfit(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w800,
                                       color: AppColors.textPrimary,
@@ -89,9 +90,9 @@ class ReceiptScreen extends ConsumerWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 4),
-                                  const Text(
+                                  Text(
                                     'Transaction Complete',
-                                    style: TextStyle(
+                                    style: GoogleFonts.plusJakartaSans(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                       color: AppColors.textSecondary,
@@ -118,7 +119,7 @@ class ReceiptScreen extends ConsumerWidget {
                                           Expanded(
                                             child: Text(
                                               '${line.itemName} ×${line.quantity.toStringAsFixed(line.quantity.truncateToDouble() == line.quantity ? 0 : 2)}',
-                                              style: const TextStyle(
+                                              style: GoogleFonts.plusJakartaSans(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w500,
                                                 color: AppColors.textPrimary,
@@ -127,13 +128,10 @@ class ReceiptScreen extends ConsumerWidget {
                                           ),
                                           Text(
                                             '₱${line.lineTotal.toStringAsFixed(2)}',
-                                            style: const TextStyle(
+                                            style: GoogleFonts.jetBrainsMono(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                               color: AppColors.textPrimary,
-                                              fontFeatures: [
-                                                FontFeature.tabularFigures(),
-                                              ],
                                             ),
                                           ),
                                         ],
@@ -151,9 +149,9 @@ class ReceiptScreen extends ConsumerWidget {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'Total',
-                                        style: TextStyle(
+                                        style: GoogleFonts.plusJakartaSans(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w800,
                                           color: AppColors.textPrimary,
@@ -161,13 +159,10 @@ class ReceiptScreen extends ConsumerWidget {
                                       ),
                                       Text(
                                         '₱${cart.totalAmount.toStringAsFixed(2)}',
-                                        style: const TextStyle(
+                                        style: GoogleFonts.jetBrainsMono(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w800,
                                           color: AppColors.brandPrimary,
-                                          fontFeatures: [
-                                            FontFeature.tabularFigures(),
-                                          ],
                                         ),
                                       ),
                                     ],
@@ -182,9 +177,9 @@ class ReceiptScreen extends ConsumerWidget {
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            const Text(
+                                            Text(
                                               'Change',
-                                              style: TextStyle(
+                                              style: GoogleFonts.plusJakartaSans(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
                                                 color: AppColors.textSecondary,
@@ -192,13 +187,10 @@ class ReceiptScreen extends ConsumerWidget {
                                             ),
                                             Text(
                                               '₱${payment.changeGiven!.toStringAsFixed(2)}',
-                                              style: const TextStyle(
+                                              style: GoogleFonts.jetBrainsMono(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppColors.accentEmerald,
-                                                fontFeatures: [
-                                                  FontFeature.tabularFigures(),
-                                                ],
                                               ),
                                             ),
                                           ],

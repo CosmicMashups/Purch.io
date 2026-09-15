@@ -18,9 +18,16 @@ abstract class CatalogRepository {
 
   Future<Category> createCategory(CreateCategoryRequest request);
 
+  Future<Category> updateCategory(
+    String categoryId,
+    UpdateCategoryRequest request,
+  );
+
   Future<List<Item>> listItems();
 
   Future<Item> createItem(CreateItemRequest request);
+
+  Future<Item> updateItem(String itemId, UpdateItemRequest request);
 
   Future<List<ModifierGroup>> listModifierGroups();
 

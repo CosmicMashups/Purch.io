@@ -40,3 +40,23 @@ class CreateCategoryRequest {
     'imageUrl': imageUrl,
   };
 }
+
+/// Mirrors Purch.Application.Catalog.UpdateCategoryRequest.
+class UpdateCategoryRequest {
+  const UpdateCategoryRequest({
+    required this.name,
+    required this.sortOrder,
+    this.imageUrl,
+  });
+
+  final String name;
+  final int sortOrder;
+  final String? imageUrl;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'sortOrder': sortOrder,
+    'imageUrl': imageUrl,
+  };
+}
+
