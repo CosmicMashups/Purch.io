@@ -1,0 +1,3 @@
+# Shell scripts must keep LF line endings regardless of core.autocrlf —
+# a CRLF-converted .sh file fails in bash with `$'\r': command not found`.
+*.sh text eol=lf
