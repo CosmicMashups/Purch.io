@@ -68,6 +68,7 @@ dependencies:
   # Charts (Home dashboard: sales trend, movement summary, low-stock,
   # staff/cashier performance, shift attendance, department/category sales)
   fl_chart: ^0.69.0
+  google_fonts: ^6.3.2
 
 dev_dependencies:
   flutter_test:

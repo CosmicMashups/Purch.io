@@ -36,6 +36,37 @@ class CashierScreen extends ConsumerStatefulWidget {
   ConsumerState<CashierScreen> createState() => _CashierScreenState();
 }
 
+/// The Cashier's lesser-used tools, in the order they sit in the app bar.
+const _secondaryActions = <_SecondaryActionSpec>[
+  _SecondaryActionSpec(
+    icon: Icons.point_of_sale_outlined,
+    label: 'Shift',
+    path: '/cashier/shift',
+  ),
+  _SecondaryActionSpec(
+    icon: Icons.local_offer_outlined,
+    label: 'Promos',
+    path: '/cashier/promo-codes',
+  ),
+  _SecondaryActionSpec(
+    icon: Icons.receipt_long_outlined,
+    label: 'X / Z',
+    path: '/cashier/bir-reading',
+  ),
+];
+
+class _SecondaryActionSpec {
+  const _SecondaryActionSpec({
+    required this.icon,
+    required this.label,
+    required this.path,
+  });
+
+  final IconData icon;
+  final String label;
+  final String path;
+}
+
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -43,6 +74,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   /// panel would squeeze the grid down to one item per row.
   static const _sidePanelBreakpoint = 720.0;
   static const _cartPanelWidth = 340.0;
+
+  /// null means "All" — the grid shows every active item, as it always has.
+  String? _selectedCategoryId;
 
   @override
   Widget build(BuildContext context) {
@@ -53,27 +87,30 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       builder: (context, constraints) {
         final showSidePanel = constraints.maxWidth >= _sidePanelBreakpoint;
 
+        final itemGrid = ItemGridPanel(
+          selectedCategoryId: _selectedCategoryId,
+          onClearCategory: () => setState(() => _selectedCategoryId = null),
+        );
+        final categorySelector = CategorySelector(
+          vertical: showSidePanel,
+          selectedCategoryId: _selectedCategoryId,
+          onSelect: (id) => setState(() => _selectedCategoryId = id),
+        );
+
         return Scaffold(
           key: _scaffoldKey,
           backgroundColor: AppColors.background,
           appBar: AppBar(
             title: const Text('Cashier'),
             actions: [
-              const _SecondaryAction(
-                icon: Icons.point_of_sale_outlined,
-                label: 'Shift',
-                path: '/cashier/shift',
-              ),
-              const _SecondaryAction(
-                icon: Icons.local_offer_outlined,
-                label: 'Promos',
-                path: '/cashier/promo-codes',
-              ),
-              const _SecondaryAction(
-                icon: Icons.receipt_long_outlined,
-                label: 'X / Z',
-                path: '/cashier/bir-reading',
-              ),
+              // Three labelled buttons plus the cart badge don't fit beside
+              // the title on a phone, and an AppBar's actions row has no
+              // overflow protection — so narrow widths get one menu instead.
+              if (showSidePanel)
+                for (final action in _secondaryActions)
+                  _SecondaryAction(spec: action)
+              else
+                const _SecondaryActionsMenu(),
               const SizedBox(width: AppSpacing.sm),
               if (!showSidePanel)
                 Padding(
@@ -105,10 +142,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   ),
           body:
               showSidePanel
-                  ? const Row(
+                  ? Row(
                     children: [
-                      Expanded(child: ItemGridPanel()),
-                      SizedBox(
+                      categorySelector,
+                      Expanded(child: itemGrid),
+                      const SizedBox(
                         width: _cartPanelWidth,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
@@ -122,7 +160,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                     ],
                   )
-                  : const ItemGridPanel(),
+                  : Column(
+                    children: [categorySelector, Expanded(child: itemGrid)],
+                  ),
           bottomNavigationBar:
               showSidePanel || cart == null || cart.lines.isEmpty
                   ? null
@@ -138,28 +178,249 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
 /// Compact app-bar entry point for the Cashier tab's lesser-used tools.
 class _SecondaryAction extends StatelessWidget {
-  const _SecondaryAction({
-    required this.icon,
-    required this.label,
-    required this.path,
-  });
+  const _SecondaryAction({required this.spec});
 
-  final IconData icon;
-  final String label;
-  final String path;
+  final _SecondaryActionSpec spec;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: TextButton.icon(
-        onPressed: () => context.push(path),
-        icon: Icon(icon, size: 18),
-        label: Text(label),
+        onPressed: () => context.push(spec.path),
+        icon: Icon(spec.icon, size: 18),
+        label: Text(spec.label),
         style: TextButton.styleFrom(
           foregroundColor: AppColors.textSecondary,
           visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        ),
+      ),
+    );
+  }
+}
+
+/// The same three tools, collapsed into one menu for narrow widths.
+class _SecondaryActionsMenu extends StatelessWidget {
+  const _SecondaryActionsMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert_rounded),
+      tooltip: 'More cashier tools',
+      color: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
+      onSelected: (path) => context.push(path),
+      itemBuilder:
+          (context) => [
+            for (final action in _secondaryActions)
+              PopupMenuItem<String>(
+                value: action.path,
+                child: Row(
+                  children: [
+                    Icon(action.icon, size: 18, color: AppColors.textSecondary),
+                    const SizedBox(width: AppSpacing.md),
+                    Text(
+                      action.label,
+                      style: AppTypography.labelMd,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Category selector
+// ---------------------------------------------------------------------------
+
+/// The inline category filter for the item grid: a vertical rail on the side
+/// opposite the cart when there's room, a horizontal strip above the grid
+/// when there isn't.
+///
+/// It is a filter, not a navigation step — the kiosk pushes a route per
+/// category because a customer browses, while a cashier is mid-sale and the
+/// grid has to stay on screen. If categories can't be loaded the selector
+/// simply isn't drawn: a catalog-taxonomy problem must never stop a sale.
+class CategorySelector extends ConsumerWidget {
+  const CategorySelector({
+    super.key,
+    required this.vertical,
+    required this.selectedCategoryId,
+    required this.onSelect,
+  });
+
+  static const double railWidth = 104;
+  static const double stripHeight = 100;
+
+  final bool vertical;
+  final String? selectedCategoryId;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categories = ref.watch(categoryListProvider).valueOrNull;
+    if (categories == null || categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final sorted = [...categories]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final entries = <Widget>[
+      _CategoryTile(
+        label: 'All',
+        icon: Icons.grid_view_rounded,
+        imageUrl: null,
+        vertical: vertical,
+        selected: selectedCategoryId == null,
+        onTap: () => onSelect(null),
+      ),
+      for (final category in sorted)
+        _CategoryTile(
+          label: category.name,
+          icon: Icons.category_rounded,
+          imageUrl: category.imageUrl,
+          vertical: vertical,
+          selected: selectedCategoryId == category.id,
+          onTap: () => onSelect(category.id),
+        ),
+    ];
+
+    if (vertical) {
+      return Container(
+        width: railWidth,
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(right: BorderSide(color: AppColors.border)),
+        ),
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.md,
+          ),
+          itemCount: entries.length,
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+          itemBuilder: (context, index) => entries[index],
+        ),
+      );
+    }
+
+    return Container(
+      height: stripHeight,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        itemCount: entries.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) => entries[index],
+      ),
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  const _CategoryTile({
+    required this.label,
+    required this.icon,
+    required this.imageUrl,
+    required this.vertical,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final String? imageUrl;
+  final bool vertical;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const thumbSize = 34.0;
+
+    final thumbnail = Container(
+      width: thumbSize,
+      height: thumbSize,
+      decoration: BoxDecoration(
+        color:
+            selected ? AppColors.brandPrimaryContainer : AppColors.borderSubtle,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child:
+          imageUrl != null && imageUrl!.isNotEmpty
+              ? PurchImage(
+                imageUrlOrPath: imageUrl,
+                width: thumbSize,
+                height: thumbSize,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                fit: BoxFit.cover,
+              )
+              : Icon(
+                icon,
+                size: 18,
+                color:
+                    selected ? AppColors.brandPrimary : AppColors.textSecondary,
+              ),
+    );
+
+    final text = Text(
+      label,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 11,
+        height: 1.15,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        color: selected ? AppColors.brandPrimary : AppColors.textSecondary,
+      ),
+    );
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color:
+            selected ? AppColors.brandPrimaryContainer : Colors.transparent,
+        borderRadius: AppRadius.mdBorder,
+        child: InkWell(
+          borderRadius: AppRadius.mdBorder,
+          onTap: onTap,
+          child: Container(
+            width: vertical ? null : 78,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.mdBorder,
+              border: Border.all(
+                color: selected ? AppColors.brandPrimary : AppColors.border,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                thumbnail,
+                const SizedBox(height: AppSpacing.xs),
+                Flexible(child: text),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -230,7 +491,17 @@ class _CartSummaryBar extends StatelessWidget {
 /// are addable directly; PricingType.combo (D2) and PricingType.variantMatrix
 /// (D3) open their own customization sheet.
 class ItemGridPanel extends ConsumerWidget {
-  const ItemGridPanel({super.key});
+  const ItemGridPanel({
+    super.key,
+    this.selectedCategoryId,
+    this.onClearCategory,
+  });
+
+  /// null means no category filter — every active item shows.
+  final String? selectedCategoryId;
+
+  /// Way back out of an empty category, offered in that empty state.
+  final VoidCallback? onClearCategory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -262,11 +533,42 @@ class ItemGridPanel extends ConsumerWidget {
           );
         }
 
+        final visibleItems =
+            selectedCategoryId == null
+                ? activeItems
+                : activeItems
+                    .where((item) => item.categoryId == selectedCategoryId)
+                    .toList();
+
+        // Distinct from an empty catalog: there *are* things to sell, just
+        // not under this filter, so the way out is back to everything.
+        if (visibleItems.isEmpty) {
+          return EmptyStateView(
+            icon: Icons.category_outlined,
+            title: 'Nothing in this category yet.',
+            description:
+                'No active item is filed under this category. Assign items to '
+                'it in the catalog, or keep selling from the full list.',
+            actionLabel: 'Show All Items',
+            onAction: onClearCategory,
+          );
+        }
+
         return LayoutBuilder(
           builder: (context, constraints) {
             // Keep tiles around 180dp wide whatever the grid's share of the
             // screen is, so the cart panel taking 340dp doesn't squash them.
             final columns = (constraints.maxWidth / 180).floor().clamp(2, 6);
+            final tileWidth =
+                (constraints.maxWidth -
+                    AppSpacing.lg * 2 -
+                    14 * (columns - 1)) /
+                columns;
+            // Height follows the 1.15 aspect the grid has always had, but
+            // with a floor: with the category rail and the cart both taking
+            // their share, a tile can end up narrow enough that a square-ish
+            // box no longer holds icon + two-line name + price.
+            final tileHeight = (tileWidth / 1.15).clamp(148.0, 200.0);
 
             return GridView.builder(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -274,11 +576,11 @@ class ItemGridPanel extends ConsumerWidget {
                 crossAxisCount: columns,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 1.15,
+                mainAxisExtent: tileHeight,
               ),
-              itemCount: activeItems.length,
+              itemCount: visibleItems.length,
               itemBuilder:
-                  (context, index) => _ItemTile(item: activeItems[index]),
+                  (context, index) => _ItemTile(item: visibleItems[index]),
             );
           },
         );
@@ -298,6 +600,7 @@ class _ItemTile extends ConsumerWidget {
     final needsCustomization =
         item.pricingType == PricingType.combo ||
         item.pricingType == PricingType.variantMatrix;
+    final badge = _ItemBadge.forItem(item);
 
     return Container(
       decoration: BoxDecoration(
@@ -388,26 +691,138 @@ class _ItemTile extends ConsumerWidget {
                           ),
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  item.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    height: 1.2,
+                Flexible(
+                  child: Text(
+                    item.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '₱${item.basePrice.toStringAsFixed(2)}',
-                  style: AppTypography.priceBadge,
+                // Price and its qualifier share one line: the grid's tiles
+                // are sized for speed, and a second line of type would cost
+                // a row of items on a phone.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '₱${item.basePrice.toStringAsFixed(2)}',
+                        style: AppTypography.priceBadge,
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 6),
+                        _ItemTypeBadge(badge: badge),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What a tile says about an item beyond its price.
+///
+/// The kiosk labels every item with its pricing type; the Cashier only
+/// labels the ones that change what tapping the tile does, so the badge
+/// stays a signal rather than noise on a wall of tiles. There is no unit
+/// field on [Item], so a weight/volume price gets no invented "/kg" suffix —
+/// it gets told, honestly, that the price is per unit of weight.
+class _ItemBadge {
+  const _ItemBadge({
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+
+  static _ItemBadge? forItem(Item item) {
+    if (item.stockOnHand <= 0 && item.pricingType == PricingType.unit) {
+      return const _ItemBadge(
+        label: 'OUT OF STOCK',
+        color: AppColors.onErrorContainer,
+        background: AppColors.errorContainer,
+      );
+    }
+    if (item.lowStockThreshold != null &&
+        item.lowStockThreshold! > 0 &&
+        item.stockOnHand <= item.lowStockThreshold! &&
+        item.pricingType == PricingType.unit) {
+      return const _ItemBadge(
+        label: 'LOW STOCK',
+        color: AppColors.onWarningContainer,
+        background: AppColors.warningContainer,
+      );
+    }
+    return switch (item.pricingType) {
+      PricingType.combo => const _ItemBadge(
+        label: 'COMBO',
+        color: AppColors.onAccentWarmContainer,
+        background: AppColors.accentWarmContainer,
+      ),
+      PricingType.variantMatrix => const _ItemBadge(
+        label: 'OPTIONS',
+        color: AppColors.onBrandPrimaryContainer,
+        background: AppColors.brandPrimaryContainer,
+      ),
+      PricingType.weightVolume => const _ItemBadge(
+        label: 'BY WEIGHT',
+        color: AppColors.onInfoContainer,
+        background: AppColors.infoContainer,
+      ),
+      PricingType.bundle => const _ItemBadge(
+        label: 'BUNDLE',
+        color: AppColors.onAccentWarmContainer,
+        background: AppColors.accentWarmContainer,
+      ),
+      PricingType.service => const _ItemBadge(
+        label: 'SERVICE',
+        color: AppColors.onInfoContainer,
+        background: AppColors.infoContainer,
+      ),
+      _ => null,
+    };
+  }
+}
+
+class _ItemTypeBadge extends StatelessWidget {
+  const _ItemTypeBadge({required this.badge});
+
+  final _ItemBadge badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: badge.background,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: badge.color.withOpacity(0.25), width: 0.8),
+      ),
+      child: Text(
+        badge.label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+          height: 1.2,
+          color: badge.color,
         ),
       ),
     );

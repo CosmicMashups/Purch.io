@@ -59,6 +59,34 @@ class CreateCategoryController extends _$CreateCategoryController {
 }
 
 @riverpod
+class UpdateCategoryController extends _$UpdateCategoryController {
+  @override
+  FutureOr<void> build() {}
+
+  Future<bool> updateCategory(
+    String categoryId,
+    UpdateCategoryRequest request,
+  ) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateCategory(categoryId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(categoryListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+@riverpod
 class ItemList extends _$ItemList {
   @override
   Future<List<Item>> build() {
@@ -81,6 +109,31 @@ class CreateItemController extends _$CreateItemController {
     final repository = ref.read(catalogRepositoryProvider);
 
     state = await AsyncValue.guard(() => repository.createItem(request));
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(itemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+@riverpod
+class UpdateItemController extends _$UpdateItemController {
+  @override
+  FutureOr<void> build() {}
+
+  Future<bool> updateItem(String itemId, UpdateItemRequest request) async {
+    state = const AsyncLoading();
+    final repository = ref.read(catalogRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateItem(itemId, request),
+    );
     final succeeded = !state.hasError;
     if (succeeded) {
       await ref.read(itemListProvider.notifier).refresh();

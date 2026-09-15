@@ -4,3 +4,15 @@
 /// here since the backend accepts them, but their dedicated screens
 /// (variant matrix, combo builder, bundle rules, batches) aren't built yet.
 enum PricingType { unit, weightVolume, bundle, service, combo, variantMatrix }
+
+extension PricingTypeX on PricingType {
+  String get label => switch (this) {
+    PricingType.unit => 'Unit',
+    PricingType.weightVolume => 'Weight / Volume',
+    PricingType.bundle => 'Bundle',
+    PricingType.service => 'Service',
+    PricingType.combo => 'Combo',
+    PricingType.variantMatrix => 'Variant Matrix',
+  };
+}
+

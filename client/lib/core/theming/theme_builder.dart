@@ -39,15 +39,17 @@ class BrandingColors {
     required this.accent,
     required this.primaryText,
     required this.secondaryText,
+    this.fontFamily,
   });
 
-  /// The built-in Purch.io palette — what the app looks like with no tenant
+  /// The built-in Purch.io palette and typography — what the app looks like with no tenant
   /// branding configured at all.
   static const BrandingColors defaults = BrandingColors(
     background: AppColors.background,
     accent: AppColors.brandPrimary,
     primaryText: AppColors.textPrimary,
     secondaryText: AppColors.textSecondary,
+    fontFamily: AppTypography.defaultFontFamily,
   );
 
   /// Resolves a cached branding row (or null, when nothing is cached yet).
@@ -62,6 +64,7 @@ class BrandingColors {
       secondaryText:
           parseHexColor(branding.secondaryTextColorHex) ??
           defaults.secondaryText,
+      fontFamily: branding.fontFamily ?? defaults.fontFamily,
     );
   }
 
@@ -69,12 +72,14 @@ class BrandingColors {
   final Color accent;
   final Color primaryText;
   final Color secondaryText;
+  final String? fontFamily;
 
   ThemeData toStaffTheme() => AppTheme.staffTheme(
     background: background,
     accent: accent,
     primaryText: primaryText,
     secondaryText: secondaryText,
+    fontFamily: fontFamily,
   );
 
   ThemeData toKioskTheme() => AppTheme.kioskTheme(
@@ -82,6 +87,7 @@ class BrandingColors {
     accent: accent,
     primaryText: primaryText,
     secondaryText: secondaryText,
+    fontFamily: fontFamily,
   );
 
   @override
@@ -90,11 +96,12 @@ class BrandingColors {
       other.background == background &&
       other.accent == accent &&
       other.primaryText == primaryText &&
-      other.secondaryText == secondaryText;
+      other.secondaryText == secondaryText &&
+      other.fontFamily == fontFamily;
 
   @override
   int get hashCode =>
-      Object.hash(background, accent, primaryText, secondaryText);
+      Object.hash(background, accent, primaryText, secondaryText, fontFamily);
 }
 
 /// Streams the single cached branding row for this device. Emits null while

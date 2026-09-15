@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_tokens.dart';
 
 /// AppTheme builds the ThemeData for Purch.io.
 /// - staffTheme: For the landscape staff tablet app (dense, high-contrast, min 48dp targets).
 /// - kioskTheme: For the portrait customer-facing self-order flow (tactile, friendly, inviting, min 64dp buttons).
 ///
-/// Both accept the four tenant-configurable colours (background, accent,
-/// primary text, secondary text). Each defaults to its AppColors token, so
-/// calling them with no arguments yields exactly the built-in Purch.io look.
-/// core/theming/theme_builder.dart is what actually feeds tenant branding in —
-/// the ThemeData tree itself lives here and only here.
+/// Both accept the tenant-configurable colours and custom font family.
+/// Each defaults to its AppColors and AppTypography tokens, so calling them with no
+/// arguments yields exactly the built-in Purch.io look.
 abstract class AppTheme {
   static ThemeData staffTheme({
     Color background = AppColors.background,
     Color accent = AppColors.brandPrimary,
     Color primaryText = AppColors.textPrimary,
     Color secondaryText = AppColors.textSecondary,
+    String? fontFamily,
   }) {
     final baseColorScheme = ColorScheme.fromSeed(
       seedColor: accent,
@@ -29,17 +29,28 @@ abstract class AppTheme {
       error: AppColors.error,
     );
 
+    final effectiveFontFamily = (fontFamily != null && fontFamily.trim().isNotEmpty)
+        ? fontFamily.trim()
+        : AppTypography.defaultFontFamily;
+    final resolvedTextTheme = AppTypography.createTextTheme(effectiveFontFamily).apply(
+      bodyColor: primaryText,
+      displayColor: primaryText,
+    );
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: baseColorScheme,
       scaffoldBackgroundColor: background,
+      textTheme: resolvedTextTheme,
+      fontFamily: resolvedTextTheme.bodyMedium?.fontFamily,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surface,
         foregroundColor: primaryText,
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: AppTypography.getSafeGoogleFont(
+          AppTypography.displayFontFamily,
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: primaryText,
@@ -121,12 +132,14 @@ abstract class AppTheme {
     Color accent = AppColors.brandPrimary,
     Color primaryText = AppColors.textPrimary,
     Color secondaryText = AppColors.textSecondary,
+    String? fontFamily,
   }) {
     final staff = staffTheme(
       background: background,
       accent: accent,
       primaryText: primaryText,
       secondaryText: secondaryText,
+      fontFamily: fontFamily,
     );
     return staff.copyWith(
       scaffoldBackgroundColor: background,
@@ -135,7 +148,8 @@ abstract class AppTheme {
         foregroundColor: primaryText,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
+        titleTextStyle: AppTypography.getSafeGoogleFont(
+          AppTypography.displayFontFamily,
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: primaryText,

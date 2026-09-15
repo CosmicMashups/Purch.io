@@ -9,6 +9,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/charts/chart_card.dart';
 import '../../../../core/widgets/charts/chart_primitives.dart';
 import '../../../../core/widgets/charts/chart_theme.dart';
+import '../../../../core/widgets/status_badge.dart';
 import '../../../credit_ledger/presentation/providers/credit_ledger_providers.dart';
 import '../../../inventory/domain/inventory_movement_models.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
@@ -65,11 +66,42 @@ class HomeTabScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            Text(_greeting(), style: AppTypography.headlineSm),
-            const SizedBox(height: 2),
-            Text(
-              "Here's what's happening right now.",
-              style: AppTypography.body,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_greeting(), style: AppTypography.headlineSm),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Here's what's happening right now.",
+                        style: AppTypography.body,
+                      ),
+                    ],
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    StatusBadge.active(label: 'Operational'),
+                    if (syncConflicts > 0)
+                      StatusBadge(
+                        label: '$syncConflicts Conflict${syncConflicts == 1 ? '' : 's'}',
+                        type: StatusBadgeType.error,
+                        icon: Icons.sync_problem_rounded,
+                      )
+                    else
+                      const StatusBadge(
+                        label: 'Synced',
+                        type: StatusBadgeType.info,
+                        icon: Icons.cloud_done_rounded,
+                      ),
+                  ],
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.xl),
 
@@ -244,13 +276,24 @@ class _TrendFooter extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          ChartTheme.peso(series.total),
-          style: AppTypography.priceLine.copyWith(fontSize: 17),
+        Flexible(
+          child: Text(
+            ChartTheme.peso(series.total),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.priceLine.copyWith(fontSize: 17),
+          ),
         ),
         const SizedBox(width: AppSpacing.md),
         if (change == null)
-          Text('No comparable prior period', style: AppTypography.bodySm)
+          Flexible(
+            child: Text(
+              'No comparable prior period',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.bodySm,
+            ),
+          )
         else
           _DeltaPill(fraction: change),
         const Spacer(),
@@ -295,14 +338,20 @@ class _DeltaPill extends StatelessWidget {
         isFlat
             ? AppColors.textMuted
             : isUp
-            ? AppColors.success
-            : AppColors.error;
+            ? AppColors.onSuccessContainer
+            : AppColors.onErrorContainer;
     final background =
         isFlat
-            ? AppColors.borderSubtle
+            ? AppColors.neutralContainer
             : isUp
-            ? AppColors.accentEmeraldContainer
-            : const Color(0xFFFEE2E2);
+            ? AppColors.successContainer
+            : AppColors.errorContainer;
+    final border =
+        isFlat
+            ? AppColors.neutralBorder
+            : isUp
+            ? AppColors.successBorder
+            : AppColors.errorBorder;
     final icon =
         isFlat
             ? Icons.remove_rounded
@@ -318,12 +367,13 @@ class _DeltaPill extends StatelessWidget {
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : AppSpacing.sm,
+        horizontal: compact ? 7 : AppSpacing.sm + 1,
         vertical: compact ? 2 : 4,
       ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(AppRadius.full),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -465,14 +515,10 @@ class _RevenueSummarySection extends ConsumerWidget {
 
     return dashboardAsync.when(
       loading:
-          () => const Row(
-            children: [
-              Expanded(child: _RevenueCardSkeleton()),
-              SizedBox(width: AppSpacing.md),
-              Expanded(child: _RevenueCardSkeleton()),
-              SizedBox(width: AppSpacing.md),
-              Expanded(child: _RevenueCardSkeleton()),
-            ],
+          () => const _RevenueCardLayout(
+            primary: _RevenueCardSkeleton(),
+            secondary: _RevenueCardSkeleton(),
+            tertiary: _RevenueCardSkeleton(),
           ),
       error:
           (error, _) => Container(
@@ -504,31 +550,74 @@ class _RevenueSummarySection extends ConsumerWidget {
             ),
           ),
       data: (dashboard) {
-        return Row(
+        return _RevenueCardLayout(
+          primary: _RevenueCard(
+            label: 'Today',
+            amount: dashboard.revenueToday,
+            change: _periodChange(dashboard.trend, days: 1),
+            isPrimary: true,
+          ),
+          secondary: _RevenueCard(
+            label: 'Last 7 Days',
+            amount: dashboard.revenueLast7Days,
+            change: _periodChange(dashboard.trend, days: 7),
+          ),
+          tertiary: _RevenueCard(
+            label: 'Last 30 Days',
+            amount: dashboard.revenueLast30Days,
+            change: _periodChange(dashboard.trend, days: 30),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Three revenue cards across when there's room; on a phone, today's figure
+/// full-width with the two rolling windows beside each other under it.
+///
+/// Splitting one phone width three ways leaves ~80dp of card interior, which
+/// isn't enough for the label, the amount and the movement pill — the row
+/// overflowed rather than degrading.
+class _RevenueCardLayout extends StatelessWidget {
+  const _RevenueCardLayout({
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+  });
+
+  static const double _stackBelowWidth = 520;
+
+  final Widget primary;
+  final Widget secondary;
+  final Widget tertiary;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= _stackBelowWidth) {
+          return Row(
+            children: [
+              Expanded(child: primary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: secondary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: tertiary),
+            ],
+          );
+        }
+
+        return Column(
           children: [
-            Expanded(
-              child: _RevenueCard(
-                label: 'Today',
-                amount: dashboard.revenueToday,
-                change: _periodChange(dashboard.trend, days: 1),
-                isPrimary: true,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _RevenueCard(
-                label: 'Last 7 Days',
-                amount: dashboard.revenueLast7Days,
-                change: _periodChange(dashboard.trend, days: 7),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _RevenueCard(
-                label: 'Last 30 Days',
-                amount: dashboard.revenueLast30Days,
-                change: _periodChange(dashboard.trend, days: 30),
-              ),
+            primary,
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(child: secondary),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: tertiary),
+              ],
             ),
           ],
         );
@@ -637,19 +726,22 @@ class _RevenueCard extends StatelessWidget {
               style: AppTypography.bodySm.copyWith(fontSize: 11),
             )
           else
-            Row(
-              children: [
-                _DeltaPill(fraction: change!, compact: true),
-                const SizedBox(width: AppSpacing.xs),
-                Flexible(
-                  child: Text(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _DeltaPill(fraction: change!, compact: true),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
                     'vs prior',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.bodySm.copyWith(fontSize: 11),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
         ],
       ),

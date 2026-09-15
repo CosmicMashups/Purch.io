@@ -247,6 +247,30 @@ void main() {
     expect(find.text('Meals'), findsOneWidget);
   });
 
+  testWidgets('the sales trend header does not overflow on a phone', (
+    tester,
+  ) async {
+    // Portrait phone: the ChartCard spans the full page width, so its header
+    // can't fit the title beside the five-chip range filter. The filter has
+    // to stack under the title rather than overflow the header row.
+    tester.view.physicalSize = const Size(400, 5200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _wrap(
+        reportsRepository: FakeReportsRepository(salesDashboard: _dashboard()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // A RenderFlex overflow surfaces here rather than only as red stripes.
+    expect(tester.takeException(), isNull);
+    expect(find.text('Sales Trend'), findsOneWidget);
+    expect(find.text('Custom'), findsOneWidget);
+  });
+
   testWidgets('cashiers get the quick actions but not the reporting charts', (
     tester,
   ) async {
