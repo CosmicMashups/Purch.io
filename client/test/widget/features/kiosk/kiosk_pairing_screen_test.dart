@@ -26,7 +26,7 @@ void main() {
       await tester.tap(find.text('Pair This Kiosk'));
       await tester.pump();
 
-      expect(find.text('Required'), findsOneWidget);
+      expect(find.text('Required'), findsNWidgets(2));
       expect(repository.lastPairingCode, isNull);
     },
   );
@@ -46,10 +46,15 @@ void main() {
       find.widgetWithText(TextFormField, 'Device pairing code'),
       'KIOSK-1',
     );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Pairing PIN'),
+      '5678',
+    );
     await tester.tap(find.text('Pair This Kiosk'));
     await tester.pumpAndSettle();
 
     expect(repository.lastPairingCode, 'KIOSK-1');
+    expect(repository.lastPairingPin, '5678');
     expect(paired, isTrue);
   });
 
@@ -73,6 +78,10 @@ void main() {
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Device pairing code'),
         'BAD-CODE',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Pairing PIN'),
+        '0000',
       );
       await tester.tap(find.text('Pair This Kiosk'));
       await tester.pumpAndSettle();

@@ -32,11 +32,15 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       final accessToken = response.data?['accessToken'] as String?;
-      if (accessToken == null) {
-        throw StateError('Login response did not include an accessToken.');
+      final refreshToken = response.data?['refreshToken'] as String?;
+      if (accessToken == null || refreshToken == null) {
+        throw StateError('Login response did not include an accessToken/refreshToken.');
       }
 
-      await _tokenStorage.saveAccessToken(accessToken);
+      await _tokenStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
 
       // The token is this device's only source for its own id — persist it
       // locally so it survives past this session (see DeviceIdentity's doc
@@ -66,11 +70,15 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       final accessToken = response.data?['accessToken'] as String?;
-      if (accessToken == null) {
-        throw StateError('Admin login response did not include an accessToken.');
+      final refreshToken = response.data?['refreshToken'] as String?;
+      if (accessToken == null || refreshToken == null) {
+        throw StateError('Admin login response did not include an accessToken/refreshToken.');
       }
 
-      await _tokenStorage.saveAccessToken(accessToken);
+      await _tokenStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
 
       // An admin token carries no device/branch claims (it isn't tied to any
       // physical terminal), so there's no device identity to persist here.
@@ -86,10 +94,25 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<void> logout() {
+  Future<void> logout() async {
+    // Best-effort: revoke the refresh token server-side so it can't be
+    // redeemed later (e.g. if it leaked) — but a failure here must never
+    // block the local logout the user is actively asking for.
+    final refreshToken = await _tokenStorage.readRefreshToken();
+    if (refreshToken != null) {
+      try {
+        await _apiClient.dio.post<void>(
+          '/auth/logout',
+          data: {'refreshToken': refreshToken},
+        );
+      } on DioException {
+        // Ignored — see comment above.
+      }
+    }
+
     // Identity is left in place deliberately: it's re-derived from the same
     // device's own next login, and clearing it would erase the last-known
     // receipt number that a future offline checkout needs to resume from.
-    return _tokenStorage.clear();
+    await _tokenStorage.clear();
   }
 }

@@ -18,6 +18,7 @@ namespace Purch.IntegrationTests;
 public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
 {
     private static readonly BCryptPinHasher PinHasher = new();
+    private static readonly BCryptPasswordHasher PasswordHasher = new();
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
@@ -43,6 +44,52 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
 
         Assert.Equal(tenantId.ToString(), tenantClaim);
         Assert.Equal(nameof(Role.Admin), roleClaim);
+        Assert.False(string.IsNullOrWhiteSpace(body!.RefreshToken));
+    }
+
+    [Fact]
+    public async Task Refresh_with_a_valid_token_issues_a_new_access_token_and_rotates_the_refresh_token()
+    {
+        var tenantId = Guid.NewGuid();
+        const string pairingCode = "DEVICE-REFRESH";
+        const string pin = "1234";
+        await SeedTenantDeviceAndUserAsync(tenantId, pairingCode, pin, Role.Admin);
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var loginResponse = await client.PostAsJsonAsync("/auth/login", new LoginRequest(pairingCode, pin));
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        Assert.NotNull(loginBody);
+
+        var refreshResponse = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody!.RefreshToken));
+
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var refreshBody = await refreshResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        Assert.NotNull(refreshBody);
+        Assert.False(string.IsNullOrWhiteSpace(refreshBody!.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(refreshBody.RefreshToken));
+        Assert.NotEqual(loginBody.RefreshToken, refreshBody.RefreshToken);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(refreshBody.AccessToken);
+        Assert.Equal(tenantId.ToString(), jwt.Claims.Single(c => c.Type == JwtClaimTypes.TenantId).Value);
+
+        // Single-use: the original refresh token was rotated away, so redeeming it again fails.
+        var reuseResponse = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, reuseResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_with_an_unrecognized_token_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest("not-a-real-refresh-token"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.False(string.IsNullOrWhiteSpace(problem?.Detail));
     }
 
     [Fact]
@@ -89,6 +136,96 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         Assert.Contains("Pin", problem!.Errors.Keys);
     }
 
+    [Fact]
+    public async Task Requesting_and_confirming_a_password_reset_lets_the_admin_log_in_with_the_new_password_and_revokes_old_sessions()
+    {
+        var tenantId = Guid.NewGuid();
+        const string email = "owner@example.com";
+        const string oldPassword = "old-password-123";
+        const string newPassword = "brand-new-password-456";
+        var userId = await SeedAdminUserAsync(tenantId, email, oldPassword);
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var oldLoginResponse = await client.PostAsJsonAsync("/auth/admin-login", new AdminLoginRequest(email, oldPassword));
+        var oldLoginBody = await oldLoginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        Assert.NotNull(oldLoginBody);
+
+        var requestResponse = await client.PostAsJsonAsync("/auth/password-reset/request", new PasswordResetRequest(email));
+        Assert.Equal(HttpStatusCode.NoContent, requestResponse.StatusCode);
+
+        var rawToken = factory.PasswordResetTokenNotifier.LastTokenFor(userId);
+
+        var confirmResponse = await client.PostAsJsonAsync(
+            "/auth/password-reset/confirm",
+            new PasswordResetConfirmRequest(rawToken, newPassword));
+        Assert.Equal(HttpStatusCode.NoContent, confirmResponse.StatusCode);
+
+        // The refresh token from before the reset no longer works...
+        var refreshWithOldTokenResponse = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(oldLoginBody!.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, refreshWithOldTokenResponse.StatusCode);
+
+        // ...the old password no longer works...
+        var oldPasswordLoginResponse = await client.PostAsJsonAsync("/auth/admin-login", new AdminLoginRequest(email, oldPassword));
+        Assert.Equal(HttpStatusCode.Unauthorized, oldPasswordLoginResponse.StatusCode);
+
+        // ...but the new one does.
+        var newPasswordLoginResponse = await client.PostAsJsonAsync("/auth/admin-login", new AdminLoginRequest(email, newPassword));
+        Assert.Equal(HttpStatusCode.OK, newPasswordLoginResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Confirming_a_password_reset_with_an_unrecognized_token_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/password-reset/confirm",
+            new PasswordResetConfirmRequest("not-a-real-token", "whatever-password"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Requesting_a_password_reset_for_an_unknown_email_still_returns_204()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        // Never reveals whether the email has an account — same shape either way.
+        var response = await client.PostAsJsonAsync("/auth/password-reset/request", new PasswordResetRequest("nobody@example.com"));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private async Task<Guid> SeedAdminUserAsync(Guid tenantId, string email, string password)
+    {
+        var options = new DbContextOptionsBuilder<PurchDbContext>()
+            .UseNpgsql(postgres.ConnectionString)
+            .Options;
+
+        await using var dbContext = new PurchDbContext(options, new TestCurrentTenantProvider { TenantId = tenantId });
+
+        var user = new User
+        {
+            TenantId = tenantId,
+            Name = "Test Owner",
+            Email = email,
+            Role = Role.Admin,
+            ScopeType = ScopeType.Tenant,
+            PinHash = PinHasher.Hash("0000"),
+            PasswordHash = PasswordHasher.Hash(password),
+            IsActive = true,
+        };
+        _ = dbContext.Users.Add(user);
+
+        _ = await dbContext.SaveChangesAsync();
+
+        return user.Id;
+    }
+
     private async Task SeedTenantDeviceAndUserAsync(Guid tenantId, string pairingCode, string pin, Role role)
     {
         var options = new DbContextOptionsBuilder<PurchDbContext>()
@@ -120,5 +257,5 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         _ = await dbContext.SaveChangesAsync();
     }
 
-    private sealed record LoginResponseBody(string AccessToken);
+    private sealed record LoginResponseBody(string AccessToken, string RefreshToken);
 }

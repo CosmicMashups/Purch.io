@@ -45,4 +45,8 @@ public class Transaction : TenantScopedEntity
     /// number is issued before payment and ReceiptNumber must only ever correspond
     /// to a completed, paid sale (BIR requirement). 0 means unissued.</summary>
     public long KioskPrepNumber { get; set; }
+
+    /// <summary>Only meaningful when OriginatedFromKiosk is true — Kitchen Display
+    /// advances it, Order Board reads it, both orthogonal to Status (payment).</summary>
+    public KitchenStatus KitchenStatus { get; set; } = KitchenStatus.Queued;
 }

@@ -183,6 +183,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
       branchId: request.branchId,
       pairingCode: 'CODE${devices.length + 1}',
       deviceIdentifier: request.deviceIdentifier,
+      deviceType: request.deviceType,
       lastSeenAt: null,
     );
     devices.add(created);

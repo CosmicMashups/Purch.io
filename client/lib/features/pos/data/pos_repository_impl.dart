@@ -67,10 +67,44 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<Transaction> setOrderType(SetOrderTypeRequest request) {
+    return _put(
+      '/transactions/cart/order-type',
+      request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
+  @override
   Future<Transaction> recordPayment(RecordPaymentRequest request) {
     return _post(
       '/transactions/cart/payments',
       request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
+  @override
+  Future<List<Transaction>> listPendingKioskOrders(String branchId) async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/transactions/kiosk-pending',
+        queryParameters: {'branchId': branchId},
+      );
+      return (response.data ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(Transaction.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<Transaction> claimKioskOrder(String transactionId) {
+    return _post(
+      '/transactions/kiosk-pending/$transactionId/claim',
+      const {},
       Transaction.fromJson,
     );
   }

@@ -210,6 +210,45 @@ class FakePosRepository implements PosRepository {
     return cart;
   }
 
+  List<Transaction> pendingKioskOrders = [];
+  String? lastClaimedKioskOrderId;
+
+  @override
+  Future<Transaction> setOrderType(SetOrderTypeRequest request) async {
+    cart = Transaction(
+      id: cart.id,
+      branchId: cart.branchId,
+      deviceId: cart.deviceId,
+      status: cart.status,
+      lines: cart.lines,
+      subtotal: cart.subtotal,
+      discountAmount: cart.discountAmount,
+      seniorPwdDiscountApplied: cart.seniorPwdDiscountApplied,
+      promoCode: cart.promoCode,
+      promoDiscountAmount: cart.promoDiscountAmount,
+      totalAmount: cart.totalAmount,
+      receiptNumber: cart.receiptNumber,
+      orderType: request.orderType,
+      originatedFromKiosk: cart.originatedFromKiosk,
+      kioskPrepNumber: cart.kioskPrepNumber,
+      payments: cart.payments,
+    );
+    return cart;
+  }
+
+  @override
+  Future<List<Transaction>> listPendingKioskOrders(String branchId) async =>
+      pendingKioskOrders;
+
+  @override
+  Future<Transaction> claimKioskOrder(String transactionId) async {
+    lastClaimedKioskOrderId = transactionId;
+    final claimed = pendingKioskOrders.firstWhere((order) => order.id == transactionId);
+    pendingKioskOrders = pendingKioskOrders.where((order) => order.id != transactionId).toList();
+    cart = claimed;
+    return cart;
+  }
+
   @override
   Future<Transaction> recordPayment(RecordPaymentRequest request) async {
     lastRecordPaymentRequest = request;

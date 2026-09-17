@@ -1,6 +1,11 @@
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Purch.Application.Auth;
+using Purch.Domain.Entities;
 
 namespace Purch.IntegrationTests.Fixtures;
 
@@ -9,6 +14,12 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
 {
     public const string TestJwtSigningKey = "integration-test-signing-key-do-not-use-in-prod";
     public const string TestJwtIssuer = "purch.io.tests";
+
+    /// <summary>The real notifier only writes to stdout (no email provider exists yet —
+    /// see ConsolePasswordResetTokenNotifier), which tests can't observe. This capturing
+    /// double stands in for it so password-reset tests can retrieve the raw token that
+    /// would otherwise only ever reach the user's inbox.</summary>
+    public CapturingPasswordResetTokenNotifier PasswordResetTokenNotifier { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -23,5 +34,24 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
                 ["JWT_ISSUER"] = TestJwtIssuer,
             });
         });
+
+        _ = builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IPasswordResetTokenNotifier>();
+            services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
+        });
     }
+}
+
+public sealed class CapturingPasswordResetTokenNotifier : IPasswordResetTokenNotifier
+{
+    private readonly ConcurrentDictionary<Guid, string> _tokensByUserId = new();
+
+    public Task NotifyAsync(User user, string rawToken, CancellationToken cancellationToken = default)
+    {
+        _tokensByUserId[user.Id] = rawToken;
+        return Task.CompletedTask;
+    }
+
+    public string LastTokenFor(Guid userId) => _tokensByUserId[userId];
 }

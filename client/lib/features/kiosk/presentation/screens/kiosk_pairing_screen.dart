@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
@@ -18,10 +18,12 @@ class KioskPairingScreen extends ConsumerStatefulWidget {
 class _KioskPairingScreenState extends ConsumerState<KioskPairingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _pairingCodeController = TextEditingController();
+  final _pairingPinController = TextEditingController();
 
   @override
   void dispose() {
     _pairingCodeController.dispose();
+    _pairingPinController.dispose();
     super.dispose();
   }
 
@@ -31,7 +33,10 @@ class _KioskPairingScreenState extends ConsumerState<KioskPairingScreen> {
     }
 
     final controller = ref.read(kioskPairingControllerProvider.notifier);
-    await controller.pair(_pairingCodeController.text.trim());
+    await controller.pair(
+      _pairingCodeController.text.trim(),
+      _pairingPinController.text.trim(),
+    );
 
     if (!mounted) {
       return;
@@ -60,107 +65,132 @@ class _KioskPairingScreenState extends ConsumerState<KioskPairingScreen> {
       ),
       body: SafeArea(
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: const BoxDecoration(
-                          color: AppColors.brandPrimaryContainer,
-                          shape: BoxShape.circle,
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: const BoxDecoration(
+                            color: AppColors.brandPrimaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.point_of_sale_rounded,
+                            size: 56,
+                            color: AppColors.brandPrimary,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.point_of_sale_rounded,
-                          size: 56,
-                          color: AppColors.brandPrimary,
-                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Pair this device as a self-order kiosk. It will only '
-                      'be able to build and submit orders — no payment, '
-                      'discounts, or promo codes.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textSecondary,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _pairingCodeController,
-                      enabled: !isLoading,
-                      decoration: const InputDecoration(
-                        labelText: 'Device pairing code',
-                        border: OutlineInputBorder(borderRadius: AppRadius.mdBorder),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      validator:
-                          (value) =>
-                              (value == null || value.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                    ),
-                    if (failure != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        failure.message,
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Pair this device as a self-order kiosk. It will only '
+                        'be able to build and submit orders — no payment, '
+                        'discounts, or promo codes.',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                    ],
-                    const SizedBox(height: 28),
-                    Container(
-                      decoration: const BoxDecoration(
-                        boxShadow: AppShadows.tactileButton,
-                        borderRadius: AppRadius.mdBorder,
-                      ),
-                      child: SizedBox(
-                        height: 60,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.brandPrimary,
-                            foregroundColor: AppColors.onBrandPrimary,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: AppRadius.mdBorder,
-                            ),
+                      const SizedBox(height: 32),
+                      TextFormField(
+                        controller: _pairingCodeController,
+                        enabled: !isLoading,
+                        decoration: const InputDecoration(
+                          labelText: 'Device pairing code',
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
                           ),
-                          onPressed: isLoading ? null : _submit,
-                          child:
-                              isLoading
-                                  ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator:
+                            (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? 'Required'
+                                    : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _pairingPinController,
+                        enabled: !isLoading,
+                        decoration: const InputDecoration(
+                          labelText: 'Pairing PIN',
+                          helperText:
+                              'Set by an admin in Manage Devices when this kiosk was added.',
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.mdBorder,
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        validator:
+                            (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? 'Required'
+                                    : null,
+                      ),
+                      if (failure != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          failure.message,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+                      Container(
+                        decoration: const BoxDecoration(
+                          boxShadow: AppShadows.tactileButton,
+                          borderRadius: AppRadius.mdBorder,
+                        ),
+                        child: SizedBox(
+                          height: 60,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.brandPrimary,
+                              foregroundColor: AppColors.onBrandPrimary,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                            ),
+                            onPressed: isLoading ? null : _submit,
+                            child:
+                                isLoading
+                                    ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text(
+                                      'Pair This Kiosk',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  )
-                                  : const Text(
-                                    'Pair This Kiosk',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

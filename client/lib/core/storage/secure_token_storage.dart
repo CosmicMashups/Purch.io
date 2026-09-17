@@ -10,6 +10,7 @@ class SecureTokenStorage {
     : _storage = storage ?? const FlutterSecureStorage();
 
   static const _accessTokenKey = 'purch_access_token';
+  static const _refreshTokenKey = 'purch_refresh_token';
 
   final FlutterSecureStorage _storage;
 
@@ -21,7 +22,26 @@ class SecureTokenStorage {
     return _storage.read(key: _accessTokenKey);
   }
 
-  Future<void> clear() {
-    return _storage.delete(key: _accessTokenKey);
+  Future<void> saveRefreshToken(String token) {
+    return _storage.write(key: _refreshTokenKey, value: token);
+  }
+
+  Future<String?> readRefreshToken() {
+    return _storage.read(key: _refreshTokenKey);
+  }
+
+  /// Persists a login/refresh response's pair together, since one is never
+  /// meaningful without the other.
+  Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await saveAccessToken(accessToken);
+    await saveRefreshToken(refreshToken);
+  }
+
+  Future<void> clear() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _refreshTokenKey);
   }
 }

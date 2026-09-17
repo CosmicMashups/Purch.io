@@ -3,6 +3,9 @@ import 'payment_method.dart';
 /// Mirrors Purch.Domain.Enums.TransactionStatus exactly, in declared order.
 enum TransactionStatus { open, awaitingPayment, completed, voided, refunded }
 
+/// Mirrors Purch.Domain.Enums.KitchenStatus exactly, in declared order.
+enum KitchenStatus { queued, preparing, ready, pickedUp }
+
 /// Mirrors Purch.Application.Pos.TransactionDto — the cart engine's view of
 /// a device's single in-progress sale.
 class Transaction {
@@ -22,6 +25,7 @@ class Transaction {
     this.orderType,
     this.originatedFromKiosk = false,
     this.kioskPrepNumber,
+    this.kitchenStatus = KitchenStatus.queued,
     required this.payments,
   });
 
@@ -46,6 +50,7 @@ class Transaction {
       orderType: json['orderType'] as String?,
       originatedFromKiosk: json['originatedFromKiosk'] as bool,
       kioskPrepNumber: (json['kioskPrepNumber'] as num?)?.toInt(),
+      kitchenStatus: KitchenStatus.values[json['kitchenStatus'] as int? ?? 0],
       payments:
           (json['payments'] as List<dynamic>)
               .cast<Map<String, dynamic>>()
@@ -69,6 +74,7 @@ class Transaction {
   final String? orderType;
   final bool originatedFromKiosk;
   final int? kioskPrepNumber;
+  final KitchenStatus kitchenStatus;
   final List<Payment> payments;
 
   int get itemCount =>
@@ -269,4 +275,14 @@ class SetOrderTypeRequest {
   final String orderType;
 
   Map<String, dynamic> toJson() => {'orderType': orderType};
+}
+
+/// Mirrors Purch.Application.Pos.UpdateKitchenStatusRequest — Kitchen Display's
+/// request to advance a kiosk order's kitchen-prep state.
+class UpdateKitchenStatusRequest {
+  const UpdateKitchenStatusRequest({required this.kitchenStatus});
+
+  final KitchenStatus kitchenStatus;
+
+  Map<String, dynamic> toJson() => {'kitchenStatus': kitchenStatus.index};
 }

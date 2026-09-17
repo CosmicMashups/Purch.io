@@ -1,3 +1,5 @@
+using Purch.Domain.Enums;
+
 namespace Purch.Application.Onboarding;
 
 public sealed record DeviceDto(
@@ -5,4 +7,5 @@ public sealed record DeviceDto(
     Guid BranchId,
     string PairingCode,
     string? DeviceIdentifier,
+    DeviceType DeviceType,
     DateTimeOffset? LastSeenAt);

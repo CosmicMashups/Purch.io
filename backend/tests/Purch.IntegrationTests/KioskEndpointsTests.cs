@@ -23,7 +23,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest("not-a-real-code"));
+        var response = await client.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest("not-a-real-code", "1234"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -157,6 +157,68 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, claimResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task Resetting_a_devices_pairing_code_invalidates_the_old_code_and_revokes_its_sessions()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, deviceId) = await PairedKioskClientAsync(factory, adminClient);
+
+        var devicesBeforeReset = await adminClient.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+        var oldPairingCode = devicesBeforeReset!.Single(d => d.Id == deviceId).PairingCode;
+
+        var resetResponse = await adminClient.PostAsync($"/devices/{deviceId}/reset-pairing-code", null);
+        var resetDevice = await resetResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, resetResponse.StatusCode);
+        Assert.NotNull(resetDevice);
+        Assert.NotEqual(oldPairingCode, resetDevice!.PairingCode);
+
+        // The token issued under the old pairing code no longer works...
+        var cartAfterResetResponse = await kioskClient.GetAsync("/kiosk/cart");
+        Assert.Equal(HttpStatusCode.Unauthorized, cartAfterResetResponse.StatusCode);
+
+        // ...pairing with the old code is rejected...
+        using var staleKioskClient = factory.CreateClient();
+        var staleSessionResponse = await staleKioskClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(oldPairingCode, "5678"));
+        Assert.Equal(HttpStatusCode.Unauthorized, staleSessionResponse.StatusCode);
+
+        // ...but pairing with the new code succeeds.
+        using var freshKioskClient = factory.CreateClient();
+        var freshSessionResponse = await freshKioskClient.PostAsJsonAsync(
+            "/kiosk/session",
+            new KioskSessionRequest(resetDevice.PairingCode, "5678"));
+        Assert.Equal(HttpStatusCode.OK, freshSessionResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resetting_a_devices_pairing_pin_invalidates_the_old_pin_and_revokes_its_sessions()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, deviceId) = await PairedKioskClientAsync(factory, adminClient);
+
+        var resetResponse = await adminClient.PostAsJsonAsync(
+            $"/devices/{deviceId}/reset-pairing-pin",
+            new ResetDevicePairingPinRequest("4321"));
+        var resetDevice = await resetResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, resetResponse.StatusCode);
+
+        // The old session is revoked by the PIN reset...
+        var cartAfterResetResponse = await kioskClient.GetAsync("/kiosk/cart");
+        Assert.Equal(HttpStatusCode.Unauthorized, cartAfterResetResponse.StatusCode);
+
+        // ...the old PIN no longer works...
+        using var oldPinClient = factory.CreateClient();
+        var oldPinResponse = await oldPinClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(resetDevice!.PairingCode, "5678"));
+        Assert.Equal(HttpStatusCode.Unauthorized, oldPinResponse.StatusCode);
+
+        // ...but the new one does.
+        using var newPinClient = factory.CreateClient();
+        var newPinResponse = await newPinClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(resetDevice.PairingCode, "4321"));
+        Assert.Equal(HttpStatusCode.OK, newPinResponse.StatusCode);
+    }
+
     private static async Task<(HttpClient KioskClient, Guid BranchId, Guid DeviceId)> PairedKioskClientAsync(
         PurchApiFactory factory,
         HttpClient? existingAdminClient = null)
@@ -165,11 +227,13 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var branches = await adminClient.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
         var branchId = branches!.Single().Id;
 
-        var deviceResponse = await adminClient.PostAsJsonAsync("/devices", new CreateDeviceRequest(branchId, "Kiosk Terminal 1"));
+        var deviceResponse = await adminClient.PostAsJsonAsync(
+            "/devices",
+            new CreateDeviceRequest(branchId, "Kiosk Terminal 1", DeviceType.Kiosk, "5678"));
         var device = await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
 
         var kioskClient = factory.CreateClient();
-        var sessionResponse = await kioskClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(device!.PairingCode));
+        var sessionResponse = await kioskClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(device!.PairingCode, "5678"));
         var session = await sessionResponse.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions);
 
         kioskClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session!.AccessToken);

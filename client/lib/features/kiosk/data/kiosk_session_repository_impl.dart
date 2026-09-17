@@ -16,21 +16,31 @@ class KioskSessionRepositoryImpl implements KioskSessionRepository {
   final SecureTokenStorage _tokenStorage;
 
   @override
-  Future<void> pair({required String devicePairingCode}) async {
+  Future<void> pair({
+    required String devicePairingCode,
+    required String pairingPin,
+  }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/kiosk/session',
-        data: {'devicePairingCode': devicePairingCode},
+        data: {
+          'devicePairingCode': devicePairingCode,
+          'pairingPin': pairingPin,
+        },
       );
 
       final accessToken = response.data?['accessToken'] as String?;
-      if (accessToken == null) {
+      final refreshToken = response.data?['refreshToken'] as String?;
+      if (accessToken == null || refreshToken == null) {
         throw StateError(
-          'Kiosk session response did not include an accessToken.',
+          'Kiosk session response did not include an accessToken/refreshToken.',
         );
       }
 
-      await _tokenStorage.saveAccessToken(accessToken);
+      await _tokenStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
     }

@@ -13,6 +13,7 @@ import '../../../catalog/domain/pricing_type.dart';
 import '../../../catalog/domain/tingi_mode.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../catalog/presentation/screens/add_item_screen.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../../onboarding/presentation/screens/hardware_settings_screen.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
@@ -56,6 +57,11 @@ const _secondaryActions = <_SecondaryActionSpec>[
     icon: Icons.receipt_long_outlined,
     label: 'X / Z',
     path: '/cashier/bir-reading',
+  ),
+  _SecondaryActionSpec(
+    icon: Icons.storefront_outlined,
+    label: 'Kiosk Orders',
+    path: '/cashier/pending-kiosk-orders',
   ),
 ];
 
@@ -1487,6 +1493,28 @@ class _CartFooter extends ConsumerWidget {
                       ),
                     ),
           ),
+          if (ref.watch(isDineInTakeOutVerticalProvider))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                8,
+                AppSpacing.md,
+                4,
+              ),
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'Dine In', label: Text('Dine In'), icon: Icon(Icons.restaurant_rounded)),
+                  ButtonSegment(value: 'Take Out', label: Text('Take Out'), icon: Icon(Icons.takeout_dining_rounded)),
+                ],
+                selected: {if (cart.orderType != null) cart.orderType!},
+                emptySelectionAllowed: true,
+                onSelectionChanged: (selection) {
+                  if (selection.isNotEmpty) {
+                    ref.read(cartNotifierProvider.notifier).setOrderType(selection.first);
+                  }
+                },
+              ),
+            ),
           const Divider(color: AppColors.border, height: 1),
           if (MediaQuery.sizeOf(context).height >= 700) ...[
             Padding(
@@ -1504,18 +1532,7 @@ class _CartFooter extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(AppRadius.sm),
-                          onTap:
-                              () => Navigator.of(
-                                context,
-                                rootNavigator: true,
-                              ).push<void>(
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => PaymentScreen(
-                                        total: cart.totalAmount,
-                                      ),
-                                ),
-                              ),
+                          onTap: () => _goToPayment(context, ref, cart),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 5),
                             decoration: BoxDecoration(
@@ -1571,15 +1588,7 @@ class _CartFooter extends ConsumerWidget {
                       ),
                       elevation: 1,
                     ),
-                    onPressed:
-                        () => Navigator.of(context, rootNavigator: true)
-                            .push<void>(
-                              MaterialPageRoute(
-                                builder:
-                                    (_) =>
-                                        PaymentScreen(total: cart.totalAmount),
-                              ),
-                            ),
+                    onPressed: () => _goToPayment(context, ref, cart),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -1605,6 +1614,23 @@ class _CartFooter extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Guards checkout for Restaurant/Cafe tenants: Dine In/Take Out must be
+/// chosen first, matching what the kiosk flow already requires before it
+/// will submit an order.
+void _goToPayment(BuildContext context, WidgetRef ref, Transaction cart) {
+  final requiresOrderType = ref.read(isDineInTakeOutVerticalProvider);
+  if (requiresOrderType && cart.orderType == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Select Dine In or Take Out before checkout.')),
+    );
+    return;
+  }
+
+  Navigator.of(context, rootNavigator: true).push<void>(
+    MaterialPageRoute(builder: (_) => PaymentScreen(total: cart.totalAmount)),
+  );
 }
 
 class _CartLineTile extends ConsumerWidget {

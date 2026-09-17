@@ -18,7 +18,11 @@ public sealed record TransactionDto(
     string? OrderType,
     bool OriginatedFromKiosk,
     long? KioskPrepNumber,
+    KitchenStatus KitchenStatus,
     IReadOnlyList<PaymentDto> Payments);
+
+/// <summary>Kitchen Display's request to advance a kiosk order's kitchen-prep state.</summary>
+public sealed record UpdateKitchenStatusRequest(KitchenStatus KitchenStatus);
 
 public sealed record TransactionLineDto(
     Guid Id,

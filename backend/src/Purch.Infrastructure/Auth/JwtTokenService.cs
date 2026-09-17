@@ -33,7 +33,12 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
         }
 
-        return WriteToken(claims, TimeSpan.FromHours(8));
+        // Short-lived by design now that a refresh token backs it (see
+        // IRefreshTokenService) — the client silently exchanges the refresh token
+        // for a new one well before this expires, so shortening this window only
+        // reduces how long a leaked access token stays usable, without shortening
+        // the shift itself.
+        return WriteToken(claims, TimeSpan.FromMinutes(30));
     }
 
     public string IssueAdminAccessToken(User user)
@@ -51,7 +56,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
         }
 
-        return WriteToken(claims, TimeSpan.FromHours(8));
+        return WriteToken(claims, TimeSpan.FromMinutes(30));
     }
 
     public string IssueKioskAccessToken(Device device)
@@ -67,6 +72,21 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         // A stationary, unattended terminal — no one re-pairs it every shift the
         // way a staff member re-logs-in, so this carries a longer expiry than a
         // staff session token.
+        return WriteToken(claims, TimeSpan.FromHours(24));
+    }
+
+    public string IssueUnattendedAccessToken(Device device, Role role)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtClaimTypes.TenantId, device.TenantId.ToString()),
+            new(JwtClaimTypes.Role, role.ToString()),
+            new(JwtClaimTypes.DeviceId, device.Id.ToString()),
+            new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
+        };
+
+        // Same rationale as IssueKioskAccessToken: a stationary, unattended
+        // display isn't re-paired every shift.
         return WriteToken(claims, TimeSpan.FromHours(24));
     }
 

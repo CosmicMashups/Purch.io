@@ -17,11 +17,14 @@ class AddDeviceScreen extends ConsumerStatefulWidget {
 class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _identifierController = TextEditingController();
+  final _pairingPinController = TextEditingController();
   Branch? _selectedBranch;
+  DeviceType _deviceType = DeviceType.register;
 
   @override
   void dispose() {
     _identifierController.dispose();
+    _pairingPinController.dispose();
     super.dispose();
   }
 
@@ -39,6 +42,11 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
             _identifierController.text.trim().isEmpty
                 ? null
                 : _identifierController.text.trim(),
+        deviceType: _deviceType,
+        pairingPin:
+            _deviceType == DeviceType.register
+                ? null
+                : _pairingPinController.text.trim(),
       ),
     );
 
@@ -182,6 +190,60 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                           isDense: true,
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<DeviceType>(
+                        value: _deviceType,
+                        decoration: const InputDecoration(
+                          labelText: 'Device type',
+                          prefixIcon: Icon(Icons.devices_other_outlined),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: DeviceType.register,
+                            child: Text('Register (staff login)'),
+                          ),
+                          DropdownMenuItem(
+                            value: DeviceType.kiosk,
+                            child: Text('Self-Order Kiosk'),
+                          ),
+                          DropdownMenuItem(
+                            value: DeviceType.orderBoard,
+                            child: Text('Order Number Board'),
+                          ),
+                          DropdownMenuItem(
+                            value: DeviceType.kitchenDisplay,
+                            child: Text('Kitchen Display'),
+                          ),
+                        ],
+                        onChanged:
+                            isLoading
+                                ? null
+                                : (value) => setState(
+                                  () => _deviceType = value ?? DeviceType.register,
+                                ),
+                      ),
+                      if (_deviceType != DeviceType.register) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _pairingPinController,
+                          enabled: !isLoading,
+                          decoration: const InputDecoration(
+                            labelText: 'Pairing PIN',
+                            helperText: 'Given to whoever sets up this device — required alongside the pairing code above.',
+                            prefixIcon: Icon(Icons.pin_outlined),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator:
+                              (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                      ? 'Required for this device type'
+                                      : null,
+                        ),
+                      ],
                       if (failure != null) ...[
                         const SizedBox(height: AppSpacing.sm),
                         Container(

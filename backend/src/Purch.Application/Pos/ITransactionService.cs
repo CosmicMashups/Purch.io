@@ -38,4 +38,9 @@ public interface ITransactionService
     /// to this device and staff user and reopens it (AwaitingPayment to Open). Rejects if this
     /// device already has its own open cart, or if the order belongs to a different branch.</summary>
     Task<TransactionDto> ClaimKioskOrderAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
+    /// <summary>Kitchen-Display-only: advances a kiosk order's kitchen-prep state
+    /// (Queued to Preparing to Ready to PickedUp). Orthogonal to payment — rejects
+    /// if the order isn't kiosk-originated or doesn't belong to this branch.</summary>
+    Task<TransactionDto> UpdateKitchenStatusAsync(Guid transactionId, UpdateKitchenStatusRequest request, CancellationToken cancellationToken = default);
 }

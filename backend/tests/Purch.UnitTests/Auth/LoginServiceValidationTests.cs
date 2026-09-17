@@ -1,6 +1,7 @@
 using Purch.Application.Auth;
 using Purch.Application.Common.Exceptions;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 
 namespace Purch.UnitTests.Auth;
 
@@ -18,7 +19,8 @@ public sealed class LoginServiceValidationTests
             new NeverCalledUserRepository(),
             new NeverCalledPinHasher(),
             new NeverCalledPasswordHasher(),
-            new NeverCalledJwtTokenService());
+            new NeverCalledJwtTokenService(),
+            new NeverCalledRefreshTokenService());
 
         var exception = await Assert.ThrowsAsync<ValidationException>(
             () => loginService.LoginAsync(new LoginRequest(pairingCode, pin)));
@@ -118,6 +120,39 @@ public sealed class LoginServiceValidationTests
         }
 
         public string IssueAdminAccessToken(User user)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public string IssueUnattendedAccessToken(Device device, Role role)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+    }
+
+    private sealed class NeverCalledRefreshTokenService : IRefreshTokenService
+    {
+        public Task<string> IssueAsync(Guid tenantId, Guid? userId, Guid? deviceId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<RefreshTokenOwner?> RedeemAsync(string rawToken, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task RevokeAsync(string rawToken, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task RevokeAllForDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

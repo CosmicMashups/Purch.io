@@ -6,7 +6,7 @@ import '../../features/onboarding/domain/onboarding_enums.dart';
 
 /// Which top-level shell the router should show, derived from whether a
 /// session is stored on this device and what role its token claims.
-enum AuthGateState { loggedOut, kiosk, staff }
+enum AuthGateState { loggedOut, kiosk, orderBoard, kitchenDisplay, staff }
 
 /// Combines [hasStoredSessionProvider] and [storedSessionRoleProvider] into
 /// the single decision the router's redirect needs — see AppRouter.
@@ -16,7 +16,16 @@ final authGateProvider = FutureProvider<AuthGateState>((ref) async {
     return AuthGateState.loggedOut;
   }
   final role = await ref.watch(storedSessionRoleProvider.future);
-  return role == 'Kiosk' ? AuthGateState.kiosk : AuthGateState.staff;
+  switch (role) {
+    case 'Kiosk':
+      return AuthGateState.kiosk;
+    case 'OrderBoard':
+      return AuthGateState.orderBoard;
+    case 'KitchenDisplay':
+      return AuthGateState.kitchenDisplay;
+    default:
+      return AuthGateState.staff;
+  }
 });
 
 /// The signed-in staff member's [StaffRole], parsed from the JWT role claim.
