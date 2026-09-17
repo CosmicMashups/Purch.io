@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/auth_gate.dart';
 import '../../../../core/routing/nav_destinations.dart';
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/widgets/purch_app_bar.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../widgets/nav_tile_card.dart';
 
@@ -21,8 +22,8 @@ class BusinessTabScreen extends ConsumerWidget {
     final sections = businessSectionsForRole(role);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Business'),
+      appBar: PurchAppBar(
+        title: 'Business',
         actions: [
           IconButton(
             tooltip: 'Log Out',

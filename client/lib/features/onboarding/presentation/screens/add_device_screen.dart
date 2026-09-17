@@ -153,6 +153,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                               branches.isNotEmpty ? branches.first : null;
                           return DropdownButtonFormField<Branch>(
                             value: _selectedBranch,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Branch',
                               prefixIcon: Icon(Icons.storefront_outlined),
@@ -193,6 +194,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       const SizedBox(height: AppSpacing.md),
                       DropdownButtonFormField<DeviceType>(
                         value: _deviceType,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Device type',
                           prefixIcon: Icon(Icons.devices_other_outlined),

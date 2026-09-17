@@ -43,6 +43,7 @@ appsettings.Local.json
 *.pfx
 *.key
 scripts/
+!scripts/*.sh
 
 # --- Installer Build Output (see installer/README.md) ---
 installer/dist/

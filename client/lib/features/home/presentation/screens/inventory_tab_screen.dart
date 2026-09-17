@@ -6,6 +6,7 @@ import '../../../../core/errors/failure.dart';
 import '../../../../core/routing/nav_destinations.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/charts/chart_theme.dart';
+import '../../../../core/widgets/purch_app_bar.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../inventory/domain/inventory_movement_models.dart';
@@ -30,7 +31,7 @@ class InventoryTabScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Inventory')),
+      appBar: const PurchAppBar(title: 'Inventory'),
       body: RefreshIndicator(
         color: AppColors.brandPrimary,
         onRefresh: () async {
