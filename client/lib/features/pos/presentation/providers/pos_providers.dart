@@ -69,6 +69,19 @@ class CartNotifier extends _$CartNotifier {
         repository.applyPromoCode(ApplyPromoCodeRequest(code: code)),
   );
 
+  /// Sets the cart's fulfillment choice (e.g. "Dine In"/"Take Out") — shown
+  /// to restaurant/cafe tenants only, but the underlying field is generic.
+  Future<bool> setOrderType(String orderType) => _mutate(
+    (repository) => repository.setOrderType(SetOrderTypeRequest(orderType: orderType)),
+  );
+
+  /// Replaces the current cart with a pending kiosk order the cashier just
+  /// claimed, so the normal checkout flow (payment, receipt) picks it up as
+  /// if it were this device's own in-progress sale.
+  Future<bool> claimKioskOrder(String transactionId) => _mutate(
+    (repository) => repository.claimKioskOrder(transactionId),
+  );
+
   /// Records a full payment. On success the cart moves to Completed with its
   /// receipt number — the caller shows that as a receipt before calling
   /// [startNewSale] to fetch the fresh cart that replaces it.
@@ -119,4 +132,18 @@ class CartNotifier extends _$CartNotifier {
     final error = state.error;
     return error is Failure ? error : null;
   }
+}
+
+/// Kiosk orders submitted and awaiting a cashier to collect payment for this
+/// device's branch — read fresh each time the Pending Kiosk Orders screen
+/// opens (no live push; a manual refresh/reopen is enough for this use case).
+@riverpod
+Future<List<Transaction>> pendingKioskOrders(Ref ref) async {
+  final identity = await ref.watch(deviceIdentityDaoProvider).getIdentity();
+  if (identity == null) {
+    return const [];
+  }
+  return ref
+      .watch(posRepositoryProvider)
+      .listPendingKioskOrders(identity.branchId);
 }

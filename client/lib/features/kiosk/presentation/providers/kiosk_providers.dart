@@ -46,12 +46,15 @@ class KioskPairingController extends _$KioskPairingController {
   @override
   FutureOr<void> build() {}
 
-  Future<void> pair(String devicePairingCode) async {
+  Future<void> pair(String devicePairingCode, String pairingPin) async {
     state = const AsyncLoading();
     final repository = ref.read(kioskSessionRepositoryProvider);
 
     state = await AsyncValue.guard(
-      () => repository.pair(devicePairingCode: devicePairingCode),
+      () => repository.pair(
+        devicePairingCode: devicePairingCode,
+        pairingPin: pairingPin,
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+using Purch.Api.RateLimiting;
 using Purch.Application.Kiosk;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
@@ -31,14 +32,14 @@ public static class KioskEndpoints
             var result = await kioskSessionService.PairAsync(request, cancellationToken);
             return result switch
             {
-                KioskSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken }),
+                KioskSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
                 KioskSessionResult.InvalidDevice => Results.Problem(
                     statusCode: StatusCodes.Status401Unauthorized,
-                    title: "Invalid device.",
-                    detail: "The device pairing code was not recognized."),
+                    title: "Invalid credentials.",
+                    detail: "The device pairing code or PIN was not recognized."),
                 _ => throw new InvalidOperationException($"Unhandled {nameof(KioskSessionResult)} case: {result.GetType().Name}"),
             };
-        }).AllowAnonymous();
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
 
         _ = app.MapGet("/kiosk/cart", async (
             ITransactionService transactionService,

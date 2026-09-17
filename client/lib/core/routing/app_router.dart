@@ -19,6 +19,8 @@ import '../../features/inventory/presentation/screens/movement_log_screen.dart';
 import '../../features/inventory/presentation/screens/purchase_order_list_screen.dart';
 import '../../features/inventory/presentation/screens/supplier_list_screen.dart';
 import '../../features/kiosk/presentation/screens/kiosk_landing_screen.dart';
+import '../../features/kitchen_display/presentation/screens/kitchen_display_screen.dart';
+import '../../features/order_board/presentation/screens/order_board_display_screen.dart';
 import '../../features/onboarding/presentation/screens/audit_log_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_list_screen.dart';
 import '../../features/onboarding/presentation/screens/device_list_screen.dart';
@@ -29,6 +31,7 @@ import '../hardware/cfd/customer_facing_display_screen.dart';
 import '../../features/pos/presentation/screens/bir_reading_screen.dart';
 import '../../features/pos/presentation/screens/cashier_screen.dart';
 import '../../features/pos/presentation/screens/promo_code_list_screen.dart';
+import '../../features/pos/presentation/screens/pending_kiosk_orders_screen.dart';
 import '../../features/pos/presentation/screens/shift_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../sync/presentation/flagged_sync_screen.dart';
@@ -69,6 +72,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               return location == '/login' ? null : '/login';
             case AuthGateState.kiosk:
               return location.startsWith('/kiosk') ? null : '/kiosk';
+            case AuthGateState.orderBoard:
+              return location.startsWith('/order-board') ? null : '/order-board';
+            case AuthGateState.kitchenDisplay:
+              return location.startsWith('/kitchen-display') ? null : '/kitchen-display';
             case AuthGateState.staff:
               if (location == '/customer-facing-display') return null;
               final inStaffShell = _staffShellPaths.any(
@@ -108,6 +115,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   ),
               child: const KioskLandingScreen(),
             ),
+      ),
+      GoRoute(
+        path: '/order-board',
+        builder: (context, state) => const OrderBoardDisplayScreen(),
+      ),
+      GoRoute(
+        path: '/kitchen-display',
+        builder: (context, state) => const KitchenDisplayScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder:
@@ -162,6 +177,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'bir-reading',
                     builder: (context, state) => const BirReadingScreen(),
+                  ),
+                  GoRoute(
+                    path: 'pending-kiosk-orders',
+                    builder: (context, state) => const PendingKioskOrdersScreen(),
                   ),
                 ],
               ),

@@ -6,10 +6,15 @@ class FakeKioskSessionRepository implements KioskSessionRepository {
 
   final Failure? failureToThrow;
   String? lastPairingCode;
+  String? lastPairingPin;
 
   @override
-  Future<void> pair({required String devicePairingCode}) async {
+  Future<void> pair({
+    required String devicePairingCode,
+    required String pairingPin,
+  }) async {
     lastPairingCode = devicePairingCode;
+    lastPairingPin = pairingPin;
     if (failureToThrow != null) {
       throw failureToThrow!;
     }

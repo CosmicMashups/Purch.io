@@ -7,7 +7,8 @@ public sealed class LoginService(
     IUserRepository userRepository,
     IPinHasher pinHasher,
     IPasswordHasher passwordHasher,
-    IJwtTokenService jwtTokenService) : ILoginService
+    IJwtTokenService jwtTokenService,
+    IRefreshTokenService refreshTokenService) : ILoginService
 {
     public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
@@ -28,7 +29,8 @@ public sealed class LoginService(
         }
 
         var accessToken = jwtTokenService.IssueAccessToken(matchedUser, device);
-        return new LoginResult.Success(accessToken);
+        var refreshToken = await refreshTokenService.IssueAsync(device.TenantId, matchedUser.Id, device.Id, cancellationToken);
+        return new LoginResult.Success(accessToken, refreshToken);
     }
 
     public async Task<LoginResult> AdminLoginAsync(AdminLoginRequest request, CancellationToken cancellationToken = default)
@@ -43,7 +45,8 @@ public sealed class LoginService(
         }
 
         var accessToken = jwtTokenService.IssueAdminAccessToken(user);
-        return new LoginResult.Success(accessToken);
+        var refreshToken = await refreshTokenService.IssueAsync(user.TenantId, user.Id, null, cancellationToken);
+        return new LoginResult.Success(accessToken, refreshToken);
     }
 
     private static void ValidateAdmin(AdminLoginRequest request)

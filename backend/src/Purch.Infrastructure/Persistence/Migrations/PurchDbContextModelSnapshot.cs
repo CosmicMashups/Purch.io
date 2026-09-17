@@ -355,6 +355,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<string>("DeviceIdentifier")
                         .HasColumnType("text");
 
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -363,6 +366,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("PairingCode")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PairingPinHash")
                         .HasColumnType("text");
 
                     b.Property<Guid>("TenantId")
@@ -970,6 +976,81 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.ToTable("ReceiptSequences");
                 });
 
+            modelBuilder.Entity("Purch.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("PasswordResetTokens");
+                });
+
+            modelBuilder.Entity("Purch.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("Purch.Domain.Entities.Shift", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1233,6 +1314,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<int>("KitchenStatus")
+                        .HasColumnType("integer");
 
                     b.Property<long>("KioskPrepNumber")
                         .HasColumnType("bigint");

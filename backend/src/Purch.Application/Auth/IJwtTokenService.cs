@@ -1,4 +1,5 @@
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 
 namespace Purch.Application.Auth;
 
@@ -14,4 +15,9 @@ public interface IJwtTokenService
     /// <summary>An admin/owner logging in via email+password from the back office,
     /// not any particular physical terminal — no device/branch claims to carry.</summary>
     string IssueAdminAccessToken(User user);
+
+    /// <summary>Same shape as IssueKioskAccessToken (no sub/user claim, tenant/device/
+    /// branch only) generalized to any unattended device role (OrderBoard,
+    /// KitchenDisplay) — these are read-only display terminals, never a cart.</summary>
+    string IssueUnattendedAccessToken(Device device, Role role);
 }

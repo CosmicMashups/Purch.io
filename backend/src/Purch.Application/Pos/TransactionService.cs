@@ -591,6 +591,23 @@ public sealed class TransactionService(
         return await ToDtoAsync(order, cancellationToken);
     }
 
+    public async Task<TransactionDto> UpdateKitchenStatusAsync(Guid transactionId, UpdateKitchenStatusRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await transactionRepository.GetByIdAsync(transactionId, cancellationToken);
+        if (order is null
+            || order.TenantId != CurrentTenantId
+            || order.BranchId != CurrentBranchId
+            || !order.OriginatedFromKiosk)
+        {
+            throw new NotFoundException("Kiosk order", transactionId);
+        }
+
+        order.KitchenStatus = request.KitchenStatus;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(order, cancellationToken);
+    }
+
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
     {
         var line = await transactionRepository.GetLineAsync(lineId, cancellationToken)
@@ -736,6 +753,7 @@ public sealed class TransactionService(
             transaction.OrderType,
             transaction.OriginatedFromKiosk,
             transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,
+            transaction.KitchenStatus,
             paymentDtos);
     }
 

@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../../../kiosk/presentation/screens/kiosk_pairing_screen.dart';
+import '../../../kitchen_display/presentation/screens/kitchen_display_pairing_screen.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
 import '../../../onboarding/presentation/screens/server_connection_screen.dart';
+import '../../../order_board/presentation/screens/order_board_pairing_screen.dart';
 import '../providers/auth_providers.dart';
 import 'admin_login_screen.dart';
 
@@ -293,6 +295,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         MaterialPageRoute(
                                           builder:
                                               (_) => KioskPairingScreen(
+                                                onPaired: widget.onLoggedIn,
+                                              ),
+                                        ),
+                                      ),
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(
+                                Icons.confirmation_number_outlined,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                              label: const Text(
+                                'Set up as an order number board',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => OrderBoardPairingScreen(
+                                                onPaired: widget.onLoggedIn,
+                                              ),
+                                        ),
+                                      ),
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(
+                                Icons.soup_kitchen_outlined,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                              label: const Text(
+                                'Set up as a kitchen display',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => KitchenDisplayPairingScreen(
                                                 onPaired: widget.onLoggedIn,
                                               ),
                                         ),

@@ -4,8 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../domain/device_models.dart';
 import '../providers/onboarding_providers.dart';
 import 'add_device_screen.dart';
+
+(IconData, String) _typeIconAndLabel(DeviceType type) => switch (type) {
+  DeviceType.register => (Icons.tablet_mac_rounded, 'Register'),
+  DeviceType.kiosk => (Icons.storefront_rounded, 'Self-Order Kiosk'),
+  DeviceType.orderBoard => (Icons.confirmation_number_rounded, 'Order Number Board'),
+  DeviceType.kitchenDisplay => (Icons.soup_kitchen_rounded, 'Kitchen Display'),
+};
 
 /// A3's device list. Each device's pairing code is shown plainly — the admin
 /// needs to be able to read it back off-screen to type into a new tablet,
@@ -55,6 +63,7 @@ class DeviceListScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final device = devices[index];
+                final (typeIcon, typeLabel) = _typeIconAndLabel(device.deviceType);
                 return Container(
                   decoration: BoxDecoration(
                     color: AppColors.surface,
@@ -73,10 +82,7 @@ class DeviceListScreen extends ConsumerWidget {
                         color: AppColors.brandPrimaryContainer,
                         borderRadius: AppRadius.smBorder,
                       ),
-                      child: const Icon(
-                        Icons.tablet_mac_rounded,
-                        color: AppColors.brandPrimary,
-                      ),
+                      child: Icon(typeIcon, color: AppColors.brandPrimary),
                     ),
                     title: Text(
                       device.deviceIdentifier ?? 'Unlabeled device',
@@ -88,25 +94,40 @@ class DeviceListScreen extends ConsumerWidget {
                     ),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.xs),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: AppRadius.smBorder,
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: SelectableText(
-                          'Pairing code: ${device.pairingCode}',
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                      child: Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            typeLabel,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: AppRadius.smBorder,
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: SelectableText(
+                              'Pairing code: ${device.pairingCode}',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

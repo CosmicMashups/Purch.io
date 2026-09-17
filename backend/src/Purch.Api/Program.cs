@@ -1,16 +1,20 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Purch.Api.Endpoints;
 using Purch.Api.ErrorHandling;
 using Purch.Api.Middleware;
+using Purch.Api.RateLimiting;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.CreditLedger;
 using Purch.Application.Onboarding;
 using Purch.Application.Inventory;
+using Purch.Application.Devices;
 using Purch.Application.Kiosk;
 using Purch.Application.Pos;
 using Purch.Application.Promotions;
@@ -52,6 +56,12 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ILoginService, LoginService>();
+builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
+builder.Services.AddScoped<IPasswordResetTokenRepository, EfPasswordResetTokenRepository>();
+builder.Services.AddSingleton<IPasswordResetTokenNotifier, ConsolePasswordResetTokenNotifier>();
+builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<ITenantRepository, EfTenantRepository>();
@@ -88,6 +98,7 @@ builder.Services.AddScoped<IReceiptSequenceRepository, EfReceiptSequenceReposito
 builder.Services.AddScoped<IKioskPrepSequenceRepository, EfKioskPrepSequenceRepository>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IKioskSessionService, KioskSessionService>();
+builder.Services.AddScoped<IUnattendedSessionService, UnattendedSessionService>();
 builder.Services.AddScoped<IShiftRepository, EfShiftRepository>();
 builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IPromoCodeRepository, EfPromoCodeRepository>();
@@ -148,6 +159,26 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// Throttles the anonymous credential-guessing surfaces (login, kiosk pairing,
+// password-reset request/confirm) — partitioned per client IP so one abusive caller
+// can't exhaust another's budget. A fixed window rather than sliding/token-bucket:
+// simplest option that still bounds guesses/minute, and these endpoints don't need
+// smoother burst handling.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy(RateLimiterPolicies.AuthSensitive, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(15),
+                PermitLimit = 10,
+                QueueLimit = 0,
+            }));
+});
 
 var app = builder.Build();
 
@@ -231,6 +262,7 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapAuthEndpoints();
@@ -238,6 +270,7 @@ app.MapOnboardingEndpoints();
 app.MapCatalogEndpoints();
 app.MapPosEndpoints();
 app.MapKioskEndpoints();
+app.MapDeviceDisplayEndpoints();
 app.MapShiftEndpoints();
 app.MapPromoCodeEndpoints();
 app.MapReportingEndpoints();

@@ -87,6 +87,21 @@ public static class OnboardingEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await deviceService.CreateAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // Regenerates the pairing code, immediately invalidating the old one and revoking
+        // any session already issued under it — for a device that's been lost/replaced.
+        _ = app.MapPost("/devices/{deviceId:guid}/reset-pairing-code", async (
+            Guid deviceId,
+            IDeviceManagementService deviceService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await deviceService.ResetPairingCodeAsync(deviceId, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        _ = app.MapPost("/devices/{deviceId:guid}/reset-pairing-pin", async (
+            Guid deviceId,
+            ResetDevicePairingPinRequest request,
+            IDeviceManagementService deviceService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await deviceService.ResetPairingPinAsync(deviceId, request.NewPin, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
         // --- Tenant settings: branding (A2), BIR/compliance (A5), barcode requirement ---
         _ = app.MapGet("/tenant/settings", async (ITenantSettingsService settingsService, CancellationToken cancellationToken) =>
             Results.Ok(await settingsService.GetAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));

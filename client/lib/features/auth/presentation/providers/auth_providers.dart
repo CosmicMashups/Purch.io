@@ -18,7 +18,16 @@ SecureTokenStorage secureTokenStorage(Ref ref) {
 
 @Riverpod(keepAlive: true)
 ApiClient apiClient(Ref ref) {
-  return ApiClient(tokenStorage: ref.watch(secureTokenStorageProvider));
+  return ApiClient(
+    tokenStorage: ref.watch(secureTokenStorageProvider),
+    // The refresh token itself expired/was revoked — ApiClient already
+    // cleared storage; this just makes the router notice and fall back to
+    // the login screen instead of the app silently 401ing forever.
+    onSessionExpired: () {
+      ref.invalidate(hasStoredSessionProvider);
+      ref.invalidate(storedSessionRoleProvider);
+    },
+  );
 }
 
 @Riverpod(keepAlive: true)

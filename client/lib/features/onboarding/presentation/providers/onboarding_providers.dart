@@ -12,6 +12,7 @@ import '../../domain/bootstrap_models.dart';
 import '../../domain/branch_models.dart';
 import '../../domain/department_models.dart';
 import '../../domain/device_models.dart';
+import '../../domain/onboarding_enums.dart';
 import '../../domain/onboarding_repository.dart';
 import '../../domain/staff_models.dart';
 import '../../domain/tenant_settings_models.dart';
@@ -289,6 +290,20 @@ class TenantSettingsNotifier extends _$TenantSettingsNotifier {
     final error = state.error;
     return error is Failure ? error : null;
   }
+}
+
+/// Whether this tenant's vertical wants a Dine In/Take Out fulfillment
+/// choice on every sale — true for Restaurant and Cafe, false for every
+/// other [BusinessType]. Defaults to false while settings are still loading
+/// or unavailable, since showing the selector unprompted is the safer miss.
+@riverpod
+bool isDineInTakeOutVertical(Ref ref) {
+  final businessType = ref
+      .watch(tenantSettingsNotifierProvider)
+      .valueOrNull
+      ?.businessType;
+  return businessType == BusinessType.restaurant ||
+      businessType == BusinessType.cafe;
 }
 
 /// Loads the audit log viewer (A6). Filtering by staff/date/action type is
