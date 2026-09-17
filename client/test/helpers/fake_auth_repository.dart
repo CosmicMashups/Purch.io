@@ -26,6 +26,22 @@ class FakeAuthRepository implements AuthRepository {
     hasSession = true;
   }
 
+  String? lastAdminEmail;
+  String? lastAdminPassword;
+
+  @override
+  Future<void> loginAsAdmin({
+    required String email,
+    required String password,
+  }) async {
+    lastAdminEmail = email;
+    lastAdminPassword = password;
+    if (failureToThrow != null) {
+      throw failureToThrow!;
+    }
+    hasSession = true;
+  }
+
   @override
   Future<bool> hasStoredSession() async => hasSession;
 

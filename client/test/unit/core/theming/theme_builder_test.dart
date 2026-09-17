@@ -49,6 +49,40 @@ void main() {
     });
   });
 
+  group('derivePrimaryContainer and deriveOnPrimaryContainer', () {
+    test('derives luminous container and high-contrast foreground from default brand primary', () {
+      final container = derivePrimaryContainer(AppColors.brandPrimary);
+      final onContainer = deriveOnPrimaryContainer(AppColors.brandPrimary);
+
+      final containerHsl = HSLColor.fromColor(container);
+      final onContainerHsl = HSLColor.fromColor(onContainer);
+
+      expect(containerHsl.lightness, closeTo(0.95, 0.01));
+      expect(onContainerHsl.lightness, closeTo(0.20, 0.01));
+    });
+
+    test('derives harmonious containers across diverse hues without crashing', () {
+      const hues = [
+        Color(0xFF0F766E), // Pine Teal
+        Color(0xFF9A3412), // Terracotta
+        Color(0xFF831843), // Deep Wine
+        Color(0xFF1E40AF), // Classic Blue
+        Color(0xFF14532D), // Deep Forest Green
+      ];
+
+      for (final color in hues) {
+        final container = derivePrimaryContainer(color);
+        final onContainer = deriveOnPrimaryContainer(color);
+
+        final containerHsl = HSLColor.fromColor(container);
+        expect(containerHsl.lightness, closeTo(0.95, 0.01));
+
+        final onContainerHsl = HSLColor.fromColor(onContainer);
+        expect(onContainerHsl.lightness, closeTo(0.20, 0.01));
+      }
+    });
+  });
+
   group('BrandingColors', () {
     test('null branding row resolves entirely to the AppColors defaults', () {
       final colors = BrandingColors.fromCachedBranding(null);

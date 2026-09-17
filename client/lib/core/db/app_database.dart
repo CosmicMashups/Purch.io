@@ -5,8 +5,10 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'daos/device_identity_dao.dart';
 import 'daos/sync_queue_dao.dart';
 import 'tables/cached_branding_table.dart';
+import 'tables/device_identity_table.dart';
 import 'tables/pending_sync_queue_table.dart';
 
 part 'app_database.g.dart';
@@ -15,14 +17,17 @@ part 'app_database.g.dart';
 /// queue. Deliberately a small, hand-picked subset of the backend's schema —
 /// only what a device needs cached/queued locally, not a full mirror — see
 /// docs/ARCHITECTURE.md §2 ("Local persistence").
-@DriftDatabase(tables: [PendingSyncQueue, CachedBranding], daos: [SyncQueueDao])
+@DriftDatabase(
+  tables: [PendingSyncQueue, CachedBranding, DeviceIdentity],
+  daos: [SyncQueueDao, DeviceIdentityDao],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -40,6 +45,11 @@ class AppDatabase extends _$AppDatabase {
         // so dropping and recreating it loses nothing durable.
         await m.deleteTable(cachedBranding.actualTableName);
         await m.createTable(cachedBranding);
+      }
+      if (from < 4) {
+        // v3 → v4: new device_identity table — this device's own id/tenant/
+        // branch plus its cached last-issued receipt number.
+        await m.createTable(deviceIdentity);
       }
     },
   );

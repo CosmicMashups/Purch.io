@@ -11,6 +11,11 @@ abstract class AuthRepository {
   /// callers don't need to handle the token themselves.
   Future<void> login({required String devicePairingCode, required String pin});
 
+  /// Logs in a tenant admin/owner by email+password — a separate path from
+  /// device pairing code + PIN, e.g. for back-office use. On success, the
+  /// access token is persisted the same way as [login].
+  Future<void> loginAsAdmin({required String email, required String password});
+
   /// Whether a previously-issued access token is still stored on this device.
   /// Used at app startup to decide whether to show the login screen or skip
   /// straight to the app shell — this does NOT verify the token is still

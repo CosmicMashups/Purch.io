@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../db/app_database.dart';
-import '../sync/sync_providers.dart';
+import '../db/db_providers.dart';
 import 'app_theme.dart';
 import 'app_tokens.dart';
 
@@ -28,6 +28,22 @@ Color? parseHexColor(String? hex) {
 
   final parsed = int.tryParse(value, radix: 16);
   return parsed == null ? null : Color(parsed);
+}
+
+/// Derives a soft, harmonious primary container color from a brand primary color.
+/// In light themes, this produces a luminous tinted surface (lightness ~95%, gentle saturation)
+/// that pairs gracefully with [brandColor].
+Color derivePrimaryContainer(Color brandColor) {
+  final hsl = HSLColor.fromColor(brandColor);
+  final targetSaturation = (hsl.saturation * 0.40).clamp(0.08, 0.35);
+  return hsl.withLightness(0.95).withSaturation(targetSaturation).toColor();
+}
+
+/// Derives the matching high-contrast foreground text/icon color for the primary container.
+Color deriveOnPrimaryContainer(Color brandColor) {
+  final hsl = HSLColor.fromColor(brandColor);
+  final targetSaturation = (hsl.saturation * 0.90).clamp(0.50, 0.95);
+  return hsl.withLightness(0.20).withSaturation(targetSaturation).toColor();
 }
 
 /// The four tenant-configurable theme colours, already resolved to concrete
@@ -74,9 +90,14 @@ class BrandingColors {
   final Color secondaryText;
   final String? fontFamily;
 
+  Color get primaryContainer => derivePrimaryContainer(accent);
+  Color get onPrimaryContainer => deriveOnPrimaryContainer(accent);
+
   ThemeData toStaffTheme() => AppTheme.staffTheme(
     background: background,
     accent: accent,
+    primaryContainer: primaryContainer,
+    onPrimaryContainer: onPrimaryContainer,
     primaryText: primaryText,
     secondaryText: secondaryText,
     fontFamily: fontFamily,
@@ -85,6 +106,8 @@ class BrandingColors {
   ThemeData toKioskTheme() => AppTheme.kioskTheme(
     background: background,
     accent: accent,
+    primaryContainer: primaryContainer,
+    onPrimaryContainer: onPrimaryContainer,
     primaryText: primaryText,
     secondaryText: secondaryText,
     fontFamily: fontFamily,

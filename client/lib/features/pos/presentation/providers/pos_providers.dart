@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/pos_repository_impl.dart';
@@ -69,8 +72,30 @@ class CartNotifier extends _$CartNotifier {
   /// Records a full payment. On success the cart moves to Completed with its
   /// receipt number — the caller shows that as a receipt before calling
   /// [startNewSale] to fetch the fresh cart that replaces it.
-  Future<bool> recordPayment(RecordPaymentRequest request) =>
-      _mutate((repository) => repository.recordPayment(request));
+  ///
+  /// Also caches the issued receipt number in DeviceIdentity, so this
+  /// device's local record of "what number did I last issue" never falls
+  /// behind — see that table's doc comment for why that matters for BIR's
+  /// sequential-numbering requirement. Fire-and-forget: it's a local cache
+  /// update, not part of the sale itself, so it never affects whether this
+  /// call reports success or delays showing the receipt.
+  Future<bool> recordPayment(RecordPaymentRequest request) async {
+    final succeeded = await _mutate(
+      (repository) => repository.recordPayment(request),
+    );
+
+    final receiptNumber = state.value?.receiptNumber;
+    if (succeeded && receiptNumber != null) {
+      unawaited(
+        ref
+            .read(deviceIdentityDaoProvider)
+            .recordIssuedReceiptNumber(receiptNumber)
+            .catchError((_) {}),
+      );
+    }
+
+    return succeeded;
+  }
 
   /// Call once the completed sale's receipt has been shown/acknowledged.
   Future<void> startNewSale() async {

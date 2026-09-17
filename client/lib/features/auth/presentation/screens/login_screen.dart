@@ -6,6 +6,7 @@ import '../../../kiosk/presentation/screens/kiosk_pairing_screen.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
 import '../../../onboarding/presentation/screens/server_connection_screen.dart';
 import '../providers/auth_providers.dart';
+import 'admin_login_screen.dart';
 
 /// The first screen any staff member sees on a paired device.
 /// Hero banner establishes the brand moment (logo, name, tagline) on a
@@ -320,6 +321,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                   const ServerConnectionScreen(),
                                         ),
                                       ),
+                            ),
+                            TextButton(
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => AdminLoginScreen(
+                                                onLoggedIn: widget.onLoggedIn,
+                                              ),
+                                        ),
+                                      ),
+                              child: const Text(
+                                'Sign in as admin instead',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                           ],
                         ),

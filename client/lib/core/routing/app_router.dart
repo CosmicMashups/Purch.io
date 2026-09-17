@@ -22,8 +22,10 @@ import '../../features/kiosk/presentation/screens/kiosk_landing_screen.dart';
 import '../../features/onboarding/presentation/screens/audit_log_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_list_screen.dart';
 import '../../features/onboarding/presentation/screens/device_list_screen.dart';
+import '../../features/onboarding/presentation/screens/hardware_settings_screen.dart';
 import '../../features/onboarding/presentation/screens/staff_list_screen.dart';
 import '../../features/onboarding/presentation/screens/tenant_settings_screen.dart';
+import '../hardware/cfd/customer_facing_display_screen.dart';
 import '../../features/pos/presentation/screens/bir_reading_screen.dart';
 import '../../features/pos/presentation/screens/cashier_screen.dart';
 import '../../features/pos/presentation/screens/promo_code_list_screen.dart';
@@ -68,6 +70,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             case AuthGateState.kiosk:
               return location.startsWith('/kiosk') ? null : '/kiosk';
             case AuthGateState.staff:
+              if (location == '/customer-facing-display') return null;
               final inStaffShell = _staffShellPaths.any(
                 (path) => location.startsWith(path),
               );
@@ -78,6 +81,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
+      GoRoute(
+        path: '/customer-facing-display',
+        builder: (context, state) => const CustomerFacingDisplayScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder:
@@ -226,6 +233,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'devices',
                     builder: (context, state) => const DeviceListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'hardware-settings',
+                    builder: (context, state) => const HardwareSettingsScreen(),
                   ),
                   GoRoute(
                     path: 'settings',

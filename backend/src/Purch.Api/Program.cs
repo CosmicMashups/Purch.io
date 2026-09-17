@@ -47,6 +47,7 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 });
 
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();
+builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();

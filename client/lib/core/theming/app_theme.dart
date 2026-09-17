@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_tokens.dart';
 
 /// AppTheme builds the ThemeData for Purch.io.
@@ -13,14 +12,22 @@ abstract class AppTheme {
   static ThemeData staffTheme({
     Color background = AppColors.background,
     Color accent = AppColors.brandPrimary,
+    Color? primaryContainer,
+    Color? onPrimaryContainer,
     Color primaryText = AppColors.textPrimary,
     Color secondaryText = AppColors.textSecondary,
     String? fontFamily,
   }) {
+    final effectivePrimaryContainer =
+        primaryContainer ?? AppColors.brandPrimaryContainer;
+    final effectiveOnPrimaryContainer =
+        onPrimaryContainer ?? AppColors.onBrandPrimaryContainer;
     final baseColorScheme = ColorScheme.fromSeed(
       seedColor: accent,
       primary: accent,
       onPrimary: AppColors.onBrandPrimary,
+      primaryContainer: effectivePrimaryContainer,
+      onPrimaryContainer: effectiveOnPrimaryContainer,
       surface: AppColors.surface,
       surfaceContainerLowest: AppColors.surface,
       surfaceContainerLow: background,
@@ -130,6 +137,8 @@ abstract class AppTheme {
   static ThemeData kioskTheme({
     Color background = AppColors.background,
     Color accent = AppColors.brandPrimary,
+    Color? primaryContainer,
+    Color? onPrimaryContainer,
     Color primaryText = AppColors.textPrimary,
     Color secondaryText = AppColors.textSecondary,
     String? fontFamily,
@@ -137,6 +146,8 @@ abstract class AppTheme {
     final staff = staffTheme(
       background: background,
       accent: accent,
+      primaryContainer: primaryContainer,
+      onPrimaryContainer: onPrimaryContainer,
       primaryText: primaryText,
       secondaryText: secondaryText,
       fontFamily: fontFamily,

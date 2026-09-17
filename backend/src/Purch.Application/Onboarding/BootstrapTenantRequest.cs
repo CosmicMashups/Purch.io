@@ -13,4 +13,8 @@ public sealed record BootstrapTenantRequest(
     BusinessType BusinessType,
     string BranchName,
     string AdminName,
-    string AdminPin);
+    string AdminPin,
+    /// <summary>Optional — when both are set, the admin can also log in via
+    /// POST /auth/admin-login instead of only device pairing code + PIN.</summary>
+    string? AdminEmail = null,
+    string? AdminPassword = null);

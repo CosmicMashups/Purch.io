@@ -104,6 +104,112 @@ class _ColorFieldState extends State<_ColorField> {
   }
 }
 
+/// Specialized branding input for Brand Primary that dynamically derives and displays
+/// the Primary Container color and its matching foreground in real time.
+class _BrandPrimaryColorField extends StatefulWidget {
+  const _BrandPrimaryColorField({
+    required this.controller,
+    required this.enabled,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback? onChanged;
+
+  @override
+  State<_BrandPrimaryColorField> createState() => _BrandPrimaryColorFieldState();
+}
+
+class _BrandPrimaryColorFieldState extends State<_BrandPrimaryColorField> {
+  @override
+  Widget build(BuildContext context) {
+    final parsed = parseHexColor(widget.controller.text.trim()) ?? AppColors.brandPrimary;
+    final derivedContainer = derivePrimaryContainer(parsed);
+    final derivedOnContainer = deriveOnPrimaryContainer(parsed);
+    final containerHex = '#${(derivedContainer.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: widget.controller,
+          enabled: widget.enabled,
+          onChanged: (_) {
+            setState(() {});
+            widget.onChanged?.call();
+          },
+          decoration: InputDecoration(
+            labelText: 'Brand Primary (e.g. #0F766E)',
+            helperText: 'Primary brand accent for actions, highlights, and active tabs.',
+            border: const OutlineInputBorder(borderRadius: AppRadius.smBorder),
+            suffixIcon: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: parsed,
+                  borderRadius: AppRadius.smBorder,
+                  border: Border.all(color: AppColors.border),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: derivedContainer,
+            borderRadius: AppRadius.smBorder,
+            border: Border.all(color: derivedOnContainer.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: derivedContainer,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: derivedOnContainer, width: 2),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Derived Primary Container: $containerHex',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: derivedOnContainer,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: parsed,
+                  borderRadius: AppRadius.smBorder,
+                ),
+                child: const Text(
+                  'Active Chip',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _TenantSettingsForm extends ConsumerStatefulWidget {
   const _TenantSettingsForm({super.key, required this.initial});
 
@@ -299,10 +405,10 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                             enabled: !isSaving,
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          _ColorField(
+                          _BrandPrimaryColorField(
                             controller: _accentColorController,
-                            label: 'Accent color (e.g. #1E40AF)',
                             enabled: !isSaving,
+                            onChanged: () => setState(() {}),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _ColorField(
@@ -455,6 +561,7 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                       padding: const EdgeInsets.all(AppSpacing.md),
                       child: _TypographyPreviewCard(
                         fontFamily: _fontFamilyController.text,
+                        brandPrimary: parseHexColor(_accentColorController.text.trim()),
                       ),
                     ),
                   ),
@@ -623,15 +730,22 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
 
 /// Interactive live typography preview card for tenant administrators.
 class _TypographyPreviewCard extends StatelessWidget {
-  const _TypographyPreviewCard({required this.fontFamily});
+  const _TypographyPreviewCard({
+    required this.fontFamily,
+    this.brandPrimary,
+  });
 
   final String fontFamily;
+  final Color? brandPrimary;
 
   @override
   Widget build(BuildContext context) {
     final trimmed = fontFamily.trim();
     final effectiveFamily =
         trimmed.isEmpty ? AppTypography.defaultFontFamily : trimmed;
+    final effectiveBrandPrimary = brandPrimary ?? AppColors.brandPrimary;
+    final effectivePrimaryContainer = derivePrimaryContainer(effectiveBrandPrimary);
+    final effectiveOnPrimaryContainer = deriveOnPrimaryContainer(effectiveBrandPrimary);
 
     final headerStyle = AppTypography.getSafeGoogleFont(
       effectiveFamily,
@@ -651,7 +765,7 @@ class _TypographyPreviewCard extends StatelessWidget {
     final priceStyle = GoogleFonts.jetBrainsMono(
       fontSize: 15,
       fontWeight: FontWeight.w700,
-      color: AppColors.brandPrimary,
+      color: effectiveBrandPrimary,
     );
 
     return Container(
@@ -695,18 +809,18 @@ class _TypographyPreviewCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.brandPrimaryContainer,
+                    color: effectivePrimaryContainer,
                     borderRadius: AppRadius.smBorder,
-                    border: Border.all(color: AppColors.infoBorder),
+                    border: Border.all(color: effectiveOnPrimaryContainer.withValues(alpha: 0.25)),
                   ),
                   child: Text(
                     effectiveFamily,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.brandPrimary,
+                      color: effectiveBrandPrimary,
                     ),
                   ),
                 ),

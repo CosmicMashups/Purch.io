@@ -7,9 +7,10 @@ import '../../../../core/widgets/error_state_view.dart';
 import '../providers/onboarding_providers.dart';
 import 'add_branch_screen.dart';
 import 'department_list_screen.dart';
+import 'hardware_settings_screen.dart';
 import 'manual_gcash_qr_settings_screen.dart';
 
-enum _BranchAction { departments, manualGcashQr }
+enum _BranchAction { departments, manualGcashQr, hardwareSettings }
 
 /// A3's branch list — multi-branch from the start (not single-enforced), per
 /// the implementation plan. Each branch offers its departments (B6) and its
@@ -130,6 +131,15 @@ class BranchListScreen extends ConsumerWidget {
                               ),
                             );
                             break;
+                          case _BranchAction.hardwareSettings:
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => HardwareSettingsScreen(
+                                  branchId: branch.id,
+                                ),
+                              ),
+                            );
+                            break;
                         }
                       },
                       itemBuilder: (context) => const [
@@ -143,7 +153,12 @@ class BranchListScreen extends ConsumerWidget {
                                 color: AppColors.textSecondary,
                               ),
                               SizedBox(width: AppSpacing.sm),
-                              Text('Departments'),
+                              Flexible(
+                                child: Text(
+                                  'Departments',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -157,7 +172,31 @@ class BranchListScreen extends ConsumerWidget {
                                 color: AppColors.textSecondary,
                               ),
                               SizedBox(width: AppSpacing.sm),
-                              Text('Manual GCash QR'),
+                              Flexible(
+                                child: Text(
+                                  'Manual GCash QR',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _BranchAction.hardwareSettings,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.print_rounded,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(width: AppSpacing.sm),
+                              Flexible(
+                                child: Text(
+                                  'Hardware Settings',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ],
                           ),
                         ),

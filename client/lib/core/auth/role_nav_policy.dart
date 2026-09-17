@@ -27,9 +27,9 @@ class TabSpec {
 const Map<AppTab, TabSpec> _tabSpecs = {
   AppTab.home: TabSpec(
     tab: AppTab.home,
-    label: 'Home',
-    icon: Icons.home_outlined,
-    selectedIcon: Icons.home_rounded,
+    label: 'Dashboard',
+    icon: Icons.dashboard_outlined,
+    selectedIcon: Icons.dashboard_rounded,
   ),
   AppTab.cashier: TabSpec(
     tab: AppTab.cashier,

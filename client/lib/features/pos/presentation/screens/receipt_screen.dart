@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/hardware/hardware_providers.dart';
 import '../../../../core/theming/app_tokens.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../providers/pos_providers.dart';
 import 'cashier_screen.dart';
 
@@ -199,7 +201,80 @@ class ReceiptScreen extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
+
+                            // Action Buttons (Thermal Print & Open Drawer)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: AppRadius.mdBorder,
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      final tenantSettings =
+                                          ref.read(tenantSettingsNotifierProvider).valueOrNull;
+                                      final success = await ref
+                                          .read(printerServiceProvider)
+                                          .printReceipt(
+                                            transaction: cart,
+                                            tenantSettings: tenantSettings,
+                                            cashierName: 'Cashier',
+                                            cutPaper: true,
+                                          );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              success
+                                                  ? 'Receipt sent to thermal printer.'
+                                                  : 'Failed to print receipt.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.print_rounded, size: 18),
+                                    label: const Text('Print Receipt'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                      horizontal: 16,
+                                    ),
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await ref
+                                          .read(cashDrawerServiceProvider)
+                                          .openManual(
+                                            operatorName: 'Cashier',
+                                            reason: 'Manual Open after Sale',
+                                            isManagerOverride: true,
+                                          );
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('$e')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                                  label: const Text('Drawer'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
 
                             // New Sale CTA
                             SizedBox(

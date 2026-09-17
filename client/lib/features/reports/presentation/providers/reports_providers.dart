@@ -19,7 +19,15 @@ ReportsRepository reportsRepository(Ref ref) {
   return ReportsRepositoryImpl(apiClient: ref.watch(apiClientProvider));
 }
 
-@riverpod
+/// keepAlive: these all back Home dashboard charts, which sit in a plain
+/// ListView — Flutter's Sliver machinery still mounts/unmounts list items
+/// lazily based on the viewport's cache extent, same as ListView.builder, so
+/// autoDispose (the default) would tear the fetched data down and refetch
+/// from the network every time a chart scrolls far enough off-screen and
+/// back. The data only changes when RefreshIndicator invalidates it or the
+/// range/filter changes, so there's nothing to gain from disposing it on a
+/// scroll.
+@Riverpod(keepAlive: true)
 Future<SalesDashboard> salesDashboard(Ref ref, {String? branchId}) {
   return ref
       .watch(reportsRepositoryProvider)
@@ -29,7 +37,7 @@ Future<SalesDashboard> salesDashboard(Ref ref, {String? branchId}) {
 /// Home's trend chart — one provider instance per (granularity, range)
 /// combination, so switching Day → Week → Custom re-queries rather than
 /// re-filtering a fixed 14-day window client-side.
-@riverpod
+@Riverpod(keepAlive: true)
 Future<SalesTrendSeries> salesTrend(
   Ref ref, {
   String? branchId,
@@ -50,7 +58,7 @@ Future<SalesTrendSeries> salesTrend(
 /// Revenue by catalog category. Composed here rather than in the reports
 /// repository because the item→category mapping is a catalog concern and the
 /// backend exposes no category-sales endpoint — see [aggregateCategorySales].
-@riverpod
+@Riverpod(keepAlive: true)
 Future<List<CategorySalesSummary>> categorySales(
   Ref ref, {
   String? branchId,
@@ -66,7 +74,7 @@ Future<List<CategorySalesSummary>> categorySales(
   );
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<MovementSummary> movementSummary(
   Ref ref, {
   String? branchId,
@@ -81,7 +89,7 @@ Future<MovementSummary> movementSummary(
       .getMovementSummary(branchId: branchId, from: fromDate, to: toDate);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<StaffPerformanceReport> staffPerformance(
   Ref ref, {
   String? branchId,
@@ -93,7 +101,7 @@ Future<StaffPerformanceReport> staffPerformance(
       .getStaffPerformance(branchId: branchId, from: fromDate, to: toDate);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<List<DepartmentSalesSummary>> departmentSales(
   Ref ref, {
   String? branchId,

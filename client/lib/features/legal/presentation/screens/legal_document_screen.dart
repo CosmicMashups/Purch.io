@@ -35,20 +35,24 @@ class LegalDocumentScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.accentWarmContainer,
+                      color: AppColors.cardHover,
                       borderRadius: AppRadius.smBorder,
                       border: Border.all(
-                        color: AppColors.accentWarm.withAlpha(80),
+                        color: AppColors.border,
                       ),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
-                          Icons.info_outline_rounded,
-                          size: 18,
-                          color: AppColors.onAccentWarmContainer,
+                          Icons.verified_outlined,
+                          size: 16,
+                          color: AppColors.brandPrimary,
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
@@ -56,8 +60,8 @@ class LegalDocumentScreen extends StatelessWidget {
                             lastUpdatedNote,
                             style: const TextStyle(
                               fontSize: 12,
-                              color: AppColors.onAccentWarmContainer,
-                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),

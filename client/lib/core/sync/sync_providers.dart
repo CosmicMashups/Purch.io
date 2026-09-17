@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../db/app_database.dart';
-import '../db/daos/sync_queue_dao.dart';
+import '../db/db_providers.dart';
 import '../errors/failure.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import 'sync_coordinator.dart';
@@ -11,18 +10,6 @@ import 'sync_repository.dart';
 import 'sync_repository_impl.dart';
 
 part 'sync_providers.g.dart';
-
-@Riverpod(keepAlive: true)
-AppDatabase appDatabase(Ref ref) {
-  final db = AppDatabase();
-  ref.onDispose(db.close);
-  return db;
-}
-
-@Riverpod(keepAlive: true)
-SyncQueueDao syncQueueDao(Ref ref) {
-  return ref.watch(appDatabaseProvider).syncQueueDao;
-}
 
 @Riverpod(keepAlive: true)
 SyncRepository syncRepository(Ref ref) {

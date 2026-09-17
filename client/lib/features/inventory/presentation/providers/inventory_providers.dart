@@ -17,7 +17,11 @@ InventoryRepository inventoryRepository(Ref ref) {
   return InventoryRepositoryImpl(apiClient: ref.watch(apiClientProvider));
 }
 
-@riverpod
+/// keepAlive: backs the Home dashboard's "Running Low" chart, which sits in
+/// a scrollable list — see reports_providers.dart's keepAlive doc comment
+/// for why autoDispose would otherwise refetch this every time the chart
+/// scrolls off-screen and back.
+@Riverpod(keepAlive: true)
 class InventoryDashboardNotifier extends _$InventoryDashboardNotifier {
   @override
   Future<InventoryDashboard> build() {

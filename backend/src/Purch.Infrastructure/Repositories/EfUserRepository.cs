@@ -28,6 +28,16 @@ public sealed class EfUserRepository(PurchDbContext dbContext) : IUserRepository
         return dbContext.Users.FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
+    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = email.Trim();
+        return dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                user => user.Email != null && EF.Functions.ILike(user.Email, normalized),
+                cancellationToken);
+    }
+
     public void Add(User user)
     {
         _ = dbContext.Users.Add(user);

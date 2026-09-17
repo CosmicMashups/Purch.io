@@ -7,14 +7,18 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../../../core/widgets/purch_image.dart';
+import '../../../../core/hardware/hardware_providers.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/domain/pricing_type.dart';
+import '../../../catalog/domain/tingi_mode.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../catalog/presentation/screens/add_item_screen.dart';
+import '../../../onboarding/presentation/screens/hardware_settings_screen.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'combo_customization_screen.dart';
 import 'payment_screen.dart';
+import 'tingi_weight_dialog.dart';
 import 'variant_picker_screen.dart';
 
 /// The Cashier screen — D1's item grid and cart, merged.
@@ -69,6 +73,14 @@ class _SecondaryActionSpec {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   /// Width at which the cart earns a permanent column. Below this a side
   /// panel would squeeze the grid down to one item per row.
@@ -80,6 +92,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(cartNotifierProvider, (_, next) {
+      final cartValue = next.valueOrNull;
+      if (cartValue != null) {
+        ref.read(cfdServiceProvider).updateFromTransaction(transaction: cartValue);
+      }
+    });
+
     final cart = ref.watch(cartNotifierProvider).valueOrNull;
     final itemCount = cart?.itemCount ?? 0;
 
@@ -89,6 +108,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
         final itemGrid = ItemGridPanel(
           selectedCategoryId: _selectedCategoryId,
+          searchQuery: _searchQuery,
           onClearCategory: () => setState(() => _selectedCategoryId = null),
         );
         final categorySelector = CategorySelector(
@@ -101,18 +121,204 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           key: _scaffoldKey,
           backgroundColor: AppColors.background,
           appBar: AppBar(
-            title: const Text('Cashier'),
+            title: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.brandPrimary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'P.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const Flexible(
+                            child: Text(
+                              'Cashier',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          if (showSidePanel) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandPrimaryContainer,
+                                borderRadius: BorderRadius.circular(AppRadius.full),
+                                border: Border.all(
+                                  color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: const Text(
+                                'Main Branch',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.brandPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (showSidePanel)
+                        const Text(
+                          'Register #01 • Online',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (showSidePanel && constraints.maxWidth >= 960) ...[
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Container(
+                      height: 38,
+                      constraints: const BoxConstraints(maxWidth: 380),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                        decoration: InputDecoration(
+                          hintText: 'Scan barcode or search items... [F2]',
+                          hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : const Icon(Icons.qr_code_scanner_rounded, size: 18, color: AppColors.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          fillColor: AppColors.card,
+                          filled: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 1.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             actions: [
-              // Three labelled buttons plus the cart badge don't fit beside
-              // the title on a phone, and an AppBar's actions row has no
-              // overflow protection — so narrow widths get one menu instead.
-              if (showSidePanel)
+              // Hardware actions and secondary buttons on wide screens;
+              // collapsed into menu on narrow screens to prevent AppBar title overflow
+              if (showSidePanel) ...[
+                IconButton(
+                  tooltip: 'Open Cash Drawer / No Sale',
+                  icon: const Icon(Icons.point_of_sale_rounded, size: 20),
+                  onPressed: () async {
+                    try {
+                      final success = await ref.read(cashDrawerServiceProvider).openManual(
+                        operatorName: 'Cashier',
+                        reason: 'Cashier Manual Open / No Sale',
+                        isManagerOverride: true,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success ? 'Cash drawer opened.' : 'Failed to open drawer.'),
+                            backgroundColor: success ? AppColors.accentEmerald : Colors.red,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Hardware Settings',
+                  icon: const Icon(Icons.settings_input_component_rounded, size: 20),
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const HardwareSettingsScreen()),
+                  ),
+                ),
                 for (final action in _secondaryActions)
-                  _SecondaryAction(spec: action)
-              else
+                  _SecondaryAction(spec: action),
+                if (constraints.maxWidth >= 1080) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.brandPrimaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      border: Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 11,
+                          backgroundColor: AppColors.brandPrimary,
+                          child: Text(
+                            'MS',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Maria S. • Cashier',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: AppSpacing.sm),
+              ] else ...[
                 const _SecondaryActionsMenu(),
-              const SizedBox(width: AppSpacing.sm),
-              if (!showSidePanel)
+                const SizedBox(width: AppSpacing.sm),
                 Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: IconButton(
@@ -130,6 +336,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     tooltip: 'View cart',
                   ),
                 ),
+              ],
             ],
           ),
           endDrawer:
@@ -297,14 +504,38 @@ class CategorySelector extends ConsumerWidget {
           color: AppColors.surface,
           border: Border(right: BorderSide(color: AppColors.border)),
         ),
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.md,
-          ),
-          itemCount: entries.length,
-          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) => entries[index],
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.xs,
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'CATEGORIES',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                itemCount: entries.length,
+                separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                itemBuilder: (context, index) => entries[index],
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -348,7 +579,7 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const thumbSize = 34.0;
+    const thumbSize = 36.0;
 
     final thumbnail = Container(
       width: thumbSize,
@@ -370,7 +601,7 @@ class _CategoryTile extends StatelessWidget {
               )
               : Icon(
                 icon,
-                size: 18,
+                size: 20,
                 color:
                     selected ? AppColors.brandPrimary : AppColors.textSecondary,
               ),
@@ -384,7 +615,7 @@ class _CategoryTile extends StatelessWidget {
       style: TextStyle(
         fontSize: 11,
         height: 1.15,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
         color: selected ? AppColors.brandPrimary : AppColors.textSecondary,
       ),
     );
@@ -400,23 +631,34 @@ class _CategoryTile extends StatelessWidget {
           borderRadius: AppRadius.mdBorder,
           onTap: onTap,
           child: Container(
-            width: vertical ? null : 78,
+            width: vertical ? null : 80,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.xs,
-              vertical: AppSpacing.sm,
+              vertical: AppSpacing.sm + 2,
             ),
             decoration: BoxDecoration(
               borderRadius: AppRadius.mdBorder,
               border: Border.all(
                 color: selected ? AppColors.brandPrimary : AppColors.border,
+                width: selected ? 1.5 : 1,
               ),
+              boxShadow:
+                  selected
+                      ? [
+                        BoxShadow(
+                          color: AppColors.brandPrimary.withValues(alpha: 0.12),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                      : null,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
                 thumbnail,
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: 6),
                 Flexible(child: text),
               ],
             ),
@@ -494,11 +736,15 @@ class ItemGridPanel extends ConsumerWidget {
   const ItemGridPanel({
     super.key,
     this.selectedCategoryId,
+    this.searchQuery = '',
     this.onClearCategory,
   });
 
   /// null means no category filter — every active item shows.
   final String? selectedCategoryId;
+
+  /// live query from AppBar search input.
+  final String searchQuery;
 
   /// Way back out of an empty category, offered in that empty state.
   final VoidCallback? onClearCategory;
@@ -533,7 +779,7 @@ class ItemGridPanel extends ConsumerWidget {
           );
         }
 
-        final visibleItems =
+        final categoryFiltered =
             selectedCategoryId == null
                 ? activeItems
                 : activeItems
@@ -542,7 +788,7 @@ class ItemGridPanel extends ConsumerWidget {
 
         // Distinct from an empty catalog: there *are* things to sell, just
         // not under this filter, so the way out is back to everything.
-        if (visibleItems.isEmpty) {
+        if (categoryFiltered.isEmpty) {
           return EmptyStateView(
             icon: Icons.category_outlined,
             title: 'Nothing in this category yet.',
@@ -554,21 +800,40 @@ class ItemGridPanel extends ConsumerWidget {
           );
         }
 
+        final visibleItems =
+            searchQuery.isEmpty
+                ? categoryFiltered
+                : categoryFiltered.where((item) {
+                  final q = searchQuery.toLowerCase();
+                  final nameMatches = item.name.toLowerCase().contains(q);
+                  final skuMatches =
+                      item.sku?.toLowerCase().contains(q) ?? false;
+                  final barcodeMatches =
+                      item.barcode?.toLowerCase().contains(q) ?? false;
+                  return nameMatches || skuMatches || barcodeMatches;
+                }).toList();
+
+        if (visibleItems.isEmpty) {
+          return EmptyStateView(
+            icon: Icons.search_off_rounded,
+            title: 'No matching items found.',
+            description: 'No items match "$searchQuery" in this category.',
+            actionLabel: 'Show All Items',
+            onAction: onClearCategory,
+          );
+        }
+
         return LayoutBuilder(
           builder: (context, constraints) {
             // Keep tiles around 180dp wide whatever the grid's share of the
-            // screen is, so the cart panel taking 340dp doesn't squash them.
-            final columns = (constraints.maxWidth / 180).floor().clamp(2, 6);
+            // screen is, so the cart panel taking 360dp doesn't squash them.
+            final columns = (constraints.maxWidth / 168).floor().clamp(2, 6);
             final tileWidth =
                 (constraints.maxWidth -
                     AppSpacing.lg * 2 -
                     14 * (columns - 1)) /
                 columns;
-            // Height follows the 1.15 aspect the grid has always had, but
-            // with a floor: with the category rail and the cart both taking
-            // their share, a tile can end up narrow enough that a square-ish
-            // box no longer holds icon + two-line name + price.
-            final tileHeight = (tileWidth / 1.15).clamp(148.0, 200.0);
+            final tileHeight = (tileWidth * 1.12).clamp(168.0, 220.0);
 
             return GridView.builder(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -596,16 +861,23 @@ class _ItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDirectlySellable = item.pricingType == PricingType.unit;
+    final isWeighed =
+        item.pricingType == PricingType.weightVolume ||
+        item.tingiMode != TingiMode.none;
+    final isDirectlySellable =
+        item.pricingType == PricingType.unit ||
+        item.pricingType == PricingType.service ||
+        item.pricingType == PricingType.bundle;
     final needsCustomization =
         item.pricingType == PricingType.combo ||
         item.pricingType == PricingType.variantMatrix;
     final badge = _ItemBadge.forItem(item);
+    final isOutOfStock = badge?.label == 'OUT OF STOCK';
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: AppRadius.mdBorder,
+        borderRadius: BorderRadius.circular(14),
         boxShadow: AppShadows.subtle,
         border: Border.all(color: AppColors.border),
       ),
@@ -632,13 +904,19 @@ class _ItemTile extends ConsumerWidget {
               return;
             }
 
+            if (isWeighed) {
+              await showDialog<bool>(
+                context: context,
+                builder: (_) => TingiWeightDialog(item: item),
+              );
+              return;
+            }
+
             if (!isDirectlySellable) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    '${item.name} needs a customization step that '
-                    'isn\'t built yet — only regular unit-priced '
-                    'items can be added directly for now.',
+                    '${item.name} needs a customization step for weight/portion selection.',
                   ),
                 ),
               );
@@ -655,78 +933,129 @@ class _ItemTile extends ConsumerWidget {
               ).showSnackBar(SnackBar(content: Text('Added ${item.name}')));
             }
           },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color:
-                        isDirectlySellable || needsCustomization
-                            ? AppColors.brandPrimaryContainer
-                            : AppColors.cardHover,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child:
-                      item.imageUrl != null && item.imageUrl!.isNotEmpty
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- Mockup Top Image Banner & Badge Overlay ---
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      color: AppColors.cardHover,
+                      child: item.imageUrl != null && item.imageUrl!.isNotEmpty
                           ? PurchImage(
-                            imageUrlOrPath: item.imageUrl,
-                            width: 44,
-                            height: 44,
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            fit: BoxFit.cover,
-                          )
-                          : Icon(
-                            isDirectlySellable || needsCustomization
-                                ? Icons.inventory_2_rounded
-                                : Icons.inventory_2_outlined,
-                            size: 22,
-                            color:
-                                isDirectlySellable || needsCustomization
-                                    ? AppColors.brandPrimary
-                                    : AppColors.textMuted,
-                          ),
-                ),
-                const SizedBox(height: 10),
-                Flexible(
-                  child: Text(
-                    item.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.2,
+                              imageUrlOrPath: item.imageUrl,
+                              fit: BoxFit.cover,
+                            )
+                          : Center(
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: isDirectlySellable || needsCustomization || isWeighed
+                                      ? AppColors.brandPrimaryContainer
+                                      : AppColors.background,
+                                  borderRadius: BorderRadius.circular(AppRadius.md),
+                                ),
+                                child: Icon(
+                                  isDirectlySellable || needsCustomization || isWeighed
+                                      ? (isWeighed ? Icons.scale_rounded : Icons.inventory_2_rounded)
+                                      : Icons.inventory_2_outlined,
+                                  size: 24,
+                                  color: isDirectlySellable || needsCustomization || isWeighed
+                                      ? AppColors.brandPrimary
+                                      : AppColors.textMuted,
+                                ),
+                              ),
+                            ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Price and its qualifier share one line: the grid's tiles
-                // are sized for speed, and a second line of type would cost
-                // a row of items on a phone.
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '₱${item.basePrice.toStringAsFixed(2)}',
-                        style: AppTypography.priceBadge,
+                    if (badge != null && !isOutOfStock)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: _ItemTypeBadge(badge: badge),
                       ),
-                      if (badge != null) ...[
-                        const SizedBox(width: 6),
-                        _ItemTypeBadge(badge: badge),
-                      ],
-                    ],
-                  ),
+                    if (isOutOfStock)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          alignment: Alignment.center,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              borderRadius: BorderRadius.circular(AppRadius.full),
+                            ),
+                            child: const Text(
+                              'OUT OF STOCK',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+
+              // --- Mockup Bottom Content Area ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          '₱${item.basePrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: AppColors.brandPrimaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            size: 16,
+                            color: AppColors.brandPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -809,17 +1138,24 @@ class _ItemTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: badge.background,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: badge.color.withOpacity(0.25), width: 0.8),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        border: Border.all(color: badge.color.withValues(alpha: 0.25), width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Text(
         badge.label,
         style: TextStyle(
           fontSize: 9,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           letterSpacing: 0.4,
           height: 1.2,
           color: badge.color,
@@ -905,14 +1241,52 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           ),
           child: Row(
             children: [
-              Text('Cart', style: AppTypography.titleMd),
-              const Spacer(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Cart', style: AppTypography.titleMd),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.brandPrimaryContainer,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Text(
+                            '${cartAsync.valueOrNull?.itemCount ?? 0} item${(cartAsync.valueOrNull?.itemCount ?? 0) == 1 ? '' : 's'}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brandPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 1),
+                    const Text(
+                      'Ticket #0042 • Counter Sale',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               IconButton(
                 onPressed:
                     cartAsync.valueOrNull == null
                         ? null
                         : () => _confirmVoid(context, ref),
-                icon: const Icon(Icons.delete_sweep),
+                icon: const Icon(Icons.delete_sweep, color: AppColors.error),
                 tooltip: 'Void cart',
               ),
             ],
@@ -1114,12 +1488,64 @@ class _CartFooter extends ConsumerWidget {
                     ),
           ),
           const Divider(color: AppColors.border, height: 1),
+          if (MediaQuery.sizeOf(context).height >= 700) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                0,
+                AppSpacing.md,
+                8,
+              ),
+              child: Row(
+                children: [
+                  for (final tender in ['CASH', 'QR PH', 'CARD', 'CREDIT'])
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          onTap:
+                              () => Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).push<void>(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => PaymentScreen(
+                                        total: cart.totalAmount,
+                                      ),
+                                ),
+                              ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              tender,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
               AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1127,15 +1553,15 @@ class _CartFooter extends ConsumerWidget {
                 _TotalsRow(label: 'Subtotal', amount: cart.subtotal),
                 if (cart.discountAmount > 0)
                   _TotalsRow(label: 'Discount', amount: -cart.discountAmount),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 _TotalsRow(
                   label: 'Total',
                   amount: cart.totalAmount,
                   emphasize: true,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 SizedBox(
-                  height: 52,
+                  height: 48,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.brandPrimary,
@@ -1143,6 +1569,7 @@ class _CartFooter extends ConsumerWidget {
                       shape: const RoundedRectangleBorder(
                         borderRadius: AppRadius.mdBorder,
                       ),
+                      elevation: 1,
                     ),
                     onPressed:
                         () => Navigator.of(context, rootNavigator: true)
@@ -1153,12 +1580,21 @@ class _CartFooter extends ConsumerWidget {
                                         PaymentScreen(total: cart.totalAmount),
                               ),
                             ),
-                    child: const Text(
-                      'Pay',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.point_of_sale_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Pay',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, size: 16),
+                      ],
                     ),
                   ),
                 ),
@@ -1185,8 +1621,9 @@ class _CartLineTile extends ConsumerWidget {
         color: AppColors.surface,
         borderRadius: AppRadius.mdBorder,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.subtle,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -1202,14 +1639,14 @@ class _CartLineTile extends ConsumerWidget {
                       line.itemName,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       '₱${line.unitPrice.toStringAsFixed(2)} each',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -1218,10 +1655,14 @@ class _CartLineTile extends ConsumerWidget {
               ),
               Text(
                 '₱${line.lineTotal.toStringAsFixed(2)}',
-                style: AppTypography.priceLine,
+                style: AppTypography.priceLine.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 2),
           Row(
             children: [
               IconButton(
@@ -1231,6 +1672,7 @@ class _CartLineTile extends ConsumerWidget {
                   color: AppColors.error,
                   size: 20,
                 ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Remove',
               ),
@@ -1245,6 +1687,7 @@ class _CartLineTile extends ConsumerWidget {
                           ),
                         )
                         : null,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.remove_circle_outline, size: 20),
               ),
@@ -1256,7 +1699,7 @@ class _CartLineTile extends ConsumerWidget {
                   ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
                 ),
@@ -1269,6 +1712,7 @@ class _CartLineTile extends ConsumerWidget {
                         quantity: line.quantity + 1,
                       ),
                     ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.add_circle_outline, size: 20),
               ),
