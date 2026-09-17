@@ -127,6 +127,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           key: _scaffoldKey,
           backgroundColor: AppColors.background,
           appBar: AppBar(
+            centerTitle: false,
+            titleSpacing: showSidePanel ? NavigationToolbar.kMiddleSpacing : 12.0,
             title: Row(
               children: [
                 Container(
@@ -147,25 +149,38 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          const Flexible(
-                            child: Text(
-                              'Cashier',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                                letterSpacing: -0.3,
+                if (!showSidePanel || constraints.maxWidth < 960)
+                  const Flexible(
+                    child: Text(
+                      'Cashier',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Flexible(
+                              child: Text(
+                                'Cashier',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
                             ),
-                          ),
-                          if (showSidePanel) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -189,9 +204,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                      if (showSidePanel)
+                        ),
                         const Text(
                           'Register #01 • Online',
                           overflow: TextOverflow.ellipsis,
@@ -201,9 +214,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             fontWeight: FontWeight.normal,
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 if (showSidePanel && constraints.maxWidth >= 960) ...[
                   const SizedBox(width: 24),
                   Expanded(
@@ -287,7 +300,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   ),
                 ),
                 for (final action in _secondaryActions)
-                  _SecondaryAction(spec: action),
+                  if (action.label != 'Kiosk Orders' || constraints.maxWidth >= 960)
+                    _SecondaryAction(spec: action),
                 if (constraints.maxWidth >= 1080) ...[
                   const SizedBox(width: 8),
                   Container(

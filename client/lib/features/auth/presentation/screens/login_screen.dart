@@ -2,24 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
-import '../../../kiosk/presentation/screens/kiosk_pairing_screen.dart';
-import '../../../kitchen_display/presentation/screens/kitchen_display_pairing_screen.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
 import '../../../onboarding/presentation/screens/server_connection_screen.dart';
-import '../../../order_board/presentation/screens/order_board_pairing_screen.dart';
 import '../providers/auth_providers.dart';
 import 'admin_login_screen.dart';
 
 /// The first screen any staff member sees on a paired device.
-/// Hero banner establishes the brand moment (logo, name, tagline) on a
-/// gradient field; the card below stays a focused, tactile pairing-code +
-/// PIN form — Purch.io logs staff into a device, not an email account.
+/// Designed for fast, distraction-free terminal sign-in:
+/// - Compact brand header with direct access to local server network settings.
+/// - Focused tactile card for Device Pairing Code + PIN and prominent Log In action.
+/// - Secondary "Sign in as admin instead" for store owners.
+/// - Footer link for first-time business onboarding.
+/// - Completely fits above the fold in standard 9:16 mobile and tablet viewports.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, required this.onLoggedIn});
 
-  /// Called once login succeeds. Kept as a callback rather than baking in
-  /// go_router navigation here, since the full route tree isn't built yet —
-  /// this screen shouldn't need to change when it is.
+  /// Called once login succeeds.
   final VoidCallback onLoggedIn;
 
   @override
@@ -70,311 +68,241 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _HeroBanner(),
-                  Transform.translate(
-                    offset: const Offset(0, -28),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: AppRadius.xlBorder,
-                        boxShadow: AppShadows.card,
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      padding: const EdgeInsets.all(32),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.brandPrimaryContainer,
-                                    borderRadius: AppRadius.mdBorder,
-                                  ),
-                                  child: const Icon(
-                                    Icons.login_rounded,
-                                    color: AppColors.brandPrimary,
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Welcome Back',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Log in to this device to continue',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
+                  // Top utility & brand header
+                  _BrandHeader(isLoading: isLoading),
+                  const SizedBox(height: 16),
 
-                            // Device pairing code
-                            TextFormField(
-                              controller: _pairingCodeController,
-                              enabled: !isLoading,
-                              decoration: const InputDecoration(
-                                labelText: 'Device pairing code',
-                                prefixIcon: Icon(
-                                  Icons.tablet_mac_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                              textInputAction: TextInputAction.next,
-                              validator:
-                                  (value) =>
-                                      (value == null || value.trim().isEmpty)
-                                          ? 'Required'
-                                          : null,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // PIN
-                            TextFormField(
-                              controller: _pinController,
-                              enabled: !isLoading,
-                              decoration: const InputDecoration(
-                                labelText: 'PIN',
-                                prefixIcon: Icon(
-                                  Icons.lock_outline_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              obscureText: true,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _submit(),
-                              validator:
-                                  (value) =>
-                                      (value == null || value.trim().isEmpty)
-                                          ? 'Required'
-                                          : null,
-                            ),
-
-                            // Failure notice
-                            if (failure != null) ...[
-                              const SizedBox(height: 16),
+                  // Main sign-in card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: AppRadius.lgBorder,
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: AppShadows.card,
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                width: 40,
+                                height: 40,
                                 decoration: BoxDecoration(
-                                  color: AppColors.error.withAlpha(20),
-                                  borderRadius: AppRadius.smBorder,
-                                  border: Border.all(
-                                    color: AppColors.error.withAlpha(60),
-                                  ),
+                                  color: AppColors.brandPrimaryContainer,
+                                  borderRadius: AppRadius.mdBorder,
                                 ),
-                                child: Row(
+                                child: const Icon(
+                                  Icons.login_rounded,
+                                  color: AppColors.brandPrimary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.error_outline_rounded,
-                                      size: 18,
-                                      color: AppColors.error,
+                                    Text(
+                                      'Device Sign In',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                        letterSpacing: -0.2,
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        failure.message,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.error,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                    Text(
+                                      'Enter terminal pairing code and PIN',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 20),
 
-                            const SizedBox(height: 24),
-
-                            // Primary Login Button
-                            SizedBox(
-                              height: 52,
-                              child: FilledButton(
-                                onPressed: isLoading ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.brandPrimary,
-                                  foregroundColor: AppColors.onBrandPrimary,
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: AppRadius.mdBorder,
-                                  ),
-                                ),
-                                child:
-                                    isLoading
-                                        ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            color: AppColors.onBrandPrimary,
-                                          ),
-                                        )
-                                        : const Text(
-                                          'Log In',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
+                          // Device pairing code
+                          TextFormField(
+                            controller: _pairingCodeController,
+                            enabled: !isLoading,
+                            decoration: InputDecoration(
+                              labelText: 'Device pairing code',
+                              hintText: 'e.g. POS-01-REG',
+                              prefixIcon: const Icon(
+                                Icons.tablet_mac_rounded,
+                                size: 20,
+                                color: AppColors.textSecondary,
                               ),
-                            ),
-
-                            const SizedBox(height: 28),
-                            const Divider(color: AppColors.border, height: 1),
-                            const SizedBox(height: 16),
-
-                            // Secondary Navigation Links
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.store_mall_directory_outlined,
-                                size: 18,
-                                color: AppColors.brandPrimary,
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
                               ),
-                              label: const Text(
-                                'Set up a new business',
-                                style: TextStyle(
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(
                                   color: AppColors.brandPrimary,
-                                  fontWeight: FontWeight.w600,
+                                  width: 1.5,
                                 ),
                               ),
-                              onPressed:
-                                  isLoading
-                                      ? null
-                                      : () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => const BootstrapScreen(),
-                                        ),
-                                      ),
                             ),
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.touch_app_outlined,
-                                size: 18,
+                            textInputAction: TextInputAction.next,
+                            validator:
+                                (value) =>
+                                    (value == null || value.trim().isEmpty)
+                                        ? 'Required'
+                                        : null,
+                          ),
+                          const SizedBox(height: 14),
+
+                          // PIN field
+                          TextFormField(
+                            controller: _pinController,
+                            enabled: !isLoading,
+                            decoration: InputDecoration(
+                              labelText: 'PIN',
+                              hintText: '4-digit staff PIN',
+                              prefixIcon: const Icon(
+                                Icons.lock_outline_rounded,
+                                size: 20,
                                 color: AppColors.textSecondary,
                               ),
-                              label: const Text(
-                                'Set up as a self-order kiosk',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.mdBorder,
+                                borderSide: const BorderSide(
+                                  color: AppColors.brandPrimary,
+                                  width: 1.5,
                                 ),
                               ),
-                              onPressed:
+                            ),
+                            keyboardType: TextInputType.number,
+                            obscureText: true,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _submit(),
+                            validator:
+                                (value) =>
+                                    (value == null || value.trim().isEmpty)
+                                        ? 'Required'
+                                        : null,
+                          ),
+
+                          // Failure banner
+                          if (failure != null) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.errorContainer,
+                                borderRadius: AppRadius.smBorder,
+                                border: Border.all(
+                                  color: AppColors.errorBorder,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 18,
+                                    color: AppColors.error,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      failure.message,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.onErrorContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: 18),
+
+                          // Primary Log In Button
+                          SizedBox(
+                            height: 48,
+                            child: FilledButton(
+                              onPressed: isLoading ? null : _submit,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.brandPrimary,
+                                foregroundColor: AppColors.onBrandPrimary,
+                                elevation: 0,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: AppRadius.mdBorder,
+                                ),
+                              ),
+                              child:
                                   isLoading
-                                      ? null
-                                      : () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => KioskPairingScreen(
-                                                onPaired: widget.onLoggedIn,
-                                              ),
+                                      ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          color: AppColors.onBrandPrimary,
+                                        ),
+                                      )
+                                      : const Text(
+                                        'Log In',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                             ),
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.confirmation_number_outlined,
-                                size: 18,
-                                color: AppColors.textSecondary,
-                              ),
-                              label: const Text(
-                                'Set up as an order number board',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              onPressed:
-                                  isLoading
-                                      ? null
-                                      : () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => OrderBoardPairingScreen(
-                                                onPaired: widget.onLoggedIn,
-                                              ),
-                                        ),
-                                      ),
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.soup_kitchen_outlined,
-                                size: 18,
-                                color: AppColors.textSecondary,
-                              ),
-                              label: const Text(
-                                'Set up as a kitchen display',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              onPressed:
-                                  isLoading
-                                      ? null
-                                      : () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => KitchenDisplayPairingScreen(
-                                                onPaired: widget.onLoggedIn,
-                                              ),
-                                        ),
-                                      ),
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(
-                                Icons.dns_outlined,
-                                size: 18,
-                                color: AppColors.textSecondary,
-                              ),
-                              label: const Text(
-                                'Connect to a local server',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              onPressed:
-                                  isLoading
-                                      ? null
-                                      : () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) =>
-                                                  const ServerConnectionScreen(),
-                                        ),
-                                      ),
-                            ),
-                            TextButton(
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Secondary Admin Sign In
+                          Center(
+                            child: TextButton.icon(
                               onPressed:
                                   isLoading
                                       ? null
@@ -386,7 +314,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               ),
                                         ),
                                       ),
-                              child: const Text(
+                              icon: const Icon(
+                                Icons.admin_panel_settings_outlined,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              label: const Text(
                                 'Sign in as admin instead',
                                 style: TextStyle(
                                   color: AppColors.textSecondary,
@@ -394,10 +327,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   fontSize: 13,
                                 ),
                               ),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Bottom Onboarding Link
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          'New to Purch.io? ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        InkWell(
+                          onTap:
+                              isLoading
+                                  ? null
+                                  : () => Navigator.of(context).push<void>(
+                                    MaterialPageRoute(
+                                      builder: (_) => const BootstrapScreen(),
+                                    ),
+                                  ),
+                          borderRadius: AppRadius.smBorder,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              'Set up a new business',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.brandPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -410,102 +394,101 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// Full-bleed photographic banner establishing the brand moment above the
-/// login card. `assets/images/login_hero.jpg` is a deliberately
-/// vertical-agnostic storefront scene (blurred cues from café, grocery,
-/// and retail all at once, no single business type dominant) so it reads
-/// as "a Filipino small business" regardless of which vertical a given
-/// tenant runs. A brand-ultramarine gradient scrim sits over it, both for
-/// text legibility and to keep the banner tied to the app's own palette
-/// rather than looking like a stock photo pasted on top.
-class _HeroBanner extends StatelessWidget {
+/// Refined top brand banner with embedded connection icon button.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader({required this.isLoading});
+
+  final bool isLoading;
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: SizedBox(
-        height: 320,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              'assets/images/login_hero.jpg',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.brandPrimary,
+        borderRadius: AppRadius.lgBorder,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x200F766E),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          // Logo
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: AppRadius.mdBorder,
             ),
-            // Ultramarine scrim: heavier at top (logo sits there) and at the
-            // bottom edge (where it meets the white card), lighter through
-            // the middle so the photo still reads as a real place.
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xCC1E3A8A),
-                    Color(0x661E40AF),
-                    Color(0xE61E3A8A),
-                  ],
-                  stops: [0.0, 0.55, 1.0],
+            padding: const EdgeInsets.all(7),
+            child: ClipRRect(
+              borderRadius: AppRadius.smBorder,
+              child: Image.asset(
+                'assets/logo.jpg',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Brand Wordmark + Tagline
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/wordmark.png',
+                  height: 22,
+                  color: Colors.white,
+                  colorBlendMode: BlendMode.srcIn,
+                  semanticLabel: 'Purch.io',
                 ),
-              ),
+                const SizedBox(height: 2),
+                const Text(
+                  'One POS core for every kind of business',
+                  style: TextStyle(
+                    color: Color(0xCCFFFFFF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 32,
-                horizontal: 24,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    width: 84,
-                    height: 84,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: AppRadius.xlBorder,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x40000000),
-                          blurRadius: 16,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(13),
-                    child: ClipRRect(
-                      borderRadius: AppRadius.mdBorder,
-                      child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Image.asset(
-                    'assets/wordmark.png',
-                    height: 32,
-                    color: Colors.white,
-                    colorBlendMode: BlendMode.srcIn,
-                    semanticLabel: 'Purch.io',
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'One POS core for every kind of business',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.1,
-                      shadows: [
-                        Shadow(color: Color(0x80000000), blurRadius: 6),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          ),
+
+          // Server Connection Action
+          IconButton(
+            tooltip: 'Connect to a local server',
+            icon: const Icon(
+              Icons.dns_outlined,
+              color: Colors.white,
+              size: 20,
             ),
-          ],
-        ),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0x26FFFFFF),
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed:
+                isLoading
+                    ? null
+                    : () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const ServerConnectionScreen(),
+                      ),
+                    ),
+          ),
+        ],
       ),
     );
   }
 }
+

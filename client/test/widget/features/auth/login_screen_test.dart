@@ -93,4 +93,35 @@ void main() {
       expect(loggedIn, isFalse);
     },
   );
+
+  testWidgets(
+    'fits above the fold in standard 9:16 phone viewport without scrolling',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final repository = FakeAuthRepository();
+      await tester.pumpWidget(
+        _wrap(LoginScreen(onLoggedIn: () {}), repository: repository),
+      );
+      await tester.pumpAndSettle();
+
+      // "Log In" button and "Device Sign In" title are directly on screen
+      expect(find.text('Device Sign In'), findsOneWidget);
+      expect(find.text('Log In'), findsOneWidget);
+      expect(find.text('Sign in as admin instead'), findsOneWidget);
+      expect(find.text('Set up a new business'), findsOneWidget);
+      expect(find.byIcon(Icons.dns_outlined), findsOneWidget);
+
+      // Tap directly without scroll
+      await tester.tap(find.text('Log In'));
+      await tester.pump();
+      expect(find.text('Required'), findsNWidgets(2));
+    },
+  );
 }
+

@@ -34,8 +34,20 @@ DOTNET_BIN="dotnet"
 if [ -x "/d/dotnet-sdk/dotnet.exe" ]; then
     DOTNET_BIN="/d/dotnet-sdk/dotnet.exe"
     export DOTNET_ROOT="D:\\dotnet-sdk"
-    export PATH="/d/dotnet-sdk:$PATH"
+    export PATH="/d/dotnet-sdk:$HOME/.dotnet/tools:$PATH"
+elif [ -d "$HOME/.dotnet/tools" ]; then
+    export PATH="$HOME/.dotnet/tools:$PATH"
 fi
+
+# Ensure terminal doesn't close immediately on success or error (e.g. if double-clicked)
+finish() {
+    local exit_code=$?
+    echo
+    read -n 1 -s -r -p "Press any key to close this window..."
+    echo
+    exit $exit_code
+}
+trap finish EXIT
 
 echo "Using dotnet: $DOTNET_BIN"
 "$DOTNET_BIN" --version
@@ -60,6 +72,7 @@ export SUPABASE_DB_CONNECTION_STRING
 # app's own startup config validation without needing real values.
 export PURCH_DEPLOYMENT_MODE="${PURCH_DEPLOYMENT_MODE:-Cloud}"
 export SUPABASE_STORAGE_URL="${SUPABASE_STORAGE_URL:-https://placeholder}"
+export SUPABASE_STORAGE_KEY="${SUPABASE_STORAGE_KEY:-placeholder}"
 export JWT_SIGNING_KEY="${JWT_SIGNING_KEY:-placeholder}"
 export JWT_ISSUER="${JWT_ISSUER:-purch.io}"
 

@@ -9,6 +9,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/charts/chart_card.dart';
 import '../../../../core/widgets/charts/chart_primitives.dart';
 import '../../../../core/widgets/charts/chart_theme.dart';
+import '../../../../core/widgets/purch_app_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../credit_ledger/presentation/providers/credit_ledger_providers.dart';
 import '../../../inventory/domain/inventory_movement_models.dart';
@@ -56,24 +57,8 @@ class HomeTabScreen extends ConsumerWidget {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.brandPrimary,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'P.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
+            const PurchLogoAvatar(size: 32),
+            const SizedBox(width: 10),
             const Text(
               'Dashboard',
               style: TextStyle(
