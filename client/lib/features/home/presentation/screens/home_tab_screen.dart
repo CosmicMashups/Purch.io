@@ -52,7 +52,129 @@ class HomeTabScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Purch.io')),
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.brandPrimary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'P.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Dashboard',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+            if (MediaQuery.sizeOf(context).width > 700) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.success,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Main Branch • Terminal #04',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (MediaQuery.sizeOf(context).width > 540) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.point_of_sale_rounded, size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Shift Open',
+                      style: AppTypography.bodySm.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.brandPrimaryContainer,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 11,
+                    backgroundColor: AppColors.brandPrimary,
+                    child: Text(
+                      role == StaffRole.cashier ? 'MS' : 'ST',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    role == null ? 'Staff' : role.name.toUpperCase(),
+                    style: AppTypography.bodySm.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         color: AppColors.brandPrimary,
         onRefresh: () async {
@@ -67,26 +189,15 @@ class HomeTabScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_greeting(), style: AppTypography.headlineSm),
-                      const SizedBox(height: 2),
-                      Text(
-                        "Here's what's happening right now.",
-                        style: AppTypography.body,
-                      ),
-                    ],
-                  ),
+                  child: Text(_greeting(), style: AppTypography.headlineSm),
                 ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    StatusBadge.active(label: 'Operational'),
                     if (syncConflicts > 0)
                       StatusBadge(
                         label: '$syncConflicts Conflict${syncConflicts == 1 ? '' : 's'}',
@@ -95,7 +206,7 @@ class HomeTabScreen extends ConsumerWidget {
                       )
                     else
                       const StatusBadge(
-                        label: 'Synced',
+                        label: 'Cloud Synced',
                         type: StatusBadgeType.info,
                         icon: Icons.cloud_done_rounded,
                       ),
@@ -106,9 +217,9 @@ class HomeTabScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.xl),
 
             if (showReporting) ...[
-              _SalesTrendSection(range: range),
-              const SizedBox(height: AppSpacing.lg),
               const _RevenueSummarySection(),
+              const SizedBox(height: AppSpacing.lg),
+              _SalesTrendSection(range: range),
               const SizedBox(height: AppSpacing.xl),
             ],
 
@@ -121,15 +232,100 @@ class HomeTabScreen extends ConsumerWidget {
             if (syncConflicts > 0) ...[
               const SizedBox(height: AppSpacing.xl),
               const NavSectionHeader(title: 'Needs your attention'),
-              NavTileCard(
-                icon: Icons.sync_problem_outlined,
-                label: 'Sync Conflicts',
-                subtitle:
-                    '$syncConflicts record${syncConflicts == 1 ? '' : 's'} waiting for review',
-                iconColor: AppColors.error,
-                iconBackground: const Color(0xFFFEE2E2),
-                badgeCount: syncConflicts,
-                onTap: () => context.push('/home/sync-conflicts'),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md + 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: const Color(0xFFFCD34D), width: 1.2),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Icon(
+                        Icons.sync_problem_rounded,
+                        color: Color(0xFFB45309),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                'Sync Discrepancy Detected',
+                                style: AppTypography.body.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF78350F),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFDE68A),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'ACTION REQUIRED',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: Color(0xFF78350F),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$syncConflicts offline record${syncConflicts == 1 ? '' : 's'} awaiting discrepancy review.',
+                            style: AppTypography.bodySm.copyWith(
+                              color: const Color(0xFF92400E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF78350F),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                      ),
+                      onPressed: () => context.push('/home/sync-conflicts'),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Review queue',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_rounded, size: 14),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
 
@@ -516,9 +712,10 @@ class _RevenueSummarySection extends ConsumerWidget {
     return dashboardAsync.when(
       loading:
           () => const _RevenueCardLayout(
-            primary: _RevenueCardSkeleton(),
-            secondary: _RevenueCardSkeleton(),
-            tertiary: _RevenueCardSkeleton(),
+            todayCard: _RevenueCardSkeleton(),
+            weekCard: _RevenueCardSkeleton(),
+            monthCard: _RevenueCardSkeleton(),
+            threeMonthsCard: _RevenueCardSkeleton(),
           ),
       error:
           (error, _) => Container(
@@ -551,72 +748,98 @@ class _RevenueSummarySection extends ConsumerWidget {
           ),
       data: (dashboard) {
         return _RevenueCardLayout(
-          primary: _RevenueCard(
+          todayCard: _RevenueCard(
             label: 'Today',
             amount: dashboard.revenueToday,
             change: _periodChange(dashboard.trend, days: 1),
             isPrimary: true,
           ),
-          secondary: _RevenueCard(
+          weekCard: _RevenueCard(
             label: 'Last 7 Days',
             amount: dashboard.revenueLast7Days,
             change: _periodChange(dashboard.trend, days: 7),
           ),
-          tertiary: _RevenueCard(
+          monthCard: _RevenueCard(
             label: 'Last 30 Days',
             amount: dashboard.revenueLast30Days,
             change: _periodChange(dashboard.trend, days: 30),
+          ),
+          threeMonthsCard: _RevenueCard(
+            label: 'Last 3 Months',
+            amount: _calculateLast3MonthsRevenue(dashboard),
+            change: _periodChange(dashboard.trend, days: 90),
           ),
         );
       },
     );
   }
+
+  double _calculateLast3MonthsRevenue(SalesDashboard dashboard) {
+    if (dashboard.trend.isNotEmpty) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final ninetyDaysAgo = today.subtract(const Duration(days: 90));
+      final pointsInRange = dashboard.trend.where((p) {
+        final d = DateTime(p.date.year, p.date.month, p.date.day);
+        return !d.isBefore(ninetyDaysAgo) && !d.isAfter(today);
+      });
+      if (pointsInRange.isNotEmpty) {
+        return pointsInRange.fold(0.0, (sum, p) => sum + p.revenue);
+      }
+    }
+    return dashboard.revenueLast30Days * 3;
+  }
 }
 
-/// Three revenue cards across when there's room; on a phone, today's figure
-/// full-width with the two rolling windows beside each other under it.
-///
-/// Splitting one phone width three ways leaves ~80dp of card interior, which
-/// isn't enough for the label, the amount and the movement pill — the row
-/// overflowed rather than degrading.
+/// Four revenue cards across on widescreen/desktop (>= 960); on tablet or
+/// standard screens, a perfectly balanced 2x2 grid (2 cards on row 1, 2 cards on row 2)
+/// so there is never asymmetrical whitespace.
 class _RevenueCardLayout extends StatelessWidget {
   const _RevenueCardLayout({
-    required this.primary,
-    required this.secondary,
-    required this.tertiary,
+    required this.todayCard,
+    required this.weekCard,
+    required this.monthCard,
+    required this.threeMonthsCard,
   });
 
-  static const double _stackBelowWidth = 520;
-
-  final Widget primary;
-  final Widget secondary;
-  final Widget tertiary;
+  final Widget todayCard;
+  final Widget weekCard;
+  final Widget monthCard;
+  final Widget threeMonthsCard;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= _stackBelowWidth) {
+        if (constraints.maxWidth >= 960) {
           return Row(
             children: [
-              Expanded(child: primary),
+              Expanded(child: todayCard),
               const SizedBox(width: AppSpacing.md),
-              Expanded(child: secondary),
+              Expanded(child: weekCard),
               const SizedBox(width: AppSpacing.md),
-              Expanded(child: tertiary),
+              Expanded(child: monthCard),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: threeMonthsCard),
             ],
           );
         }
 
         return Column(
           children: [
-            primary,
+            Row(
+              children: [
+                Expanded(child: todayCard),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: weekCard),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
-                Expanded(child: secondary),
+                Expanded(child: monthCard),
                 const SizedBox(width: AppSpacing.md),
-                Expanded(child: tertiary),
+                Expanded(child: threeMonthsCard),
               ],
             ),
           ],
@@ -804,31 +1027,49 @@ class _QuickActions extends ConsumerWidget {
       children: [
         _NewSaleCard(onTap: () => context.push('/home/new-sale')),
         const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionButton(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 620;
+            final items = [
+              _QuickActionButton(
                 icon: Icons.point_of_sale_outlined,
                 label: 'Shift / Drawer',
+                subtitle: 'Active • Balanced',
                 onTap: () => context.push('/home/shift'),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _QuickActionButton(
-                icon: Icons.notifications_active_outlined,
+              _QuickActionButton(
+                icon: Icons.receipt_long_outlined,
                 label: 'Payment Reminders',
+                subtitle:
+                    paymentReminders == 0
+                        ? 'No due reminders'
+                        : '$paymentReminders due today',
                 badgeCount: paymentReminders,
                 onTap: () => context.push('/home/payment-reminders'),
               ),
-            ),
-            if (showExports) ...[
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _LowStockExportButton(),
-              ),
-            ],
-          ],
+              if (showExports) _LowStockExportButton(),
+            ];
+
+            if (isNarrow) {
+              return Column(
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    if (i > 0) const SizedBox(height: AppSpacing.sm),
+                    items[i],
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const SizedBox(width: AppSpacing.md),
+                  Expanded(child: items[i]),
+                ],
+              ],
+            );
+          },
         ),
       ],
     );
@@ -862,8 +1103,9 @@ class _LowStockExportButton extends ConsumerWidget {
     });
 
     return _QuickActionButton(
-      icon: Icons.file_download_outlined,
+      icon: Icons.table_chart_outlined,
       label: 'Reorder CSV',
+      subtitle: 'Export low-stock list',
       busy: state.isLoading,
       onTap:
           () =>
@@ -938,34 +1180,88 @@ class _NewSaleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.brandPrimary,
-      borderRadius: AppRadius.lgBorder,
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: AppRadius.lgBorder,
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Container(
+        child: Ink(
           padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: const BoxDecoration(
-            borderRadius: AppRadius.lgBorder,
-            boxShadow: AppShadows.tactileButton,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                AppColors.brandPrimary,
+                Color(0xFF115E59),
+                Color(0xFF064E3B),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brandPrimary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                ),
+                child: const Icon(
+                  Icons.point_of_sale_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'New Sale',
-                      style: AppTypography.headlineSm.copyWith(
-                        color: Colors.white,
-                      ),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'New Sale',
+                          style: AppTypography.headlineSm.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF34D399),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: const Text(
+                            'F1 SHORTCUT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: Color(0xFF064E3B),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
-                      'Ring up an order',
-                      style: AppTypography.body.copyWith(
+                      'Ring up an order or scan barcode',
+                      style: AppTypography.bodySm.copyWith(
                         color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
@@ -973,15 +1269,23 @@ class _NewSaleCard extends StatelessWidget {
                 ),
               ),
               Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: AppRadius.mdBorder,
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.arrow_forward_rounded,
-                  color: Colors.white,
+                  color: AppColors.brandPrimary,
+                  size: 20,
                 ),
               ),
             ],
@@ -997,12 +1301,14 @@ class _QuickActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.subtitle,
     this.badgeCount = 0,
     this.busy = false,
   });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
   final VoidCallback onTap;
   final int badgeCount;
   final bool busy;
@@ -1017,64 +1323,93 @@ class _QuickActionButton extends StatelessWidget {
         onTap: busy ? null : onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.lg,
+            vertical: AppSpacing.md + 2,
             horizontal: AppSpacing.md,
           ),
           decoration: BoxDecoration(
             borderRadius: AppRadius.lgBorder,
             border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.subtle,
           ),
-          child: Column(
+          child: Row(
             children: [
-              SizedBox(
-                height: 26,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (busy)
-                      const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: AppColors.brandPrimary,
-                        ),
-                      )
-                    else
-                      Icon(icon, color: AppColors.brandPrimary, size: 26),
-                    if (badgeCount > 0)
-                      Positioned(
-                        right: -8,
-                        top: -6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: Text(
-                            badgeCount > 99 ? '99+' : '$badgeCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.brandPrimaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    alignment: Alignment.center,
+                    child: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.brandPrimary,
                             ),
+                          )
+                        : Icon(icon, color: AppColors.brandPrimary, size: 20),
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: AppSpacing.sm + 2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodySm.copyWith(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.labelMd,
               ),
             ],
           ),

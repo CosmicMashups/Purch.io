@@ -9,6 +9,7 @@ import 'package:purch_client/features/catalog/presentation/providers/catalog_pro
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/cashier_screen.dart';
+import 'package:purch_client/features/pos/presentation/screens/tingi_weight_dialog.dart';
 
 import '../../../helpers/fake_catalog_repository.dart';
 import '../../../helpers/fake_pos_repository.dart';
@@ -238,8 +239,10 @@ void main() {
       await tester.tap(find.text('Rice (Sack)'));
       await tester.pumpAndSettle();
 
+      // weightVolume items open the TingiWeightDialog for portion entry —
+      // they do NOT show a snack bar.  Cart must remain empty.
       expect(posRepository.cart.lines, isEmpty);
-      expect(find.textContaining('needs a customization step'), findsOneWidget);
+      expect(find.byType(TingiWeightDialog), findsOneWidget);
     });
 
     testWidgets('tapping a variant-matrix item opens the variant picker', (

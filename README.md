@@ -83,7 +83,7 @@ Built for mission-critical operations, Purch.io features offline-resilient local
 - **`client/`**: Cross-platform Flutter client:
   - `lib/core/`: Theming tokens, network clients, Drift database, and shared UI components (`PurchImage`, `EmptyStateView`, `ErrorStateView`).
   - `lib/features/`: Feature modules for Auth, Catalog, POS, Kiosk, Inventory, Credit Ledger, and Reports.
-  - `test/`: 148 automated unit and widget regression tests.
+  - `test/`: 200 automated unit and widget regression tests.
 - **`docs/`**: Architecture decision records (`docs/adr/`), specifications, database schemas, and design token documentation (`docs/design/`).
 - **`installer/`**: Deployment configurations for dedicated on-premise deployments (Docker Compose / Windows Service).
 
@@ -163,4 +163,4 @@ Every installation operates in one of two deployment modes, controlled by the `P
 
 - **Backend Solution**: Clean compilation with 0 warnings/errors across all projects.
 - **Integration Tests**: Tested with Dockerized PostgreSQL testcontainers for authentication, tenant onboarding, catalog operations, inventory reconciliation, and multipart image uploads.
-- **Client Test Suite**: 100% green test suite (148/148 passing tests) validating state management, user flows, tabular financial calculations, and edge-case error recovery.
+- **Client Test Suite**: 100% green test suite (200/200 passing tests) validating state management, user flows, tabular financial calculations, and edge-case error recovery.

@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/db/app_database.dart';
+import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
-import '../../../../core/sync/sync_providers.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/onboarding_repository_impl.dart';
 import '../../domain/audit_log_models.dart';

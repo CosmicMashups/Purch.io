@@ -6,6 +6,9 @@ import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/payment_screen.dart';
 
+import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
+
+import '../../../helpers/fake_catalog_repository.dart';
 import '../../../helpers/fake_pos_repository.dart';
 
 const _cartWithOneLine = Transaction(
@@ -37,7 +40,10 @@ const _cartWithOneLine = Transaction(
 
 Widget _wrap(FakePosRepository repository) {
   return ProviderScope(
-    overrides: [posRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      posRepositoryProvider.overrideWithValue(repository),
+      catalogRepositoryProvider.overrideWithValue(FakeCatalogRepository()),
+    ],
     child: const MaterialApp(home: PaymentScreen(total: 30)),
   );
 }

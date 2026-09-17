@@ -11,6 +11,11 @@ public interface IUserRepository
 
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Looks up an admin/owner account by email for the email+password login
+    /// path — deliberately not tenant-scoped, since the caller doesn't know which
+    /// tenant they belong to until this returns (mirrors device pairing-code lookup).</summary>
+    Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+
     /// <summary>Stages a new user for insert — call IUnitOfWork.SaveChangesAsync to commit.</summary>
     void Add(User user);
 }

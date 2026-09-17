@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purch_client/core/db/app_database.dart';
-import 'package:purch_client/core/sync/sync_providers.dart';
+import 'package:purch_client/core/db/db_providers.dart';
 import 'package:purch_client/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:purch_client/features/onboarding/presentation/screens/tenant_settings_screen.dart';
 
@@ -51,7 +51,7 @@ void main() {
       '#123456',
     );
     await tester.enterText(
-      find.widgetWithText(TextField, 'Accent color (e.g. #1E40AF)'),
+      find.widgetWithText(TextField, 'Brand Primary (e.g. #0F766E)'),
       '#234567',
     );
     await tester.enterText(
@@ -76,7 +76,7 @@ void main() {
     expect(repository.settings.brandingSecondaryTextColorHex, '#456789');
   });
 
-  testWidgets('all four branding color fields are rendered', (tester) async {
+  testWidgets('all four branding color fields and derived container are rendered', (tester) async {
     final repository = FakeOnboardingRepository();
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(database.close);
@@ -88,7 +88,11 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.widgetWithText(TextField, 'Accent color (e.g. #1E40AF)'),
+      find.widgetWithText(TextField, 'Brand Primary (e.g. #0F766E)'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Derived Primary Container:'),
       findsOneWidget,
     );
     expect(

@@ -25,6 +25,22 @@ public static class AuthEndpoints
             };
         }).AllowAnonymous();
 
+        _ = app.MapPost("/auth/admin-login", async (AdminLoginRequest request, ILoginService loginService, CancellationToken cancellationToken) =>
+        {
+            var result = await loginService.AdminLoginAsync(request, cancellationToken);
+            return result switch
+            {
+                LoginResult.Success success => Results.Ok(new { accessToken = success.AccessToken }),
+
+                LoginResult.InvalidAdminCredentials => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Invalid credentials.",
+                    detail: "The email or password was not recognized."),
+
+                _ => throw new InvalidOperationException($"Unhandled {nameof(LoginResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous();
+
         return app;
     }
 }

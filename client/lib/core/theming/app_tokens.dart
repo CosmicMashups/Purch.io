@@ -4,18 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Strongly-typed design tokens derived from docs/design/tokens.json.
 /// Adheres to taste-skill / design-taste-frontend anti-slop principles:
-/// - Distinct Philippine retail ultramarine & amber palette (no generic AI purple).
+/// - Distinct Philippine retail deep viridian / pine teal palette (no generic blue or generic AI purple).
 /// - Single corner-radius rhythm (16dp cards, 12dp buttons, 8dp chips, 24dp pills).
 /// - Tabular figures on all price displays.
 /// - Minimum 48dp touch targets, with 64-72dp for customer-facing kiosk buttons.
 abstract class AppColors {
-  // Brand
-  static const Color brandPrimary = Color(0xFF1E40AF);
-  static const Color brandPrimaryHover = Color(0xFF1D4ED8);
-  static const Color brandPrimaryActive = Color(0xFF1E3A8A);
-  static const Color brandPrimaryContainer = Color(0xFFEFF6FF);
+  // Brand (Deep Viridian / Pine Teal - non-blue, high-contrast, premium retail)
+  static const Color brandPrimary = Color(0xFF0F766E);
+  static const Color brandPrimaryHover = Color(0xFF115E59);
+  static const Color brandPrimaryActive = Color(0xFF042F2E);
+  static const Color brandPrimaryContainer = Color(0xFFF0FDFA);
   static const Color onBrandPrimary = Colors.white;
-  static const Color onBrandPrimaryContainer = Color(0xFF1E3A8A);
+  static const Color onBrandPrimaryContainer = Color(0xFF115E59);
 
   // Accents
   static const Color accentWarm = Color(0xFFD97706);
@@ -128,7 +128,7 @@ abstract class AppShadows {
 
   static const List<BoxShadow> tactileButton = [
     BoxShadow(
-      color: Color(0x401E40AF),
+      color: Color(0x400F766E),
       blurRadius: 14,
       offset: Offset(0, 6),
     ),

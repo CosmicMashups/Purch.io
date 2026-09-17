@@ -10,4 +10,8 @@ public interface IJwtTokenService
     /// <summary>A kiosk terminal pairs without a staff PIN — the token carries only
     /// tenant/device/branch claims under Role.Kiosk, no sub/user claim at all.</summary>
     string IssueKioskAccessToken(Device device);
+
+    /// <summary>An admin/owner logging in via email+password from the back office,
+    /// not any particular physical terminal — no device/branch claims to carry.</summary>
+    string IssueAdminAccessToken(User user);
 }

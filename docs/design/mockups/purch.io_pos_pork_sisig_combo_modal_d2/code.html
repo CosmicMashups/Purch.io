@@ -1,0 +1,359 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><title>Purch.io POS</title><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"error":"#ba1a1a","secondary-fixed":"#85f8c4","error-container":"#ffdad6","on-error":"#ffffff","surface-bright":"#faf8ff","on-background":"#131b2e","primary-fixed-dim":"#b8c4ff","primary":"#00288e","tertiary-fixed":"#ffdcc3","tertiary-fixed-dim":"#ffb77d","on-secondary":"#ffffff","inverse-surface":"#283044","tertiary":"#532a00","outline-variant":"#c4c5d5","on-tertiary-fixed-variant":"#6e3900","background":"#faf8ff","surface-container-low":"#f2f3ff","outline":"#757684","surface-container-high":"#e2e7ff","surface-container-highest":"#dae2fd","on-surface-variant":"#444653","primary-fixed":"#dde1ff","on-primary-container":"#a8b8ff","surface-container-lowest":"#ffffff","on-tertiary-fixed":"#2f1500","on-tertiary-container":"#ffa85d","primary-container":"#1e40af","surface-tint":"#3755c3","surface-dim":"#d2d9f4","on-secondary-container":"#00714e","secondary-container":"#82f5c1","secondary-fixed-dim":"#68dba9","on-secondary-fixed":"#002114","surface-container":"#eaedff","on-primary":"#ffffff","surface":"#faf8ff","tertiary-container":"#743d00","inverse-primary":"#b8c4ff","secondary":"#006c4a","on-tertiary":"#ffffff","on-primary-fixed-variant":"#173bab","inverse-on-surface":"#eef0ff","on-error-container":"#93000a","on-surface":"#131b2e","on-primary-fixed":"#001453","on-secondary-fixed-variant":"#005137","surface-variant":"#dae2fd"},borderRadius:{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},spacing:{"gutter":"0.75rem","space-lg":"1rem","margin":"1rem","space-xl":"1.5rem","space-xs":"0.25rem","space-sm":"0.5rem","space-md":"0.75rem"},fontFamily:{"body-lg":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"currency-display":["Plus Jakarta Sans"],"display-lg":["Plus Jakarta Sans"],"currency-body":["Plus Jakarta Sans"],"label-sm":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"]},fontSize:{"body-lg":["16px",{lineHeight:"24px",letterSpacing:"0em",fontWeight:"400"}],"headline-lg":["24px",{lineHeight:"32px",letterSpacing:"-0.015em",fontWeight:"700"}],"headline-sm":["16px",{lineHeight:"24px",letterSpacing:"-0.005em",fontWeight:"600"}],"currency-display":["28px",{lineHeight:"36px",letterSpacing:"-0.02em",fontWeight:"700"}],"display-lg":["32px",{lineHeight:"40px",letterSpacing:"-0.02em",fontWeight:"700"}],"currency-body":["14px",{lineHeight:"20px",letterSpacing:"0em",fontWeight:"600"}],"label-sm":["10px",{lineHeight:"14px",letterSpacing:"0.04em",fontWeight:"700"}],"label-lg":["14px",{lineHeight:"20px",letterSpacing:"0.01em",fontWeight:"600"}],"headline-md":["20px",{lineHeight:"28px",letterSpacing:"-0.01em",fontWeight:"600"}],"label-md":["12px",{lineHeight:"16px",letterSpacing:"0.02em",fontWeight:"600"}],"body-sm":["12px",{lineHeight:"16px",letterSpacing:"0.01em",fontWeight:"400"}],"body-md":["14px",{lineHeight:"20px",letterSpacing:"0em",fontWeight:"400"}]}}}}</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-margin flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md shrink-0"><img alt="Purch.io Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzMuKHb0HrCvhf3QKv1I5l8LhoDXtzKzuXWlWKvlP4kUnTikDz5XNnkPXqKGDSyDaQqm_wYnsfW_WrJOWZD8AgWF2RdYlSLuhbvr2nnM8Diplqs273xVSactNjGs7xGwM9k3FfBBsyZIzHoD8prG-MlnZ7oKu1eARh1xdmRr1S5lqut8Ptw3IoLpxiLn-A_HX2GqHxGMWSwsvxyCxYF_ULyNfl5b3NWC2KjbuhPPiklFxt9SNk6H_oNA"><div class="flex flex-col justify-center"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight">Cashier</span><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm uppercase text-secondary font-bold tracking-wider">Main Branch</span></div></div></div><div class="flex-1 max-w-xl mx-auto"><div class="relative flex items-center w-full bg-surface-container-low rounded-xl px-space-md py-space-xs focus-within:bg-surface-container-lowest focus-within:shadow-[0_0_0_2px_#1e40af] transition-all"><span class="material-symbols-outlined text-outline text-[20px] select-none mr-space-sm">barcode_scanner</span><input class="w-full bg-transparent border-0 outline-none font-body-md text-body-md text-on-surface placeholder:text-outline" placeholder="Scan barcode or search items..." type="text"><svg class="w-5 h-5 shrink-0 text-outline" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg></div></div><div class="flex items-center gap-space-sm shrink-0"><nav class="flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary font-bold"><button class="inline-flex items-center gap-space-xs px-space-md py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors active:scale-95" data-path="shift-management" title="Shift Management &amp; Drawer Reconcile"><svg class="w-4 h-4 text-on-surface-variant shrink-0" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><rect height="16" rx="2" width="20" x="2" y="4"></rect><line x1="2" x2="22" y1="12" y2="12"></line><circle cx="12" cy="16" r="1"></circle></svg><span class="font-semibold tracking-tight">Drawer #1</span><span class="text-outline text-label-sm">|</span><span class="text-secondary font-semibold font-label-sm text-label-sm">Balanced</span></button><a class="inline-flex items-center px-space-md py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" data-path="promotions" href="#">Promos</a><a class="inline-flex items-center px-space-md py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors" data-path="reading-compliance" href="#">X / Z Reading</a></nav><div class="h-6 w-[1px] bg-outline-variant mx-space-xs"></div><div class="flex items-center gap-space-sm bg-surface-container-low pl-space-xs pr-space-md py-1 rounded-full"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByAciqFAqlQ5Oa_pflIR7id78HN2hU3wGTM7q_ZI5N5XGmRjISvs1rkYjMxReg1W9neRELVBmd5h-U9g_Wfe5pXRAIzGYwn_vaunaPgyK6wmo90o0Opavjrv5bZZYAjmhAFA70IeOR0udw8PBdbvKQeGY9BgvGNfVvrD6s75FOv_fIyQkTT9i00YVyS6s1t3TvjO5FvwGUwoy2DFoych5icpexJnXIsiXRYatls2QyEaPmckMAQSo67w"><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface font-bold leading-tight">Maria S.</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Cashier</span></div></div></div></div></header><main class="w-full pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full">
+<div class="w-full h-[calc(100vh-4rem-2.25rem)] flex overflow-hidden bg-surface select-none">
+<!-- ZONE 2A: LEFT VERTICAL CATEGORY RAIL (100px fixed width) -->
+<aside class="w-24 shrink-0 bg-surface-container-lowest flex flex-col items-center py-space-sm gap-space-xs shadow-sm z-10 overflow-y-auto">
+<!-- Rail Header / Total Counter -->
+<div class="w-full text-center pb-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold">Categories</span>
+</div>
+<!-- Item: All Items (Active) -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-high text-primary-container shadow-sm group">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">apps</span>
+<span class="font-label-md text-label-md font-bold leading-tight">All Items</span>
+</button>
+<!-- Item: Rice Bowls -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface group active:scale-95">
+<span class="material-symbols-outlined text-[24px]">rice_bowl</span>
+<span class="font-label-md text-label-md font-semibold leading-tight text-center">Rice Bowls</span>
+</button>
+<!-- Item: Beverages -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface group active:scale-95">
+<span class="material-symbols-outlined text-[24px]">local_cafe</span>
+<span class="font-label-md text-label-md font-semibold leading-tight text-center">Beverages</span>
+</button>
+<!-- Item: Snacks -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface group active:scale-95">
+<span class="material-symbols-outlined text-[24px]">cookie</span>
+<span class="font-label-md text-label-md font-semibold leading-tight text-center">Snacks</span>
+</button>
+<!-- Item: Retail / Merch -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface group active:scale-95">
+<span class="material-symbols-outlined text-[24px]">loyalty</span>
+<span class="font-label-md text-label-md font-semibold leading-tight text-center">Retail</span>
+</button>
+<!-- Item: Services / E-Load -->
+<button class="w-[84px] h-[76px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface group active:scale-95">
+<span class="material-symbols-outlined text-[24px]">tap_and_play</span>
+<span class="font-label-md text-label-md font-semibold leading-tight text-center">E-Load</span>
+</button>
+<!-- Spacer -->
+<div class="mt-auto w-full flex flex-col items-center pt-2">
+<button class="w-[84px] h-11 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+<span class="font-label-sm text-label-sm font-bold">Faves</span>
+</button>
+</div>
+</aside>
+<!-- ZONE 2B: PRODUCT CATALOG GRID (~65-70% width, flexible) -->
+<section class="flex-1 flex flex-col min-w-0 bg-surface px-space-md py-space-sm overflow-hidden">
+<!-- Subcategory Bar / Quick Filters -->
+<div class="flex items-center justify-between pb-space-sm shrink-0 gap-space-md">
+<div class="flex items-center gap-space-xs overflow-x-auto py-0.5">
+<button class="h-9 px-space-md rounded-full bg-inverse-surface text-inverse-on-surface font-label-md text-label-md font-bold shadow-sm whitespace-nowrap">
+            All (117)
+          </button>
+<button class="h-9 px-space-md rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors shadow-sm whitespace-nowrap">
+            Best Sellers 🔥
+          </button>
+<button class="h-9 px-space-md rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors shadow-sm whitespace-nowrap">
+            Morning Combo
+          </button>
+<button class="h-9 px-space-md rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors shadow-sm whitespace-nowrap">
+            Coffee &amp; Tea
+          </button>
+<button class="h-9 px-space-md rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors shadow-sm whitespace-nowrap">
+            Beer &amp; Spirits
+          </button>
+<button class="h-9 px-space-md rounded-full bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors shadow-sm whitespace-nowrap">
+            Bakery Fresh
+          </button>
+</div>
+<div class="flex items-center gap-space-xs shrink-0">
+<span class="font-label-sm text-label-sm text-outline font-semibold">VIEW:</span>
+<div class="inline-flex bg-surface-container-high rounded-lg p-0.5">
+<button class="p-1 rounded bg-surface-container-lowest text-primary-container shadow-xs">
+<span class="material-symbols-outlined text-[18px]">grid_view</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-[18px]">view_list</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Tactile Card Grid -->
+<div class="flex-1 overflow-y-auto pr-space-xs grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-space-md pb- items-start"><!-- Item 1: Pork Sisig Rice Bowl -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A sizzling hot plate of Filipino pork sisig topped with raw egg yolk, freshly sliced calamansi, green chilies, and served next to steaming garlic fried rice in high-resolution commercial cafe lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRuUv_G4V3zormyWxw0PCMfpoARE8YY-bRUE8Rk7yW2Jubg2whZXRTZdYJ7qQmDW2lcs9meBOUPGjw83JlvRrNaCwQZeAG6d6tgTjFnjaO65UYXoPWt-BmZ9azaK3A-51PnhZiKvKhIvHdoT0w-O-ruwQ8SAI_RYc42gJunVnksWDmgUjhw7jyeOajmmCs4LSK6_kUrd4KTEZaLWBqVkKmskxyk4Mwz_bGAArR9UZHSvyv07267W0SOA"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">COMBO</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Pork Sisig Rice Bowl</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱125.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 2: Artisan Iced Latte -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A tall glass of artisan iced cafe latte with visible rich dark espresso cascading down into cold whole fresh milk and ice cubes against a clean minimalist cafe counter backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjxJDPpKJWxTsw3V9atBOxQn1KYZVSyaHYqDzkBu7jJl0BZZKLFDbA6z9sayWv4oVHydVJ5g6yHwzpt1K-IiLoncY5xcPFHOqD_38NjudSMBeC3pBhdp3No7vXOP7wT3CBtJWCHvCbeOgd5OpbREfnElsLWIQ7sPA8w6Un9DNxMja71A57h3gjlpccpdSbawnQlbj_hM5TWSZLt2dFnW5Jqdm69-tD7pEq6g1-HtpaEWqWfeVVT66-zQ"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">OPTIONS</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Artisan Iced Latte</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱140.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 3: San Miguel Pale Pilsen -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="An amber glass bottle of cold San Miguel Pale Pilsen beer with refreshing moisture condensation droplets on the brown glass bottle under warm restaurant bistro lights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIUgh4gN1hDaxH7Io305MqHyUgNMmOJ7O3avYR5ML72H_LT2U4AvQ-5iYy2S6yU39IPM8J_qjEdNXfudFupdfD5saLPim2GLjC-u1KCDhXbjhcdfvt2zD8WRGDXojnZ3k-AVlLOVP2wllK1-VBAfO2X3ipHJ1ifoQDqdsXDie7XdUfjbAWhlcvIxTgKkXuf29XlXx4KSptwWxvQ8vQIDQsWbIbKM7ZBpRlPJiKPLlkESO1OZqQ4jihrw"></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">San Miguel Pale Pilsen</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱68.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 4: Washed Cotton Shirt -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A neatly folded premium washed organic cotton navy blue t-shirt sitting on a smooth concrete display shelf with natural soft directional studio lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRu3Q94pH1Vps-64R8sM4VfKEqnxqYY7EXN8QHUlhZCdAaa7FgVEL7WWfHS2yFE9_dAZy9kax5F3PkZvMyWechdO0ewUa8EOifbC6yZa_-i_Ulk2wYUR3qi0LZVZ7w_K8LnA3t5tYZZV2_4iW3Lo8pnGn8Vi09T3_U-L-cECUj3HvZJmMPJxDkYPhVBSGjgI8LbX5dW6qI7gEvDGDxVcQiC0eMTzgHTiSo-v7NaA7SYWNwk57IaAy0Iw"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">OPTIONS</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Washed Cotton Shirt</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱350.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 5: Refined White Sugar (1kg) -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A crisp clean retail grocery 1kg package pouch of pure refined cane sugar set against a soft slate retail background with sharp studio illumination." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6p7DB4nHRgXJeDxW_hje2uz-5DG3k6VRXVvecbbaPNDAetp1NbFBq3iN0Ys8-R_k0LQSxwZyutT8-WoAsfNFwnMl4yf-BUoNwbYgY2cy9L-6lWS3BsfLEfMHzL1sR57kDKmnAhgwJCqce-FjZTpWt_fHJnj0BNkSaVGDAoR_8SzgKZJzAqbLDhd4UTprQ-p8-6bJ5yxa8bAOPqUgtbkbN0Ce9_NjlN9iERp3nuA0mE8zR7GFqNrcRgw"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">BY WEIGHT</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Refined White Sugar (1kg)</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱76.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 6: Corned Beef 150g -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A premium 150g aluminum pull-tab can of gourmet corned beef canned goods isolated cleanly on a warm timber shelf with soft rim lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbJiHcrnaLlAfGcssNZ_6der4wBneWJNcbAB3ai4FsqwPqIJitjUU5VJ79V5qmdvuSm7x-sH8DaZNKVheBE_TL7-URD_p_qj5OChhagbdB-jWid41gfHbDz9u2A8rZEmk_Ei70-djtvlQiV7MOzyPLrUgYE7ZkpeUMbzTzgfLzexvtV_eg6WRa2TKV3HJpqIT0mfSqm40AvOngW3Gme7nDv5euPuUEttpoOk_oqC6rgy85vOrygt42xQ"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-error-container text-error font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-error"></span>LOW STOCK: 3</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Corned Beef 150g</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱48.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 7: Classic Milk Tea (OUT OF STOCK) -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-xs opacity-50 cursor-not-allowed relative overflow-hidden pointer-events-none">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover grayscale" data-alt="A cup of classic brown sugar boba pearl milk tea with ice and black tapioca pearls at the bottom in neutral commercial lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgwQVtNQhCDEV5s4QSQbxGEJBtFynxn8IJEEbKV4seuxc_Hk8Wgjve2UbMgSl_vLH4Gr53nBb_I9qN-1ydtTBlPxNZ1gSpTsP8LnoD6WyFZ3FTO9dTqsEOp0CkgUOJv8AogBGOH7RuNb0vdLjb0x7T-Ema4HY_fCZY3xPKc7UAhtalEYUouBz3BDm6PNWpsJ4PiNXe8E4jLyRLvLpStfJ8NtG2qzcn14_IAGeMlWR3wf8kUwQiWlwA-g"><div class="absolute inset-0 bg-inverse-surface/60 flex items-center justify-center"><span class="px-2.5 py-1 rounded-full bg-error text-on-error font-label-sm text-label-sm uppercase font-bold tracking-wider shadow-sm">OUT OF STOCK</span></div></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Classic Milk Tea</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-outline font-bold tabular-nums">₱95.00</span><span class="material-symbols-outlined text-outline text-[20px]">block</span></div></div>
+</div>
+<!-- Item 8: Crispy Chicken with Rice -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A golden-brown crispy deep-fried chicken quarter leg with glistening skin, hot savory gravy boat, and steamed jasmine white rice on a rustic plate." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyAazeGMbbBXd_jkI9WTirlEZh3JHR1w8Ljkz8f20UXyVr0e9WphUN7dg1fkbVS4ZPq4sPTcM5zUmKuIVdDKlFyaqRHzo5dTVzWUAWvc7W67scCWbXommhWo_ufTyzZnIm69iXc1a7_oRLaAvgCUpk-4T7NiS3sF3Sp72Rhho8pFWb1pizx4eQfNWsTmn1vxuubNnl0DAM8H45Ie8rfFUNAUUBAq0CbObknhphyiYjwbOSj25aS9-6iw"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">COMBO</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Crispy Chicken Rice</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱135.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 9: Mineral Water 500ml -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A clear transparent 500ml recyclable plastic bottle of purified drinking water with blue screw cap placed against a pure white studio setup." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSuMaiXhLd--CxV0wVz_b3qIa5cKFrvxQ52CioTlyW4P3NNpeKnjIW8ZfcC9L703IdJzaYVJ6Nb25QTYlSod-snBlgpD4q_xyb6U9u8C-MkvN2jOqNlgekiEMKfTAfseEjqAuxqTE01wYOZukroi1P1gdIsYqtp7UZTSeVcrpc6y_ckpb0akVFpa48uZKTDnRHyXngVpJ3Bmbs51I9J9J45EI3eQ-ofVsgRjKoplZfqyp63GmMhF42HQ"></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Mineral Water 500ml</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱25.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 10: Chocolate Chip Cookie -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A thick bakery-style chocolate chip cookie with molten dark chocolate puddles and flaky sea salt crystals on parchment baking paper in warm bakery morning light." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB620XRty0nuQGid7UlraRYj_RL3xYVja5DRn_zThZrg8p9zrUoVRWkDCIxrZGgXmS2wYXId_L_TJOWqojMuqt8YE7MVNwNw1-BByXqzuhx50rbuwbCnZbaTIC_HR1PeH6TCUGmRGkQ6ER4r3cvhaLUjCk2fy7_2RnDJMhaRgZJ0BIadjt3KAOc22fLAqTKuPCGBvoPAUiKTJV5hWUqKGZXPaI88YUlbATqc9evCdOvDBLl2WZHWpSRrA"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">FRESH BAKED</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Choco Chip Cookie</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱55.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 11: Kape Barako Drip -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A steaming ceramic mug of hot Batangas Liberica Kape Barako black drip coffee with visible steam vapor against a warm wooden counter." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXWIpJHAX1LZlqfSIRz0P80uTOPilEXTgVpCCOJTN6VmkPpy96wWmp6qzdhwkIzbsrflmnDkWaxVivzvHAODNh22OEzLnAPkTV3NrEsXMaklIGS3CxuGtC4Zd1EkER_zlWw3VzPxdmExy0QoU9X_oLr3LHqJJWqo2iNsJiXxpxvUQLJGBqrRG75jFy64_WN5pMkCeBInOuKjJsXqFQAkAH0eOm7OHf7oyjUlOM3u78mhfJ9fwiAX-4Lw"><span class="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm uppercase font-bold tracking-wide shadow-sm">HOT BREW</span></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Kape Barako Drip</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱85.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div>
+<!-- Item 12: Instant Pancit Canton -->
+<div class="bg-surface-container-lowest rounded-xl flex flex-col shadow-sm hover:shadow-md active:translate-y-0.5 transition-all cursor-pointer group relative overflow-hidden">
+<div class="relative w-full h-40 overflow-hidden bg-surface-container"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A sealed bright packaged pouch of Filipino instant pancit canton noodles in kalamansi flavor presented cleanly on a retail merchandise counter." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcaa8gTTxHoYUEt9iEc-rrBWytZUwmgTzr1Q-lP3HG8m8lAVGlx65MIZBRdiGWMTvEqfs1neANTnbq2ZHgW-y8fJ61nGcrFwwoLr0SjgimA6rR_869ptBgFF0X9Cze7upky12CopF5OMysGioZTtPk8WutnHjfq69xcBEPmN0ajOh8LS4nl9ACAunI5lLk6aMGxpy3yi606Z-MotZ9fl2tVUOenw-WItMzyX6vs2tAI8QdIjjGcHqbsw"></div>
+<div class="p-space-md flex flex-col gap-1.5"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate">Instant Pancit Canton</span><div class="flex items-center justify-between"><span class="font-headline-md text-headline-md text-on-surface-variant font-bold tabular-nums">₱22.00</span><span class="material-symbols-outlined text-primary-container text-[20px] opacity-0 group-hover:opacity-100 transition-opacity">add_circle</span></div></div>
+</div></div>
+</section>
+<!-- ZONE 3: PERSISTENT ORDER CART & TENDER PANEL (380px fixed width) -->
+<aside class="w-[380px] shrink-0 bg-surface-container-lowest flex flex-col shadow-xl z-20 overflow-hidden">
+<!-- Panel Header -->
+<div class="px-space-md py-space-sm bg-surface-container-low shrink-0 flex items-center justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Current Sale</span>
+<span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary font-label-sm text-label-sm font-bold">
+              3 items
+            </span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Ticket #0042 • Dine-In / Counter</span>
+</div>
+<button class="h-10 w-10 rounded-lg flex items-center justify-center text-error hover:bg-error-container hover:text-on-error-container active:scale-90 transition-all" title="Void entire ticket">
+<span class="material-symbols-outlined text-[22px]">delete_sweep</span>
+</button>
+</div>
+<!-- Line Items Scrollable Container -->
+<div class="flex-1 overflow-y-auto px-space-md py-space-xs flex flex-col gap-space-xs">
+<!-- Line Item 1: Pork Sisig -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest hover:bg-surface-container-low transition-colors group">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold truncate">Pork Sisig Rice Bowl</span>
+<button class="text-outline hover:text-error transition-colors p-0.5 -mr-1">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">
+                Combo: Garlic Rice, Fried Egg, Mild Calamansi
+              </p>
+</div>
+</div>
+<div class="flex items-center justify-between mt-2 pt-1">
+<!-- Stepper (minimum 44px touch ergonomics) -->
+<div class="flex items-center bg-surface-container rounded-lg p-0.5 shadow-xs">
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</button>
+<span class="w-8 text-center font-headline-sm text-headline-sm font-bold tabular-nums">1</span>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm text-on-surface-variant font-bold tabular-nums">₱125.00</span>
+</div>
+</div>
+</div>
+<!-- Line Item 2: Artisan Iced Latte (Active / Custom modifiers) -->
+<div class="p-space-sm rounded-xl bg-surface-container-high/60 transition-colors group">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold truncate">Artisan Iced Latte</span>
+<button class="text-outline hover:text-error transition-colors p-0.5 -mr-1">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">
+                Large (16oz), Oat Milk (+₱30.00), 50% Sugar
+              </p>
+</div>
+</div>
+<div class="flex items-center justify-between mt-2 pt-1">
+<!-- Stepper -->
+<div class="flex items-center bg-surface-container-lowest rounded-lg p-0.5 shadow-xs">
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</button>
+<span class="w-8 text-center font-headline-sm text-headline-sm font-bold tabular-nums">2</span>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-outline block leading-none">2 × ₱170.00</span>
+<span class="font-headline-sm text-headline-sm text-on-surface-variant font-bold tabular-nums">₱340.00</span>
+</div>
+</div>
+</div>
+<!-- Line Item 3: San Miguel Pale Pilsen -->
+<div class="p-space-sm rounded-xl bg-surface-container-lowest hover:bg-surface-container-low transition-colors group">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold truncate">San Miguel Pale Pilsen</span>
+<button class="text-outline hover:text-error transition-colors p-0.5 -mr-1">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mt-0.5">
+                Chilled bottle 330ml
+              </p>
+</div>
+</div>
+<div class="flex items-center justify-between mt-2 pt-1">
+<!-- Stepper -->
+<div class="flex items-center bg-surface-container rounded-lg p-0.5 shadow-xs">
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</button>
+<span class="w-8 text-center font-headline-sm text-headline-sm font-bold tabular-nums">1</span>
+<button class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm text-on-surface-variant font-bold tabular-nums">₱68.00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Compliance & Promo Section -->
+<div class="px-space-md py-space-xs bg-surface-container-low shrink-0 flex flex-col gap-space-xs">
+<!-- Senior Citizen / PWD Toggle -->
+<div class="p-2 rounded-xl bg-surface-container-lowest flex items-center justify-between shadow-xs">
+<div class="flex-1 pr-2">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-outline text-[18px]">badge</span>
+<span class="font-label-md text-label-md font-bold text-on-surface">SC / PWD Discount (20%)</span>
+</div>
+<p class="font-label-sm text-label-sm text-outline leading-tight mt-0.5">
+              Requires physical ID. Auto-exempts 12% VAT.
+            </p>
+</div>
+<!-- Custom Switch Component -->
+<button aria-checked="false" class="w-12 h-6 bg-surface-container-highest rounded-full p-1 transition-colors flex items-center justify-start cursor-pointer" role="switch" type="button">
+<div class="w-4 h-4 bg-surface-container-lowest rounded-full shadow-sm"></div>
+</button>
+</div>
+<!-- Promo Code Input / Applied Badge -->
+<div class="flex items-center justify-between gap-space-xs bg-surface-container-lowest p-1.5 rounded-xl shadow-xs">
+<div class="flex items-center gap-1.5 min-w-0 pl-1">
+<span class="material-symbols-outlined text-secondary text-[18px]">confirmation_number</span>
+<span class="font-label-md text-label-md font-bold text-secondary truncate">MERCHANTSUMMER</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="px-2 py-0.5 rounded-md bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-bold tabular-nums">
+              -₱50.00
+            </span>
+<button class="text-outline hover:text-error p-0.5">
+<span class="material-symbols-outlined text-[16px]">cancel</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Financial Calculations Breakdown -->
+<div class="px-space-md py-space-sm bg-surface-container-low shrink-0 flex flex-col gap-1">
+<div class="flex justify-between items-center font-body-sm text-body-sm text-on-surface-variant">
+<span class="">Subtotal</span>
+<span class="tabular-nums font-semibold">₱533.00</span>
+</div>
+<div class="flex justify-between items-center font-body-sm text-body-sm text-secondary">
+<span class="">Promo Discount</span>
+<span class="tabular-nums font-bold">-₱50.00</span>
+</div>
+<div class="flex justify-between items-center font-label-sm text-label-sm text-outline pt-0.5">
+<span class="">VATable Sales: ₱431.25</span>
+<span class="tabular-nums">VAT (12%): ₱51.75</span>
+</div>
+<!-- Hairline Divider -->
+<div class="h-[1px] bg-outline-variant my-1"></div>
+<!-- Total Due Row -->
+<div class="flex justify-between items-baseline pt-0.5">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-bold">Total Due</span>
+<span class="font-label-sm text-label-sm text-secondary font-medium">BIR Official Receipt</span>
+</div>
+<span class="font-display-lg text-display-lg text-primary-container font-extrabold tabular-nums tracking-tight">
+            ₱483.00
+          </span>
+</div>
+</div>
+<!-- Payment Method Quick Chips & Sticky Pay Trigger -->
+<div class="p-space-md bg-surface-container-lowest shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] flex flex-col gap-space-xs">
+<!-- Quick tender selector -->
+<div class="grid grid-cols-4 gap-1.5 pb-1">
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface flex flex-col items-center justify-center active:scale-95 transition-all">
+<span class="font-label-sm text-label-sm font-bold uppercase">Cash</span>
+</button>
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface flex flex-col items-center justify-center active:scale-95 transition-all">
+<span class="font-label-sm text-label-sm font-bold uppercase text-primary">QR Ph</span>
+</button>
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface flex flex-col items-center justify-center active:scale-95 transition-all">
+<span class="font-label-sm text-label-sm font-bold uppercase">Card</span>
+</button>
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface flex flex-col items-center justify-center active:scale-95 transition-all">
+<span class="font-label-sm text-label-sm font-bold uppercase text-tertiary">Credit</span>
+</button>
+</div>
+<!-- Primary Full-Width Action Button (56px) -->
+<button class="w-full h-14 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-headline-md text-headline-md font-bold px-space-md flex items-center justify-between shadow-md active:translate-y-0.5 active:shadow-sm transition-all cursor-pointer relative overflow-hidden group select-none" title="Process Tender (F12 / Enter)"><div class="flex items-center gap-space-sm"><div class="w-9 h-9 rounded-lg bg-surface-container-lowest/15 flex items-center justify-center"><span class="material-symbols-outlined text-[22px]">point_of_sale</span></div><div class="flex flex-col text-left leading-none"><span class="font-label-sm text-label-sm text-on-primary-container uppercase tracking-wider font-bold">Charge</span><span class="font-headline-md text-headline-md tracking-tight font-extrabold">Pay Now</span></div></div><div class="flex items-center gap-space-sm"><span class="tabular-nums font-currency-display text-currency-display tracking-tight text-right">₱483.00</span><div class="w-7 h-7 rounded-full bg-surface-container-lowest/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5"><span class="material-symbols-outlined text-[18px]">arrow_forward</span></div></div></button>
+</div>
+</aside>
+</div>
+</div>
+<script>
+  // Ergonomic cashier quick-key listeners
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'F2') {
+      event.preventDefault();
+      const searchInput = document.querySelector('header input[type="text"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+  });
+</script></main><footer class="w-full bg-surface-container-lowest py-space-sm shadow-[0_-1px_4px_rgba(0,0,0,0.02)]"><div class="w-full px-margin flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><div class="">Purch.io OS v4.8 • Registered POS Terminal #04 • BIR Accreditation No: 048-19283719-001</div><div class="flex items-center gap-space-md"><span class="">Sync Status: Realtime Cloud</span><span class="">Network: 120ms Latency</span><span class="">Hardware: Connected (Epson TM-T88VI)</span></div></div></footer>
+<div class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-inverse-surface/60 backdrop-blur-sm" id="combo-customization-modal"><div class="w-full max-w-xl bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/50 overflow-hidden flex flex-col"><div class="p-space-md bg-surface-container-low border-b border-outline-variant/40 flex items-start justify-between gap-space-md shrink-0"><div class="flex items-center gap-space-md"><img alt="Pork Sisig Rice Bowl" class="w-14 h-14 rounded-xl object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRuUv_G4V3zormyWxw0PCMfpoARE8YY-bRUE8Rk7yW2Jubg2whZXRTZdYJ7qQmDW2lcs9meBOUPGjw83JlvRrNaCwQZeAG6d6tgTjFnjaO65UYXoPWt-BmZ9azaK3A-51PnhZiKvKhIvHdoT0w-O-ruwQ8SAI_RYc42gJunVnksWDmgUjhw7jyeOajmmCs4LSK6_kUrd4KTEZaLWBqVkKmskxyk4Mwz_bGAArR9UZHSvyv07267W0SOA"><div class="flex flex-col"><div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm uppercase font-bold">COMBO</span><span class="font-label-sm text-label-sm text-outline font-medium">Ticket #0042 • Dine-In</span></div><h2 class="font-headline-md text-headline-md text-on-surface font-bold leading-tight mt-0.5">Pork Sisig Rice Bowl</h2><span class="font-headline-sm text-headline-sm text-primary-container font-bold tabular-nums" style="color: rgb(15, 118, 110);">₱125.00</span></div></div><button aria-label="Close modal" class="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-[20px]">close</span></button></div><div class="p-space-md flex flex-col gap-space-md overflow-y-auto max-h-[62vh]"><div><div class="flex items-center justify-between mb-2"><span class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wide">Step 1: Choose Rice Base</span><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm font-bold" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">REQUIRED</span></div><div class="grid grid-cols-2 gap-2.5"><div class="cursor-pointer p-3 rounded-xl border-2 border-primary-container bg-surface-container-high/40 flex items-center justify-between transition-all" style="border-color: rgb(15, 118, 110); background-color: rgb(240, 253, 250);"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-primary-container flex items-center justify-center" style="border-color: rgb(15, 118, 110);"><div class="w-2.5 h-2.5 rounded-full bg-primary-container" style="background-color: rgb(15, 118, 110);"></div></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Garlic Rice</span><span class="font-body-sm text-body-sm text-on-surface-variant">Toasted garlic bits</span></div></div><span class="font-label-sm text-label-sm font-bold text-secondary" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">INCLUDED</span></div><div class="cursor-pointer p-3 rounded-xl border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low flex items-center justify-between transition-all"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-outline flex items-center justify-center"></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Plain Jasmine Rice</span><span class="font-body-sm text-body-sm text-on-surface-variant">Steamed white</span></div></div><span class="font-label-sm text-label-sm text-outline font-medium" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">+₱0.00</span></div></div></div><div><div class="flex items-center justify-between mb-2"><span class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wide">Step 2: Egg Style</span><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm font-bold" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">REQUIRED</span></div><div class="grid grid-cols-2 gap-2.5"><div class="cursor-pointer p-3 rounded-xl border-2 border-primary-container bg-surface-container-high/40 flex items-center justify-between transition-all" style="border-color: rgb(15, 118, 110); background-color: rgb(240, 253, 250);"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-primary-container flex items-center justify-center" style="border-color: rgb(15, 118, 110);"><div class="w-2.5 h-2.5 rounded-full bg-primary-container" style="background-color: rgb(15, 118, 110);"></div></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Sunny Side Up</span><span class="font-body-sm text-body-sm text-on-surface-variant">Crispy edges, runny yolk</span></div></div><span class="font-label-sm text-label-sm font-bold text-secondary" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">INCLUDED</span></div><div class="cursor-pointer p-3 rounded-xl border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low flex items-center justify-between transition-all"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-outline flex items-center justify-center"></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Scrambled Egg</span><span class="font-body-sm text-body-sm text-on-surface-variant">Soft, fluffy beaten egg</span></div></div><span class="font-label-sm text-label-sm text-outline font-medium" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">+₱0.00</span></div></div></div><div><div class="flex items-center justify-between mb-2"><span class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wide">Step 3: Seasoning &amp; Spice Level</span><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm font-bold" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">REQUIRED</span></div><div class="grid grid-cols-2 gap-2.5"><div class="cursor-pointer p-3 rounded-xl border-2 border-primary-container bg-surface-container-high/40 flex items-center justify-between transition-all" style="border-color: rgb(15, 118, 110); background-color: rgb(240, 253, 250);"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-primary-container flex items-center justify-center" style="border-color: rgb(15, 118, 110);"><div class="w-2.5 h-2.5 rounded-full bg-primary-container" style="background-color: rgb(15, 118, 110);"></div></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Mild Calamansi</span><span class="font-body-sm text-body-sm text-on-surface-variant">Citrusy, balanced heat</span></div></div><span class="font-label-sm text-label-sm font-bold text-secondary" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">DEFAULT</span></div><div class="cursor-pointer p-3 rounded-xl border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low flex items-center justify-between transition-all"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full border-2 border-outline flex items-center justify-center"></div><div class="flex flex-col"><span class="font-label-md text-label-md font-bold text-on-surface">Extra Spicy 🌶️</span><span class="font-body-sm text-body-sm text-on-surface-variant">Double siling labuyo</span></div></div><span class="font-label-sm text-label-sm text-outline font-medium" style="background-color: rgb(240, 253, 250); color: rgb(17, 94, 89); border: 1px solid rgba(15, 118, 110, 0.2);">+₱0.00</span></div></div></div></div><div class="p-space-md bg-surface-container-low border-t border-outline-variant/40 flex items-center justify-between gap-space-md shrink-0"><div class="flex items-center gap-2"><div class="flex items-center bg-surface-container-lowest rounded-xl p-1 shadow-xs border border-outline-variant/50"><button class="w-10 h-10 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all"><span class="material-symbols-outlined text-[18px]">remove</span></button><span class="w-9 text-center font-headline-md text-headline-md font-bold tabular-nums">1</span><button class="w-10 h-10 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all"><span class="material-symbols-outlined text-[18px]">add</span></button></div><button class="px-3 py-2 rounded-xl text-outline hover:text-error hover:bg-error-container font-label-md text-label-md font-semibold transition-colors">Cancel</button></div><button class="flex-1 h-12 rounded-xl bg-primary-container hover:bg-primary text-on-primary font-headline-sm text-headline-sm font-bold px-space-md flex items-center justify-between shadow-md active:translate-y-0.5 transition-all cursor-pointer" style="background-color: rgb(15, 118, 110); box-shadow: rgba(15, 118, 110, 0.25) 0px 4px 14px;"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-[20px]">check_circle</span><span class="">Update Item</span></div><span class="font-currency-display text-[20px] tabular-nums">₱125.00</span></button></div></div></div>
+
+</body></html>

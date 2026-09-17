@@ -17,6 +17,7 @@ public sealed class LoginServiceValidationTests
             new NeverCalledDeviceRepository(),
             new NeverCalledUserRepository(),
             new NeverCalledPinHasher(),
+            new NeverCalledPasswordHasher(),
             new NeverCalledJwtTokenService());
 
         var exception = await Assert.ThrowsAsync<ValidationException>(
@@ -67,6 +68,11 @@ public sealed class LoginServiceValidationTests
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
 
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
         public void Add(User user)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
@@ -86,6 +92,19 @@ public sealed class LoginServiceValidationTests
         }
     }
 
+    private sealed class NeverCalledPasswordHasher : IPasswordHasher
+    {
+        public string Hash(string password)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public bool Verify(string password, string hash)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+    }
+
     private sealed class NeverCalledJwtTokenService : IJwtTokenService
     {
         public string IssueAccessToken(User user, Device device)
@@ -94,6 +113,11 @@ public sealed class LoginServiceValidationTests
         }
 
         public string IssueKioskAccessToken(Device device)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public string IssueAdminAccessToken(User user)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

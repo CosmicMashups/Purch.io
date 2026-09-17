@@ -12,6 +12,7 @@ public sealed class BootstrapTenantService(
     IDeviceRepository deviceRepository,
     IUserRepository userRepository,
     IPinHasher pinHasher,
+    IPasswordHasher passwordHasher,
     IDeploymentContext deploymentContext,
     IUnitOfWork unitOfWork) : IBootstrapTenantService
 {
@@ -48,6 +49,10 @@ public sealed class BootstrapTenantService(
             Role = Role.Admin,
             ScopeType = ScopeType.Tenant,
             PinHash = pinHasher.Hash(request.AdminPin),
+            Email = request.AdminEmail?.Trim(),
+            PasswordHash = request.AdminPassword is { Length: > 0 }
+                ? passwordHasher.Hash(request.AdminPassword)
+                : null,
             IsActive = true,
         };
         userRepository.Add(admin);
@@ -79,6 +84,14 @@ public sealed class BootstrapTenantService(
         if (string.IsNullOrWhiteSpace(request.AdminPin))
         {
             errors[nameof(request.AdminPin)] = ["Admin PIN is required."];
+        }
+
+        var hasEmail = !string.IsNullOrWhiteSpace(request.AdminEmail);
+        var hasPassword = !string.IsNullOrWhiteSpace(request.AdminPassword);
+        if (hasEmail != hasPassword)
+        {
+            errors[nameof(request.AdminEmail)] =
+                ["Admin email and password must both be provided together, or both omitted."];
         }
 
         if (errors.Count > 0)

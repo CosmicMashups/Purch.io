@@ -189,7 +189,7 @@ class _ServerConnectionScreenState
                                 size: 18,
                                 color: AppColors.accentEmerald,
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Connected — this device will use that server from now on.',

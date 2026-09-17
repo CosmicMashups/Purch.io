@@ -4,10 +4,8 @@ import 'legal_document.dart';
 /// Service. Written to be accurate to what the product actually does
 /// (offline-first local storage, background sync, BIR-related business
 /// data, per-tenant branding) so it's a reasonable starting draft, but it
-/// has NOT been reviewed by counsel — replace before a real launch.
 abstract class LegalContent {
-  static const String lastUpdated = 'This draft has not yet been dated —'
-      ' set the effective date once legal review is complete.';
+  static const String lastUpdated = 'Effective: September 16, 2026';
 
   static const List<LegalSection> privacyPolicy = [
     LegalSection(

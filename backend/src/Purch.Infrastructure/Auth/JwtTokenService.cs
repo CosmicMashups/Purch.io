@@ -36,6 +36,24 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         return WriteToken(claims, TimeSpan.FromHours(8));
     }
 
+    public string IssueAdminAccessToken(User user)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtClaimTypes.TenantId, user.TenantId.ToString()),
+            new(JwtClaimTypes.Role, user.Role.ToString()),
+            new(JwtClaimTypes.ScopeType, user.ScopeType.ToString()),
+        };
+
+        if (user.ScopeId is { } scopeId)
+        {
+            claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
+        }
+
+        return WriteToken(claims, TimeSpan.FromHours(8));
+    }
+
     public string IssueKioskAccessToken(Device device)
     {
         var claims = new List<Claim>

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/auth/jwt_claims.dart';
+import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_token_storage.dart';
@@ -25,6 +26,7 @@ AuthRepository authRepository(Ref ref) {
   return AuthRepositoryImpl(
     apiClient: ref.watch(apiClientProvider),
     tokenStorage: ref.watch(secureTokenStorageProvider),
+    deviceIdentityDao: ref.watch(deviceIdentityDaoProvider),
   );
 }
 
@@ -70,6 +72,30 @@ class LoginController extends _$LoginController {
   /// The typed Failure behind the current error state, if any — screens use
   /// this instead of re-parsing `state.error`, which Riverpod only exposes
   /// as `Object?`.
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
+  }
+}
+
+/// Drives the admin email+password login screen — mirrors [LoginController]
+/// but for the separate admin login path.
+@riverpod
+class AdminLoginController extends _$AdminLoginController {
+  @override
+  FutureOr<void> build() {
+    // No-op initial state: not logged in, no error, not loading.
+  }
+
+  Future<void> login({required String email, required String password}) async {
+    state = const AsyncLoading();
+    final repository = ref.read(authRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.loginAsAdmin(email: email, password: password),
+    );
+  }
+
   Failure? get currentFailure {
     final error = state.error;
     return error is Failure ? error : null;
