@@ -13,6 +13,9 @@
 
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+        <!-- Fixed brand color, not ?android:colorBackground: that resolves to
+             black in system dark mode, which showed as a plain black screen
+             during Flutter's startup gap instead of the intended splash. -->
+        <item name="android:windowBackground">@color/launch_background_color</item>
     </style>
 </resources>
