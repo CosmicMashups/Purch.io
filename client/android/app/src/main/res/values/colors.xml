@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches SplashScreen.background in Dart (lib/features/splash/presentation/screens/splash_screen.dart)
+         so the native window shown before Flutter's first frame is the same
+         color as the Flutter splash, not a mismatched white/black flash. -->
+    <color name="launch_background_color">#0E6B5A</color>
+</resources>
