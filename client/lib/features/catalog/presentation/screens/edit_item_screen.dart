@@ -6,6 +6,8 @@ import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/image_upload_field.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../inventory/presentation/screens/recipe_editor_screen.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
 import '../providers/catalog_providers.dart';
@@ -118,6 +120,12 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
     final categoriesAsync = ref.watch(categoryListProvider);
     final departmentsAsync = ref.watch(allDepartmentsProvider);
+    final useSeparateInventoryTracking = ref
+        .watch(tenantSettingsNotifierProvider)
+        .maybeWhen(
+          data: (settings) => settings.useSeparateInventoryTracking,
+          orElse: () => false,
+        );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -417,6 +425,32 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                           },
                           orElse: () => const SizedBox.shrink(),
                         ),
+
+                        if (useSeparateInventoryTracking) ...[
+                          OutlinedButton.icon(
+                            onPressed: isLoading
+                                ? null
+                                : () => Navigator.of(context).push<void>(
+                                      MaterialPageRoute(
+                                        builder: (_) => RecipeEditorScreen(
+                                          itemId: widget.item.id,
+                                          itemName: widget.item.name,
+                                        ),
+                                      ),
+                                    ),
+                            icon: const Icon(Icons.receipt_long_outlined),
+                            label: const Text('Manage Recipe'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.brandPrimary,
+                              side: const BorderSide(color: AppColors.border),
+                              minimumSize: const Size.fromHeight(44),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
 
                         // Active State Switch
                         Container(

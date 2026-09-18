@@ -131,6 +131,14 @@ public static class OnboardingEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await settingsService.UpdateCreditLedgerSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // --- Separate inventory tracking toggle — off by default: Cashier items keep using
+        // Item.StockOnHand directly until an admin opts into InventoryItem + recipe tracking ---
+        _ = app.MapPut("/tenant/settings/inventory-tracking", async (
+            UpdateInventoryTrackingSettingRequest request,
+            ITenantSettingsService settingsService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settingsService.UpdateInventoryTrackingSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
         // --- Security & access: audit log viewer (A6) ---
         _ = app.MapGet("/audit-logs", async (
             Guid? actorUserId,

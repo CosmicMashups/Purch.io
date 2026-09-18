@@ -114,28 +114,52 @@ class ReceiptScreen extends ConsumerWidget {
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 5,
                                       ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              '${line.itemName} ×${line.quantity.toStringAsFixed(line.quantity.truncateToDouble() == line.quantity ? 0 : 2)}',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: AppColors.textPrimary,
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${line.itemName} ×${line.quantity.toStringAsFixed(line.quantity.truncateToDouble() == line.quantity ? 0 : 2)}',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              Text(
+                                                '₱${line.lineTotal.toStringAsFixed(2)}',
+                                                style: GoogleFonts.jetBrainsMono(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (line.modifierSelections.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  for (final mod in line.modifierSelections)
+                                                    Text(
+                                                      mod.priceDelta > 0
+                                                          ? '  + ${mod.modifierName} (+₱${mod.priceDelta.toStringAsFixed(2)})'
+                                                          : '  + ${mod.modifierName}',
+                                                      style: GoogleFonts.plusJakartaSans(
+                                                        fontSize: 12,
+                                                        color: AppColors.textSecondary,
+                                                      ),
+                                                    ),
+                                                ],
                                               ),
                                             ),
-                                          ),
-                                          Text(
-                                            '₱${line.lineTotal.toStringAsFixed(2)}',
-                                            style: GoogleFonts.jetBrainsMono(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
                                         ],
                                       ),
                                     ),

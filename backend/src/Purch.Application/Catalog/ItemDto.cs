@@ -19,4 +19,5 @@ public sealed record ItemDto(
     IReadOnlyList<decimal> TingiAllowedSizes,
     int? ServiceDurationMinutes,
     Guid? DepartmentId,
-    decimal? LowStockThreshold);
+    decimal? LowStockThreshold,
+    bool IsOutOfStock);

@@ -7,6 +7,7 @@ import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import '../../../../core/errors/failure.dart';
+import 'item_modifier_customization_dialog.dart';
 
 /// D3 — lets the cashier pick which variant (size/color/etc.) of a
 /// PricingType.variantMatrix item to add.
@@ -126,6 +127,31 @@ class VariantPickerScreen extends ConsumerWidget {
                         (request) => ref
                             .read(cartNotifierProvider.notifier)
                             .addLine(request);
+
+                    final modifierGroups =
+                        await ref.read(itemModifierGroupListProvider(item.id).future);
+                    if (modifierGroups.isNotEmpty && context.mounted) {
+                      final added = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => ItemModifierCustomizationDialog(
+                          item: item,
+                          itemVariant: variant,
+                          addLine: add,
+                        ),
+                      );
+                      if (added == true && context.mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Added ${item.name} (${variant.attributesLabel})',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     final succeeded = await add(
                       AddTransactionLineRequest(
                         itemId: item.id,

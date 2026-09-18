@@ -251,6 +251,8 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
   );
   late bool _requiresBarcode = widget.initial.requiresBarcodePerItem;
   late bool _creditLedgerEnabled = widget.initial.creditLedgerEnabled;
+  late bool _useSeparateInventoryTracking =
+      widget.initial.useSeparateInventoryTracking;
 
   @override
   void dispose() {
@@ -330,6 +332,13 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
     await ref
         .read(tenantSettingsNotifierProvider.notifier)
         .updateCreditLedgerSetting(value);
+  }
+
+  Future<void> _toggleInventoryTracking(bool value) async {
+    setState(() => _useSeparateInventoryTracking = value);
+    await ref
+        .read(tenantSettingsNotifierProvider.notifier)
+        .updateInventoryTrackingSetting(value);
   }
 
   @override
@@ -651,6 +660,19 @@ class _TenantSettingsFormState extends ConsumerState<_TenantSettingsForm> {
                           value: _creditLedgerEnabled,
                           activeColor: AppColors.brandPrimary,
                           onChanged: isSaving ? null : _toggleCreditLedger,
+                        ),
+                        const Divider(height: 1),
+                        SwitchListTile(
+                          title: const Text(
+                            'Track inventory separately from menu items',
+                          ),
+                          subtitle: const Text(
+                            'Track ingredient-level stock (e.g. coffee beans, '
+                            'milk) separately from what\'s sold at the register.',
+                          ),
+                          value: _useSeparateInventoryTracking,
+                          activeColor: AppColors.brandPrimary,
+                          onChanged: isSaving ? null : _toggleInventoryTracking,
                         ),
                       ],
                     ),

@@ -43,6 +43,10 @@ abstract class OnboardingRepository {
 
   Future<TenantSettings> updateCreditLedgerSetting(bool creditLedgerEnabled);
 
+  Future<TenantSettings> updateInventoryTrackingSetting(
+    bool useSeparateInventoryTracking,
+  );
+
   Future<List<AuditLogEntry>> listAuditLogs();
 
   Future<List<Department>> listDepartments(String branchId);

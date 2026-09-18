@@ -52,9 +52,10 @@ trap finish EXIT
 echo "Using dotnet: $DOTNET_BIN"
 "$DOTNET_BIN" --version
 
-if ! "$DOTNET_BIN" tool list --global 2>/dev/null | grep -q "dotnet-ef"; then
-    echo "dotnet-ef not found — installing..."
-    "$DOTNET_BIN" tool install --global dotnet-ef
+if ! "$DOTNET_BIN" tool list --global 2>/dev/null | grep -qE "dotnet-ef[[:space:]]+9\."; then
+    echo "Installing/updating dotnet-ef to matching 9.0.9 version..."
+    "$DOTNET_BIN" tool uninstall --global dotnet-ef 2>/dev/null || true
+    "$DOTNET_BIN" tool install --global dotnet-ef --version 9.0.9
 fi
 
 if [ -z "${SUPABASE_DB_CONNECTION_STRING:-}" ]; then

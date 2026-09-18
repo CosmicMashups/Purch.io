@@ -49,4 +49,7 @@ public class Tenant : Entity
 
     /// <summary>Kiosk landing screen promotional poster — a URL to a hosted image displayed full-bleed as the hero on the customer-facing kiosk (E1). Null falls back to the wordmark card.</summary>
     public string? KioskPosterImageUrl { get; set; }
+
+    /// <summary>When true, Cashier items track stock via linked InventoryItem records + recipes instead of Item.StockOnHand directly.</summary>
+    public bool UseSeparateInventoryTracking { get; set; }
 }

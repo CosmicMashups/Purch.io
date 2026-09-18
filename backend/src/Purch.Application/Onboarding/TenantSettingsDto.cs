@@ -18,4 +18,5 @@ public sealed record TenantSettingsDto(
     string? RegisteredAddress,
     int? CreditLedgerRetentionDays,
     bool CreditLedgerEnabled,
-    string? KioskPosterImageUrl);
+    string? KioskPosterImageUrl,
+    bool UseSeparateInventoryTracking);

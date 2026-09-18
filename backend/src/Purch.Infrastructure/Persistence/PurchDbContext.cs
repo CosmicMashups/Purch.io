@@ -23,6 +23,10 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<Item> Items => Set<Item>();
 
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+
+    public DbSet<ItemRecipeLine> ItemRecipeLines => Set<ItemRecipeLine>();
+
     public DbSet<ItemVariant> ItemVariants => Set<ItemVariant>();
 
     public DbSet<ItemComboComponent> ItemComboComponents => Set<ItemComboComponent>();

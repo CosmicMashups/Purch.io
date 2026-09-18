@@ -130,6 +130,15 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
+  Future<TenantSettings> updateInventoryTrackingSetting(
+    bool useSeparateInventoryTracking,
+  ) {
+    return _put('/tenant/settings/inventory-tracking', {
+      'useSeparateInventoryTracking': useSeparateInventoryTracking,
+    }, TenantSettings.fromJson);
+  }
+
+  @override
   Future<List<AuditLogEntry>> listAuditLogs() {
     return _getList('/audit-logs', AuditLogEntry.fromJson);
   }

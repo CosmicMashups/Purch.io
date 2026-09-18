@@ -270,6 +270,14 @@ class TenantSettingsNotifier extends _$TenantSettingsNotifier {
     (repository) => repository.updateCreditLedgerSetting(creditLedgerEnabled),
   );
 
+  Future<bool> updateInventoryTrackingSetting(
+    bool useSeparateInventoryTracking,
+  ) => _update(
+    (repository) => repository.updateInventoryTrackingSetting(
+      useSeparateInventoryTracking,
+    ),
+  );
+
   Future<bool> _update(
     Future<TenantSettings> Function(OnboardingRepository) action,
   ) async {

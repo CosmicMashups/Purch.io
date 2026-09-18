@@ -10,6 +10,7 @@ import '../../../catalog/domain/pricing_type.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../pos/domain/transaction_models.dart';
 import '../../../pos/presentation/screens/combo_customization_screen.dart';
+import '../../../pos/presentation/screens/item_modifier_customization_dialog.dart';
 import '../../../pos/presentation/screens/variant_picker_screen.dart';
 import '../providers/kiosk_providers.dart';
 import 'kiosk_cart_screen.dart';
@@ -174,11 +175,51 @@ class KioskItemListScreen extends ConsumerWidget {
                               borderRadius: AppRadius.mdBorder,
                             ),
                             content: Text(
-                              ' isn\'t available at the kiosk yet '
+                              '${item.name} isn\'t available at the kiosk yet '
                               '— please order at the counter.',
                             ),
                           ),
                         );
+                        return;
+                      }
+
+                      // Check if item has attached modifier groups
+                      final modifierGroups =
+                          await ref.read(itemModifierGroupListProvider(item.id).future);
+                      if (modifierGroups.isNotEmpty && context.mounted) {
+                        final added = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => ItemModifierCustomizationDialog(
+                            item: item,
+                            addLine: _kioskAddLine(ref),
+                          ),
+                        );
+                        if (added == true && context.mounted) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.textPrimary,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppRadius.mdBorder,
+                              ),
+                              duration: const Duration(milliseconds: 1400),
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: AppColors.accentEmerald,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text('Added ${item.name}'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
                         return;
                       }
 

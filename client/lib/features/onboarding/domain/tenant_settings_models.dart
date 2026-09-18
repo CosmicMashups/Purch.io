@@ -19,6 +19,7 @@ class TenantSettings {
     required this.creditLedgerRetentionDays,
     required this.creditLedgerEnabled,
     required this.kioskPosterImageUrl,
+    this.useSeparateInventoryTracking = false,
   });
 
   factory TenantSettings.fromJson(Map<String, dynamic> json) {
@@ -41,6 +42,8 @@ class TenantSettings {
       creditLedgerRetentionDays: json['creditLedgerRetentionDays'] as int?,
       creditLedgerEnabled: json['creditLedgerEnabled'] as bool,
       kioskPosterImageUrl: json['kioskPosterImageUrl'] as String?,
+      useSeparateInventoryTracking:
+          json['useSeparateInventoryTracking'] as bool? ?? false,
     );
   }
 
@@ -63,6 +66,11 @@ class TenantSettings {
   /// URL to the promotional poster image shown full-bleed on the kiosk
   /// landing screen (E1). Null = show the wordmark card fallback.
   final String? kioskPosterImageUrl;
+
+  /// Opt-in-per-tenant flag: when true, Cashier items can be backed by
+  /// separate InventoryItem records (ingredients) linked via a recipe/BOM,
+  /// instead of the item's own direct stockOnHand tracking.
+  final bool useSeparateInventoryTracking;
 }
 
 /// Mirrors Purch.Application.Onboarding.UpdateBrandingRequest. logoUrl is an
@@ -130,4 +138,17 @@ class UpdateCreditLedgerSettingRequest {
   final bool creditLedgerEnabled;
 
   Map<String, dynamic> toJson() => {'creditLedgerEnabled': creditLedgerEnabled};
+}
+
+/// Mirrors Purch.Application.Onboarding.UpdateInventoryTrackingSettingRequest.
+class UpdateInventoryTrackingSettingRequest {
+  const UpdateInventoryTrackingSettingRequest({
+    required this.useSeparateInventoryTracking,
+  });
+
+  final bool useSeparateInventoryTracking;
+
+  Map<String, dynamic> toJson() => {
+    'useSeparateInventoryTracking': useSeparateInventoryTracking,
+  };
 }
