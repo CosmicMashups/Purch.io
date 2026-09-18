@@ -30,6 +30,7 @@ public sealed record TransactionLineDto(
     Guid ItemId,
     string ItemName,
     Guid? ItemVariantId,
+    IReadOnlyDictionary<string, string> ItemVariantAttributes,
     decimal Quantity,
     decimal UnitPrice,
     decimal LineTotal,
