@@ -28,6 +28,7 @@ public sealed class InventoryMovementService(
         MovementType.Damaged,
         MovementType.ForReturn,
         MovementType.Transfer,
+        MovementType.Sale,
     ];
 
     public async Task<IReadOnlyList<InventoryMovementDto>> ListAsync(

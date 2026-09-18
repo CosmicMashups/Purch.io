@@ -413,15 +413,14 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
-    /// <summary>Deducts each line's quantity from its item's StockOnHand in the
-    /// same SaveChangesAsync as completing the sale, so a payment and its stock
-    /// effect can never land separately — this is the only place a completed
-    /// sale touches stock; manual InventoryMovements are for everything else
-    /// (deliveries, spoilage, corrections). Skipped for tenants that have opted
-    /// into UseSeparateInventoryTracking: for them, stock lives on InventoryItem
-    /// and is maintained by ConsumeInventoryForCompletedSaleAsync/ReceiveStockAsync
-    /// instead — StockOnHand would otherwise drift negative forever since nothing
-    /// replenishes it once a tenant switches over.</summary>
+    /// <summary>Deducts each line's quantity from its item's StockOnHand and logs a Sale
+    /// InventoryMovement per item, in the same SaveChangesAsync as completing the sale, so a
+    /// payment and its stock effect can never land separately — this is the only place a
+    /// completed sale touches stock; manual InventoryMovements are for everything else
+    /// (deliveries, spoilage, corrections). Skipped for tenants that have opted into
+    /// UseSeparateInventoryTracking: for them, stock lives on InventoryItem and is maintained by
+    /// ConsumeInventoryForCompletedSaleAsync/ReceiveStockAsync instead — StockOnHand would
+    /// otherwise drift negative forever since nothing replenishes it once a tenant switches over.</summary>
     private async Task DecrementStockForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
     {
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
@@ -439,7 +438,19 @@ public sealed class TransactionService(
                 continue;
             }
 
-            item.StockOnHand -= group.Sum(line => line.Quantity);
+            var quantitySold = group.Sum(line => line.Quantity);
+            item.StockOnHand -= quantitySold;
+
+            inventoryMovementRepository.Add(new InventoryMovement
+            {
+                TenantId = CurrentTenantId,
+                ItemId = item.Id,
+                BranchId = cart.BranchId,
+                Type = MovementType.Sale,
+                Quantity = quantitySold,
+                StaffUserId = CurrentUserId,
+                Note = $"Sale — receipt #{cart.ReceiptNumber}",
+            });
         }
     }
 
