@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -26,6 +27,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             // member's User.BranchId is null, but a transaction always happens
             // at one physical terminal's branch.
             new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
+            new(JwtClaimTypes.DeviceSessionVersion, device.SessionVersion.ToString(CultureInfo.InvariantCulture)),
         };
 
         if (user.ScopeId is { } scopeId)
@@ -67,6 +69,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             new(JwtClaimTypes.Role, Role.Kiosk.ToString()),
             new(JwtClaimTypes.DeviceId, device.Id.ToString()),
             new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
+            new(JwtClaimTypes.DeviceSessionVersion, device.SessionVersion.ToString(CultureInfo.InvariantCulture)),
         };
 
         // A stationary, unattended terminal — no one re-pairs it every shift the
@@ -83,6 +86,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
             new(JwtClaimTypes.Role, role.ToString()),
             new(JwtClaimTypes.DeviceId, device.Id.ToString()),
             new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
+            new(JwtClaimTypes.DeviceSessionVersion, device.SessionVersion.ToString(CultureInfo.InvariantCulture)),
         };
 
         // Same rationale as IssueKioskAccessToken: a stationary, unattended

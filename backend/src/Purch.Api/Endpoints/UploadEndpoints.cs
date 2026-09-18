@@ -16,7 +16,7 @@ public static class UploadEndpoints
     {
         _ = app.MapPost("/uploads/image", async (
             IFormFile file,
-            IWebHostEnvironment env,
+            IFileStorage fileStorage,
             ICurrentTenantProvider tenantProvider,
             HttpRequest request,
             CancellationToken cancellationToken) =>
@@ -38,27 +38,16 @@ public static class UploadEndpoints
             }
 
             var tenantFolder = tenantProvider.TenantId?.ToString("N") ?? "public";
-            var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-            var uploadsDir = Path.Combine(webRoot, "uploads", tenantFolder);
-            
-            Directory.CreateDirectory(uploadsDir);
-
             var uniqueFileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-            var filePath = Path.Combine(uploadsDir, uniqueFileName);
-
-            await using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream, cancellationToken);
-            }
-
-            var relativePath = $"/uploads/{tenantFolder}/{uniqueFileName}";
             var baseUrl = $"{request.Scheme}://{request.Host}";
-            var absoluteUrl = $"{baseUrl}{relativePath}";
+
+            await using var stream = file.OpenReadStream();
+            var stored = await fileStorage.SaveAsync(stream, uniqueFileName, file.ContentType, tenantFolder, baseUrl, cancellationToken);
 
             return Results.Ok(new
             {
-                url = absoluteUrl,
-                relativePath = relativePath,
+                url = stored.Url,
+                relativePath = stored.RelativePath,
                 fileName = uniqueFileName,
                 size = file.Length,
                 contentType = file.ContentType

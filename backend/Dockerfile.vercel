@@ -1,0 +1,32 @@
+# Vercel container deployment — see docs/VERCEL-DEPLOYMENT.md for the full
+# setup (env vars, migrations, and the local-disk-uploads caveat). This is a
+# separate file from Dockerfile (Render) because Vercel's container runtime
+# has different constraints: it runs the image as a Vercel Function, so it
+# must listen on $PORT (not a fixed port), and the chiseled runtime image
+# below runs as a non-root user, which can't bind privileged port 80.
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+COPY Purch.sln Directory.Build.props ./
+COPY src/Purch.Domain/Purch.Domain.csproj src/Purch.Domain/
+COPY src/Purch.Application/Purch.Application.csproj src/Purch.Application/
+COPY src/Purch.Infrastructure/Purch.Infrastructure.csproj src/Purch.Infrastructure/
+COPY src/Purch.Api/Purch.Api.csproj src/Purch.Api/
+RUN dotnet restore src/Purch.Api/Purch.Api.csproj
+
+COPY src/ src/
+RUN dotnet publish src/Purch.Api/Purch.Api.csproj -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Vercel injects PORT at runtime; 8080 here is just the local/default value.
+# ASPNETCORE_HTTP_PORTS (not ASPNETCORE_URLS) is what the base image's
+# Kestrel defaults actually key off — set it to match PORT so the container
+# doesn't 502 on requests that arrive before any override lands.
+ENV PORT=8080
+ENV ASPNETCORE_HTTP_PORTS=8080
+ENV DOTNET_EnableDiagnostics=0
+
+ENTRYPOINT ["/bin/sh", "-c", "ASPNETCORE_HTTP_PORTS=${PORT:-8080} dotnet Purch.Api.dll"]

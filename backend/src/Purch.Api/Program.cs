@@ -26,6 +26,7 @@ using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
 using Purch.Infrastructure.Repositories;
+using Purch.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +42,25 @@ builder.Services.AddProblemDetails(options =>
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<IDeploymentContext, ConfigDeploymentContext>();
+
+builder.Services.AddHttpClient(nameof(SupabaseFileStorage));
+builder.Services.AddSingleton<IFileStorage>(serviceProvider =>
+{
+    var deploymentContext = serviceProvider.GetRequiredService<IDeploymentContext>();
+    if (deploymentContext.Mode == DeploymentMode.Local)
+    {
+        var env = serviceProvider.GetRequiredService<IWebHostEnvironment>();
+        var webRootPath = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        return new LocalFileStorage(webRootPath);
+    }
+
+    var httpClient = serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(SupabaseFileStorage));
+    return new SupabaseFileStorage(
+        httpClient,
+        deploymentContext.StorageLocation,
+        deploymentContext.StorageKey!,
+        deploymentContext.StorageBucket!);
+});
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
 builder.Services.AddScoped<ICurrentActorProvider, HttpContextCurrentActorProvider>();
 

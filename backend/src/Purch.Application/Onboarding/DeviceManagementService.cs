@@ -55,11 +55,14 @@ public sealed class DeviceManagementService(
         var device = await GetOwnedDeviceAsync(deviceId, cancellationToken);
 
         device.PairingCode = PairingCodeGenerator.Generate();
+        device.SessionVersion++;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // The old code is gone the moment it's overwritten (lookup is by value, not a
-        // separate active/inactive flag), but a session already issued under it would
-        // otherwise keep working until its refresh token naturally expires.
+        // separate active/inactive flag). Bumping SessionVersion invalidates any
+        // access token already issued under it immediately (see
+        // DeviceSessionValidationMiddleware); revoking refresh tokens on top of that
+        // stops it being silently renewed once that access token does expire.
         await refreshTokenService.RevokeAllForDeviceAsync(device.Id, cancellationToken);
 
         return ToDto(device);
@@ -76,6 +79,7 @@ public sealed class DeviceManagementService(
         }
 
         device.PairingPinHash = string.IsNullOrWhiteSpace(newPin) ? null : pinHasher.Hash(newPin);
+        device.SessionVersion++;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         await refreshTokenService.RevokeAllForDeviceAsync(device.Id, cancellationToken);

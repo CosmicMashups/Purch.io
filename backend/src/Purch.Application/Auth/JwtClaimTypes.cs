@@ -9,4 +9,5 @@ public static class JwtClaimTypes
     public const string ScopeId = "scope_id";
     public const string BranchId = "branch_id";
     public const string DeviceId = "device_id";
+    public const string DeviceSessionVersion = "device_session_ver";
 }

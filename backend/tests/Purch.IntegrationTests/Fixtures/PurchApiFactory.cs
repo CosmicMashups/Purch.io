@@ -5,7 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Purch.Application.Auth;
+using Purch.Application.Common;
 using Purch.Domain.Entities;
+using Purch.Infrastructure.Storage;
 
 namespace Purch.IntegrationTests.Fixtures;
 
@@ -30,6 +32,7 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
                 ["PURCH_DEPLOYMENT_MODE"] = "Cloud",
                 ["SUPABASE_DB_CONNECTION_STRING"] = connectionString,
                 ["SUPABASE_STORAGE_URL"] = "https://test.local/storage",
+                ["SUPABASE_STORAGE_KEY"] = "integration-test-storage-key",
                 ["JWT_SIGNING_KEY"] = TestJwtSigningKey,
                 ["JWT_ISSUER"] = TestJwtIssuer,
             });
@@ -39,6 +42,14 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
         {
             services.RemoveAll<IPasswordResetTokenNotifier>();
             services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
+
+            // Real IFileStorage in Cloud mode hits Supabase Storage over HTTP, which
+            // has nothing to talk to in tests (SUPABASE_STORAGE_URL above is a fake
+            // host). Swap in LocalFileStorage against a temp dir so upload tests
+            // still exercise the endpoint end-to-end without real network I/O.
+            services.RemoveAll<IFileStorage>();
+            services.AddSingleton<IFileStorage>(
+                new LocalFileStorage(Path.Combine(Path.GetTempPath(), "purch-test-uploads", Guid.NewGuid().ToString("N"))));
         });
     }
 }
