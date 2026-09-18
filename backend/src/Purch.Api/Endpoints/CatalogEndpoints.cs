@@ -1,4 +1,5 @@
 using Purch.Application.Catalog;
+using Purch.Application.Inventory;
 using Purch.Domain.Enums;
 
 namespace Purch.Api.Endpoints;
@@ -79,6 +80,21 @@ public static class CatalogEndpoints
             IItemModifierGroupService itemModifierGroupService,
             CancellationToken cancellationToken) =>
             Results.Ok(await itemModifierGroupService.AttachAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Item recipe (ingredients consumed per order, for UseSeparateInventoryTracking tenants) ---
+        _ = app.MapGet("/items/{itemId:guid}/recipe", async (
+            Guid itemId,
+            IItemRecipeService itemRecipeService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemRecipeService.GetRecipeAsync(itemId, cancellationToken))).RequireAuthorization();
+
+        _ = app.MapPut("/items/{itemId:guid}/recipe", async (
+            Guid itemId,
+            ReplaceItemRecipeRequest request,
+            IItemRecipeService itemRecipeService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemRecipeService.ReplaceRecipeAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
         // --- Tingi (sub-unit) selling config for weight/volume items ---

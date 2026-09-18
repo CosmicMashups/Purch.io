@@ -21,6 +21,7 @@ class Item {
     required this.serviceDurationMinutes,
     required this.departmentId,
     required this.lowStockThreshold,
+    this.isOutOfStock = false,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) {
@@ -45,6 +46,7 @@ class Item {
       serviceDurationMinutes: json['serviceDurationMinutes'] as int?,
       departmentId: json['departmentId'] as String?,
       lowStockThreshold: (json['lowStockThreshold'] as num?)?.toDouble(),
+      isOutOfStock: json['isOutOfStock'] as bool,
     );
   }
 
@@ -65,6 +67,11 @@ class Item {
   final int? serviceDurationMinutes;
   final String? departmentId;
   final double? lowStockThreshold;
+
+  /// Server-computed: accounts for the recipe/InventoryItem logic when the
+  /// tenant's `useSeparateInventoryTracking` flag is on, and for
+  /// `stockOnHand <= 0` when it's off.
+  final bool isOutOfStock;
 }
 
 /// Mirrors Purch.Application.Catalog.CreateItemRequest. PricingType is fixed

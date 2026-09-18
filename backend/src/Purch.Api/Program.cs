@@ -121,6 +121,10 @@ builder.Services.AddScoped<ISupplierRepository, EfSupplierRepository>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseOrderRepository, EfPurchaseOrderRepository>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+builder.Services.AddScoped<IInventoryItemRepository, EfInventoryItemRepository>();
+builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
+builder.Services.AddScoped<IItemRecipeRepository, EfItemRecipeRepository>();
+builder.Services.AddScoped<IItemRecipeService, ItemRecipeService>();
 builder.Services.AddScoped<ISyncedRecordRepository, EfSyncedRecordRepository>();
 builder.Services.AddScoped<ISyncService, SyncService>();
 

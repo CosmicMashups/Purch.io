@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
+import '../domain/inventory_item_models.dart';
 import '../domain/inventory_movement_models.dart';
 import '../domain/inventory_repository.dart';
 
@@ -57,6 +58,118 @@ class InventoryRepositoryImpl implements InventoryRepository {
         data: request.toJson(),
       );
       return InventoryMovement.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<List<InventoryItem>> listInventoryItems() async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/inventory-items',
+      );
+      return response.data!
+          .cast<Map<String, dynamic>>()
+          .map(InventoryItem.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryItem> createInventoryItem(
+    CreateInventoryItemRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/inventory-items',
+        data: request.toJson(),
+      );
+      return InventoryItem.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryItem> updateInventoryItem(
+    String id,
+    UpdateInventoryItemRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.put<Map<String, dynamic>>(
+        '/inventory-items/$id',
+        data: request.toJson(),
+      );
+      return InventoryItem.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryItem> updatePhysicalCount(
+    String id,
+    UpdatePhysicalCountRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/inventory-items/$id/physical-count',
+        data: request.toJson(),
+      );
+      return InventoryItem.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryItem> receiveInventoryStock(
+    String id,
+    ReceiveInventoryStockRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/inventory-items/$id/receive',
+        data: request.toJson(),
+      );
+      return InventoryItem.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<List<ItemRecipeLine>> getItemRecipe(String itemId) async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/items/$itemId/recipe',
+      );
+      return response.data!
+          .cast<Map<String, dynamic>>()
+          .map(ItemRecipeLine.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<List<ItemRecipeLine>> replaceItemRecipe(
+    String itemId,
+    ReplaceItemRecipeRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.put<List<dynamic>>(
+        '/items/$itemId/recipe',
+        data: request.toJson(),
+      );
+      return response.data!
+          .cast<Map<String, dynamic>>()
+          .map(ItemRecipeLine.fromJson)
+          .toList();
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
     }

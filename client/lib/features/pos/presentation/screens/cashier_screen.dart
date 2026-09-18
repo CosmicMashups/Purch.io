@@ -18,6 +18,7 @@ import '../../../onboarding/presentation/screens/hardware_settings_screen.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'combo_customization_screen.dart';
+import 'item_modifier_customization_dialog.dart';
 import 'payment_screen.dart';
 import 'tingi_weight_dialog.dart';
 import 'variant_picker_screen.dart';
@@ -943,6 +944,22 @@ class _ItemTile extends ConsumerWidget {
               return;
             }
 
+            // Check if item has attached modifier groups
+            final modifierGroups =
+                await ref.read(itemModifierGroupListProvider(item.id).future);
+            if (modifierGroups.isNotEmpty && context.mounted) {
+              final added = await showDialog<bool>(
+                context: context,
+                builder: (_) => ItemModifierCustomizationDialog(item: item),
+              );
+              if (added == true && context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Added ${item.name}')));
+              }
+              return;
+            }
+
             final controller = ref.read(cartNotifierProvider.notifier);
             final succeeded = await controller.addLine(
               AddTransactionLineRequest(itemId: item.id, quantity: 1),
@@ -1102,7 +1119,15 @@ class _ItemBadge {
   final Color background;
 
   static _ItemBadge? forItem(Item item) {
-    if (item.stockOnHand <= 0 && item.pricingType == PricingType.unit) {
+    // Authoritative: the server computes isOutOfStock from StockOnHand when the
+    // tenant tracks stock directly, or from the recipe/InventoryItem system
+    // when it doesn't — so this alone determines OOS, no separate stockOnHand
+    // check here. (StockOnHand itself goes stale/unmaintained for tenants on
+    // the recipe system, so re-checking it directly would show false
+    // OUT OF STOCK badges once it drifts.) Kept scoped to unit-priced items,
+    // matching pre-existing behavior, so combo/variant-matrix/etc. items don't
+    // regress.
+    if (item.isOutOfStock && item.pricingType == PricingType.unit) {
       return const _ItemBadge(
         label: 'OUT OF STOCK',
         color: AppColors.onErrorContainer,
@@ -1690,6 +1715,37 @@ class _CartLineTile extends ConsumerWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    if (line.modifierSelections.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            for (final mod in line.modifierSelections)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandPrimaryContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  mod.priceDelta > 0
+                                      ? '+ ${mod.modifierName} (₱${mod.priceDelta.toStringAsFixed(2)})'
+                                      : '+ ${mod.modifierName}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.brandPrimary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),

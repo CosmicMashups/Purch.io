@@ -292,6 +292,32 @@ class FakeOnboardingRepository implements OnboardingRepository {
   }
 
   @override
+  Future<TenantSettings> updateInventoryTrackingSetting(
+    bool useSeparateInventoryTracking,
+  ) async {
+    settings = TenantSettings(
+      id: settings.id,
+      name: settings.name,
+      businessType: settings.businessType,
+      brandingLogoUrl: settings.brandingLogoUrl,
+      brandingBackgroundColorHex: settings.brandingBackgroundColorHex,
+      brandingAccentColorHex: settings.brandingAccentColorHex,
+      brandingPrimaryTextColorHex: settings.brandingPrimaryTextColorHex,
+      brandingSecondaryTextColorHex: settings.brandingSecondaryTextColorHex,
+      brandingFontFamily: settings.brandingFontFamily,
+      requiresBarcodePerItem: settings.requiresBarcodePerItem,
+      tin: settings.tin,
+      registeredBusinessName: settings.registeredBusinessName,
+      registeredAddress: settings.registeredAddress,
+      creditLedgerRetentionDays: settings.creditLedgerRetentionDays,
+      creditLedgerEnabled: settings.creditLedgerEnabled,
+      kioskPosterImageUrl: settings.kioskPosterImageUrl,
+      useSeparateInventoryTracking: useSeparateInventoryTracking,
+    );
+    return settings;
+  }
+
+  @override
   Future<List<AuditLogEntry>> listAuditLogs() async => auditLogs;
 
   @override

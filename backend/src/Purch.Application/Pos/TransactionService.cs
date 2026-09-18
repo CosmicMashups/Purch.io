@@ -2,6 +2,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.CreditLedger;
+using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Promotions;
 using Purch.Domain.Entities;
@@ -27,6 +28,9 @@ public sealed class TransactionService(
     IPromoCodeRepository promoCodeRepository,
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
+    IItemRecipeRepository itemRecipeRepository,
+    IInventoryItemRepository inventoryItemRepository,
+    IInventoryMovementRepository inventoryMovementRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
@@ -402,6 +406,7 @@ public sealed class TransactionService(
         cart.Status = TransactionStatus.Completed;
 
         await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
+        await ConsumeInventoryForCompletedSaleAsync(cart, cancellationToken);
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -412,9 +417,19 @@ public sealed class TransactionService(
     /// same SaveChangesAsync as completing the sale, so a payment and its stock
     /// effect can never land separately — this is the only place a completed
     /// sale touches stock; manual InventoryMovements are for everything else
-    /// (deliveries, spoilage, corrections).</summary>
+    /// (deliveries, spoilage, corrections). Skipped for tenants that have opted
+    /// into UseSeparateInventoryTracking: for them, stock lives on InventoryItem
+    /// and is maintained by ConsumeInventoryForCompletedSaleAsync/ReceiveStockAsync
+    /// instead — StockOnHand would otherwise drift negative forever since nothing
+    /// replenishes it once a tenant switches over.</summary>
     private async Task DecrementStockForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
     {
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is not null && tenant.UseSeparateInventoryTracking)
+        {
+            return;
+        }
+
         var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
         foreach (var group in lines.GroupBy(line => line.ItemId))
         {
@@ -425,6 +440,54 @@ public sealed class TransactionService(
             }
 
             item.StockOnHand -= group.Sum(line => line.Quantity);
+        }
+    }
+
+    /// <summary>When the tenant has opted into UseSeparateInventoryTracking, decrements each
+    /// sold item's recipe ingredients (InventoryItem.QuantityOnHand) by QuantityPerOrder times
+    /// the quantity sold, logging a Consumption InventoryMovement per ingredient — in the same
+    /// SaveChangesAsync as completing the sale, alongside DecrementStockForCompletedSaleAsync.</summary>
+    private async Task ConsumeInventoryForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is null || !tenant.UseSeparateInventoryTracking)
+        {
+            return;
+        }
+
+        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        foreach (var group in lines.GroupBy(line => line.ItemId))
+        {
+            var quantitySold = group.Sum(line => line.Quantity);
+            var recipeLines = await itemRecipeRepository.ListByItemAsync(group.Key, cancellationToken);
+
+            foreach (var recipeLine in recipeLines)
+            {
+                if (recipeLine.QuantityPerOrder is not { } quantityPerOrder)
+                {
+                    continue;
+                }
+
+                var inventoryItem = await inventoryItemRepository.GetByIdAsync(recipeLine.InventoryItemId, cancellationToken);
+                if (inventoryItem is null)
+                {
+                    continue;
+                }
+
+                var consumedQuantity = quantityPerOrder * quantitySold;
+                inventoryItem.QuantityOnHand -= consumedQuantity;
+
+                inventoryMovementRepository.Add(new InventoryMovement
+                {
+                    TenantId = CurrentTenantId,
+                    InventoryItemId = inventoryItem.Id,
+                    BranchId = cart.BranchId,
+                    Type = MovementType.Consumption,
+                    Quantity = consumedQuantity,
+                    StaffUserId = CurrentUserId,
+                    Note = $"Consumed for sale of item {group.Key}",
+                });
+            }
         }
     }
 

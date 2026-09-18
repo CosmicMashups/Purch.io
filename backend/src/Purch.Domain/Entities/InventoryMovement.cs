@@ -7,6 +7,9 @@ public class InventoryMovement : TenantScopedEntity
 {
     public Guid ItemId { get; set; }
 
+    /// <summary>Set instead of ItemId when this movement is against a separately tracked InventoryItem rather than a catalog Item.</summary>
+    public Guid? InventoryItemId { get; set; }
+
     public Guid BranchId { get; set; }
 
     public MovementType Type { get; set; }

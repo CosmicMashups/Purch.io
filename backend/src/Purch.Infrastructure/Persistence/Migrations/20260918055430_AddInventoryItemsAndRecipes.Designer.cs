@@ -12,8 +12,8 @@ using Purch.Infrastructure.Persistence;
 namespace Purch.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PurchDbContext))]
-    [Migration("20260917125824_TestCheckPending")]
-    partial class TestCheckPending
+    [Migration("20260918055430_AddInventoryItemsAndRecipes")]
+    partial class AddInventoryItemsAndRecipes
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -388,6 +388,62 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.ToTable("Devices");
                 });
 
+            modelBuilder.Entity("Purch.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BaseUnit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsAutoCreatedForItem")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LinkedItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("LowStockThreshold")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("PackagingSize")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<string>("PackagingUnit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("QuantityOnHand")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<string>("Sku")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("InventoryItems");
+                });
+
             modelBuilder.Entity("Purch.Domain.Entities.InventoryMovement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -399,6 +455,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ItemId")
                         .HasColumnType("uuid");
@@ -650,6 +709,38 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("ItemModifierGroups");
+                });
+
+            modelBuilder.Entity("Purch.Domain.Entities.ItemRecipeLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("QuantityPerOrder")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("ItemRecipeLines");
                 });
 
             modelBuilder.Entity("Purch.Domain.Entities.ItemVariant", b =>
@@ -941,6 +1032,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("ExpectedUnitCost")
                         .HasPrecision(14, 4)
                         .HasColumnType("numeric(14,4)");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ItemId")
                         .HasColumnType("uuid");
@@ -1260,6 +1354,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("UseSeparateInventoryTracking")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 

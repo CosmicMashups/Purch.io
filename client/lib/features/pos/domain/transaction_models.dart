@@ -142,6 +142,7 @@ class TransactionLine {
     required this.unitPrice,
     required this.lineTotal,
     required this.comboSelections,
+    this.modifierSelections = const [],
   });
 
   factory TransactionLine.fromJson(Map<String, dynamic> json) {
@@ -154,10 +155,17 @@ class TransactionLine {
       unitPrice: (json['unitPrice'] as num).toDouble(),
       lineTotal: (json['lineTotal'] as num).toDouble(),
       comboSelections:
-          (json['comboSelections'] as List<dynamic>)
-              .cast<Map<String, dynamic>>()
+          (json['comboSelections'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>()
               .map(TransactionLineComboSelection.fromJson)
-              .toList(),
+              .toList() ??
+          const [],
+      modifierSelections:
+          (json['modifierSelections'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>()
+              .map(TransactionLineModifierSelection.fromJson)
+              .toList() ??
+          const [],
     );
   }
 
@@ -169,6 +177,32 @@ class TransactionLine {
   final double unitPrice;
   final double lineTotal;
   final List<TransactionLineComboSelection> comboSelections;
+  final List<TransactionLineModifierSelection> modifierSelections;
+}
+
+/// Mirrors Purch.Application.Pos.ModifierSelectionDto — a resolved modifier
+/// pick on a line for cart and receipt display.
+class TransactionLineModifierSelection {
+  const TransactionLineModifierSelection({
+    required this.itemModifierId,
+    required this.modifierName,
+    required this.modifierGroupName,
+    required this.priceDelta,
+  });
+
+  factory TransactionLineModifierSelection.fromJson(Map<String, dynamic> json) {
+    return TransactionLineModifierSelection(
+      itemModifierId: json['itemModifierId'] as String,
+      modifierName: json['modifierName'] as String,
+      modifierGroupName: json['modifierGroupName'] as String,
+      priceDelta: (json['priceDelta'] as num).toDouble(),
+    );
+  }
+
+  final String itemModifierId;
+  final String modifierName;
+  final String modifierGroupName;
+  final double priceDelta;
 }
 
 /// Mirrors Purch.Application.Pos.ComboSelectionDto — a resolved slot/item pick
@@ -204,18 +238,21 @@ class AddTransactionLineRequest {
     this.itemVariantId,
     required this.quantity,
     this.comboSelections,
+    this.selectedModifierIds,
   });
 
   final String itemId;
   final String? itemVariantId;
   final double quantity;
   final List<ComboSelectionRequest>? comboSelections;
+  final List<String>? selectedModifierIds;
 
   Map<String, dynamic> toJson() => {
     'itemId': itemId,
     'itemVariantId': itemVariantId,
     'quantity': quantity,
     'comboSelections': comboSelections?.map((s) => s.toJson()).toList(),
+    'selectedModifierIds': selectedModifierIds,
   };
 }
 

@@ -1,3 +1,4 @@
+import 'package:purch_client/features/inventory/domain/inventory_item_models.dart';
 import 'package:purch_client/features/inventory/domain/inventory_movement_models.dart';
 import 'package:purch_client/features/inventory/domain/inventory_repository.dart';
 
@@ -72,5 +73,129 @@ class FakeInventoryRepository implements InventoryRepository {
     );
     movements.add(created);
     return created;
+  }
+
+  final List<InventoryItem> inventoryItems = [];
+  final Map<String, List<ItemRecipeLine>> recipesByItemId = {};
+
+  @override
+  Future<List<InventoryItem>> listInventoryItems() async => inventoryItems;
+
+  @override
+  Future<InventoryItem> createInventoryItem(
+    CreateInventoryItemRequest request,
+  ) async {
+    final created = InventoryItem(
+      id: 'inventory-item-${inventoryItems.length + 1}',
+      name: request.name,
+      sku: request.sku,
+      baseUnit: request.baseUnit,
+      packagingUnit: request.packagingUnit,
+      packagingSize: request.packagingSize,
+      quantityOnHand: 0,
+      lowStockThreshold: request.lowStockThreshold,
+      isAutoCreatedForItem: false,
+      linkedItemId: null,
+      isActive: true,
+    );
+    inventoryItems.add(created);
+    return created;
+  }
+
+  @override
+  Future<InventoryItem> updateInventoryItem(
+    String id,
+    UpdateInventoryItemRequest request,
+  ) async {
+    final index = inventoryItems.indexWhere((item) => item.id == id);
+    final current = inventoryItems[index];
+    final updated = InventoryItem(
+      id: current.id,
+      name: request.name,
+      sku: request.sku,
+      baseUnit: request.baseUnit,
+      packagingUnit: request.packagingUnit,
+      packagingSize: request.packagingSize,
+      quantityOnHand: current.quantityOnHand,
+      lowStockThreshold: request.lowStockThreshold,
+      isAutoCreatedForItem: current.isAutoCreatedForItem,
+      linkedItemId: current.linkedItemId,
+      isActive: request.isActive,
+    );
+    inventoryItems[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<InventoryItem> updatePhysicalCount(
+    String id,
+    UpdatePhysicalCountRequest request,
+  ) async {
+    final index = inventoryItems.indexWhere((item) => item.id == id);
+    final current = inventoryItems[index];
+    final updated = InventoryItem(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      baseUnit: current.baseUnit,
+      packagingUnit: current.packagingUnit,
+      packagingSize: current.packagingSize,
+      quantityOnHand: request.quantityOnHand,
+      lowStockThreshold: current.lowStockThreshold,
+      isAutoCreatedForItem: current.isAutoCreatedForItem,
+      linkedItemId: current.linkedItemId,
+      isActive: current.isActive,
+    );
+    inventoryItems[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<InventoryItem> receiveInventoryStock(
+    String id,
+    ReceiveInventoryStockRequest request,
+  ) async {
+    final index = inventoryItems.indexWhere((item) => item.id == id);
+    final current = inventoryItems[index];
+    final updated = InventoryItem(
+      id: current.id,
+      name: current.name,
+      sku: current.sku,
+      baseUnit: current.baseUnit,
+      packagingUnit: current.packagingUnit,
+      packagingSize: current.packagingSize,
+      quantityOnHand:
+          current.quantityOnHand + request.packagesReceived * current.packagingSize,
+      lowStockThreshold: current.lowStockThreshold,
+      isAutoCreatedForItem: current.isAutoCreatedForItem,
+      linkedItemId: current.linkedItemId,
+      isActive: current.isActive,
+    );
+    inventoryItems[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<List<ItemRecipeLine>> getItemRecipe(String itemId) async {
+    return recipesByItemId[itemId] ?? [];
+  }
+
+  @override
+  Future<List<ItemRecipeLine>> replaceItemRecipe(
+    String itemId,
+    ReplaceItemRecipeRequest request,
+  ) async {
+    final lines = [
+      for (final line in request.lines)
+        ItemRecipeLine(
+          inventoryItemId: line.inventoryItemId,
+          inventoryItemName: inventoryItems
+              .firstWhere((item) => item.id == line.inventoryItemId)
+              .name,
+          quantityPerOrder: line.quantityPerOrder,
+        ),
+    ];
+    recipesByItemId[itemId] = lines;
+    return lines;
   }
 }

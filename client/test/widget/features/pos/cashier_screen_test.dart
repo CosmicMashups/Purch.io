@@ -5,10 +5,12 @@ import 'package:purch_client/features/catalog/domain/category_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
+import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/cashier_screen.dart';
+import 'package:purch_client/features/pos/presentation/screens/item_modifier_customization_dialog.dart';
 import 'package:purch_client/features/pos/presentation/screens/tingi_weight_dialog.dart';
 
 import '../../../helpers/fake_catalog_repository.dart';
@@ -278,6 +280,58 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'tapping an item with attached modifier groups opens ItemModifierCustomizationDialog',
+      (tester) async {
+        const itemWithMods = Item(
+          id: 'item-coffee',
+          name: 'Iced Latte',
+          sku: null,
+          barcode: null,
+          categoryId: null,
+          basePrice: 120,
+          imageUrl: null,
+          pricingType: PricingType.unit,
+          stockOnHand: 10,
+          isActive: true,
+          tingiMode: TingiMode.none,
+          packagedSize: null,
+          tingiIncrementStep: null,
+          tingiAllowedSizes: [],
+          serviceDurationMinutes: null,
+          departmentId: null,
+          lowStockThreshold: null,
+        );
+
+        const group = ModifierGroup(
+          id: 'grp-sweetness',
+          name: 'Sweetness',
+          allowMultipleSelection: false,
+          isRequired: true,
+          modifiers: [
+            ItemModifierOption(id: 'mod-1', name: 'Less Sweet', priceDelta: 0),
+          ],
+        );
+
+        final catalogRepository = FakeCatalogRepository(
+          initialItems: [itemWithMods],
+          initialItemModifierGroups: {
+            itemWithMods.id: [group],
+          },
+        );
+
+        await tester.pumpWidget(_wrap(catalogRepository, FakePosRepository()));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Iced Latte'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ItemModifierCustomizationDialog), findsOneWidget);
+        expect(find.text('Sweetness'), findsOneWidget);
+        expect(find.text('Less Sweet'), findsOneWidget);
+      },
+    );
   });
 
   group('cart panel', () {

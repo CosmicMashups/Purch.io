@@ -16,7 +16,9 @@ import '../../features/home/presentation/screens/home_tab_screen.dart';
 import '../../features/home/presentation/screens/inventory_tab_screen.dart';
 import '../../features/inventory/presentation/screens/branch_transfer_list_screen.dart';
 import '../../features/inventory/presentation/screens/movement_log_screen.dart';
+import '../../features/inventory/presentation/screens/inventory_item_list_screen.dart';
 import '../../features/inventory/presentation/screens/purchase_order_list_screen.dart';
+import '../../features/inventory/presentation/screens/recipe_editor_screen.dart';
 import '../../features/inventory/presentation/screens/supplier_list_screen.dart';
 import '../../features/kiosk/presentation/screens/kiosk_landing_screen.dart';
 import '../../features/kitchen_display/presentation/screens/kitchen_display_screen.dart';
@@ -222,6 +224,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'purchase-orders',
                     builder:
                         (context, state) => const PurchaseOrderListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'inventory-items',
+                    builder:
+                        (context, state) => const InventoryItemListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'items/:itemId/recipe',
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      final itemName =
+                          extra is String ? extra : 'Item';
+                      return RecipeEditorScreen(
+                        itemId: state.pathParameters['itemId']!,
+                        itemName: itemName,
+                      );
+                    },
                   ),
                 ],
               ),

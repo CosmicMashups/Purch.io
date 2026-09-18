@@ -111,6 +111,45 @@ public static class InventoryEndpoints
             Results.Ok(await purchaseOrderService.ReceiveAsync(purchaseOrderId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // --- Separately tracked inventory items (raw materials/ingredients), used when the
+        // tenant opts into UseSeparateInventoryTracking instead of Item.StockOnHand directly ---
+        _ = app.MapGet("/inventory-items", async (
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryItemService.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/inventory-items", async (
+            CreateInventoryItemRequest request,
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryItemService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPut("/inventory-items/{id:guid}", async (
+            Guid id,
+            UpdateInventoryItemRequest request,
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryItemService.UpdateAsync(id, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/inventory-items/{id:guid}/physical-count", async (
+            Guid id,
+            UpdatePhysicalCountRequest request,
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryItemService.UpdatePhysicalCountAsync(id, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/inventory-items/{id:guid}/receive", async (
+            Guid id,
+            ReceiveInventoryStockRequest request,
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await inventoryItemService.ReceiveStockAsync(id, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         return app;
     }
 }
