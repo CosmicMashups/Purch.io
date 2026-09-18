@@ -92,8 +92,8 @@ class _FlaggedRecordTile extends ConsumerWidget {
           height: 44,
           decoration: BoxDecoration(
             color: isAcknowledged
-                ? AppColors.accentEmerald.withOpacity(0.12)
-                : AppColors.accentWarm.withOpacity(0.12),
+                ? AppColors.accentEmerald.withValues(alpha: 0.12)
+                : AppColors.accentWarm.withValues(alpha: 0.12),
             borderRadius: AppRadius.smBorder,
           ),
           child: Icon(

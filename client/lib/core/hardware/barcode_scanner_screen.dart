@@ -113,7 +113,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
               height: 260,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: AppColors.brandPrimary.withOpacity(0.8),
+                  color: AppColors.brandPrimary.withValues(alpha: 0.8),
                   width: 2.5,
                 ),
                 borderRadius: AppRadius.lgBorder,
@@ -131,7 +131,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.65),
+                  color: Colors.black.withValues(alpha: 0.65),
                   borderRadius: AppRadius.smBorder,
                 ),
                 child: const Text(

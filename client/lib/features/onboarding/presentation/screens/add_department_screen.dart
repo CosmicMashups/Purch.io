@@ -130,10 +130,10 @@ class _AddDepartmentScreenState extends ConsumerState<AddDepartmentScreen> {
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.08),
+                            color: AppColors.error.withValues(alpha: 0.08),
                             borderRadius: AppRadius.smBorder,
                             border: Border.all(
-                              color: AppColors.error.withOpacity(0.2),
+                              color: AppColors.error.withValues(alpha: 0.2),
                             ),
                           ),
                           child: Text(

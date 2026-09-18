@@ -58,7 +58,6 @@ const _toppingsGroup = ModifierGroup(
 Widget _buildTestWidget({
   required FakeCatalogRepository catalogRepo,
   required FakePosRepository posRepo,
-  AddTransactionLineRequest? capturedRequest,
   void Function(AddTransactionLineRequest)? onAdd,
 }) {
   return ProviderScope(

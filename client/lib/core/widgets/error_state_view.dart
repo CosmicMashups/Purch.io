@@ -29,7 +29,7 @@ class ErrorStateView extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: AppRadius.mdBorder,
-              border: Border.all(color: AppColors.error.withOpacity(0.3)),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
               boxShadow: AppShadows.subtle,
             ),
             child: Column(
@@ -39,7 +39,7 @@ class ErrorStateView extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

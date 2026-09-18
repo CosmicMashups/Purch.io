@@ -121,7 +121,7 @@ class ItemListScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                         border: Border.all(
                           color: item.isActive
-                              ? AppColors.brandPrimary.withOpacity(0.2)
+                              ? AppColors.brandPrimary.withValues(alpha: 0.2)
                               : AppColors.neutralBorder,
                         ),
                       ),
