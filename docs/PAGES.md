@@ -98,6 +98,18 @@
 - Enable/disable "utang" (tab/credit) feature toggle
 - Credit limit per customer, due-date/reminder settings
 
+### B8. Ingredient-Level Inventory & Recipes (opt-in, any vertical — e.g. Café/Restaurant)
+- Business Settings toggle: "Track inventory separately from menu items" — off by default, purely additive
+- Recipe editor reachable from an item's edit screen (visible only when the toggle is on): checklist of Inventory Items used by this menu item, each with an optional quantity-per-order field (blank = just check availability, filled = auto-consume that much per sale)
+- See C6 for managing the Inventory Items (ingredients) themselves
+
+### B9. Promos (Admin/Manager)
+- Tabbed screen: Promo Codes (existing code-entry discounts) alongside three automatic, no-code-entry promo types:
+  - **Buy 1 Take 1**: trigger item + quantity → free item + quantity (same or different item)
+  - **Combo Deals**: two specific items priced as one fixed total when bought together
+  - **Item Discounts**: percentage off / fixed amount off / fixed override price for a specific item
+- Each automatic promo type carries a start/end date-time window and an active toggle; all three apply themselves at checkout with no cashier action required
+
 ---
 
 ## C. Inventory Management (Admin / Warehouse Officer / Storekeeper)
@@ -108,7 +120,7 @@
 
 ### C2. Stock Movement Log
 - Filterable table: date, item, movement type, quantity, branch, staff, reason/note
-- Movement type filter chips: Stock-In, Stock-Out, Consumption, Spoiled, Damaged, For Return, Transfer, Adjustment
+- Movement type filter chips: Stock-In, Stock-Out, Consumption, Spoiled, Damaged, For Return, Transfer, Adjustment, **Sale** (system-generated only, from a completed Cashier sale — never a manual entry option in C3)
 
 ### C3. Record Movement — Form (per type)
 - Shared fields: item/variant picker, quantity, branch, date, note
@@ -121,6 +133,11 @@
 ### C5. Supplier & Purchase Order Management
 - Supplier list
 - Create PO form, PO status tracker, receive-stock-against-PO flow
+
+### C6. Inventory Items (ingredients, opt-in — see B8)
+- List of Inventory Items with name, unit of measure (base unit e.g. mL/g/pc), packaging (e.g. "450 mL per pc"), quantity on hand shown as whole packages + partial remainder, and a stock-level badge
+- Create/edit form: name, SKU, base unit, packaging unit + size, low-stock threshold
+- Per-item actions: **Physical Count** (manually set quantity on hand, e.g. for items with no recipe attached to any menu item) and **Receive Stock** (add whole packages from a delivery, e.g. "received 10 pcs")
 
 ---
 
@@ -147,8 +164,8 @@
 - Stock indicator per variant combination (greys out if out-of-stock)
 
 ### D4. Cart / Order Review
-- Line items with edit/remove
-- Discount/promo code entry, Senior/PWD discount toggle (auto-recalculates tax per BIR rule)
+- Line items with edit/remove — each line also shows, where applicable: selected variant attributes, combo slot picks, modifier chips, and an applied-promo chip (e.g. "BUY 1 TAKE 1", "COMBO ₱85.00", "20% OFF") for a line automatically discounted by an active promo from B9
+- Discount/promo code entry, Senior/PWD discount toggle (auto-recalculates tax per BIR rule), plus a read-only "Item promos" total reflecting whatever automatic BOGO/combo/item-discount promos (B9) matched the cart — no cashier action needed to apply them, they stack automatically ahead of Senior/PWD and the promo code
 - Order type selector (Dine-in / Takeout / Delivery — restaurant mode only)
 - **Void/refund/discount-after-sale** as distinct permissioned actions, each logged to audit log
 
@@ -181,6 +198,10 @@
 
 ### E3. Kiosk Item Customize Page
 - Same combo/variant logic as D2/D3, kiosk-optimized (larger touch targets, no cashier assumed)
+
+### E3a. Kiosk Cart Review
+- Order review before the fulfillment choice — same per-line detail as D4 (variant attributes, combo picks, modifier chips, applied-promo chip), read-only since the kiosk has no discount/promo-entry controls of its own
+- Quantity/remove per line, running total, "Continue" to E4
 
 ### E4. Kiosk Fulfillment Choice
 - Staff-assist vs self-fetch vs dine-in/takeout selector

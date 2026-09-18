@@ -32,7 +32,7 @@ Purch.io is a multi-tenant, offline-first POS platform with a config-driven vert
 - **Multi-tenancy:** shared database, `tenant_id` column on all tenant-scoped tables (not per-tenant schema — cheaper to run at $0-tier, adequate at SME scale; revisit only if a single tenant needs data isolation guarantees a shared DB can't meet)
 - **API shape:** REST for CRUD (catalog, inventory, staff), consider a dedicated sync endpoint (`POST /sync`) that accepts a batch of queued offline transactions and returns conflict resolutions in one round trip — don't make the client sync item-by-item
 - **Auth:** JWT-based, role claims embedded (Admin/Manager/Cashier/Warehouse), server-side permission checks on every endpoint (not just UI hiding — see security notes)
-- **Config layer:** `business_type` + `feature_flags` table per tenant, read by both backend (validation rules) and client (which UI modules render)
+- **Config layer:** `business_type` + `feature_flags` table per tenant, read by both backend (validation rules) and client (which UI modules render). Larger opt-in behavior changes get their own first-class boolean on `tenants` rather than being folded into the generic flags blob — e.g. `use_separate_inventory_tracking`, which switches a tenant's stock model from direct `items.stock_on_hand` to the ingredient-level Inventory Item/Recipe model below, entirely additively (off by default, existing tenants unaffected).
 
 ## 4. Data Model (core entities, not exhaustive)
 - `tenants` (business_type, branding config, feature_flags, license_status)
@@ -41,8 +41,12 @@ Purch.io is a multi-tenant, offline-first POS platform with a config-driven vert
 - `items` (pricing_type: unit/weight/bundle/service/combo/variant, base fields)
 - `item_variants` (for variant-matrix pricing_type)
 - `item_combo_components` (for combo pricing_type)
-- `inventory_movements` (item_id, branch_id, type: stock-in/stock-out/consumption/spoiled/damaged/for-return/transfer, quantity, staff_id, timestamp, note)
-- `transactions`, `transaction_lines`, `payments`
+- `inventory_movements` (item_id or inventory_item_id, branch_id, type: stock-in/stock-out/consumption/spoiled/damaged/for-return/transfer/adjustment/**sale**, quantity, staff_id, timestamp, note) — `sale` is logged automatically by a completed Cashier sale (never a manual entry), kept distinct from a manual `stock-out` or a recipe's `consumption` so the movement log can tell all three apart
+- `inventory_items` (tenant-scoped ingredient/stock record, used only when `tenants.use_separate_inventory_tracking` is on: name, base_unit e.g. mL/g/pc, packaging_unit + packaging_size e.g. 450 mL per pc, quantity_on_hand always in base_unit, low_stock_threshold, and a `linked_item_id` back-reference for the 1:1 fallback record auto-created for a catalog item with no recipe — preserving today's manual Physical Count behavior)
+- `item_recipe_lines` (the BOM: catalog item_id → inventory_item_id, with an optional quantity_per_order — null means "just check availability," set means "auto-consume this much per sale")
+- `promo_codes` (cart-level, code-entry discount — percentage or fixed amount, admin-created, cashier-applied at checkout)
+- `bogo_promo_rules`, `combo_promo_rules`, `item_discount_promo_rules` — automatic, no-code-entry, time-boxed (`starts_at`/`ends_at`) item-targeted promos: buy-N-get-M free (same or different item), two items priced as one fixed total, and a percent/fixed/override discount on a specific item, respectively. Computed server-side at checkout via a claimed-quantity pricing pass (BOGO → Combo → Item Discount) so a unit matching more than one active rule is never discounted twice, then stacked underneath the existing Senior/PWD and promo-code discounts.
+- `transactions`, `transaction_lines` (each line also carries a resolved `promo_discount_amount`/`applied_promo_label` for cart/receipt display), `payments`
 - `audit_log` (actor, action_type, target, before/after, timestamp) — covers voids, refunds, discounts, price overrides, inventory adjustments
 - `customer_credit_ledger` (sari-sari utang mode — phase 2, schema reserved now)
 

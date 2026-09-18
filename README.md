@@ -15,6 +15,8 @@ Built for mission-critical operations, Purch.io features offline-resilient local
   - **Combo Meals & Customization**: Multi-tier slot selection with optional add-ons and substitution pricing.
   - **Bundles & Tiered Volume Pricing**: Mix-and-match bundle rules, buy-X-get-Y, and automatic basket discounts.
   - **Timed Services**: Time-based service tracking with practitioner scheduling and duration-based rates.
+- **Automatic, No-Code Promotions**: Time-boxed rules that apply themselves at checkout — Buy-1-Take-1 (same or cross-item), fixed-total combo bundles (e.g. two named items for one flat price), and per-item percentage/fixed/override discounts — stacked on top of existing Senior/PWD and promo-code discounts via a claimed-quantity pricing pass that prevents double-discounting a unit matched by more than one rule.
+- **Ingredient-Level Inventory (Recipe/BOM)**: An opt-in per-tenant mode that decouples what's sold at the register from what's tracked in the stockroom — a cafe can track "coffee beans" and "milk" as Inventory Items with their own unit of measure and delivery packaging (e.g. 10 pcs of 450 mL bottles), link them to menu items via a recipe with optional per-order consumption quantities, and let Out-of-Stock status derive automatically from ingredient availability. Items without a configured recipe keep working exactly as before via manual Physical Count.
 - **Dual Form-Factor Client**:
   - **Landscape Staff Shell**: A role-filtered, five-tab bottom-navigation dashboard (Home, Sell, Reports, Inventory, Business) built on `go_router`, wrapping rapid-scan cashier POS, split-pane manager console, live shift drawer audits, and stock movement logging. Which tabs render is driven by the signed-in staff member's role — a Cashier only ever sees Home + Sell, a Warehouse account only Home + Inventory.
   - **Portrait Self-Service Kiosk**: Customer-facing ordering terminal with customizable 16:9 promotional hero posters, visual category carousels, and order ticket dispatch.
@@ -83,7 +85,7 @@ Built for mission-critical operations, Purch.io features offline-resilient local
 - **`client/`**: Cross-platform Flutter client:
   - `lib/core/`: Theming tokens, network clients, Drift database, and shared UI components (`PurchImage`, `EmptyStateView`, `ErrorStateView`).
   - `lib/features/`: Feature modules for Auth, Catalog, POS, Kiosk, Inventory, Credit Ledger, and Reports.
-  - `test/`: 200 automated unit and widget regression tests.
+  - `test/`: 230+ automated unit and widget regression tests.
 - **`docs/`**: Architecture decision records (`docs/adr/`), specifications, database schemas, and design token documentation (`docs/design/`).
 - **`installer/`**: Deployment configurations for dedicated on-premise deployments (Docker Compose / Windows Service).
 
@@ -163,4 +165,5 @@ Every installation operates in one of two deployment modes, controlled by the `P
 
 - **Backend Solution**: Clean compilation with 0 warnings/errors across all projects.
 - **Integration Tests**: Tested with Dockerized PostgreSQL testcontainers for authentication, tenant onboarding, catalog operations, inventory reconciliation, and multipart image uploads.
-- **Client Test Suite**: 100% green test suite (200/200 passing tests) validating state management, user flows, tabular financial calculations, and edge-case error recovery.
+- **Client Test Suite**: 100% green test suite (233/233 passing tests) validating state management, user flows, tabular financial calculations, and edge-case error recovery.
+- **Zero-warning static analysis**: `flutter analyze` reports 0 issues across the entire client codebase.
