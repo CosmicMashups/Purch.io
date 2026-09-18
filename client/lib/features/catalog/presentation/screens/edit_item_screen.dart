@@ -180,7 +180,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                                 borderRadius: AppRadius.mdBorder,
                                 border: Border.all(
                                   color: _isActive
-                                      ? AppColors.brandPrimary.withOpacity(0.2)
+                                      ? AppColors.brandPrimary.withValues(alpha: 0.2)
                                       : AppColors.neutralBorder,
                                 ),
                               ),
@@ -460,7 +460,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: _isActive
-                                ? AppColors.successContainer.withOpacity(0.4)
+                                ? AppColors.successContainer.withValues(alpha: 0.4)
                                 : AppColors.neutralContainer,
                             borderRadius: AppRadius.mdBorder,
                             border: Border.all(

@@ -69,7 +69,7 @@ class AuditLogScreen extends ConsumerWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.accentWarm.withOpacity(0.12),
+                        color: AppColors.accentWarm.withValues(alpha: 0.12),
                         borderRadius: AppRadius.smBorder,
                       ),
                       child: const Icon(

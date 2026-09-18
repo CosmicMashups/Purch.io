@@ -127,7 +127,7 @@ class _BrandPrimaryColorFieldState extends State<_BrandPrimaryColorField> {
     final parsed = parseHexColor(widget.controller.text.trim()) ?? AppColors.brandPrimary;
     final derivedContainer = derivePrimaryContainer(parsed);
     final derivedOnContainer = deriveOnPrimaryContainer(parsed);
-    final containerHex = '#${(derivedContainer.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    final containerHex = '#${(derivedContainer.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

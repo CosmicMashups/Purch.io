@@ -112,7 +112,7 @@ class _ManualGcashQrSettingsScreenState
                         color: AppColors.brandPrimaryContainer,
                         borderRadius: AppRadius.smBorder,
                         border: Border.all(
-                          color: AppColors.brandPrimary.withOpacity(0.2),
+                          color: AppColors.brandPrimary.withValues(alpha: 0.2),
                         ),
                       ),
                       child: Row(
@@ -217,10 +217,10 @@ class _ManualGcashQrSettingsScreenState
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.08),
+                          color: AppColors.error.withValues(alpha: 0.08),
                           borderRadius: AppRadius.smBorder,
                           border: Border.all(
-                            color: AppColors.error.withOpacity(0.2),
+                            color: AppColors.error.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Text(

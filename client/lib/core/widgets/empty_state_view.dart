@@ -40,10 +40,10 @@ class EmptyStateView extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: AppColors.brandPrimaryContainer.withOpacity(0.7),
+                  color: AppColors.brandPrimaryContainer.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.brandPrimary.withOpacity(0.15),
+                    color: AppColors.brandPrimary.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Icon(
