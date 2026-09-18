@@ -8,6 +8,10 @@ enum MovementType {
   forReturn,
   transfer,
   adjustment,
+
+  /// System-generated only, from a completed Cashier sale — never manually
+  /// selectable when recording a movement by hand.
+  sale,
 }
 
 extension MovementTypeLabel on MovementType {
@@ -20,6 +24,7 @@ extension MovementTypeLabel on MovementType {
     MovementType.forReturn => 'For Return',
     MovementType.transfer => 'Transfer',
     MovementType.adjustment => 'Adjustment',
+    MovementType.sale => 'Sale',
   };
 }
 

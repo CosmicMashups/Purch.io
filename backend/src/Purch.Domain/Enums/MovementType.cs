@@ -10,4 +10,8 @@ public enum MovementType
     ForReturn,
     Transfer,
     Adjustment,
+
+    /// <summary>System-generated only, from a completed Cashier sale of a directly-tracked
+    /// (non-recipe) item — never manually selectable when recording a movement by hand.</summary>
+    Sale,
 }
