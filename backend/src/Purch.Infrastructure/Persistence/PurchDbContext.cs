@@ -79,6 +79,12 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
 
+    public DbSet<BogoPromoRule> BogoPromoRules => Set<BogoPromoRule>();
+
+    public DbSet<ComboPromoRule> ComboPromoRules => Set<ComboPromoRule>();
+
+    public DbSet<ItemDiscountPromoRule> ItemDiscountPromoRules => Set<ItemDiscountPromoRule>();
+
     public DbSet<TenantMetering> TenantMeterings => Set<TenantMetering>();
 
     public DbSet<SyncedRecord> SyncedRecords => Set<SyncedRecord>();

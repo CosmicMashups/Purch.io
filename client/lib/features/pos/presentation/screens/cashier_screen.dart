@@ -1607,6 +1607,11 @@ class _CartFooter extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _TotalsRow(label: 'Subtotal', amount: cart.subtotal),
+                if (cart.itemPromoDiscountAmount > 0)
+                  _TotalsRow(
+                    label: 'Item promos',
+                    amount: -cart.itemPromoDiscountAmount,
+                  ),
                 if (cart.discountAmount > 0)
                   _TotalsRow(label: 'Discount', amount: -cart.discountAmount),
                 const SizedBox(height: 4),
@@ -1744,6 +1749,39 @@ class _CartLineTile extends ConsumerWidget {
                                 ),
                               ),
                           ],
+                        ),
+                      ),
+                    if (line.appliedPromoLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentEmeraldContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.local_offer_outlined,
+                                size: 11,
+                                color: AppColors.accentEmerald,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                line.appliedPromoLabel!,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.accentEmerald,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],

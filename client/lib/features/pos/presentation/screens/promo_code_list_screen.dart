@@ -9,13 +9,11 @@ import 'add_promo_code_screen.dart';
 
 /// Admin/Manager promo code management — the code the cashier types in at
 /// D4's cart review. See CashierScreen's cart panel for where they're applied.
-class PromoCodeListScreen extends ConsumerWidget {
+class PromoCodeListScreen extends StatelessWidget {
   const PromoCodeListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final promoCodesAsync = ref.watch(promoCodeListProvider);
-
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -23,6 +21,23 @@ class PromoCodeListScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
       ),
+      body: const PromoCodeListView(),
+    );
+  }
+}
+
+/// The body+FAB of [PromoCodeListScreen], without its own Scaffold/AppBar —
+/// so it can be embedded as a tab (see PromosScreen) without stacking a
+/// second app bar under the tab bar's own.
+class PromoCodeListView extends ConsumerWidget {
+  const PromoCodeListView({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final promoCodesAsync = ref.watch(promoCodeListProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
       body: promoCodesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error:

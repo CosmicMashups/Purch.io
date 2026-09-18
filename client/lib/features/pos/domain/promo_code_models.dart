@@ -1,5 +1,7 @@
 /// Mirrors Purch.Domain.Enums.PromoDiscountType exactly, in declared order.
-enum PromoDiscountType { percentage, fixedAmount }
+/// fixedPrice was appended for the automatic item-discount promo rules (see
+/// item_promo_models.dart) — index-based serialization, so it must stay last.
+enum PromoDiscountType { percentage, fixedAmount, fixedPrice }
 
 /// Mirrors Purch.Application.Promotions.PromoCodeDto — a cart-level code the
 /// cashier types in at checkout, distinct from the catalog feature's

@@ -26,6 +26,9 @@ public sealed class TransactionService(
     IItemModifierGroupRepository itemModifierGroupRepository,
     IModifierGroupRepository modifierGroupRepository,
     IPromoCodeRepository promoCodeRepository,
+    IBogoPromoRuleRepository bogoPromoRuleRepository,
+    IComboPromoRuleRepository comboPromoRuleRepository,
+    IItemDiscountPromoRuleRepository itemDiscountPromoRuleRepository,
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
     IItemRecipeRepository itemRecipeRepository,
@@ -720,9 +723,11 @@ public sealed class TransactionService(
     private async Task RecalculateTotalAsync(Transaction transaction, CancellationToken cancellationToken, Guid? excludingLineId = null)
     {
         var lines = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
-        var subtotal = lines
-            .Where(line => line.Id != excludingLineId)
-            .Sum(line => line.LineTotal);
+        var pricedLines = lines.Where(line => line.Id != excludingLineId).ToList();
+
+        var itemPromoDiscountTotal = await ApplyItemPromosAsync(transaction, pricedLines, cancellationToken);
+
+        var subtotal = pricedLines.Sum(line => line.LineTotal) - itemPromoDiscountTotal;
 
         var seniorPwdAmount = transaction.SeniorPwdDiscountApplied
             ? Math.Round(subtotal * SeniorPwdDiscountRate, 2)
@@ -750,6 +755,68 @@ public sealed class TransactionService(
         transaction.PromoDiscountAmount = promoAmount;
         transaction.DiscountAmount = seniorPwdAmount + promoAmount;
         transaction.TotalAmount = subtotal - transaction.DiscountAmount;
+    }
+
+    /// <summary>
+    /// Applies the automatic, no-code item-level promos (BOGO, combo bundle, item
+    /// discount) to the cart's lines, before the Senior/PWD and PromoCode discounts
+    /// that RecalculateTotalAsync layers on top. Idempotent: every call recomputes
+    /// each line's PromoDiscountAmount/AppliedPromoLabel from scratch, the same way
+    /// the rest of this method recomputes totals rather than incrementally patching
+    /// them. Returns the total item-promo discount, which the caller subtracts from
+    /// the subtotal before Senior/PWD and PromoCode are computed on what's left.
+    ///
+    /// The heavy lifting — which units get discounted, and by how much, without a
+    /// unit being discounted twice by two different rules — lives in
+    /// ItemPromoPricingCalculator so it can be unit tested directly.
+    /// </summary>
+    private async Task<decimal> ApplyItemPromosAsync(Transaction transaction, List<TransactionLine> lines, CancellationToken cancellationToken)
+    {
+        foreach (var line in lines)
+        {
+            line.PromoDiscountAmount = 0m;
+            line.AppliedPromoLabel = null;
+        }
+
+        if (lines.Count == 0)
+        {
+            transaction.ItemPromoDiscountAmount = 0m;
+            return 0m;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var bogoRules = await bogoPromoRuleRepository.ListActiveByTenantAsync(CurrentTenantId, now, cancellationToken);
+        var comboRules = await comboPromoRuleRepository.ListActiveByTenantAsync(CurrentTenantId, now, cancellationToken);
+        var itemDiscountRules = await itemDiscountPromoRuleRepository.ListActiveByTenantAsync(CurrentTenantId, now, cancellationToken);
+
+        if (bogoRules.Count == 0 && comboRules.Count == 0 && itemDiscountRules.Count == 0)
+        {
+            transaction.ItemPromoDiscountAmount = 0m;
+            return 0m;
+        }
+
+        var lineInputs = lines
+            .Select(line => new ItemPromoPricingCalculator.LineInput(line.Id, line.ItemId, line.Quantity, line.UnitPrice))
+            .ToList();
+
+        var results = ItemPromoPricingCalculator.Calculate(lineInputs, bogoRules, comboRules, itemDiscountRules);
+
+        var linesById = lines.ToDictionary(line => line.Id);
+        var total = 0m;
+        foreach (var result in results)
+        {
+            if (!linesById.TryGetValue(result.LineId, out var line))
+            {
+                continue;
+            }
+
+            line.PromoDiscountAmount = result.DiscountAmount;
+            line.AppliedPromoLabel = result.Label;
+            total += result.DiscountAmount;
+        }
+
+        transaction.ItemPromoDiscountAmount = total;
+        return total;
     }
 
     private async Task<TransactionDto> ToDtoAsync(Transaction transaction, CancellationToken cancellationToken)
@@ -800,6 +867,8 @@ public sealed class TransactionService(
                 line.Quantity,
                 line.UnitPrice,
                 line.LineTotal,
+                line.PromoDiscountAmount,
+                line.AppliedPromoLabel,
                 comboSelectionDtos,
                 modifierSelectionDtos));
         }
@@ -822,6 +891,7 @@ public sealed class TransactionService(
             transaction.SeniorPwdDiscountApplied,
             transaction.PromoCode,
             transaction.PromoDiscountAmount,
+            transaction.ItemPromoDiscountAmount,
             transaction.TotalAmount,
             transaction.ReceiptNumber,
             transaction.OrderType,

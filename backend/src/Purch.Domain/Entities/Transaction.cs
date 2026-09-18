@@ -35,6 +35,10 @@ public class Transaction : TenantScopedEntity
     /// <summary>Just the promo-code portion of DiscountAmount, for receipt breakdown.</summary>
     public decimal PromoDiscountAmount { get; set; }
 
+    /// <summary>Sum of all lines' PromoDiscountAmount (automatic BOGO/combo/item-discount
+    /// promos), for receipt/cart display. Applied before Senior/PWD and PromoCode.</summary>
+    public decimal ItemPromoDiscountAmount { get; set; }
+
     public string? OrderType { get; set; }
 
     /// <summary>Kiosk-originated orders are prep-only — set true, payment always finalized at cashier POS.</summary>

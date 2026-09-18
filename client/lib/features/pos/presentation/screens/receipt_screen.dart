@@ -160,6 +160,18 @@ class ReceiptScreen extends ConsumerWidget {
                                                 ],
                                               ),
                                             ),
+                                          if (line.appliedPromoLabel != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              child: Text(
+                                                '  Promo: ${line.appliedPromoLabel}',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.accentEmerald,
+                                                ),
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -169,6 +181,60 @@ class ReceiptScreen extends ConsumerWidget {
                                     height: 1,
                                   ),
                                   const SizedBox(height: 14),
+
+                                  // Item promos row
+                                  if (cart.itemPromoDiscountAmount > 0) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Item promos',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          '-₱${cart.itemPromoDiscountAmount.toStringAsFixed(2)}',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.accentEmerald,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                  ],
+                                  if (cart.discountAmount > 0) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          cart.promoCode != null
+                                              ? 'Discount (${cart.promoCode})'
+                                              : 'Discount',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          '-₱${cart.discountAmount.toStringAsFixed(2)}',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.accentEmerald,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                  ],
 
                                   // Total row
                                   Row(
