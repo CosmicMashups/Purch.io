@@ -66,8 +66,29 @@ class ApiClient {
             return;
           }
 
-          final newAccessToken = await _refreshAccessToken();
+          String? newAccessToken;
+          try {
+            newAccessToken = await _refreshAccessToken();
+          } on DioException catch (refreshError) {
+            // Only a genuine 401 from /auth/refresh means the refresh token
+            // itself is invalid/expired/revoked — that's the one case where
+            // signing the user out is correct. Anything else (a dropped wifi
+            // connection, a request timeout, a transient 5xx) is a network
+            // hiccup, not a dead session: clearing tokens here would force a
+            // full re-login over what's often a few seconds of bad signal,
+            // which is exactly what was happening periodically during a
+            // shift. Leave the stored tokens alone so the next request gets
+            // another chance to refresh.
+            if (refreshError.response?.statusCode == 401) {
+              await _tokenStorage.clear();
+              onSessionExpired?.call();
+            }
+            handler.next(error);
+            return;
+          }
+
           if (newAccessToken == null) {
+            // No refresh token was even stored — genuinely not authenticated.
             await _tokenStorage.clear();
             onSessionExpired?.call();
             handler.next(error);
@@ -109,31 +130,31 @@ class ApiClient {
     });
   }
 
+  /// Throws DioException on failure (rather than swallowing it to null) so
+  /// the caller can tell a genuine 401 (invalid/expired/revoked refresh
+  /// token — sign the user out) apart from a transient network/server
+  /// failure (leave the stored tokens alone and let the next request retry).
   Future<String?> _doRefresh() async {
     final refreshToken = await _tokenStorage.readRefreshToken();
     if (refreshToken == null) {
       return null;
     }
 
-    try {
-      final response = await _refreshDio.post<Map<String, dynamic>>(
-        '/auth/refresh',
-        data: {'refreshToken': refreshToken},
-      );
+    final response = await _refreshDio.post<Map<String, dynamic>>(
+      '/auth/refresh',
+      data: {'refreshToken': refreshToken},
+    );
 
-      final newAccessToken = response.data?['accessToken'] as String?;
-      final newRefreshToken = response.data?['refreshToken'] as String?;
-      if (newAccessToken == null || newRefreshToken == null) {
-        return null;
-      }
-
-      await _tokenStorage.saveTokens(
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-      );
-      return newAccessToken;
-    } on DioException {
+    final newAccessToken = response.data?['accessToken'] as String?;
+    final newRefreshToken = response.data?['refreshToken'] as String?;
+    if (newAccessToken == null || newRefreshToken == null) {
       return null;
     }
+
+    await _tokenStorage.saveTokens(
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    );
+    return newAccessToken;
   }
 }

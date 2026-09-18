@@ -17,18 +17,23 @@ public sealed class ConfigDeploymentContext : IDeploymentContext
         var modeValue = configuration["PURCH_DEPLOYMENT_MODE"] ?? nameof(DeploymentMode.Cloud);
         Mode = Enum.Parse<DeploymentMode>(modeValue, ignoreCase: true);
 
-        (DatabaseConnectionString, StorageLocation) = Mode switch
+        (DatabaseConnectionString, StorageLocation, StorageKey, StorageBucket) = Mode switch
         {
             DeploymentMode.Local => (
                 configuration["LOCAL_DB_CONNECTION_STRING"]
                     ?? throw new InvalidOperationException("LOCAL_DB_CONNECTION_STRING is required when PURCH_DEPLOYMENT_MODE=Local."),
                 configuration["LOCAL_STORAGE_PATH"]
-                    ?? throw new InvalidOperationException("LOCAL_STORAGE_PATH is required when PURCH_DEPLOYMENT_MODE=Local.")),
+                    ?? throw new InvalidOperationException("LOCAL_STORAGE_PATH is required when PURCH_DEPLOYMENT_MODE=Local."),
+                (string?)null,
+                (string?)null),
             DeploymentMode.Cloud => (
                 configuration["SUPABASE_DB_CONNECTION_STRING"]
                     ?? throw new InvalidOperationException("SUPABASE_DB_CONNECTION_STRING is required when PURCH_DEPLOYMENT_MODE=Cloud."),
                 configuration["SUPABASE_STORAGE_URL"]
-                    ?? throw new InvalidOperationException("SUPABASE_STORAGE_URL is required when PURCH_DEPLOYMENT_MODE=Cloud.")),
+                    ?? throw new InvalidOperationException("SUPABASE_STORAGE_URL is required when PURCH_DEPLOYMENT_MODE=Cloud."),
+                configuration["SUPABASE_STORAGE_KEY"]
+                    ?? throw new InvalidOperationException("SUPABASE_STORAGE_KEY is required when PURCH_DEPLOYMENT_MODE=Cloud."),
+                configuration["SUPABASE_STORAGE_BUCKET"] ?? "uploads"),
             _ => throw new InvalidOperationException($"Unhandled deployment mode: {Mode}"),
         };
     }
@@ -38,4 +43,8 @@ public sealed class ConfigDeploymentContext : IDeploymentContext
     public string DatabaseConnectionString { get; }
 
     public string StorageLocation { get; }
+
+    public string? StorageKey { get; }
+
+    public string? StorageBucket { get; }
 }

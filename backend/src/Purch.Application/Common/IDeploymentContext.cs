@@ -14,6 +14,12 @@ public interface IDeploymentContext
 
     string DatabaseConnectionString { get; }
 
-    /// <summary>Supabase Storage URL/key (Cloud) or a local filesystem root path (Local).</summary>
+    /// <summary>Supabase Storage URL (Cloud) or a local filesystem root path (Local).</summary>
     string StorageLocation { get; }
+
+    /// <summary>Supabase Storage service key. Null in Local mode.</summary>
+    string? StorageKey { get; }
+
+    /// <summary>Supabase Storage bucket name. Null in Local mode.</summary>
+    string? StorageBucket { get; }
 }

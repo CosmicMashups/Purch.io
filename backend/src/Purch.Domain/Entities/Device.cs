@@ -24,6 +24,13 @@ public class Device : TenantScopedEntity
 
     public DateTimeOffset? LastSeenAt { get; set; }
 
+    /// <summary>Bumped whenever this device's pairing code or PIN is reset. Embedded
+    /// in every access token issued for this device (see JwtTokenService) and checked
+    /// on every authenticated request (see DeviceSessionValidationMiddleware) so an
+    /// already-issued access token stops working immediately on reset, not just once
+    /// its refresh token would otherwise have been used again.</summary>
+    public int SessionVersion { get; set; }
+
     /// <summary>BIR accreditation's Machine Identification Number for this terminal — admin-entered once the unit is accredited; falls back to a device-ID-derived placeholder until then (see BirReadingService).</summary>
     public string? MachineIdentificationNumber { get; set; }
 }
