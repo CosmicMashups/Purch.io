@@ -1720,6 +1720,48 @@ class _CartLineTile extends ConsumerWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    if (line.itemVariantAttributes.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          line.variantAttributesLabel,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    if (line.comboSelections.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            for (final selection in line.comboSelections)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentWarmContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${selection.slotLabel}: ${selection.selectedItemName}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.onAccentWarmContainer,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     if (line.modifierSelections.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 3),

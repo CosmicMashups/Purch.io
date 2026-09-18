@@ -141,6 +141,35 @@ class ReceiptScreen extends ConsumerWidget {
                                               ),
                                             ],
                                           ),
+                                          if (line.itemVariantAttributes.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              child: Text(
+                                                '  ${line.variantAttributesLabel}',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 12,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                          if (line.comboSelections.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  for (final selection in line.comboSelections)
+                                                    Text(
+                                                      '  ${selection.slotLabel}: ${selection.selectedItemName}',
+                                                      style: GoogleFonts.plusJakartaSans(
+                                                        fontSize: 12,
+                                                        color: AppColors.textSecondary,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
                                           if (line.modifierSelections.isNotEmpty)
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8, top: 2),

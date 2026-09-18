@@ -142,6 +142,7 @@ class TransactionLine {
     required this.itemId,
     required this.itemName,
     required this.itemVariantId,
+    this.itemVariantAttributes = const {},
     required this.quantity,
     required this.unitPrice,
     required this.lineTotal,
@@ -157,6 +158,10 @@ class TransactionLine {
       itemId: json['itemId'] as String,
       itemName: json['itemName'] as String,
       itemVariantId: json['itemVariantId'] as String?,
+      itemVariantAttributes:
+          (json['itemVariantAttributes'] as Map<String, dynamic>?)
+              ?.cast<String, String>() ??
+          const {},
       quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unitPrice'] as num).toDouble(),
       lineTotal: (json['lineTotal'] as num).toDouble(),
@@ -182,6 +187,7 @@ class TransactionLine {
   final String itemId;
   final String itemName;
   final String? itemVariantId;
+  final Map<String, String> itemVariantAttributes;
   final double quantity;
   final double unitPrice;
   final double lineTotal;
@@ -189,6 +195,11 @@ class TransactionLine {
   final String? appliedPromoLabel;
   final List<TransactionLineComboSelection> comboSelections;
   final List<TransactionLineModifierSelection> modifierSelections;
+
+  /// e.g. "Size: Large, Color: Red" — mirrors ItemVariant.attributesLabel's
+  /// join format so a variant reads the same way everywhere it's shown.
+  String get variantAttributesLabel =>
+      itemVariantAttributes.entries.map((e) => '${e.key}: ${e.value}').join(', ');
 }
 
 /// Mirrors Purch.Application.Pos.ModifierSelectionDto — a resolved modifier

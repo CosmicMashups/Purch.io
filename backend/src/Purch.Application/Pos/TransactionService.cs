@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
@@ -846,6 +847,17 @@ public sealed class TransactionService(
                 }
             }
 
+            var itemVariantAttributes = new Dictionary<string, string>();
+            if (line.ItemVariantId is { } variantIdForDto)
+            {
+                var variant = await itemVariantRepository.GetByIdAsync(variantIdForDto, cancellationToken);
+                if (variant is not null)
+                {
+                    itemVariantAttributes = JsonSerializer.Deserialize<Dictionary<string, string>>(variant.VariantAttributesJson)
+                        ?? [];
+                }
+            }
+
             var modifierSelections = await transactionRepository.ListModifierSelectionsAsync(line.Id, cancellationToken);
             var modifierSelectionDtos = new List<ModifierSelectionDto>();
             foreach (var selection in modifierSelections)
@@ -864,6 +876,7 @@ public sealed class TransactionService(
                 line.ItemId,
                 item?.Name ?? "(deleted item)",
                 line.ItemVariantId,
+                itemVariantAttributes,
                 line.Quantity,
                 line.UnitPrice,
                 line.LineTotal,
