@@ -32,7 +32,7 @@ import '../../features/onboarding/presentation/screens/tenant_settings_screen.da
 import '../hardware/cfd/customer_facing_display_screen.dart';
 import '../../features/pos/presentation/screens/bir_reading_screen.dart';
 import '../../features/pos/presentation/screens/cashier_screen.dart';
-import '../../features/pos/presentation/screens/promo_code_list_screen.dart';
+import '../../features/pos/presentation/screens/promos_screen.dart';
 import '../../features/pos/presentation/screens/pending_kiosk_orders_screen.dart';
 import '../../features/pos/presentation/screens/shift_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
@@ -174,7 +174,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'promo-codes',
-                    builder: (context, state) => const PromoCodeListScreen(),
+                    builder: (context, state) => const PromosScreen(),
                   ),
                   GoRoute(
                     path: 'bir-reading',

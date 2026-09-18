@@ -13,6 +13,7 @@ public sealed record TransactionDto(
     bool SeniorPwdDiscountApplied,
     string? PromoCode,
     decimal PromoDiscountAmount,
+    decimal ItemPromoDiscountAmount,
     decimal TotalAmount,
     long? ReceiptNumber,
     string? OrderType,
@@ -32,6 +33,8 @@ public sealed record TransactionLineDto(
     decimal Quantity,
     decimal UnitPrice,
     decimal LineTotal,
+    decimal PromoDiscountAmount,
+    string? AppliedPromoLabel,
     IReadOnlyList<ComboSelectionDto> ComboSelections,
     IReadOnlyList<ModifierSelectionDto> ModifierSelections);
 

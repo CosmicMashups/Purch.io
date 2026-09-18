@@ -20,6 +20,7 @@ class Transaction {
     required this.seniorPwdDiscountApplied,
     required this.promoCode,
     required this.promoDiscountAmount,
+    this.itemPromoDiscountAmount = 0,
     required this.totalAmount,
     required this.receiptNumber,
     this.orderType,
@@ -45,6 +46,8 @@ class Transaction {
       seniorPwdDiscountApplied: json['seniorPwdDiscountApplied'] as bool,
       promoCode: json['promoCode'] as String?,
       promoDiscountAmount: (json['promoDiscountAmount'] as num).toDouble(),
+      itemPromoDiscountAmount:
+          (json['itemPromoDiscountAmount'] as num?)?.toDouble() ?? 0,
       totalAmount: (json['totalAmount'] as num).toDouble(),
       receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
       orderType: json['orderType'] as String?,
@@ -69,6 +72,7 @@ class Transaction {
   final bool seniorPwdDiscountApplied;
   final String? promoCode;
   final double promoDiscountAmount;
+  final double itemPromoDiscountAmount;
   final double totalAmount;
   final int? receiptNumber;
   final String? orderType;
@@ -141,6 +145,8 @@ class TransactionLine {
     required this.quantity,
     required this.unitPrice,
     required this.lineTotal,
+    this.promoDiscountAmount = 0,
+    this.appliedPromoLabel,
     required this.comboSelections,
     this.modifierSelections = const [],
   });
@@ -154,6 +160,9 @@ class TransactionLine {
       quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unitPrice'] as num).toDouble(),
       lineTotal: (json['lineTotal'] as num).toDouble(),
+      promoDiscountAmount:
+          (json['promoDiscountAmount'] as num?)?.toDouble() ?? 0,
+      appliedPromoLabel: json['appliedPromoLabel'] as String?,
       comboSelections:
           (json['comboSelections'] as List<dynamic>?)
               ?.cast<Map<String, dynamic>>()
@@ -176,6 +185,8 @@ class TransactionLine {
   final double quantity;
   final double unitPrice;
   final double lineTotal;
+  final double promoDiscountAmount;
+  final String? appliedPromoLabel;
   final List<TransactionLineComboSelection> comboSelections;
   final List<TransactionLineModifierSelection> modifierSelections;
 }
