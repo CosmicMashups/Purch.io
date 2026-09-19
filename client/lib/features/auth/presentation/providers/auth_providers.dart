@@ -5,6 +5,7 @@ import '../../../../core/auth/jwt_claims.dart';
 import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/session/session_scope.dart';
 import '../../../../core/storage/secure_token_storage.dart';
 import '../../data/auth_repository_impl.dart';
 import '../../domain/auth_repository.dart';
@@ -23,10 +24,7 @@ ApiClient apiClient(Ref ref) {
     // The refresh token itself expired/was revoked — ApiClient already
     // cleared storage; this just makes the router notice and fall back to
     // the login screen instead of the app silently 401ing forever.
-    onSessionExpired: () {
-      ref.invalidate(hasStoredSessionProvider);
-      ref.invalidate(storedSessionRoleProvider);
-    },
+    onSessionExpired: resetSessionScope,
   );
 }
 

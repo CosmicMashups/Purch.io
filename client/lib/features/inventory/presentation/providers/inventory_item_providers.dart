@@ -1,3 +1,4 @@
+import '../../../../core/data/data_refresh.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/errors/failure.dart';
@@ -35,6 +36,7 @@ class CreateInventoryItemController extends _$CreateInventoryItemController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(inventoryItemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -60,6 +62,7 @@ class UpdateInventoryItemController extends _$UpdateInventoryItemController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(inventoryItemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -85,6 +88,7 @@ class PhysicalCountController extends _$PhysicalCountController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(inventoryItemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -111,6 +115,7 @@ class ReceiveInventoryStockController
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(inventoryItemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -151,6 +156,7 @@ class ReplaceItemRecipeController extends _$ReplaceItemRecipeController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemRecipeProvider(itemId).notifier).refresh();
     }
     return succeeded;

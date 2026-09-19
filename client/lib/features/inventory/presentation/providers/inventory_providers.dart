@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/data/data_refresh.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -17,14 +18,14 @@ InventoryRepository inventoryRepository(Ref ref) {
   return InventoryRepositoryImpl(apiClient: ref.watch(apiClientProvider));
 }
 
-/// keepAlive: backs the Home dashboard's "Running Low" chart, which sits in
-/// a scrollable list — see reports_providers.dart's keepAlive doc comment
-/// for why autoDispose would otherwise refetch this every time the chart
-/// scrolls off-screen and back.
-@Riverpod(keepAlive: true)
+/// Backs the Home dashboard's "Running Low" chart. Short-lived cache (see
+/// [CacheFor]) so scrolling the chart off-screen doesn't refetch, without
+/// letting it go stale; stock writes invalidate it via refreshStockAndSalesData.
+@riverpod
 class InventoryDashboardNotifier extends _$InventoryDashboardNotifier {
   @override
   Future<InventoryDashboard> build() {
+    ref.cacheFor(const Duration(seconds: 45));
     return ref.watch(inventoryRepositoryProvider).getDashboard();
   }
 
@@ -83,7 +84,11 @@ class RecordMovementController extends _$RecordMovementController {
     final repository = ref.read(inventoryRepositoryProvider);
 
     state = await AsyncValue.guard(() => repository.recordMovement(request));
-    return !state.hasError;
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      refreshStockAndSalesData(ref);
+    }
+    return succeeded;
   }
 
   Failure? get currentFailure {

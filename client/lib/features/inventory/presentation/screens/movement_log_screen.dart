@@ -59,7 +59,7 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
                     ),
                     onSelected: (_) => setState(() => _typeFilter = null),
                   ),
-                  for (final type in MovementType.values) ...[
+                  for (final type in MovementType.selectable) ...[
                     const SizedBox(width: AppSpacing.sm),
                     ChoiceChip(
                       label: Text(type.label),

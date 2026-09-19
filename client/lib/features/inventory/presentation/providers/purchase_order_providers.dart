@@ -1,3 +1,4 @@
+import '../../../../core/data/data_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -41,6 +42,7 @@ class CreatePurchaseOrderController extends _$CreatePurchaseOrderController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(purchaseOrderListProvider.notifier).refresh();
     }
     return succeeded;
@@ -78,6 +80,7 @@ class PurchaseOrderActionController extends _$PurchaseOrderActionController {
     state = await AsyncValue.guard(() => action(repository));
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(purchaseOrderListProvider.notifier).refresh();
     }
     return succeeded;

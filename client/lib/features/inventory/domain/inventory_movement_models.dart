@@ -12,6 +12,23 @@ enum MovementType {
   /// System-generated only, from a completed Cashier sale — never manually
   /// selectable when recording a movement by hand.
   sale,
+
+  /// Client-only fallback for a type this build doesn't know yet (e.g. the
+  /// server added a new movement type) — decoding one must never throw and
+  /// blank a whole screen. Never sent to the server or offered in pickers.
+  other;
+
+  /// Decodes the server's numeric enum value, tolerating out-of-range values.
+  static MovementType fromServer(Object? value) {
+    final index = value is int ? value : -1;
+    return index >= 0 && index < MovementType.other.index
+        ? MovementType.values[index]
+        : MovementType.other;
+  }
+
+  /// The types a person can pick from when filtering or recording by hand.
+  static List<MovementType> get selectable =>
+      values.where((type) => type != MovementType.other).toList();
 }
 
 extension MovementTypeLabel on MovementType {
@@ -25,6 +42,7 @@ extension MovementTypeLabel on MovementType {
     MovementType.transfer => 'Transfer',
     MovementType.adjustment => 'Adjustment',
     MovementType.sale => 'Sale',
+    MovementType.other => 'Other',
   };
 }
 
@@ -54,7 +72,7 @@ class InventoryMovement {
       itemName: json['itemName'] as String,
       branchId: json['branchId'] as String,
       branchName: json['branchName'] as String,
-      type: MovementType.values[json['type'] as int],
+      type: MovementType.fromServer(json['type']),
       quantity: (json['quantity'] as num).toDouble(),
       staffUserId: json['staffUserId'] as String,
       staffUserName: json['staffUserName'] as String,

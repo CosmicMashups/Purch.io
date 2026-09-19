@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../session/session_scope.dart';
 import 'auth_gate.dart';
-import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/catalog/presentation/screens/category_list_screen.dart';
 import '../../features/catalog/presentation/screens/item_list_screen.dart';
@@ -98,10 +98,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder:
             (context, state) => LoginScreen(
-              onLoggedIn: () {
-                ref.invalidate(hasStoredSessionProvider);
-                ref.invalidate(storedSessionRoleProvider);
-              },
+              // A fresh login must never inherit the previous session's cached
+              // data (possibly another tenant's), so rebuild every provider.
+              onLoggedIn: resetSessionScope,
             ),
       ),
       GoRoute(
