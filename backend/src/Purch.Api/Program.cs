@@ -30,6 +30,15 @@ using Purch.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Render's Dockerfile resolves this via a shell entrypoint
+// (ASPNETCORE_HTTP_PORTS=${PORT:-8080}) instead, but Vercel's chiseled
+// container runtime (see Dockerfile.vercel) ships with no shell at all, so
+// any ENTRYPOINT that needs one fails to start before .NET even runs — no
+// app-level exception, no log line, nothing. Binding Kestrel explicitly here
+// means the entrypoint can be plain `dotnet Purch.Api.dll` on both hosts.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
 {

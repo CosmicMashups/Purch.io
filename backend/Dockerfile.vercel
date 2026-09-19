@@ -28,11 +28,13 @@ WORKDIR /app
 COPY --chown=$APP_UID:$APP_UID --from=build /app/publish .
 
 # Vercel injects PORT at runtime; 8080 here is just the local/default value.
-# ASPNETCORE_HTTP_PORTS (not ASPNETCORE_URLS) is what the base image's
-# Kestrel defaults actually key off — set it to match PORT so the container
-# doesn't 502 on requests that arrive before any override lands.
+# Program.cs reads it directly and binds Kestrel explicitly
+# (builder.WebHost.UseUrls) — not ASPNETCORE_HTTP_PORTS/ASPNETCORE_URLS via a
+# shell entrypoint, because this chiseled base image ships with no shell at
+# all. An ENTRYPOINT that needed one (["/bin/sh", "-c", "..."]) would fail to
+# start the container before .NET ever ran, with no app-level log line to
+# explain why — exec form only from here on.
 ENV PORT=8080
-ENV ASPNETCORE_HTTP_PORTS=8080
 ENV DOTNET_EnableDiagnostics=0
 
-ENTRYPOINT ["/bin/sh", "-c", "ASPNETCORE_HTTP_PORTS=${PORT:-8080} dotnet Purch.Api.dll"]
+ENTRYPOINT ["dotnet", "Purch.Api.dll"]
