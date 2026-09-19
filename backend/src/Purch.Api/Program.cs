@@ -76,7 +76,12 @@ builder.Services.AddScoped<ICurrentActorProvider, HttpContextCurrentActorProvide
 builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 {
     var deploymentContext = serviceProvider.GetRequiredService<IDeploymentContext>();
-    _ = options.UseNpgsql(deploymentContext.DatabaseConnectionString);
+    // Transient-failure retries cover the brief connection drops a pooled Supabase/Vercel
+    // connection sees after idle periods; nothing here opens manual transactions, so the
+    // retrying execution strategy is safe (SaveChanges is already atomic per call).
+    _ = options.UseNpgsql(
+        deploymentContext.DatabaseConnectionString,
+        npgsql => npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(2), errorCodesToAdd: null));
 });
 
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();
@@ -251,6 +256,32 @@ using (var startupScope = app.Services.CreateScope())
     {
         await dbContext.Database.MigrateAsync();
     }
+    else
+    {
+        // Cloud on Vercel has no preDeployCommand, so a deploy that adds a migration would
+        // otherwise serve traffic against a stale schema (missing tables/columns -> failing
+        // Items/Dashboard queries). EF takes a database-level lock while migrating, so
+        // concurrent instances don't race. Deliberately non-fatal: Supabase's transaction
+        // pooler can reject migration DDL, and a failed auto-migrate must not take down an
+        // otherwise-working API — it is logged loudly so scripts/migrate-production.* can be run.
+        var startupLogger = startupScope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+#pragma warning disable CA1031 // Intentionally broad: any migration failure must be logged, never crash startup.
+        try
+        {
+            var pending = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
+            if (pending.Count > 0)
+            {
+                Program.LogApplyingMigrations(startupLogger, pending.Count, string.Join(", ", pending));
+                await dbContext.Database.MigrateAsync();
+                Program.LogMigrationsApplied(startupLogger);
+            }
+        }
+        catch (Exception exception)
+        {
+            Program.LogMigrationFailed(startupLogger, exception);
+        }
+#pragma warning restore CA1031
+    }
 
     // Every table has Row Level Security enabled with no policies (see the
     // EnableRowLevelSecurity migration) — deliberately, since this app never
@@ -333,4 +364,14 @@ app.MapUploadEndpoints();
 app.Run();
 
 // Exposed for WebApplicationFactory<Program> in Purch.IntegrationTests.
-public partial class Program;
+public partial class Program
+{
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Applying {Count} pending migration(s): {Migrations}")]
+    internal static partial void LogApplyingMigrations(ILogger logger, int count, string migrations);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Pending migrations applied.")]
+    internal static partial void LogMigrationsApplied(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Automatic migration failed; run scripts/migrate-production against the database.")]
+    internal static partial void LogMigrationFailed(ILogger logger, Exception exception);
+}

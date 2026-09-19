@@ -49,15 +49,21 @@ can point at the same image with minor differences.
 
 ## Things that work differently than on Render
 
-- **No `preDeployCommand`.** Render runs `dotnet Purch.Api.dll migrate`
-  before each deploy (see `render.yaml`). Vercel has no equivalent hook, so
-  after any deploy that adds a migration, run it by hand against
-  `SUPABASE_DB_CONNECTION_STRING`:
+- **No `preDeployCommand`, but the API applies pending migrations at
+  startup.** Render runs `dotnet Purch.Api.dll migrate` before each deploy
+  (see `render.yaml`); Vercel has no equivalent hook. In Cloud mode the API
+  therefore migrates itself when it starts. This is **deliberately
+  non-fatal**: Supabase's pooler can reject migration DDL, and a failed
+  auto-migrate must not take an otherwise-working API down, so it logs
+  `Automatic migration failed; run scripts/migrate-production against the
+  database.` and keeps serving — against a stale schema. Treat that log line
+  as a failed deploy. For any migration that also changes data, run it by
+  hand first against `SUPABASE_DB_CONNECTION_STRING` (direct connection, not
+  the pooler):
   ```bash
   dotnet Purch.Api.dll migrate
   ```
-  from a machine that can reach the DB, or trigger it as a one-off step in
-  your CI pipeline before the Vercel deploy completes.
+  See `DEPLOY-NOTE-checkout-and-offline-sales.md` for the current batch.
 - **Scale-to-zero.** The container stops after ~5 minutes idle and cold-starts
   on the next request. Fine for a low-traffic API, but expect occasional
   cold-start latency that Render's always-on free instance doesn't have.
