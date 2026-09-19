@@ -21,6 +21,13 @@ public class Transaction : TenantScopedEntity
     /// ReceiptNumber) uniqueness, which is only meant to guard issued receipts.</summary>
     public long? ReceiptNumber { get; set; }
 
+    /// <summary>The Z-reading (the device's ResetCounter at the time) that reported this sale, or null
+    /// while it hasn't been reported yet; 0 marks sales reported by a Z-reading from before this was
+    /// tracked. A reading covers every completed sale not yet reported rather than "receipt numbers above
+    /// the last reading", so a sale that reaches the server late (an offline sale syncing after a later
+    /// number was already read) lands in the next reading instead of falling through the gap.</summary>
+    public int? ZReadingNumber { get; set; }
+
     /// <summary>Null until a kiosk-originated order is claimed by a cashier — a kiosk
     /// terminal has no staff user, so this can't be required at creation time the
     /// way a POS-originated cart's is.</summary>

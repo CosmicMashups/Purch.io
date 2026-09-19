@@ -23,8 +23,9 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
 
-    /// <summary>Completed sales on this device with ReceiptNumber greater than the given number, ordered ascending â€” the range a Z/X-reading covers.</summary>
-    Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default);
+    /// <summary>Every completed sale on this device that no Z-reading has reported yet, ordered by receipt number —
+    /// what an X/Z-reading covers. Tracked, so a Z-reading can stamp them as reported in the same save as its counters.</summary>
+    Task<IReadOnlyList<Transaction>> ListUnreportedCompletedByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>Voided carts on this device since the given time — voided carts never get a receipt number, so they can't be selected by range.</summary>
     Task<IReadOnlyList<Transaction>> ListVoidedByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
