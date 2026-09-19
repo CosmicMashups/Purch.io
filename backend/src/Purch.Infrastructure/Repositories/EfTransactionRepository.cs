@@ -57,14 +57,14 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Transaction>> ListUnreportedCompletedByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
-            .AsNoTracking()
             .Where(transaction =>
                 transaction.DeviceId == deviceId
                 && transaction.Status == TransactionStatus.Completed
-                && transaction.ReceiptNumber > fromReceiptNumberExclusive)
+                && transaction.ReceiptNumber != null
+                && transaction.ZReadingNumber == null)
             .OrderBy(transaction => transaction.ReceiptNumber)
             .ToListAsync(cancellationToken);
     }
