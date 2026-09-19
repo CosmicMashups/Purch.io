@@ -22,6 +22,15 @@ public interface ITransactionService
     /// <summary>Records a full payment against the current open cart. On success the cart is marked Completed and issued its sequential BIR receipt number.</summary>
     Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>Completes a whole sale in one call: builds a cart from the given lines, applies the
+    /// discounts/order type, prices it with the server's own rules, and records the payment.
+    /// Idempotent on <see cref="CheckoutRequest.SaleId"/> — a retry returns the already-completed sale.</summary>
+    Task<TransactionDto> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>The highest receipt number this terminal has had recorded — the floor a device
+    /// starts from when issuing its own numbers, so a reinstalled or re-synced device never reuses one.</summary>
+    Task<long> GetLastIssuedReceiptNumberAsync(CancellationToken cancellationToken = default);
+
     /// <summary>E4's fulfillment choice on the current open cart (e.g. "Dine In"/"Take Out"). Shared by kiosk and cashier POS — either can set it.</summary>
     Task<TransactionDto> SetOrderTypeAsync(SetOrderTypeRequest request, CancellationToken cancellationToken = default);
 

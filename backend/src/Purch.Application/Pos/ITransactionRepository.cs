@@ -7,6 +7,12 @@ public interface ITransactionRepository
     /// <summary>At most one Open transaction per device — a physical terminal can only ring up one cart at a time.</summary>
     Task<Transaction?> GetOpenByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
+    /// <summary>The transaction created for a checkout's client-generated SaleId, if any — the idempotency lookup.</summary>
+    Task<Transaction?> GetByClientSaleIdAsync(Guid clientSaleId, CancellationToken cancellationToken = default);
+
+    /// <summary>Whether a completed sale on this terminal already carries this receipt number.</summary>
+    Task<bool> ReceiptNumberExistsAsync(Guid deviceId, long receiptNumber, CancellationToken cancellationToken = default);
+
     Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TransactionLine>> ListLinesAsync(Guid transactionId, CancellationToken cancellationToken = default);
@@ -17,7 +23,7 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
 
-    /// <summary>Completed sales on this device with ReceiptNumber greater than the given number, ordered ascending — the range a Z/X-reading covers.</summary>
+    /// <summary>Completed sales on this device with ReceiptNumber greater than the given number, ordered ascending â€” the range a Z/X-reading covers.</summary>
     Task<IReadOnlyList<Transaction>> ListCompletedByDeviceInReceiptRangeAsync(Guid deviceId, long fromReceiptNumberExclusive, CancellationToken cancellationToken = default);
 
     /// <summary>Voided carts on this device since the given time — voided carts never get a receipt number, so they can't be selected by range.</summary>
