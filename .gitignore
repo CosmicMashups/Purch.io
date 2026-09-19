@@ -64,3 +64,6 @@ Thumbs.db
 
 # --- Local Tooling & Cache ---
 .impeccable/
+
+.vercel
+.env*

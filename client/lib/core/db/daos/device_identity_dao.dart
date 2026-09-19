@@ -19,12 +19,24 @@ class DeviceIdentityDao extends DatabaseAccessor<AppDatabase>
     required String tenantId,
     required String branchId,
   }) async {
+    // Logging in again on the same device and tenant must not forget which
+    // receipt number this device last issued — it numbers its next sale from
+    // it. Only a different device or tenant starts a fresh sequence.
+    final existing = await getIdentity();
+    final sameTerminal =
+        existing != null &&
+        existing.deviceId == deviceId &&
+        existing.tenantId == tenantId;
+    final keptReceiptNumber =
+        sameTerminal ? existing.lastKnownReceiptNumber : null;
+
     await delete(deviceIdentity).go();
     await into(deviceIdentity).insert(
       DeviceIdentityCompanion.insert(
         deviceId: deviceId,
         tenantId: tenantId,
         branchId: branchId,
+        lastKnownReceiptNumber: Value(keptReceiptNumber),
         updatedAt: DateTime.now(),
       ),
     );
@@ -40,6 +52,11 @@ class DeviceIdentityDao extends DatabaseAccessor<AppDatabase>
   Future<void> recordIssuedReceiptNumber(int receiptNumber) async {
     final identity = await getIdentity();
     if (identity == null) {
+      return;
+    }
+    // Never move backwards: a late-arriving lower number must not rewind the
+    // counter this device numbers its next sale from.
+    if ((identity.lastKnownReceiptNumber ?? 0) >= receiptNumber) {
       return;
     }
     await (update(

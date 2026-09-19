@@ -1,3 +1,4 @@
+import '../../../pos/presentation/providers/pos_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +31,8 @@ class AppShellScreen extends ConsumerWidget {
     // Starts the background sync drain loop once, for the lifetime of the
     // logged-in session — keepAlive means later navigations reuse it.
     ref.watch(syncCoordinatorProvider);
+    // Same for sales completed offline: keep trying to send them to the server.
+    ref.watch(saleSyncCoordinatorProvider);
 
     final roleAsync = ref.watch(currentStaffRoleProvider);
     final role = roleAsync.value;

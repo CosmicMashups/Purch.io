@@ -46,6 +46,13 @@ class FakePosRepository implements PosRepository {
   ApplyPromoCodeRequest? lastApplyPromoCodeRequest;
 
   @override
+  Future<int> getLastIssuedReceiptNumber() async => nextReceiptNumber - 1;
+
+  @override
+  Future<Transaction> checkout(CheckoutRequest request) =>
+      throw UnimplementedError('FakePosRepository does not model one-call checkout');
+
+  @override
   Future<Transaction> getOrCreateOpenCart() async => cart;
 
   @override

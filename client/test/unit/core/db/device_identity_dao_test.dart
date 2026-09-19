@@ -73,6 +73,37 @@ void main() {
       expect((await dao.getIdentity())?.lastKnownReceiptNumber, 2);
     });
 
+    test('recordIssuedReceiptNumber never moves the counter backwards', () async {
+      final dao = database.deviceIdentityDao;
+      await dao.saveIdentity(
+        deviceId: 'device-1',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+      );
+
+      await dao.recordIssuedReceiptNumber(10);
+      await dao.recordIssuedReceiptNumber(7);
+      expect((await dao.getIdentity())?.lastKnownReceiptNumber, 10);
+    });
+
+    test('logging in again on the same device keeps its receipt counter', () async {
+      final dao = database.deviceIdentityDao;
+      await dao.saveIdentity(
+        deviceId: 'device-1',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+      );
+      await dao.recordIssuedReceiptNumber(25);
+
+      await dao.saveIdentity(
+        deviceId: 'device-1',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+      );
+
+      expect((await dao.getIdentity())?.lastKnownReceiptNumber, 25);
+    });
+
     test('recordIssuedReceiptNumber before any identity exists is a safe no-op', () async {
       final dao = database.deviceIdentityDao;
       await dao.recordIssuedReceiptNumber(1);

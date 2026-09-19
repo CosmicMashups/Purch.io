@@ -45,11 +45,21 @@ public sealed class BirReadingService(
         bool advanceCounters,
         CancellationToken cancellationToken)
     {
-        var transactions = await transactionRepository.ListCompletedByDeviceInReceiptRangeAsync(
-            deviceId, sequence.LastZReadingReceiptNumber, cancellationToken);
+        // Everything completed and not yet reported — by status, not by "number above the last reading".
+        // A sale that reaches the server late (an offline sale synced after a later receipt number was
+        // already read) has a number below the last reading's ending number and would never be picked up
+        // by a range; selecting on "not yet reported" puts it in the next reading instead of losing it.
+        var transactions = await transactionRepository.ListUnreportedCompletedByDeviceAsync(deviceId, cancellationToken);
+        var previousEnding = sequence.LastZReadingReceiptNumber;
 
         var beginningReceiptNumber = transactions.Count > 0 ? transactions[0].ReceiptNumber : (long?)null;
         var endingReceiptNumber = transactions.Count > 0 ? transactions[^1].ReceiptNumber : (long?)null;
+
+        var lateReceiptNumbers = transactions
+            .Where(t => t.ReceiptNumber <= previousEnding)
+            .Select(t => t.ReceiptNumber!.Value)
+            .ToList();
+        var missingReceiptNumbers = FindMissingReceiptNumbers(transactions, previousEnding, endingReceiptNumber);
 
         var netSales = transactions.Sum(t => t.TotalAmount);
         var totalDiscounts = transactions.Sum(t => t.DiscountAmount);
@@ -75,8 +85,14 @@ public sealed class BirReadingService(
             sequence.GrandAccumulatedSales = newGrandAccumulatedSales;
             sequence.ZReadingResetCounter += 1;
             resetCounter = sequence.ZReadingResetCounter;
-            sequence.LastZReadingReceiptNumber = endingReceiptNumber ?? sequence.LastZReadingReceiptNumber;
+            sequence.LastZReadingReceiptNumber = Math.Max(previousEnding, endingReceiptNumber ?? previousEnding);
             sequence.LastZReadingAt = DateTimeOffset.UtcNow;
+
+            // Stamp every sale this reading covers, in the same save as the counters above.
+            foreach (var reported in transactions)
+            {
+                reported.ZReadingNumber = resetCounter;
+            }
         }
 
         var device = await deviceRepository.GetByIdAsync(deviceId, cancellationToken);
@@ -101,7 +117,32 @@ public sealed class BirReadingService(
             voidedAmount,
             oldGrandAccumulatedSales,
             newGrandAccumulatedSales,
-            resetCounter);
+            resetCounter,
+            lateReceiptNumbers,
+            missingReceiptNumbers);
+    }
+
+    /// <summary>The most missing numbers listed on one reading — a bound, not a limit on the data.</summary>
+    private const int MaxListedMissingReceiptNumbers = 200;
+
+    private static List<long> FindMissingReceiptNumbers(IReadOnlyList<Transaction> transactions, long previousEnding, long? ending)
+    {
+        var missing = new List<long>();
+        if (ending is not { } last)
+        {
+            return missing;
+        }
+
+        var present = transactions.Where(t => t.ReceiptNumber.HasValue).Select(t => t.ReceiptNumber!.Value).ToHashSet();
+        for (var number = previousEnding + 1; number <= last && missing.Count < MaxListedMissingReceiptNumbers; number++)
+        {
+            if (!present.Contains(number))
+            {
+                missing.Add(number);
+            }
+        }
+
+        return missing;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

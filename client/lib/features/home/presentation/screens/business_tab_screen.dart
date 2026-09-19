@@ -1,9 +1,12 @@
+import '../../../pos/data/sale_queue.dart';
+import '../../../pos/presentation/providers/pos_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/auth_gate.dart';
 import '../../../../core/routing/nav_destinations.dart';
+import '../../../../core/session/session_scope.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/purch_app_bar.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -60,12 +63,25 @@ class BusinessTabScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    // Sales completed offline are only on this device until they sync, and they
+    // can't sync while signed out — say so before it's too late to matter.
+    final waiting = SaleQueueStats.of(
+      ref.read(offlineSalesProvider).valueOrNull ?? const [],
+    ).unsynced;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
             title: const Text('Log out?'),
-            content: const Text('You will need your pairing code and PIN to sign back in.'),
+            content: Text(
+              waiting == 0
+                  ? 'You will need your pairing code and PIN to sign back in.'
+                  : '$waiting sale${waiting == 1 ? ' is' : 's are'} saved on this '
+                      'device and not yet sent to the server. They will stay here '
+                      'and sync the next time this terminal is signed in with '
+                      'a connection. Log out anyway?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -81,8 +97,8 @@ class BusinessTabScreen extends ConsumerWidget {
 
     if (confirmed ?? false) {
       await ref.read(authRepositoryProvider).logout();
-      ref.invalidate(hasStoredSessionProvider);
-      ref.invalidate(storedSessionRoleProvider);
+      // Drop every cached provider so the next login starts clean.
+      resetSessionScope();
     }
   }
 }

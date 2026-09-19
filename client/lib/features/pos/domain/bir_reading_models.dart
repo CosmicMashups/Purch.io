@@ -27,6 +27,8 @@ class BirReading {
     required this.oldGrandAccumulatedSales,
     required this.newGrandAccumulatedSales,
     required this.resetCounter,
+    this.lateReceiptNumbers = const [],
+    this.missingReceiptNumbers = const [],
   });
 
   factory BirReading.fromJson(Map<String, dynamic> json) {
@@ -54,8 +56,14 @@ class BirReading {
       newGrandAccumulatedSales:
           (json['newGrandAccumulatedSales'] as num).toDouble(),
       resetCounter: json['resetCounter'] as int,
+      lateReceiptNumbers: _intList(json['lateReceiptNumbers']),
+      missingReceiptNumbers: _intList(json['missingReceiptNumbers']),
     );
   }
+
+  static List<int> _intList(Object? value) =>
+      (value as List<dynamic>?)?.map((n) => (n as num).toInt()).toList() ??
+      const [];
 
   final BirReadingType type;
   final String deviceId;
@@ -76,4 +84,13 @@ class BirReading {
   final double oldGrandAccumulatedSales;
   final double newGrandAccumulatedSales;
   final int resetCounter;
+
+  /// Receipts in this reading numbered at or below the previous Z-reading's
+  /// ending number — sales that reached the server only after a later number
+  /// had already been read (e.g. an offline sale syncing late).
+  final List<int> lateReceiptNumbers;
+
+  /// Numbers up to this reading's ending number with no completed sale on the
+  /// server: not synced yet, refused, or voided.
+  final List<int> missingReceiptNumbers;
 }

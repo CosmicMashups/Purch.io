@@ -25,6 +25,14 @@ abstract class PosRepository {
 
   Future<Transaction> recordPayment(RecordPaymentRequest request);
 
+  /// Sends a whole sale — cart lines, discounts and payment — in one call.
+  /// Idempotent on [CheckoutRequest.saleId].
+  Future<Transaction> checkout(CheckoutRequest request);
+
+  /// The highest receipt number the server has recorded for this terminal —
+  /// the floor a device starts from when numbering its own sales.
+  Future<int> getLastIssuedReceiptNumber();
+
   /// Kiosk orders submitted and awaiting a cashier to collect payment at the
   /// counter, for this branch.
   Future<List<Transaction>> listPendingKioskOrders(String branchId);

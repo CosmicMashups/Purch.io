@@ -100,6 +100,85 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_sale_that_reaches_the_server_after_a_z_reading_already_passed_its_number_is_picked_up_by_the_next_reading()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Late Sale Item", 40m);
+
+        // Receipts 1 and 3 reach the server; number 2 (an offline sale) is still on its device.
+        await CheckoutWithReceiptNumberAsync(client, item.Id, 1);
+        await CheckoutWithReceiptNumberAsync(client, item.Id, 3);
+
+        var firstResponse = await client.PostAsync("/reports/z-reading", null);
+        var first = await firstResponse.Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        Assert.Equal(2, first!.TransactionCount);
+        Assert.Equal(3, first.EndingReceiptNumber);
+        // The gap is disclosed, not hidden.
+        Assert.Equal(2L, Assert.Single(first.MissingReceiptNumbers));
+        Assert.Empty(first.LateReceiptNumbers);
+
+        // Now number 2 syncs — its number is below the last reading's ending number (3).
+        await CheckoutWithReceiptNumberAsync(client, item.Id, 2);
+
+        var secondResponse = await client.PostAsync("/reports/z-reading", null);
+        var second = await secondResponse.Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        // Previously a receipt-number range (> 3) skipped it forever; now it is reported, and labelled late.
+        Assert.Equal(1, second!.TransactionCount);
+        Assert.Equal(40m, second.NetSales);
+        Assert.Equal(2, second.BeginningReceiptNumber);
+        Assert.Equal(2L, Assert.Single(second.LateReceiptNumbers));
+        Assert.Equal(80m, second.OldGrandAccumulatedSales);
+        Assert.Equal(120m, second.NewGrandAccumulatedSales);
+
+        // And once reported it is not reported again.
+        var thirdResponse = await client.PostAsync("/reports/z-reading", null);
+        var third = await thirdResponse.Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        Assert.Equal(0, third!.TransactionCount);
+    }
+
+    [Fact]
+    public async Task An_x_reading_shows_a_late_sale_without_marking_it_reported()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "X Late Item", 25m);
+        await CheckoutWithReceiptNumberAsync(client, item.Id, 2);
+        _ = await client.PostAsync("/reports/z-reading", null);
+        await CheckoutWithReceiptNumberAsync(client, item.Id, 1);
+
+        var firstX = await (await client.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        var secondX = await (await client.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        Assert.Equal(1, firstX!.TransactionCount);
+        Assert.Equal(1, secondX!.TransactionCount);
+    }
+
+    private static async Task<ItemDto> CreateItemAsync(HttpClient client, string name, decimal price)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest(name, null, null, null, price, null, PricingType.Unit));
+        return (await response.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+    }
+
+    private static async Task CheckoutWithReceiptNumberAsync(HttpClient client, Guid itemId, long receiptNumber)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(itemId, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 1000m),
+                ReceiptNumber: receiptNumber));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task A_reading_includes_voided_carts_since_the_last_z_reading()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
