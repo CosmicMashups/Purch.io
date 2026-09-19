@@ -626,6 +626,232 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(70m, cart.TotalAmount);
     }
 
+    [Fact]
+    public async Task Checkout_builds_prices_and_pays_a_whole_sale_in_one_call()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Checkout Water", 15m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 2m)],
+                SeniorPwdDiscountApplied: false,
+                PromoCode: null,
+                OrderType: "Take Out",
+                Payment: new RecordPaymentRequest(PaymentMethod.Cash, 50m),
+                ExpectedTotal: 30m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sale = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(TransactionStatus.Completed, sale!.Status);
+        Assert.Equal(30m, sale.TotalAmount);
+        Assert.Equal("Take Out", sale.OrderType);
+        Assert.NotNull(sale.ReceiptNumber);
+        Assert.Equal(20m, Assert.Single(sale.Payments).ChangeGiven);
+    }
+
+    [Fact]
+    public async Task Checkout_retried_with_the_same_sale_id_returns_the_same_sale_and_does_not_charge_twice()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Retry Water", 10m);
+        var request = new CheckoutRequest(
+            Guid.NewGuid(),
+            [new AddTransactionLineRequest(item.Id, null, 1m)],
+            false,
+            null,
+            null,
+            new RecordPaymentRequest(PaymentMethod.Cash, 10m));
+
+        var first = await (await client.PostAsJsonAsync("/transactions/checkout", request))
+            .Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        var retry = await client.PostAsJsonAsync("/transactions/checkout", request);
+
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var second = await retry.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(first!.Id, second!.Id);
+        Assert.Equal(first.ReceiptNumber, second.ReceiptNumber);
+        Assert.Single(second.Payments);
+    }
+
+    [Fact]
+    public async Task Checkout_stops_before_charging_when_the_server_prices_the_cart_differently()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Price Check Water", 10m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 100m),
+                ExpectedTotal: 5m));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Checkout_with_an_empty_cart_is_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 10m)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Checkout_replaces_a_leftover_open_cart_instead_of_adding_to_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var leftover = await CreateItemAsync(client, "Leftover", 99m);
+        var item = await CreateItemAsync(client, "Fresh Sale Item", 10m);
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(leftover.Id, null, 1m));
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 10m)));
+
+        var sale = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(10m, sale!.TotalAmount);
+        Assert.Equal(item.Id, Assert.Single(sale.Lines).ItemId);
+    }
+
+    [Fact]
+    public async Task Checkout_honours_a_device_issued_receipt_number_and_moves_the_sequence_up_to_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Numbered Water", 10m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 10m),
+                ReceiptNumber: 7));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sale = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(7, sale!.ReceiptNumber);
+
+        var sequence = await client.GetFromJsonAsync<JsonElement>("/transactions/receipt-sequence", JsonOptions);
+        Assert.Equal(7, sequence.GetProperty("lastIssuedNumber").GetInt64());
+    }
+
+    [Fact]
+    public async Task Checkout_rejects_a_receipt_number_this_terminal_already_used()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Duplicate Number Water", 10m);
+
+        CheckoutRequest Sale(long number) => new(
+            Guid.NewGuid(),
+            [new AddTransactionLineRequest(item.Id, null, 1m)],
+            false,
+            null,
+            null,
+            new RecordPaymentRequest(PaymentMethod.Cash, 10m),
+            ReceiptNumber: number);
+
+        var first = await client.PostAsJsonAsync("/transactions/checkout", Sale(3));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var duplicate = await client.PostAsJsonAsync("/transactions/checkout", Sale(3));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+    }
+
+    [Fact]
+    public async Task Checkout_rejects_an_out_of_range_receipt_number()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Range Water", 10m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 10m),
+                ReceiptNumber: 1_000_000));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Checkout_records_an_offline_sale_even_when_the_server_prices_it_differently()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Offline Water", 10m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 100m),
+                ExpectedTotal: 5m,
+                ReceiptNumber: 11,
+                OfflineSale: true,
+                SoldAt: DateTimeOffset.UtcNow.AddHours(-3)));
+
+        // The same request as an online sale is refused with a 409 (see the price-check test above);
+        // offline, the customer already paid, so the sale is recorded at the server's price.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sale = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(TransactionStatus.Completed, sale!.Status);
+        Assert.Equal(10m, sale.TotalAmount);
+        Assert.Equal(11, sale.ReceiptNumber);
+    }
+
+    private static async Task<ItemDto> CreateItemAsync(HttpClient client, string name, decimal price)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest(name, null, null, null, price, null, PricingType.Unit));
+        return (await response.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+    }
+
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
     {
         var client = factory.CreateClient();

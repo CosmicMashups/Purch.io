@@ -14,6 +14,18 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .FirstOrDefaultAsync(transaction => transaction.DeviceId == deviceId && transaction.Status == TransactionStatus.Open, cancellationToken);
     }
 
+    public Task<Transaction?> GetByClientSaleIdAsync(Guid clientSaleId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Transactions
+            .FirstOrDefaultAsync(transaction => transaction.ClientSaleId == clientSaleId, cancellationToken);
+    }
+
+    public Task<bool> ReceiptNumberExistsAsync(Guid deviceId, long receiptNumber, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Transactions
+            .AnyAsync(transaction => transaction.DeviceId == deviceId && transaction.ReceiptNumber == receiptNumber, cancellationToken);
+    }
+
     public Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.Transactions.FirstOrDefaultAsync(transaction => transaction.Id == id, cancellationToken);

@@ -18,5 +18,11 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         _ = builder.HasIndex(t => new { t.TenantId, t.BranchId, t.DeviceId, t.ReceiptNumber })
             .IsUnique()
             .HasFilter("\"ReceiptNumber\" IS NOT NULL");
+
+        // One transaction per client-generated sale id — the idempotency guard for
+        // checkout retries, including two concurrent requests carrying the same id.
+        _ = builder.HasIndex(t => new { t.TenantId, t.ClientSaleId })
+            .IsUnique()
+            .HasFilter("\"ClientSaleId\" IS NOT NULL");
     }
 }

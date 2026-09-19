@@ -1,122 +1,48 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { RequireAuth } from './features/auth/RequireAuth';
+import { LoginPage } from './features/auth/LoginPage';
+import { ItemListPage } from './features/catalog/pages/ItemListPage';
+import { AddItemPage } from './features/catalog/pages/AddItemPage';
+import { EditItemPage } from './features/catalog/pages/EditItemPage';
+import { BatchesPage } from './features/catalog/pages/BatchesPage';
+import { TingiConfigPage } from './features/catalog/pages/TingiConfigPage';
+import { BundleRulesPage } from './features/catalog/pages/BundleRulesPage';
+import { ServiceDurationPage } from './features/catalog/pages/ServiceDurationPage';
+import { VariantsPage } from './features/catalog/pages/VariantsPage';
+import { ComboComponentsPage } from './features/catalog/pages/ComboComponentsPage';
+import { ItemModifierGroupsPage } from './features/catalog/pages/ItemModifierGroupsPage';
+import { AssignDepartmentPage } from './features/catalog/pages/AssignDepartmentPage';
+import { LowStockThresholdPage } from './features/catalog/pages/LowStockThresholdPage';
+import { CategoriesPage } from './features/catalog/pages/CategoriesPage';
+import { ModifierGroupsPage } from './features/catalog/pages/ModifierGroupsPage';
 
-function App() {
-  const [count, setCount] = useState(0)
-
+export function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
 
-      <div className="ticks"></div>
+      <Route element={<RequireAuth />}>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Navigate to="/catalog/items" replace />} />
+          <Route path="/catalog/items" element={<ItemListPage />} />
+          <Route path="/catalog/items/new" element={<AddItemPage />} />
+          <Route path="/catalog/items/:itemId/edit" element={<EditItemPage />} />
+          <Route path="/catalog/items/:itemId/batches" element={<BatchesPage />} />
+          <Route path="/catalog/items/:itemId/tingi-config" element={<TingiConfigPage />} />
+          <Route path="/catalog/items/:itemId/bundle-rules" element={<BundleRulesPage />} />
+          <Route path="/catalog/items/:itemId/service-duration" element={<ServiceDurationPage />} />
+          <Route path="/catalog/items/:itemId/variants" element={<VariantsPage />} />
+          <Route path="/catalog/items/:itemId/combo-components" element={<ComboComponentsPage />} />
+          <Route path="/catalog/items/:itemId/modifier-groups" element={<ItemModifierGroupsPage />} />
+          <Route path="/catalog/items/:itemId/department" element={<AssignDepartmentPage />} />
+          <Route path="/catalog/items/:itemId/low-stock-threshold" element={<LowStockThresholdPage />} />
+          <Route path="/catalog/categories" element={<CategoriesPage />} />
+          <Route path="/catalog/modifier-groups" element={<ModifierGroupsPage />} />
+        </Route>
+      </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <Route path="*" element={<Navigate to="/catalog/items" replace />} />
+    </Routes>
+  );
 }
-
-export default App

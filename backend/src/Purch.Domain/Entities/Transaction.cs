@@ -9,6 +9,12 @@ public class Transaction : TenantScopedEntity
 
     public Guid DeviceId { get; set; }
 
+    /// <summary>Client-generated idempotency key for the one-call checkout (see
+    /// TransactionService.CheckoutAsync): the same SaleId sent twice (a retry after a
+    /// lost response) resolves to this one transaction instead of charging twice.
+    /// Null for carts built through the older cart endpoints.</summary>
+    public Guid? ClientSaleId { get; set; }
+
     /// <summary>Sequential per branch/device, server-generated — see ReceiptSequence.
     /// Null until payment, so more than one open/voided/kiosk-pending transaction
     /// can coexist per device without tripping the (TenantId, BranchId, DeviceId,

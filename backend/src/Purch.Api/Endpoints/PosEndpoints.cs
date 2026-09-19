@@ -54,6 +54,32 @@ public static class PosEndpoints
             Results.Ok(await transactionService.RecordPaymentAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapGet("/transactions/receipt-sequence", async (
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(new { lastIssuedNumber = await transactionService.GetLastIssuedReceiptNumberAsync(cancellationToken) }))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
+        // --- One-call checkout: the device builds the cart locally and sends the whole sale at
+        // payment. Idempotent on SaleId, so a retry after a lost response cannot charge twice. ---
+        _ = app.MapPost("/transactions/checkout", async (
+            CheckoutRequest request,
+            System.Security.Claims.ClaimsPrincipal user,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+        {
+            // The cart endpoint that toggles this discount is Admin/Manager-only; a sale must not
+            // be a way around that just because it arrives in one call.
+            if (request.SeniorPwdDiscountApplied && !posSupervisor.Any(user.IsInRole))
+            {
+                throw new Purch.Application.Common.Exceptions.ForbiddenException(
+                    "Only a manager or admin can apply the Senior Citizen/PWD discount.");
+            }
+
+            return Results.Ok(await transactionService.CheckoutAsync(request, cancellationToken));
+        })
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPut("/transactions/cart/senior-pwd-discount", async (
             ApplySeniorPwdDiscountRequest request,
             ITransactionService transactionService,

@@ -50,6 +50,21 @@ public sealed class TransactionService(
     /// <summary>RA 9994/RA 10754 Senior Citizen/PWD discount — see ApplySeniorPwdDiscountRequest for the VAT-treatment caveat.</summary>
     private const decimal SeniorPwdDiscountRate = 0.20m;
 
+    /// <summary>How far past the terminal's last recorded number a device-issued receipt number may
+    /// jump — wide enough for a long offline stretch, tight enough that a typo or a bad client
+    /// can't burn the sequence.</summary>
+    private const long MaxReceiptNumberJump = 10_000;
+
+    /// <summary>How far back an offline sale's own timestamp is trusted — long enough for any realistic
+    /// offline stretch (the terminal itself stops selling offline well before this), short enough that a
+    /// wrong device clock can't rewrite history.</summary>
+    private static readonly TimeSpan MaxOfflineSaleAge = TimeSpan.FromDays(7);
+
+    /// <summary>Set for the duration of an offline checkout: the time the sale really happened, stamped
+    /// on the sale, its payment and its stock movements instead of the moment the server processed it.
+    /// The service is scoped per request, so this never leaks between sales.</summary>
+    private DateTimeOffset? saleTimeOverride;
+
 
     public async Task<TransactionDto> GetOrCreateOpenCartAsync(CancellationToken cancellationToken = default)
     {
@@ -309,6 +324,101 @@ public sealed class TransactionService(
         return (priceDeltaTotal, selectedIds);
     }
 
+    public async Task<TransactionDto> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.SaleId == Guid.Empty)
+        {
+            throw new ValidationException(nameof(request.SaleId), "A sale id is required.");
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            throw new ValidationException(nameof(request.Lines), "The cart is empty — add an item before checking out.");
+        }
+
+        // Idempotent replay: this exact sale already went through (a retry after a lost
+        // response), so return it as-is instead of building and charging a second one.
+        var existing = await transactionRepository.GetByClientSaleIdAsync(request.SaleId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.Status == TransactionStatus.Completed)
+            {
+                return await ToDtoAsync(existing, cancellationToken);
+            }
+
+            if (existing.DeviceId != CurrentDeviceId)
+            {
+                throw new ConflictException("This sale id was already used by another terminal.");
+            }
+
+            // A previous attempt stopped before payment (validation error, price change, crash).
+            // Discard it and release the id so this attempt can claim it.
+            existing.Status = TransactionStatus.Voided;
+            existing.ClientSaleId = null;
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        // Discard any other unpaid cart this device is still holding (e.g. left by an attempt that
+        // failed midway, or by the older server-side cart flow) so the sale is built on a clean
+        // cart — but never a claimed kiosk order, which is someone's real, pending order.
+        var open = await transactionRepository.GetOpenByDeviceAsync(CurrentDeviceId, cancellationToken);
+        if (open is not null)
+        {
+            if (open.OriginatedFromKiosk)
+            {
+                throw new ConflictException("Finish or void the claimed kiosk order before starting a new sale.");
+            }
+
+            open.Status = TransactionStatus.Voided;
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        cart.ClientSaleId = request.SaleId;
+        if (request.OfflineSale && request.SoldAt is { } soldAt)
+        {
+            var now = DateTimeOffset.UtcNow;
+            saleTimeOverride = soldAt > now ? now : (soldAt < now - MaxOfflineSaleAge ? now - MaxOfflineSaleAge : soldAt);
+            cart.CreatedAt = saleTimeOverride.Value;
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Deliberately no cleanup in a catch: if anything below throws, this cart is left Open
+        // (still holding the SaleId) and the next checkout attempt discards it above, from a
+        // fresh unit of work. Cleaning up here would re-save whatever half-applied changes
+        // (e.g. a credit-ledger balance) the failed step left in the change tracker.
+        foreach (var line in request.Lines)
+        {
+            _ = await AddLineAsync(line, cancellationToken);
+        }
+
+        if (request.SeniorPwdDiscountApplied)
+        {
+            _ = await ApplySeniorPwdDiscountAsync(new ApplySeniorPwdDiscountRequest(true), cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PromoCode))
+        {
+            _ = await ApplyPromoCodeAsync(new ApplyPromoCodeRequest(request.PromoCode), cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.OrderType))
+        {
+            _ = await SetOrderTypeAsync(new SetOrderTypeRequest(request.OrderType), cancellationToken);
+        }
+
+        // An offline sale is already paid for at the device's price — refusing it now would leave the
+        // customer with a receipt for a sale the books never see. It is recorded at the server's price.
+        if (!request.OfflineSale && request.ExpectedTotal is { } expectedTotal && Math.Abs(cart.TotalAmount - expectedTotal) > 0.005m)
+        {
+            throw new ConflictException(
+                $"Prices or promos changed: the total is now {cart.TotalAmount:F2} (the device showed {expectedTotal:F2}). Review the cart and try again.");
+        }
+
+        return await RecordPaymentCoreAsync(request.Payment, request.ReceiptNumber, cancellationToken);
+    }
+
     public async Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Quantity <= 0)
@@ -359,7 +469,18 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
-    public async Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
+    public async Task<long> GetLastIssuedReceiptNumberAsync(CancellationToken cancellationToken = default)
+    {
+        var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, CurrentBranchId, CurrentDeviceId, cancellationToken);
+        return sequence.LastIssuedNumber;
+    }
+
+    public Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
+    {
+        return RecordPaymentCoreAsync(request, deviceIssuedReceiptNumber: null, cancellationToken);
+    }
+
+    private async Task<TransactionDto> RecordPaymentCoreAsync(RecordPaymentRequest request, long? deviceIssuedReceiptNumber, CancellationToken cancellationToken)
     {
         if (!SupportedPaymentMethods.Contains(request.Method))
         {
@@ -396,6 +517,7 @@ public sealed class TransactionService(
         paymentRepository.Add(new Payment
         {
             TenantId = CurrentTenantId,
+            CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
             TransactionId = cart.Id,
             Method = request.Method,
             Status = PaymentStatus.Confirmed,
@@ -405,8 +527,30 @@ public sealed class TransactionService(
         });
 
         var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, cart.BranchId, cart.DeviceId, cancellationToken);
-        sequence.LastIssuedNumber += 1;
-        cart.ReceiptNumber = sequence.LastIssuedNumber;
+        if (deviceIssuedReceiptNumber is { } issuedNumber)
+        {
+            // The terminal numbered this sale itself (so it could print before the server saw it).
+            // Numbers are unique per terminal and never reused; the high-water mark moves up to
+            // the number rather than incrementing, since a device may sync slightly out of order.
+            if (issuedNumber <= 0 || issuedNumber > sequence.LastIssuedNumber + MaxReceiptNumberJump)
+            {
+                throw new ValidationException(nameof(CheckoutRequest.ReceiptNumber), "That receipt number is out of range for this terminal.");
+            }
+
+            if (await transactionRepository.ReceiptNumberExistsAsync(cart.DeviceId, issuedNumber, cancellationToken))
+            {
+                throw new ConflictException($"Receipt number {issuedNumber} was already issued to this terminal.");
+            }
+
+            sequence.LastIssuedNumber = Math.Max(sequence.LastIssuedNumber, issuedNumber);
+            cart.ReceiptNumber = issuedNumber;
+        }
+        else
+        {
+            sequence.LastIssuedNumber += 1;
+            cart.ReceiptNumber = sequence.LastIssuedNumber;
+        }
+
         cart.Status = TransactionStatus.Completed;
 
         await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
@@ -448,6 +592,7 @@ public sealed class TransactionService(
             inventoryMovementRepository.Add(new InventoryMovement
             {
                 TenantId = CurrentTenantId,
+                CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
                 ItemId = item.Id,
                 BranchId = cart.BranchId,
                 Type = MovementType.Sale,
@@ -495,6 +640,7 @@ public sealed class TransactionService(
                 inventoryMovementRepository.Add(new InventoryMovement
                 {
                     TenantId = CurrentTenantId,
+                    CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
                     InventoryItemId = inventoryItem.Id,
                     BranchId = cart.BranchId,
                     Type = MovementType.Consumption,

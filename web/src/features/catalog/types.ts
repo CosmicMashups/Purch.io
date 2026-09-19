@@ -1,17 +1,19 @@
-export enum PricingType {
-  Unit = 0,
-  WeightVolume = 1,
-  Bundle = 2,
-  Service = 3,
-  Combo = 4,
-  VariantMatrix = 5,
-}
+export const PricingType = {
+  Unit: 0,
+  WeightVolume: 1,
+  Bundle: 2,
+  Service: 3,
+  Combo: 4,
+  VariantMatrix: 5,
+} as const;
+export type PricingType = (typeof PricingType)[keyof typeof PricingType];
 
-export enum TingiMode {
-  None = 0,
-  Fixed = 1,
-  Increment = 2,
-}
+export const TingiMode = {
+  None: 0,
+  Fixed: 1,
+  Increment: 2,
+} as const;
+export type TingiMode = (typeof TingiMode)[keyof typeof TingiMode];
 
 export interface Category {
   id: string;
