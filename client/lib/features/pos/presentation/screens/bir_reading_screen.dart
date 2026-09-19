@@ -254,6 +254,16 @@ class _ReadingReport extends StatelessWidget {
               '₱${reading.newGrandAccumulatedSales.toStringAsFixed(2)}',
             ),
             _Row('Reset counter', '${reading.resetCounter}'),
+            if (reading.lateReceiptNumbers.isNotEmpty)
+              _Row(
+                'Late-synced receipts (included above)',
+                reading.lateReceiptNumbers.join(', '),
+              ),
+            if (reading.missingReceiptNumbers.isNotEmpty)
+              _Row(
+                'Receipt numbers not recorded on the server',
+                reading.missingReceiptNumbers.join(', '),
+              ),
           ],
         ),
       ),

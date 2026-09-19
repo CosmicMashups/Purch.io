@@ -30,4 +30,11 @@ public sealed record BirReadingDto(
     decimal VoidedAmount,
     decimal OldGrandAccumulatedSales,
     decimal NewGrandAccumulatedSales,
-    int ResetCounter);
+    int ResetCounter,
+    // Receipts in this reading numbered at or below the previous Z-reading's ending number: sales that
+    // reached the server only after a later number had already been read (e.g. an offline sale syncing
+    // late). Listed so the reading discloses them rather than silently absorbing them.
+    IReadOnlyList<long> LateReceiptNumbers,
+    // Numbers between the previous reading and this one's ending number that have no completed sale on
+    // the server — not yet synced, refused, or voided. Capped, for a gap-auditable trail.
+    IReadOnlyList<long> MissingReceiptNumbers);

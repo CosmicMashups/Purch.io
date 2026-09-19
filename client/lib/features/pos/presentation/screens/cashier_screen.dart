@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/routing/auth_gate.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -13,6 +14,7 @@ import '../../../catalog/domain/pricing_type.dart';
 import '../../../catalog/domain/tingi_mode.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../catalog/presentation/screens/add_item_screen.dart';
+import '../../../onboarding/domain/onboarding_enums.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../../onboarding/presentation/screens/hardware_settings_screen.dart';
 import '../../domain/transaction_models.dart';
@@ -22,6 +24,7 @@ import 'item_modifier_customization_dialog.dart';
 import 'payment_screen.dart';
 import 'tingi_weight_dialog.dart';
 import 'variant_picker_screen.dart';
+import '../widgets/offline_sales_banner.dart';
 
 /// The Cashier screen — D1's item grid and cart, merged.
 ///
@@ -368,7 +371,31 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     backgroundColor: AppColors.surface,
                     child: SafeArea(child: CartPanel()),
                   ),
-          body:
+          body: Column(
+            children: [
+              const OfflineSalesBanner(),
+              Expanded(
+                child: _buildBody(showSidePanel, categorySelector, itemGrid),
+              ),
+            ],
+          ),
+          bottomNavigationBar:
+              showSidePanel || cart == null || cart.lines.isEmpty
+                  ? null
+                  : _CartSummaryBar(
+                    cart: cart,
+                    onOpen: () => _scaffoldKey.currentState?.openEndDrawer(),
+                  ),
+        );
+      },
+    );
+  }
+  Widget _buildBody(
+    bool showSidePanel,
+    Widget categorySelector,
+    Widget itemGrid,
+  ) {
+    return
               showSidePanel
                   ? Row(
                     children: [
@@ -390,17 +417,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   )
                   : Column(
                     children: [categorySelector, Expanded(child: itemGrid)],
-                  ),
-          bottomNavigationBar:
-              showSidePanel || cart == null || cart.lines.isEmpty
-                  ? null
-                  : _CartSummaryBar(
-                    cart: cart,
-                    onOpen: () => _scaffoldKey.currentState?.openEndDrawer(),
-                  ),
-        );
-      },
-    );
+                  );
   }
 }
 
@@ -1431,10 +1448,16 @@ class _CartFooter extends ConsumerWidget {
             value: cart.seniorPwdDiscountApplied,
             activeColor: AppColors.brandPrimary,
             dense: true,
+            // The backend only lets an Admin or Manager apply this discount
+            // (an audit-trailed action), and re-checks it at checkout. Disable
+            // it for everyone else rather than letting a cashier apply it on
+            // screen and get the sale rejected at payment.
             onChanged:
-                (value) => ref
-                    .read(cartNotifierProvider.notifier)
-                    .applySeniorPwdDiscount(value),
+                _canApplySeniorPwd(ref)
+                    ? (value) => ref
+                        .read(cartNotifierProvider.notifier)
+                        .applySeniorPwdDiscount(value)
+                    : null,
             title: const Text(
               'Senior Citizen/PWD Discount (20%)',
               style: TextStyle(
@@ -1951,4 +1974,11 @@ class _TotalsRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Whether the signed-in staff member may apply the Senior/PWD discount —
+/// mirrors the backend's Admin/Manager-only rule.
+bool _canApplySeniorPwd(WidgetRef ref) {
+  final role = ref.watch(currentStaffRoleProvider).valueOrNull;
+  return role == StaffRole.admin || role == StaffRole.manager;
 }

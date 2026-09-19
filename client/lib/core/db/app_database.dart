@@ -6,10 +6,14 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'daos/device_identity_dao.dart';
+import 'daos/local_cart_draft_dao.dart';
+import 'daos/queued_sale_dao.dart';
 import 'daos/sync_queue_dao.dart';
 import 'tables/cached_branding_table.dart';
 import 'tables/device_identity_table.dart';
+import 'tables/local_cart_draft_table.dart';
 import 'tables/pending_sync_queue_table.dart';
+import 'tables/queued_sale_table.dart';
 
 part 'app_database.g.dart';
 
@@ -18,8 +22,14 @@ part 'app_database.g.dart';
 /// only what a device needs cached/queued locally, not a full mirror — see
 /// docs/ARCHITECTURE.md §2 ("Local persistence").
 @DriftDatabase(
-  tables: [PendingSyncQueue, CachedBranding, DeviceIdentity],
-  daos: [SyncQueueDao, DeviceIdentityDao],
+  tables: [
+    PendingSyncQueue,
+    CachedBranding,
+    DeviceIdentity,
+    LocalCartDrafts,
+    QueuedSales,
+  ],
+  daos: [SyncQueueDao, DeviceIdentityDao, LocalCartDraftDao, QueuedSaleDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -27,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -50,6 +60,14 @@ class AppDatabase extends _$AppDatabase {
         // v3 → v4: new device_identity table — this device's own id/tenant/
         // branch plus its cached last-issued receipt number.
         await m.createTable(deviceIdentity);
+      }
+      if (from < 5) {
+        // v4 → v5: the Cashier's on-device draft cart.
+        await m.createTable(localCartDrafts);
+      }
+      if (from < 6) {
+        // v5 → v6: sales completed offline, waiting to be sent to the server.
+        await m.createTable(queuedSales);
       }
     },
   );

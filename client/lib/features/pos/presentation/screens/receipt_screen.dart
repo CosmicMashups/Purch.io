@@ -92,6 +92,30 @@ class ReceiptScreen extends ConsumerWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 4),
+                                  if (cart.savedOffline) ...[
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accentWarm.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'Saved offline — this sale will be '
+                                        'recorded when the connection returns.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                   Text(
                                     'Transaction Complete',
                                     style: GoogleFonts.plusJakartaSans(

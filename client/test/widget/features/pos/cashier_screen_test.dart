@@ -7,6 +7,8 @@ import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
 import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
+import 'package:purch_client/core/routing/auth_gate.dart';
+import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/cashier_screen.dart';
@@ -186,12 +188,14 @@ class _CategoriesDownCatalogRepository extends FakeCatalogRepository {
 
 Widget _wrap(
   FakeCatalogRepository catalogRepository,
-  FakePosRepository posRepository,
-) {
+  FakePosRepository posRepository, {
+  StaffRole role = StaffRole.cashier,
+}) {
   return ProviderScope(
     overrides: [
       catalogRepositoryProvider.overrideWithValue(catalogRepository),
       posRepositoryProvider.overrideWithValue(posRepository),
+      currentStaffRoleProvider.overrideWith((ref) async => role),
     ],
     child: const MaterialApp(home: CashierScreen()),
   );
@@ -399,11 +403,24 @@ void main() {
       );
     });
 
-    testWidgets('toggling the senior/PWD switch applies the 20% discount', (
+    testWidgets('a cashier cannot toggle the senior/PWD switch (manager/admin only)', (
       tester,
     ) async {
       final repository = FakePosRepository(initialCart: _cartWithOneLine);
       await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+      await tester.pumpAndSettle();
+
+      final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(tile.onChanged, isNull);
+    });
+
+    testWidgets('toggling the senior/PWD switch applies the 20% discount', (
+      tester,
+    ) async {
+      final repository = FakePosRepository(initialCart: _cartWithOneLine);
+      await tester.pumpWidget(
+        _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(SwitchListTile));

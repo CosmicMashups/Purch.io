@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purch_client/features/pos/data/sale_queue.dart';
 import 'package:purch_client/features/pos/presentation/providers/bir_reading_providers.dart';
+import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/bir_reading_screen.dart';
 
 import '../../../helpers/fake_bir_reading_repository.dart';
 
 Widget _wrap(FakeBirReadingRepository repository) {
   return ProviderScope(
-    overrides: [birReadingRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      birReadingRepositoryProvider.overrideWithValue(repository),
+      // The Z-reading checks the offline sale queue first; an empty in-memory
+      // one stands in for the terminal's database.
+      saleQueueStoreProvider.overrideWithValue(MemorySaleQueueStore()),
+    ],
     child: const MaterialApp(home: BirReadingScreen()),
   );
 }

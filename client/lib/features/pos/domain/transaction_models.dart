@@ -83,6 +83,13 @@ class Transaction {
 
   int get itemCount =>
       lines.fold(0, (total, line) => total + line.quantity.ceil());
+
+  /// True for a sale completed at the counter while the terminal was offline:
+  /// it is real to the customer (receipt, payment) but the server has not
+  /// recorded it yet. Its id is local, not a server transaction id.
+  bool get savedOffline => id.startsWith(offlineSaleIdPrefix);
+
+  static const offlineSaleIdPrefix = 'offline-';
 }
 
 /// Mirrors Purch.Application.Pos.PaymentDto.
@@ -123,6 +130,14 @@ class RecordPaymentRequest {
     this.amountTendered,
     this.customerCreditLedgerId,
   });
+
+  factory RecordPaymentRequest.fromJson(Map<String, dynamic> json) {
+    return RecordPaymentRequest(
+      method: PaymentMethod.values[json['method'] as int],
+      amountTendered: (json['amountTendered'] as num?)?.toDouble(),
+      customerCreditLedgerId: json['customerCreditLedgerId'] as String?,
+    );
+  }
 
   final PaymentMethod method;
   final double? amountTendered;
@@ -263,6 +278,21 @@ class AddTransactionLineRequest {
     this.selectedModifierIds,
   });
 
+  factory AddTransactionLineRequest.fromJson(Map<String, dynamic> json) {
+    return AddTransactionLineRequest(
+      itemId: json['itemId'] as String,
+      itemVariantId: json['itemVariantId'] as String?,
+      quantity: (json['quantity'] as num).toDouble(),
+      comboSelections:
+          (json['comboSelections'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>()
+              .map(ComboSelectionRequest.fromJson)
+              .toList(),
+      selectedModifierIds:
+          (json['selectedModifierIds'] as List<dynamic>?)?.cast<String>().toList(),
+    );
+  }
+
   final String itemId;
   final String? itemVariantId;
   final double quantity;
@@ -278,6 +308,82 @@ class AddTransactionLineRequest {
   };
 }
 
+/// Mirrors Purch.Application.Pos.CheckoutRequest — a whole sale in one call.
+/// [saleId] is the idempotency key: resending the same id after a lost
+/// response returns the already-completed sale instead of charging twice.
+class CheckoutRequest {
+  const CheckoutRequest({
+    required this.saleId,
+    required this.lines,
+    required this.seniorPwdDiscountApplied,
+    required this.promoCode,
+    required this.orderType,
+    required this.payment,
+    this.expectedTotal,
+    this.receiptNumber,
+    this.offlineSale = false,
+    this.soldAt,
+  });
+
+  factory CheckoutRequest.fromJson(Map<String, dynamic> json) {
+    return CheckoutRequest(
+      saleId: json['saleId'] as String,
+      lines:
+          (json['lines'] as List<dynamic>)
+              .cast<Map<String, dynamic>>()
+              .map(AddTransactionLineRequest.fromJson)
+              .toList(),
+      seniorPwdDiscountApplied: json['seniorPwdDiscountApplied'] as bool,
+      promoCode: json['promoCode'] as String?,
+      orderType: json['orderType'] as String?,
+      payment: RecordPaymentRequest.fromJson(
+        json['payment'] as Map<String, dynamic>,
+      ),
+      expectedTotal: (json['expectedTotal'] as num?)?.toDouble(),
+      receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
+      offlineSale: json['offlineSale'] as bool? ?? false,
+      soldAt:
+          json['soldAt'] == null ? null : DateTime.parse(json['soldAt'] as String),
+    );
+  }
+
+  final String saleId;
+  final List<AddTransactionLineRequest> lines;
+  final bool seniorPwdDiscountApplied;
+  final String? promoCode;
+  final String? orderType;
+  final RecordPaymentRequest payment;
+
+  /// What the device showed the customer; the server refuses to charge if it
+  /// prices the cart differently.
+  final double? expectedTotal;
+
+  /// The number this terminal issued for the sale from its own per-device
+  /// sequence. Null lets the server issue one.
+  final int? receiptNumber;
+
+  /// True when the sale was already completed at the counter while the terminal
+  /// was offline; the server then records it at its own price rather than
+  /// refusing it over a price difference.
+  final bool offlineSale;
+
+  /// When the sale really happened (only meaningful with [offlineSale]).
+  final DateTime? soldAt;
+
+  Map<String, dynamic> toJson() => {
+    'saleId': saleId,
+    'lines': lines.map((l) => l.toJson()).toList(),
+    'seniorPwdDiscountApplied': seniorPwdDiscountApplied,
+    'promoCode': promoCode,
+    'orderType': orderType,
+    'payment': payment.toJson(),
+    'expectedTotal': expectedTotal,
+    'receiptNumber': receiptNumber,
+    'offlineSale': offlineSale,
+    'soldAt': soldAt?.toUtc().toIso8601String(),
+  };
+}
+
 /// Mirrors Purch.Application.Pos.ComboSelectionRequest — one picked component
 /// for a Combo item's slot. A slot requiring N items needs N of these
 /// carrying the same slotId.
@@ -286,6 +392,13 @@ class ComboSelectionRequest {
     required this.slotId,
     required this.selectedItemId,
   });
+
+  factory ComboSelectionRequest.fromJson(Map<String, dynamic> json) {
+    return ComboSelectionRequest(
+      slotId: json['slotId'] as String,
+      selectedItemId: json['selectedItemId'] as String,
+    );
+  }
 
   final String slotId;
   final String selectedItemId;
