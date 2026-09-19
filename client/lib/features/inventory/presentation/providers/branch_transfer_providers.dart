@@ -1,3 +1,4 @@
+import '../../../../core/data/data_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -39,6 +40,7 @@ class CreateBranchTransferController extends _$CreateBranchTransferController {
     state = await AsyncValue.guard(() => repository.createTransfer(request));
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(branchTransferListProvider.notifier).refresh();
     }
     return succeeded;
@@ -73,6 +75,7 @@ class BranchTransferActionController extends _$BranchTransferActionController {
     state = await AsyncValue.guard(() => action(repository));
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(branchTransferListProvider.notifier).refresh();
     }
     return succeeded;

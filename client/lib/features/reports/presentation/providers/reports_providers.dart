@@ -7,6 +7,7 @@ import '../../data/reports_repository_impl.dart';
 import '../../domain/category_sales_models.dart';
 import '../../domain/department_sales_models.dart';
 import '../../domain/inventory_report_models.dart';
+import '../../../../core/data/data_refresh.dart';
 import '../../domain/reports_repository.dart';
 import '../../domain/sales_dashboard_models.dart';
 import '../../domain/sales_trend_models.dart';
@@ -19,16 +20,13 @@ ReportsRepository reportsRepository(Ref ref) {
   return ReportsRepositoryImpl(apiClient: ref.watch(apiClientProvider));
 }
 
-/// keepAlive: these all back Home dashboard charts, which sit in a plain
-/// ListView — Flutter's Sliver machinery still mounts/unmounts list items
-/// lazily based on the viewport's cache extent, same as ListView.builder, so
-/// autoDispose (the default) would tear the fetched data down and refetch
-/// from the network every time a chart scrolls far enough off-screen and
-/// back. The data only changes when RefreshIndicator invalidates it or the
-/// range/filter changes, so there's nothing to gain from disposing it on a
-/// scroll.
-@Riverpod(keepAlive: true)
+/// Short-lived cache (see [CacheFor]): these back Home dashboard charts in a
+/// plain ListView that mounts/unmounts children as they scroll, so a scroll
+/// must not refetch — but the data must not outlive a minute either, and any
+/// sale/stock write invalidates it explicitly via refreshStockAndSalesData.
+@riverpod
 Future<SalesDashboard> salesDashboard(Ref ref, {String? branchId}) {
+  ref.cacheFor(const Duration(seconds: 45));
   return ref
       .watch(reportsRepositoryProvider)
       .getSalesDashboard(branchId: branchId);
@@ -37,7 +35,7 @@ Future<SalesDashboard> salesDashboard(Ref ref, {String? branchId}) {
 /// Home's trend chart — one provider instance per (granularity, range)
 /// combination, so switching Day → Week → Custom re-queries rather than
 /// re-filtering a fixed 14-day window client-side.
-@Riverpod(keepAlive: true)
+@riverpod
 Future<SalesTrendSeries> salesTrend(
   Ref ref, {
   String? branchId,
@@ -45,6 +43,7 @@ Future<SalesTrendSeries> salesTrend(
   required DateTime toDate,
   required SalesTrendGranularity granularity,
 }) {
+  ref.cacheFor(const Duration(seconds: 45));
   return ref
       .watch(reportsRepositoryProvider)
       .getSalesTrend(
@@ -58,11 +57,12 @@ Future<SalesTrendSeries> salesTrend(
 /// Revenue by catalog category. Composed here rather than in the reports
 /// repository because the item→category mapping is a catalog concern and the
 /// backend exposes no category-sales endpoint — see [aggregateCategorySales].
-@Riverpod(keepAlive: true)
+@riverpod
 Future<List<CategorySalesSummary>> categorySales(
   Ref ref, {
   String? branchId,
 }) async {
+  ref.cacheFor(const Duration(seconds: 45));
   final dashboard = await ref.watch(salesDashboardProvider(branchId: branchId).future);
   final items = await ref.watch(itemListProvider.future);
   final categories = await ref.watch(categoryListProvider.future);
@@ -74,7 +74,7 @@ Future<List<CategorySalesSummary>> categorySales(
   );
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 Future<MovementSummary> movementSummary(
   Ref ref, {
   String? branchId,
@@ -84,30 +84,33 @@ Future<MovementSummary> movementSummary(
   required DateTime fromDate,
   required DateTime toDate,
 }) {
+  ref.cacheFor(const Duration(seconds: 45));
   return ref
       .watch(reportsRepositoryProvider)
       .getMovementSummary(branchId: branchId, from: fromDate, to: toDate);
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 Future<StaffPerformanceReport> staffPerformance(
   Ref ref, {
   String? branchId,
   required DateTime fromDate,
   required DateTime toDate,
 }) {
+  ref.cacheFor(const Duration(seconds: 45));
   return ref
       .watch(reportsRepositoryProvider)
       .getStaffPerformance(branchId: branchId, from: fromDate, to: toDate);
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 Future<List<DepartmentSalesSummary>> departmentSales(
   Ref ref, {
   String? branchId,
   required DateTime fromDate,
   required DateTime toDate,
 }) {
+  ref.cacheFor(const Duration(seconds: 45));
   return ref
       .watch(reportsRepositoryProvider)
       .getDepartmentSales(branchId: branchId, from: fromDate, to: toDate);

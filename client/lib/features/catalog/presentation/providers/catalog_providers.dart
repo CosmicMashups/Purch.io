@@ -1,3 +1,4 @@
+import '../../../../core/data/data_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -111,6 +112,7 @@ class CreateItemController extends _$CreateItemController {
     state = await AsyncValue.guard(() => repository.createItem(request));
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -136,6 +138,7 @@ class UpdateItemController extends _$UpdateItemController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -392,6 +395,7 @@ class UpdateTingiConfigController extends _$UpdateTingiConfigController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -420,6 +424,7 @@ class UpdateServiceDurationController
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -484,6 +489,7 @@ class UpdateItemDepartmentController extends _$UpdateItemDepartmentController {
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;
@@ -510,6 +516,7 @@ class UpdateLowStockThresholdController
     );
     final succeeded = !state.hasError;
     if (succeeded) {
+      refreshStockAndSalesData(ref);
       await ref.read(itemListProvider.notifier).refresh();
     }
     return succeeded;

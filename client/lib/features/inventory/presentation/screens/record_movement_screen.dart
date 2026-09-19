@@ -250,7 +250,7 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
                         items: [
                           // Sale is system-generated only, from a completed Cashier
                           // sale — never a manual entry here.
-                          for (final type in MovementType.values.where(
+                          for (final type in MovementType.selectable.where(
                             (type) => type != MovementType.sale,
                           ))
                             DropdownMenuItem(

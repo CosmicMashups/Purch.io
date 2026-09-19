@@ -1420,7 +1420,8 @@ Color _movementColor(MovementType type) => switch (type) {
   MovementType.forReturn => const Color(0xFF7C3AED),
   MovementType.transfer => const Color(0xFF64748B),
   MovementType.adjustment => AppColors.accentEmerald,
-  MovementType.sale => AppColors.brandPrimary,
+  MovementType.sale => const Color(0xFFEA580C),
+  MovementType.other => const Color(0xFF94A3B8),
 };
 
 class _MovementSummaryChart extends ConsumerWidget {

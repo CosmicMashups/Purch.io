@@ -34,7 +34,7 @@ class MovementTypeSummary {
 
   factory MovementTypeSummary.fromJson(Map<String, dynamic> json) {
     return MovementTypeSummary(
-      type: MovementType.values[json['type'] as int],
+      type: MovementType.fromServer(json['type']),
       totalQuantity: (json['totalQuantity'] as num).toDouble(),
       movementCount: json['movementCount'] as int,
     );

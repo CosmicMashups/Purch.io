@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_config.dart';
+import 'core/data/data_refresh.dart';
 import 'core/routing/app_router.dart';
+import 'core/session/session_scope.dart';
 import 'core/storage/server_connection_storage.dart';
 import 'core/theming/theme_builder.dart';
 
@@ -14,14 +16,42 @@ void main() async {
   final savedBaseUrl = await ServerConnectionStorage().readBaseUrl();
   AppConfig.setApiBaseUrlOverride(savedBaseUrl);
 
-  runApp(const ProviderScope(child: PurchApp()));
+  runApp(const SessionScope(child: PurchApp()));
 }
 
-class PurchApp extends ConsumerWidget {
+class PurchApp extends ConsumerStatefulWidget {
   const PurchApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PurchApp> createState() => _PurchAppState();
+}
+
+class _PurchAppState extends ConsumerState<PurchApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Coming back to the app (after minimising, a screen lock, or a long idle)
+  /// is when cached dashboard/inventory data is most likely to be stale, so
+  /// drop it and let whatever is on screen refetch.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      refreshStockAndSalesDataFromWidget(ref);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Purch.io',
       // Built at runtime from the tenant's cached branding colours, so an
