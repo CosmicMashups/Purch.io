@@ -19,7 +19,13 @@ RUN dotnet publish src/Purch.Api/Purch.Api.csproj -c Release -o /app/publish --n
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+
+# --chown to the base image's non-root runtime user (it runs as $APP_UID by
+# default, not root) — without it /app ends up root-owned and unwritable by
+# the process that actually runs, which crashed every request before the app
+# could serve anything or log why (see Program.cs's Local-mode-only disk
+# writes, gated off in Cloud mode specifically because of this).
+COPY --chown=$APP_UID:$APP_UID --from=build /app/publish .
 
 # Vercel injects PORT at runtime; 8080 here is just the local/default value.
 # ASPNETCORE_HTTP_PORTS (not ASPNETCORE_URLS) is what the base image's

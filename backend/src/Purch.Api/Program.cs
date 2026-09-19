@@ -231,10 +231,12 @@ if (args is ["migrate"])
 // owner running the installer shouldn't need the EF Core CLI, so a
 // Local-mode instance migrates its own database once at startup instead;
 // Cloud's migrations run via the "migrate" preDeployCommand above.
+DeploymentMode deploymentMode;
 using (var startupScope = app.Services.CreateScope())
 {
     var deploymentContext = startupScope.ServiceProvider.GetRequiredService<IDeploymentContext>();
     var dbContext = startupScope.ServiceProvider.GetRequiredService<PurchDbContext>();
+    deploymentMode = deploymentContext.Mode;
 
     if (deploymentContext.Mode == DeploymentMode.Local)
     {
@@ -276,18 +278,28 @@ app.UseExceptionHandler();
 // in a ProblemDetails body for those too, so no error response is ever silently empty.
 app.UseStatusCodePages();
 
-var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
-if (!Directory.Exists(webRootPath))
+// Only Local mode's LocalFileStorage ever writes here (Cloud mode's
+// SupabaseFileStorage never touches local disk — see IFileStorage) —
+// creating these directories unconditionally used to crash Cloud-mode
+// containers whose runtime image runs as a non-root user with no write
+// access to its own working directory (e.g. the chiseled image used for
+// Vercel's container deploy; see Dockerfile.vercel), since this ran before
+// the app could serve a single request or log anything.
+if (deploymentMode == DeploymentMode.Local)
 {
-    Directory.CreateDirectory(webRootPath);
-}
-var defaultUploadsPath = Path.Combine(webRootPath, "uploads");
-if (!Directory.Exists(defaultUploadsPath))
-{
-    Directory.CreateDirectory(defaultUploadsPath);
-}
+    var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    if (!Directory.Exists(webRootPath))
+    {
+        Directory.CreateDirectory(webRootPath);
+    }
+    var defaultUploadsPath = Path.Combine(webRootPath, "uploads");
+    if (!Directory.Exists(defaultUploadsPath))
+    {
+        Directory.CreateDirectory(defaultUploadsPath);
+    }
 
-app.UseStaticFiles();
+    app.UseStaticFiles();
+}
 
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
