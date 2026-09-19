@@ -73,7 +73,11 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
                     "A record with these details already exists.",
                     httpContext)),
 
-            NpgsqlException or TimeoutException => (
+            // PostgresException (bad SQL, missing column/table, constraint failures) is also an
+            // NpgsqlException, but it means the database WAS reached — reporting it as
+            // "unable to reach the database" hid the real cause (e.g. an unapplied migration),
+            // so only genuine connectivity failures map to 503; the rest fall through to 500.
+            (NpgsqlException and not PostgresException) or TimeoutException => (
                 StatusCodes.Status503ServiceUnavailable,
                 BuildProblemDetails(
                     StatusCodes.Status503ServiceUnavailable,
