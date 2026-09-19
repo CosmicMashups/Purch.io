@@ -8,6 +8,8 @@ interface AuthState {
   refreshToken: string | null;
   setTokens: (accessToken: string, refreshToken: string) => void;
   clearTokens: () => void;
+  /** Adopts whatever another tab last wrote to localStorage. */
+  syncFromStorage: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -23,4 +25,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     set({ accessToken: null, refreshToken: null });
   },
+  syncFromStorage: () =>
+    set({
+      accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
+      refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
+    }),
 }));
+
+// Refresh tokens are single-use, so two tabs must never each hold their own copy: the moment one
+// tab rotates the pair (or signs out), every other tab adopts it, instead of redeeming a token that
+// is already spent and getting logged out.
+window.addEventListener('storage', (event) => {
+  if (event.key === null || event.key === ACCESS_TOKEN_KEY || event.key === REFRESH_TOKEN_KEY) {
+    useAuthStore.getState().syncFromStorage();
+  }
+});

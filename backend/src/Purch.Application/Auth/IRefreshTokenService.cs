@@ -12,12 +12,13 @@ public interface IRefreshTokenService
     /// in plaintext, since only its hash is stored.</summary>
     Task<string> IssueAsync(Guid tenantId, Guid? userId, Guid? deviceId, CancellationToken cancellationToken = default);
 
-    /// <summary>Validates a raw refresh token and atomically revokes it (single-use —
-    /// each refresh rotates to a new token), returning who it belonged to. Returns null
-    /// for a token that's missing, expired, or already revoked/redeemed, including a
-    /// reused one — reuse of an already-rotated token is exactly the signal that the
-    /// token leaked, so it's treated the same as any other invalid token rather than
-    /// given special handling.</summary>
+    /// <summary>Validates a raw refresh token and stages its revocation (single-use — each refresh
+    /// rotates to a new token), returning who it belonged to. Returns null for a token that's missing,
+    /// expired, or already rotated more than a short grace window ago (or revoked by logout/reset).
+    /// The revocation is NOT saved here: the caller must follow with <see cref="IssueAsync"/>, whose
+    /// save commits the revoke and the replacement together — never burn a client's token without
+    /// handing it a new one. A just-rotated token is still accepted for ~60s so a lost response
+    /// doesn't force a re-login.</summary>
     Task<RefreshTokenOwner?> RedeemAsync(string rawToken, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes a refresh token without issuing a replacement — used on logout

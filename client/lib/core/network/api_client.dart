@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../auth/jwt_claims.dart';
 import '../config/app_config.dart';
 import '../storage/secure_token_storage.dart';
 
@@ -49,7 +51,23 @@ class ApiClient {
     this.dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _tokenStorage.readAccessToken();
+          var token = await _tokenStorage.readAccessToken();
+
+          // Renew a token that is about to expire (or already has) *before*
+          // sending the request, rather than sending it, taking a 401 and
+          // retrying. A failure here is deliberately ignored: the request goes
+          // out with what we have and the 401 handler below decides what a
+          // failed refresh means for the session.
+          if (token != null &&
+              !_tokenIssuingPaths.contains(options.path) &&
+              _expiresSoon(token)) {
+            try {
+              token = await _refreshAccessToken() ?? token;
+            } on DioException {
+              // See above.
+            }
+          }
+
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -79,6 +97,11 @@ class ApiClient {
             // which is exactly what was happening periodically during a
             // shift. Leave the stored tokens alone so the next request gets
             // another chance to refresh.
+            _log(
+              'token refresh failed '
+              '(${refreshError.response?.statusCode ?? refreshError.type.name}) '
+              'while calling $path',
+            );
             if (refreshError.response?.statusCode == 401) {
               await _tokenStorage.clear();
               onSessionExpired?.call();
@@ -107,6 +130,21 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  /// How far ahead of an access token's expiry to renew it.
+  static const _refreshLeeway = Duration(minutes: 2);
+
+  static bool _expiresSoon(String accessToken) {
+    final expiry = expiryFromJwt(accessToken);
+    return expiry != null &&
+        expiry.isBefore(DateTime.now().toUtc().add(_refreshLeeway));
+  }
+
+  static void _log(String message) {
+    if (kDebugMode) {
+      debugPrint('ApiClient: $message');
+    }
   }
 
   final Dio dio;
