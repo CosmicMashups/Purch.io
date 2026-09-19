@@ -19,6 +19,16 @@ Map<String, dynamic>? _decodeJwtPayload(String token) {
   }
 }
 
+/// When the access token stops being accepted (its `exp` claim), or null if it
+/// can't be read. Lets the client renew a token shortly *before* it expires
+/// instead of waiting for a request to fail with a 401.
+DateTime? expiryFromJwt(String token) {
+  final exp = _decodeJwtPayload(token)?['exp'];
+  return exp is num
+      ? DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true)
+      : null;
+}
+
 /// The "role" claim — read back out at startup so the app can decide which
 /// shell to land on (staff app vs. kiosk) without a second stored flag that
 /// could drift out of sync with what the token actually says.

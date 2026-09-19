@@ -17,6 +17,12 @@ public sealed class TokenRefreshService(
         var user = owner.UserId is { } userId ? await userRepository.GetByIdAsync(userId, cancellationToken) : null;
         var device = owner.DeviceId is { } deviceId ? await deviceRepository.GetByIdAsync(deviceId, cancellationToken) : null;
 
+        // A deactivated staff member must not be able to keep renewing their session.
+        if (user is { IsActive: false })
+        {
+            return new TokenRefreshResult.InvalidToken();
+        }
+
         // Mirrors exactly which Issue* method originally produced the access token
         // this refresh token was paired with (see RefreshTokenOwner).
         string accessToken;

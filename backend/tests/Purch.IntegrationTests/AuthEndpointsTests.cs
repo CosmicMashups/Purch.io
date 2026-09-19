@@ -74,9 +74,39 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(refreshBody.AccessToken);
         Assert.Equal(tenantId.ToString(), jwt.Claims.Single(c => c.Type == JwtClaimTypes.TenantId).Value);
 
-        // Single-use: the original refresh token was rotated away, so redeeming it again fails.
-        var reuseResponse = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody.RefreshToken));
-        Assert.Equal(HttpStatusCode.Unauthorized, reuseResponse.StatusCode);
+        // A just-rotated token is honoured for a short grace window, so a client that never received
+        // (or never saved) the response to its first refresh can retry instead of being logged out.
+        var retryResponse = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+        var retryBody = await retryResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        Assert.False(string.IsNullOrWhiteSpace(retryBody!.RefreshToken));
+    }
+
+    [Fact]
+    public async Task A_logged_out_refresh_token_can_never_be_redeemed_not_even_within_the_rotation_grace_window()
+    {
+        var tenantId = Guid.NewGuid();
+        const string pairingCode = "DEVICE-LOGOUT";
+        const string pin = "1234";
+        await SeedTenantDeviceAndUserAsync(tenantId, pairingCode, pin, Role.Admin);
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var loginResponse = await client.PostAsJsonAsync("/auth/login", new LoginRequest(pairingCode, pin));
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+
+        // Rotate once, then log out with the original (now rotated) token as well as the new one.
+        var rotated = await (await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody!.RefreshToken)))
+            .Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        _ = await client.PostAsJsonAsync("/auth/logout", new RefreshTokenRequest(loginBody.RefreshToken));
+        _ = await client.PostAsJsonAsync("/auth/logout", new RefreshTokenRequest(rotated!.RefreshToken));
+
+        var afterLogoutOriginal = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(loginBody.RefreshToken));
+        var afterLogoutRotated = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(rotated.RefreshToken));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, afterLogoutOriginal.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, afterLogoutRotated.StatusCode);
     }
 
     [Fact]
