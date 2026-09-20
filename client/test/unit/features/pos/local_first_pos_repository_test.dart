@@ -390,7 +390,7 @@ void main() {
     expect(cart.lines, hasLength(2));
   });
 
-  test('item promos, Senior/PWD and promo codes are priced locally', () async {
+  test('Senior/PWD, promo codes and item promos never stack, and are priced locally', () async {
     rules = PricingRules(
       bogo: [
         BogoPromoRule(
@@ -421,15 +421,36 @@ void main() {
     expect(cart.itemPromoDiscountAmount, 100);
     expect(cart.lines.single.appliedPromoLabel, 'B1T1');
     expect(cart.totalAmount, 100);
+    // Both options are visible to the cashier: Senior/PWD would save 40, promos 100.
+    expect(cart.seniorPwdSavings, 40);
+    expect(cart.promoSavings, 100);
 
+    // Senior/PWD is chosen INSTEAD of the promos (they never combine), on the regular price.
     cart = await repo.applySeniorPwdDiscount(
       const ApplySeniorPwdDiscountRequest(apply: true),
     );
-    expect(cart.totalAmount, 80);
+    expect(cart.itemPromoDiscountAmount, 0);
+    expect(cart.lines.single.appliedPromoLabel, isNull);
+    expect(cart.discountAmount, 40);
+    expect(cart.totalAmount, 160);
 
+    // A promo code can be entered while Senior/PWD is on, but gives nothing.
     cart = await repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'ten'));
     expect(cart.promoCode, 'TEN');
-    expect(cart.totalAmount, 70);
+    expect(cart.promoCodeNotApplied, PromoCodeNotApplied.suppressedBySeniorPwd);
+    expect(cart.promoDiscountAmount, 0);
+    expect(cart.totalAmount, 160);
+
+    // Switching Senior/PWD off returns to promotions - and only ONE applies: the
+    // item promos (100) beat the code (10% of 200 = 20).
+    cart = await repo.applySeniorPwdDiscount(
+      const ApplySeniorPwdDiscountRequest(apply: false),
+    );
+    expect(cart.itemPromoDiscountAmount, 100);
+    expect(cart.promoDiscountAmount, 0);
+    expect(cart.promoCode, 'TEN');
+    expect(cart.promoCodeNotApplied, PromoCodeNotApplied.supersededByItemPromos);
+    expect(cart.totalAmount, 100);
 
     await expectLater(
       repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'NOPE')),

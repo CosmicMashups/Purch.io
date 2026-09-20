@@ -1,4 +1,5 @@
 import 'payment_method.dart';
+import 'pricing_engine.dart' show PromoCodeNotApplied;
 
 /// Mirrors Purch.Domain.Enums.TransactionStatus exactly, in declared order.
 enum TransactionStatus { open, awaitingPayment, completed, voided, refunded }
@@ -28,6 +29,9 @@ class Transaction {
     this.kioskPrepNumber,
     this.kitchenStatus = KitchenStatus.queued,
     required this.payments,
+    this.seniorPwdSavings,
+    this.promoSavings,
+    this.promoCodeNotApplied = PromoCodeNotApplied.none,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
@@ -80,6 +84,16 @@ class Transaction {
   final int? kioskPrepNumber;
   final KitchenStatus kitchenStatus;
   final List<Payment> payments;
+
+  /// What the Senior/PWD discount would take off this cart, and what the best
+  /// promotion would — so the cashier can see both and let the customer pick
+  /// the better deal (the two never combine). Only known for carts priced on
+  /// this device; null for a cart that came from the server.
+  final double? seniorPwdSavings;
+  final double? promoSavings;
+
+  /// Why a valid promo code on the cart is not discounting right now.
+  final PromoCodeNotApplied promoCodeNotApplied;
 
   int get itemCount =>
       lines.fold(0, (total, line) => total + line.quantity.ceil());

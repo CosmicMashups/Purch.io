@@ -9,6 +9,7 @@ import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:purch_client/core/routing/auth_gate.dart';
 import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
+import 'package:purch_client/features/pos/domain/pricing_engine.dart' show PromoCodeNotApplied;
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/cashier_screen.dart';
@@ -129,6 +130,33 @@ const _cartWithOneLine = Transaction(
   totalAmount: 30,
   receiptNumber: null,
   payments: [],
+);
+
+Transaction _cartLike({
+  bool seniorPwdApplied = false,
+  String? promoCode,
+  PromoCodeNotApplied promoCodeNotApplied = PromoCodeNotApplied.none,
+  double discountAmount = 0,
+  double totalAmount = 30,
+  double? seniorPwdSavings,
+  double? promoSavings,
+}) => Transaction(
+  id: 'cart-1',
+  branchId: 'branch-1',
+  deviceId: 'device-1',
+  status: TransactionStatus.open,
+  lines: _cartWithOneLine.lines,
+  subtotal: 30,
+  discountAmount: discountAmount,
+  seniorPwdDiscountApplied: seniorPwdApplied,
+  promoCode: promoCode,
+  promoDiscountAmount: 0,
+  totalAmount: totalAmount,
+  receiptNumber: null,
+  payments: const [],
+  seniorPwdSavings: seniorPwdSavings,
+  promoSavings: promoSavings,
+  promoCodeNotApplied: promoCodeNotApplied,
 );
 
 const _drinksWater = Item(
@@ -429,6 +457,64 @@ void main() {
       expect(repository.cart.seniorPwdDiscountApplied, isTrue);
       expect(find.text('₱-6.00'), findsOneWidget);
       expect(find.text('₱24.00'), findsOneWidget);
+    });
+
+    testWidgets('shows what Senior/PWD and the promotions would each save, since they never combine', (
+      tester,
+    ) async {
+      final repository = FakePosRepository(
+        initialCart: _cartLike(seniorPwdSavings: 6, promoSavings: 3),
+      );
+      await tester.pumpWidget(
+        _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Would save ₱6.00'), findsOneWidget);
+      expect(find.textContaining('promotions save ₱3.00'), findsOneWidget);
+      expect(find.textContaining('can\'t be combined'), findsOneWidget);
+    });
+
+    testWidgets('with Senior/PWD on, a promo code is shown as not applied and why', (
+      tester,
+    ) async {
+      final repository = FakePosRepository(
+        initialCart: _cartLike(
+          seniorPwdApplied: true,
+          promoCode: 'SAVE10',
+          promoCodeNotApplied: PromoCodeNotApplied.suppressedBySeniorPwd,
+          discountAmount: 6,
+          totalAmount: 24,
+          seniorPwdSavings: 6,
+          promoSavings: 3,
+        ),
+      );
+      await tester.pumpWidget(
+        _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Promo code "SAVE10" not applied'), findsOneWidget);
+      expect(find.textContaining('Senior/PWD discount'), findsWidgets);
+      expect(find.text('Senior/PWD (20%)'), findsOneWidget);
+      expect(find.textContaining('Applied instead of promotions'), findsOneWidget);
+    });
+
+    testWidgets('an item promo that beats the promo code is named as the reason', (
+      tester,
+    ) async {
+      final repository = FakePosRepository(
+        initialCart: _cartLike(
+          promoCode: 'SAVE1',
+          promoCodeNotApplied: PromoCodeNotApplied.supersededByItemPromos,
+          promoSavings: 5,
+          seniorPwdSavings: 6,
+        ),
+      );
+      await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('item promotions save more'), findsOneWidget);
     });
 
     testWidgets('applying a promo code shows it as applied with a Remove '

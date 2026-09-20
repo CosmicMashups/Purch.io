@@ -5,6 +5,17 @@ import 'promo_code_models.dart';
 /// `TransactionService.RecalculateTotalAsync` — so the Cashier can total a cart
 /// locally, instantly, without a server round-trip per click.
 ///
+/// Discounts do NOT stack (RA 9994): the statutory Senior Citizen/PWD 20% cannot
+/// be combined with a promo code or any promotional discount, and only one
+/// promotion applies at a time. The cashier chooses via the Senior/PWD switch:
+///  - Senior/PWD on: 20% of the regular (pre-promo) subtotal; every promotion is
+///    suppressed.
+///  - Otherwise: ONE promotion — the automatic item promos (BOGO/combo/item
+///    discount) or the promo code, whichever is larger (a tie goes to the item
+///    promos).
+/// A promo code that isn't applied stays on the cart (worth nothing for now), so
+/// turning Senior/PWD off restores it.
+///
 /// This is an on-screen *estimate*: the server re-prices the whole cart with its
 /// own copy of these rules when the sale is checked out, and its numbers are the
 /// ones that get recorded. Keep the two in step — the shared cases in
@@ -23,56 +34,88 @@ class PricingEngine {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final promoResults = _calculateItemPromos(
+    final itemResults = _calculateItemPromos(
       lines,
       rules.activeBogo(clock),
       rules.activeCombo(clock),
       rules.activeItemDiscount(clock),
     );
-
-    final itemPromoTotal = promoResults.values.fold<double>(
+    final itemPromoAmount = itemResults.values.fold<double>(
       0,
       (sum, result) => sum + result.discount,
     );
-    final grossTotal = lines.fold<double>(
+
+    // Regular prices, before any discount.
+    final gross = lines.fold<double>(
       0,
       (sum, line) => sum + line.quantity * line.unitPrice,
     );
-    final subtotal = grossTotal - itemPromoTotal;
 
-    final seniorPwdAmount =
-        seniorPwdApplied ? _round2(subtotal * seniorPwdDiscountRate) : 0.0;
-
-    var promoAmount = 0.0;
-    String? appliedCode;
+    // What the promo code WOULD give on the regular subtotal. An unknown or
+    // expired code is dropped, exactly as the server does mid-cart, instead of
+    // erroring on every line edit.
+    String? retainedCode;
+    var promoCodeAmount = 0.0;
     final trimmed = promoCode?.trim();
     if (trimmed != null && trimmed.isNotEmpty) {
       final promo = rules.findPromoCode(trimmed);
       if (promo != null && promo.isActive && !_isExpired(promo, clock)) {
-        appliedCode = promo.code;
-        final remainingAfterSenior = _max(subtotal - seniorPwdAmount, 0);
-        promoAmount =
+        retainedCode = promo.code;
+        final amount =
             promo.discountType == PromoDiscountType.percentage
-                ? _round2(subtotal * promo.discountValue / 100)
+                ? _round2(gross * promo.discountValue / 100)
                 : promo.discountValue;
-        promoAmount = _min(promoAmount, remainingAfterSenior);
+        promoCodeAmount = _min(amount, gross);
       }
-      // An unknown/expired code is dropped, exactly as the server does
-      // mid-cart, instead of erroring on every line edit.
     }
 
-    final discountAmount = seniorPwdAmount + promoAmount;
+    final seniorPwdSavings = _round2(gross * seniorPwdDiscountRate);
+
+    var seniorPwdAmount = 0.0;
+    var appliedItemPromoAmount = 0.0;
+    var appliedCodeAmount = 0.0;
+    var side = PromoSide.none;
+    var codeReason = PromoCodeNotApplied.none;
+    var lineDiscounts = {
+      for (final line in lines)
+        line.lineId: const LineDiscount(discount: 0, label: null),
+    };
+
+    if (seniorPwdApplied) {
+      // On the regular price, not on a price already reduced by a promotion.
+      seniorPwdAmount = seniorPwdSavings;
+      if (retainedCode != null) {
+        codeReason = PromoCodeNotApplied.suppressedBySeniorPwd;
+      }
+    } else if (itemPromoAmount >= promoCodeAmount) {
+      appliedItemPromoAmount = itemPromoAmount;
+      lineDiscounts = itemResults;
+      if (itemPromoAmount > 0) {
+        side = PromoSide.itemPromos;
+      }
+      if (retainedCode != null && promoCodeAmount > 0) {
+        codeReason = PromoCodeNotApplied.supersededByItemPromos;
+      }
+    } else {
+      appliedCodeAmount = promoCodeAmount;
+      side = PromoSide.promoCode;
+    }
+
+    final discountAmount = seniorPwdAmount + appliedCodeAmount;
     return PricingResult(
-      lineDiscounts: {
-        for (final entry in promoResults.entries) entry.key: entry.value,
-      },
-      grossSubtotal: grossTotal,
-      itemPromoDiscountAmount: itemPromoTotal,
+      lineDiscounts: lineDiscounts,
+      grossSubtotal: gross,
+      itemPromoDiscountAmount: appliedItemPromoAmount,
       seniorPwdDiscountAmount: seniorPwdAmount,
-      promoDiscountAmount: promoAmount,
+      promoDiscountAmount: appliedCodeAmount,
       discountAmount: discountAmount,
-      totalAmount: subtotal - discountAmount,
-      appliedPromoCode: appliedCode,
+      totalAmount: gross - appliedItemPromoAmount - discountAmount,
+      appliedPromoCode: side == PromoSide.promoCode ? retainedCode : null,
+      retainedPromoCode: retainedCode,
+      promoCodeNotApplied: codeReason,
+      appliedPromoSide: side,
+      seniorPwdSavings: seniorPwdSavings,
+      promoSavings: _max(itemPromoAmount, promoCodeAmount),
     );
   }
 
@@ -314,6 +357,13 @@ class LineDiscount {
   final String? label;
 }
 
+/// Which promotion (if any) is discounting the cart. Never both, and never
+/// alongside the Senior/PWD discount.
+enum PromoSide { none, itemPromos, promoCode }
+
+/// Why a valid promo code on the cart is not discounting anything right now.
+enum PromoCodeNotApplied { none, suppressedBySeniorPwd, supersededByItemPromos }
+
 class PricingResult {
   const PricingResult({
     required this.lineDiscounts,
@@ -324,22 +374,50 @@ class PricingResult {
     required this.discountAmount,
     required this.totalAmount,
     required this.appliedPromoCode,
+    required this.retainedPromoCode,
+    required this.promoCodeNotApplied,
+    required this.appliedPromoSide,
+    required this.seniorPwdSavings,
+    required this.promoSavings,
   });
 
+  /// Per-line item-promo discount — all zero unless the item promos are the
+  /// promotion that applies.
   final Map<String, LineDiscount> lineDiscounts;
 
   /// Sum of line totals before any discount (the receipt's "subtotal").
   final double grossSubtotal;
+
+  /// The item promos' discount that actually applies (0 when Senior/PWD is
+  /// chosen or the promo code is the larger promotion).
   final double itemPromoDiscountAmount;
   final double seniorPwdDiscountAmount;
+
+  /// The promo code's discount that actually applies.
   final double promoDiscountAmount;
 
   /// Senior/PWD + promo-code discount (item promos are separate, as on the server).
   final double discountAmount;
   final double totalAmount;
 
-  /// The promo code that actually applied — null when it was unknown/expired.
+  /// The promo code that is actually discounting — null when it is suppressed,
+  /// superseded, unknown or expired.
   final String? appliedPromoCode;
+
+  /// The valid promo code still on the cart, whether or not it is discounting
+  /// (null only when it is unknown/expired). Kept so switching Senior/PWD off
+  /// restores it.
+  final String? retainedPromoCode;
+  final PromoCodeNotApplied promoCodeNotApplied;
+  final PromoSide appliedPromoSide;
+
+  /// What the Senior/PWD discount would take off — shown to the cashier so the
+  /// customer can pick the better deal.
+  final double seniorPwdSavings;
+
+  /// What the best promotion would take off (the larger of the item promos and
+  /// the promo code), whether or not it is the one currently applied.
+  final double promoSavings;
 }
 
 /// The automatic promo rules and promo codes a cart is priced against.

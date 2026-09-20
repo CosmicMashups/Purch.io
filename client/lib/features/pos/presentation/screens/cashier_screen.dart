@@ -17,6 +17,7 @@ import '../../../catalog/presentation/screens/add_item_screen.dart';
 import '../../../onboarding/domain/onboarding_enums.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../../onboarding/presentation/screens/hardware_settings_screen.dart';
+import '../../domain/pricing_engine.dart' show PromoCodeNotApplied;
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import 'combo_customization_screen.dart';
@@ -1377,7 +1378,11 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 );
               }
 
-              return Column(
+              // The footer (Senior/PWD switch, promo code, totals, Pay) can get
+              // tall — the discount explanations add text — so cap it and let it
+              // scroll, rather than overflowing a short window.
+              return LayoutBuilder(
+                builder: (context, constraints) => Column(
                 children: [
                   if (failure != null)
                     Padding(
@@ -1413,11 +1418,22 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               _CartLineTile(line: cart.lines[index]),
                     ),
                   ),
-                  _CartFooter(
-                    cart: cart,
-                    promoCodeController: _promoCodeController,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight:
+                          constraints.hasBoundedHeight
+                              ? constraints.maxHeight * 0.6
+                              : double.infinity,
+                    ),
+                    child: SingleChildScrollView(
+                      child: _CartFooter(
+                        cart: cart,
+                        promoCodeController: _promoCodeController,
+                      ),
+                    ),
                   ),
                 ],
+                ),
               );
             },
           ),
@@ -1466,9 +1482,12 @@ class _CartFooter extends ConsumerWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-            subtitle: const Text(
-              'Only apply after verifying the customer\'s physical ID.',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            subtitle: Text(
+              _seniorPwdSubtitle(cart),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           const Divider(color: AppColors.border, height: 1),
@@ -1516,23 +1535,34 @@ class _CartFooter extends ConsumerWidget {
                         horizontal: 12,
                         vertical: 6,
                       ),
-                      decoration: const BoxDecoration(
-                        color: AppColors.accentEmeraldContainer,
+                      decoration: BoxDecoration(
+                        color:
+                            _promoCodeApplied(cart)
+                                ? AppColors.accentEmeraldContainer
+                                : AppColors.cardHover,
                         borderRadius: AppRadius.smBorder,
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
+                          Icon(
+                            _promoCodeApplied(cart)
+                                ? Icons.check_circle_rounded
+                                : Icons.info_outline_rounded,
                             size: 18,
-                            color: AppColors.accentEmerald,
+                            color:
+                                _promoCodeApplied(cart)
+                                    ? AppColors.accentEmerald
+                                    : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Promo code "${cart.promoCode}" applied',
-                              style: const TextStyle(
-                                color: AppColors.onAccentEmeraldContainer,
+                              _promoCodeMessage(cart),
+                              style: TextStyle(
+                                color:
+                                    _promoCodeApplied(cart)
+                                        ? AppColors.onAccentEmeraldContainer
+                                        : AppColors.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
                               ),
@@ -1636,7 +1666,10 @@ class _CartFooter extends ConsumerWidget {
                     amount: -cart.itemPromoDiscountAmount,
                   ),
                 if (cart.discountAmount > 0)
-                  _TotalsRow(label: 'Discount', amount: -cart.discountAmount),
+                  _TotalsRow(
+                    label: _discountLabel(cart),
+                    amount: -cart.discountAmount,
+                  ),
                 const SizedBox(height: 4),
                 _TotalsRow(
                   label: 'Total',
@@ -1964,7 +1997,17 @@ class _TotalsRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: textStyle),
+        // Flexible so a long label (e.g. "Promo code (SUMMER2026)") truncates
+        // instead of overflowing the row on a narrow cart panel.
+        Flexible(
+          child: Text(
+            label,
+            style: textStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           amount < 0
               ? '₱-${(-amount).toStringAsFixed(2)}'
@@ -1974,6 +2017,55 @@ class _TotalsRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _peso(double amount) => '\u20b1${amount.toStringAsFixed(2)}';
+
+/// The line under the Senior/PWD switch. Senior/PWD and promotions never
+/// combine, so it puts both amounts side by side for the cashier to let the
+/// customer pick the better deal.
+String _seniorPwdSubtitle(Transaction cart) {
+  const idNote = 'Only apply after verifying the customer\'s physical ID.';
+  final senior = cart.seniorPwdSavings;
+  final promos = cart.promoSavings;
+  if (senior == null || promos == null || (senior <= 0 && promos <= 0)) {
+    return idNote;
+  }
+  final comparison =
+      cart.seniorPwdDiscountApplied
+          ? 'Applied instead of promotions (they would save ${_peso(promos)}).'
+          : 'Would save ${_peso(senior)}; current promotions save ${_peso(promos)}. '
+              'They can\'t be combined.';
+  return '$idNote\n$comparison';
+}
+
+/// Whether the cart's promo code is actually discounting.
+bool _promoCodeApplied(Transaction cart) =>
+    cart.promoCodeNotApplied == PromoCodeNotApplied.none;
+
+String _promoCodeMessage(Transaction cart) {
+  final code = cart.promoCode;
+  return switch (cart.promoCodeNotApplied) {
+    PromoCodeNotApplied.none => 'Promo code "$code" applied',
+    PromoCodeNotApplied.suppressedBySeniorPwd =>
+      'Promo code "$code" not applied — it can\'t be combined with the '
+          'Senior/PWD discount',
+    PromoCodeNotApplied.supersededByItemPromos =>
+      'Promo code "$code" not applied — the item promotions save more '
+          '(only one promotion applies)',
+  };
+}
+
+/// Names the one discount that applied, since Senior/PWD and promotions
+/// never combine.
+String _discountLabel(Transaction cart) {
+  if (cart.seniorPwdDiscountApplied) {
+    return 'Senior/PWD (20%)';
+  }
+  if (cart.promoCode != null && cart.promoDiscountAmount > 0) {
+    return 'Promo code (${cart.promoCode})';
+  }
+  return 'Discount';
 }
 
 /// Whether the signed-in staff member may apply the Senior/PWD discount —

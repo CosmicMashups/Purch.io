@@ -910,7 +910,12 @@ class LocalFirstPosRepository implements PosRepository {
       subtotal: priced.grossSubtotal,
       discountAmount: priced.discountAmount,
       seniorPwdDiscountApplied: cart.seniorPwdApplied,
-      promoCode: priced.appliedPromoCode,
+      // The valid code stays on the cart even while it isn't discounting (Senior/PWD
+      // chosen, or item promos are larger), so switching that off restores it.
+      promoCode: priced.retainedPromoCode,
+      promoCodeNotApplied: priced.promoCodeNotApplied,
+      seniorPwdSavings: priced.seniorPwdSavings,
+      promoSavings: priced.promoSavings,
       promoDiscountAmount: priced.promoDiscountAmount,
       itemPromoDiscountAmount: priced.itemPromoDiscountAmount,
       totalAmount: priced.totalAmount,
