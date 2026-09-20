@@ -36,6 +36,12 @@ String? roleClaimFromJwt(String token) {
   return _decodeJwtPayload(token)?['role'] as String?;
 }
 
+/// The signed-in staff member's id (the token's `sub` claim), or null for an unattended device token.
+/// Read back the same way as the role: the app never stores it separately.
+String? staffIdFromJwt(String token) {
+  return _decodeJwtPayload(token)?['sub'] as String?;
+}
+
 /// This device's own id, tenant id, and branch id, exactly as the server put
 /// them in the token at login — mirrors backend JwtClaimTypes. The server is
 /// still the source of truth for pairing; this is just how the client learns

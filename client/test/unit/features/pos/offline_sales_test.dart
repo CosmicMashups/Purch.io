@@ -159,8 +159,12 @@ void main() {
     late int localCounter;
     late List<int> retired;
 
-    LocalFirstPosRepository build({SaleQueueStore? saleQueue}) =>
+    LocalFirstPosRepository build({
+      SaleQueueStore? saleQueue,
+      Future<String?> Function()? currentStaffId,
+    }) =>
         LocalFirstPosRepository(
+          currentStaffId: currentStaffId,
           drainQueue:
               () => SaleSyncCoordinator(
                 store: queue,
@@ -234,6 +238,17 @@ void main() {
 
       expect(retired, [1], reason: 'the number is now issued, never reused');
       expect((await repo.getOrCreateOpenCart()).lines, isEmpty);
+    });
+
+    test('the queued sale records who rang it up, so it is credited to them when it syncs later', () async {
+      server.failure = const NetworkFailure('no route');
+      final repo = build(currentStaffId: () async => 'staff-manager');
+      await repo.addLine(const AddTransactionLineRequest(itemId: 'coffee', quantity: 1));
+
+      await repo.recordPayment(cash);
+
+      expect(queue.entries.values.single.request.rungByStaffId, 'staff-manager');
+      expect(queue.entries.values.single.request.toJson()['rungByStaffId'], 'staff-manager');
     });
 
     test('the queued sale reuses the sale id, so the server cannot record it twice', () async {
@@ -450,6 +465,26 @@ void main() {
       expect(queue['bad']!.status, SaleQueueStatus.rejected);
       expect(queue['bad']!.lastError, contains('not active'));
       expect(queue['good']!.status, SaleQueueStatus.synced);
+    });
+
+    test('a claimed kiosk order in progress only delays the queued sale; it is not refused for good', () async {
+      server.failure = const ConflictFailure(
+        'Finish or void the claimed kiosk order before starting a new sale.',
+      );
+      await queue.enqueue(_entry('waiting'));
+
+      await coordinator.drain();
+
+      expect(queue['waiting']!.status, SaleQueueStatus.pending);
+    });
+
+    test('any other conflict (a taken receipt number) still sets the sale aside', () async {
+      server.failure = const ConflictFailure('Receipt number 1 was already issued to this terminal.');
+      await queue.enqueue(_entry('taken'));
+
+      await coordinator.drain();
+
+      expect(queue['taken']!.status, SaleQueueStatus.rejected);
     });
 
     test('a repeated server error eventually sets the sale aside instead of blocking the queue', () async {

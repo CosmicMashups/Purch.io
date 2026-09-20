@@ -337,6 +337,7 @@ class CheckoutRequest {
     this.receiptNumber,
     this.offlineSale = false,
     this.soldAt,
+    this.rungByStaffId,
   });
 
   factory CheckoutRequest.fromJson(Map<String, dynamic> json) {
@@ -358,6 +359,7 @@ class CheckoutRequest {
       offlineSale: json['offlineSale'] as bool? ?? false,
       soldAt:
           json['soldAt'] == null ? null : DateTime.parse(json['soldAt'] as String),
+      rungByStaffId: json['rungByStaffId'] as String?,
     );
   }
 
@@ -384,6 +386,11 @@ class CheckoutRequest {
   /// When the sale really happened (only meaningful with [offlineSale]).
   final DateTime? soldAt;
 
+  /// Who was signed in when an offline sale was rung up. It syncs later under whoever is signed in
+  /// then; the server verifies this person in the tenant to credit the sale and judge the
+  /// Senior/PWD discount. Only an id: the server never takes a role from the device.
+  final String? rungByStaffId;
+
   Map<String, dynamic> toJson() => {
     'saleId': saleId,
     'lines': lines.map((l) => l.toJson()).toList(),
@@ -395,6 +402,7 @@ class CheckoutRequest {
     'receiptNumber': receiptNumber,
     'offlineSale': offlineSale,
     'soldAt': soldAt?.toUtc().toIso8601String(),
+    'rungByStaffId': rungByStaffId,
   };
 }
 

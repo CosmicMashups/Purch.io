@@ -117,6 +117,10 @@ class SaleSyncCoordinator {
   static bool isTransient(Failure failure) => _shouldRetryLater(failure);
 
   static bool _shouldRetryLater(Failure failure) =>
+      // The cashier is midway through a claimed kiosk order; once they finish or void it the queued
+      // sale goes through, so it isn't refused for good. Other conflicts (a taken receipt number, a
+      // sale id used elsewhere) will never succeed and still set the sale aside.
+      (failure is ConflictFailure && failure.message.contains('claimed kiosk order')) ||
       failure is NetworkFailure ||
       failure is ServiceUnavailableFailure ||
       failure is UnknownFailure ||

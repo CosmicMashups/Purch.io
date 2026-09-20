@@ -8,6 +8,7 @@ using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Application.Promotions;
+using Purch.Application.Reporting;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -470,6 +471,76 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var selection = Assert.Single(line.ComboSelections);
         Assert.Equal("Choose a Drink", selection.SlotLabel);
         Assert.Equal("Soda", selection.SelectedItemName);
+    }
+
+    private sealed record StaffLogin(HttpClient Client, Guid ManagerId, Guid CashierId);
+
+    /// <summary>An admin who sets up a manager and a cashier, plus a client signed in as the cashier: the
+    /// person whose login a queued sale ends up syncing under.</summary>
+    private static async Task<(StaffLogin Staff, HttpClient Admin)> ManagerAndCashierAsync(PurchApiFactory factory)
+    {
+        var admin = await AuthenticatedAdminClientAsync(factory);
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
+        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+
+        var cashier = factory.CreateClient();
+        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "6789"));
+        var token = (await login.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken;
+        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        return (new StaffLogin(cashier, staff!.Single(x => x.Role == Role.Manager).Id, staff!.Single(x => x.Role == Role.Cashier).Id), admin);
+    }
+
+    private static CheckoutRequest OfflineSeniorSale(ItemDto item, Guid? rungBy)
+    {
+        return new(
+            Guid.NewGuid(),
+            [new AddTransactionLineRequest(item.Id, null, 1m)],
+            SeniorPwdDiscountApplied: true,
+            PromoCode: null,
+            OrderType: null,
+            Payment: new RecordPaymentRequest(PaymentMethod.Cash, 500m),
+            ExpectedTotal: null,
+            ReceiptNumber: null,
+            OfflineSale: true,
+            SoldAt: DateTimeOffset.UtcNow,
+            RungByStaffId: rungBy);
+    }
+
+    [Fact]
+    public async Task A_managers_senior_discount_sale_syncs_under_a_cashier_login_and_is_credited_to_the_manager()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var (staff, admin) = await ManagerAndCashierAsync(factory);
+        using var _admin = admin;
+        using var _cashier = staff.Client;
+        var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Medicine", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var response = await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, staff.ManagerId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var from = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));
+        var to = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
+        var report = await admin.GetFromJsonAsync<StaffPerformanceReportDto>($"/reports/staff-performance?from={from}&to={to}", JsonOptions);
+        Assert.Equal(staff.ManagerId, Assert.Single(report!.Sales).StaffUserId);
+    }
+
+    [Fact]
+    public async Task An_offline_senior_discount_sale_rung_by_a_cashier_or_an_unknown_person_is_still_refused()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var (staff, admin) = await ManagerAndCashierAsync(factory);
+        using var _admin = admin;
+        using var _cashier = staff.Client;
+        var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Medicine", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        // A cashier can't have applied it, and a claim is worthless if the person isn't in this tenant.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, staff.CashierId))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, Guid.NewGuid()))).StatusCode);
+        // Without naming anyone, the old rule applies: the signed-in cashier isn't a supervisor.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, null))).StatusCode);
     }
 
     [Fact]

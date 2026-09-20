@@ -75,6 +75,7 @@ class LocalFirstPosRepository implements PosRepository {
     Future<bool> Function()? isConnected,
     Future<void> Function()? drainQueue,
     Future<void> Function()? refreshCatalog,
+    Future<String?> Function()? currentStaffId,
     DateTime Function()? clock,
   }) : _remote = remote,
        _catalog = catalog,
@@ -89,6 +90,7 @@ class LocalFirstPosRepository implements PosRepository {
        _isConnected = isConnected,
        _drainQueue = drainQueue,
        _refreshCatalog = refreshCatalog,
+       _currentStaffId = currentStaffId,
        _clock = clock ?? DateTime.now;
 
   final PosRepository _remote;
@@ -97,6 +99,10 @@ class LocalFirstPosRepository implements PosRepository {
 
   /// Drops the cached item list so the next [_loadItems] reads current prices.
   final Future<void> Function()? _refreshCatalog;
+
+  /// Who is signed in right now, stamped on offline sales so the server can credit and authorise
+  /// them correctly when they sync later under a different login.
+  final Future<String?> Function()? _currentStaffId;
   final Future<PricingRules> Function() _loadRules;
   final CartDraftStore _store;
   final Future<CartIdentity?> Function() _identity;
@@ -551,6 +557,7 @@ class LocalFirstPosRepository implements PosRepository {
       receiptNumber: number,
       offlineSale: true,
       soldAt: now,
+      rungByStaffId: await _currentStaffId?.call(),
     );
 
     // Durable first: once this returns the sale survives a crash or restart.

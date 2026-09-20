@@ -70,7 +70,11 @@ public static class PosEndpoints
         {
             // The cart endpoint that toggles this discount is Admin/Manager-only; a sale must not
             // be a way around that just because it arrives in one call.
+            // An offline sale that names who rang it up is checked against that person instead (see
+            // TransactionService.CheckoutAsync): it syncs under whoever is signed in later, who may be a
+            // cashier even though a manager applied the discount at the counter.
             return request.SeniorPwdDiscountApplied && !posSupervisor.Any(user.IsInRole)
+                && !(request.OfflineSale && request.RungByStaffId is not null)
                 ? throw new Application.Common.Exceptions.ForbiddenException(
                     "Only a manager or admin can apply the Senior Citizen/PWD discount.")
                 : Results.Ok(await transactionService.CheckoutAsync(request, cancellationToken));

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/auth/jwt_claims.dart';
 import '../../../../core/data/data_refresh.dart';
 import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
@@ -83,6 +84,10 @@ PosRepository posRepository(Ref ref) {
     drainQueue: () => ref.read(saleSyncCoordinatorProvider).drain(),
     catalog: ref.watch(catalogRepositoryProvider),
     loadItems: () => ref.read(itemListProvider.future),
+    currentStaffId: () async {
+      final token = await ref.read(secureTokenStorageProvider).readAccessToken();
+      return token == null ? null : staffIdFromJwt(token);
+    },
     refreshCatalog: () async {
       ref.invalidate(itemListProvider);
       await ref.read(itemListProvider.future);

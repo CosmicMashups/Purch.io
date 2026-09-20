@@ -26,6 +26,11 @@ namespace Purch.Application.Pos;
 /// <param name="SoldAt">When the sale actually happened on the terminal. Only honoured for an
 /// OfflineSale, and clamped to the past week and to now, so a late-syncing sale is dated when it was
 /// rung up rather than when it reached the server.</param>
+/// <param name="RungByStaffId">Who was signed in at the terminal when an OfflineSale was rung up. Sales queue
+/// offline and sync later under whoever is signed in then, so without this the sale would be credited to
+/// the wrong person and the Senior/PWD role check would judge the wrong login. Only honoured for an
+/// OfflineSale, and only as a claim to verify: the server looks the person up in the tenant and never
+/// takes a role from the request.</param>
 public sealed record CheckoutRequest(
     Guid SaleId,
     IReadOnlyList<AddTransactionLineRequest> Lines,
@@ -36,4 +41,5 @@ public sealed record CheckoutRequest(
     decimal? ExpectedTotal = null,
     long? ReceiptNumber = null,
     bool OfflineSale = false,
-    DateTimeOffset? SoldAt = null);
+    DateTimeOffset? SoldAt = null,
+    Guid? RungByStaffId = null);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
@@ -33,6 +34,7 @@ public sealed class TransactionService(
     IItemDiscountPromoRuleRepository itemDiscountPromoRuleRepository,
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
+    IUserRepository userRepository,
     IItemRecipeRepository itemRecipeRepository,
     IInventoryItemRepository inventoryItemRepository,
     IInventoryMovementRepository inventoryMovementRepository,
@@ -65,6 +67,10 @@ public sealed class TransactionService(
     /// on the sale, its payment and its stock movements instead of the moment the server processed it.
     /// The service is scoped per request, so this never leaks between sales.</summary>
     private DateTimeOffset? saleTimeOverride;
+
+    /// <summary>Set while recording an offline sale whose ringing-up staff member was verified: they, not
+    /// whoever happens to be signed in when it syncs, are the sale's staff user.</summary>
+    private Guid? staffOverride;
 
 
     public async Task<TransactionDto> GetOrCreateOpenCartAsync(CancellationToken cancellationToken = default)
@@ -380,6 +386,19 @@ public sealed class TransactionService(
 
             open.Status = TransactionStatus.Voided;
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        if (request.OfflineSale && request.RungByStaffId is { } rungByStaffId)
+        {
+            // Tenant-scoped lookup, so an id from another tenant simply isn't found. The role comes from
+            // the database, never from the request.
+            var rungBy = await userRepository.GetByIdAsync(rungByStaffId, cancellationToken);
+            if (request.SeniorPwdDiscountApplied && rungBy?.Role is not (Role.Admin or Role.Manager))
+            {
+                throw new ForbiddenException("Only a manager or admin can apply the Senior Citizen/PWD discount.");
+            }
+
+            staffOverride = rungBy?.Id;
         }
 
         var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
@@ -950,7 +969,7 @@ public sealed class TransactionService(
             TenantId = CurrentTenantId,
             BranchId = CurrentBranchId,
             DeviceId = deviceId,
-            StaffUserId = currentActorProvider.UserId,
+            StaffUserId = staffOverride ?? currentActorProvider.UserId,
             Status = TransactionStatus.Open,
         };
 
@@ -1182,6 +1201,6 @@ public sealed class TransactionService(
     private Guid CurrentBranchId => currentActorProvider.BranchId
         ?? throw new ForbiddenException("The POS requires an authenticated device's branch.");
 
-    private Guid CurrentUserId => currentActorProvider.UserId
+    private Guid CurrentUserId => staffOverride ?? currentActorProvider.UserId
         ?? throw new InvalidOperationException("The POS requires an authenticated staff user.");
 }
