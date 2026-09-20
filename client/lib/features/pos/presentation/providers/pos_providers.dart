@@ -83,6 +83,10 @@ PosRepository posRepository(Ref ref) {
     drainQueue: () => ref.read(saleSyncCoordinatorProvider).drain(),
     catalog: ref.watch(catalogRepositoryProvider),
     loadItems: () => ref.read(itemListProvider.future),
+    refreshCatalog: () async {
+      ref.invalidate(itemListProvider);
+      await ref.read(itemListProvider.future);
+    },
     loadRules: () async {
       final promos = ref.read(itemPromoRepositoryProvider);
       final results = await Future.wait([

@@ -552,6 +552,31 @@ void main() {
     expect(ruleLoads, greaterThan(loadsBeforePay), reason: 'rules refetched for the retry');
   });
 
+  test('after a price change the lines are re-priced from the catalog, so the retry can succeed', () async {
+    final repo = build();
+    final added = await repo.addLine(add('coffee', 2));
+    final lineId = added.lines.single.id;
+    expect(added.totalAmount, 200);
+
+    // The price is changed while the cart is open; the server refuses the stale total.
+    items = [_item('coffee', 'Coffee', 80), ...items.where((i) => i.id != 'coffee')];
+    remote.checkoutFailure = const ConflictFailure(
+      'Prices or promos changed: the total is now 160.00',
+    );
+    const payment = RecordPaymentRequest(method: PaymentMethod.cash, amountTendered: 500);
+    await expectLater(repo.recordPayment(payment), throwsA(isA<ConflictFailure>()));
+
+    final cart = await repo.getOrCreateOpenCart();
+    expect(cart.lines.single.id, lineId, reason: 'same line, not removed and re-added');
+    expect(cart.lines.single.quantity, 2);
+    expect(cart.totalAmount, 160);
+
+    // Retrying now sends the new total and goes through.
+    remote.checkoutFailure = null;
+    await repo.recordPayment(payment);
+    expect(remote.checkoutRequests.last.expectedTotal, closeTo(160, 0.001));
+  });
+
   test('retrying after a lost response reuses the sale id, so the customer is charged once', () async {
     final repo = build();
     await repo.addLine(add('coffee', 2));

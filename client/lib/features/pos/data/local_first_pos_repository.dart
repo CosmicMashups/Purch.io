@@ -74,6 +74,7 @@ class LocalFirstPosRepository implements PosRepository {
     OfflineLimits offlineLimits = const OfflineLimits(),
     Future<bool> Function()? isConnected,
     Future<void> Function()? drainQueue,
+    Future<void> Function()? refreshCatalog,
     DateTime Function()? clock,
   }) : _remote = remote,
        _catalog = catalog,
@@ -87,11 +88,15 @@ class LocalFirstPosRepository implements PosRepository {
        _offlineLimits = offlineLimits,
        _isConnected = isConnected,
        _drainQueue = drainQueue,
+       _refreshCatalog = refreshCatalog,
        _clock = clock ?? DateTime.now;
 
   final PosRepository _remote;
   final CatalogRepository _catalog;
   final Future<List<Item>> Function() _loadItems;
+
+  /// Drops the cached item list so the next [_loadItems] reads current prices.
+  final Future<void> Function()? _refreshCatalog;
   final Future<PricingRules> Function() _loadRules;
   final CartDraftStore _store;
   final Future<CartIdentity?> Function() _identity;
@@ -463,6 +468,12 @@ class LocalFirstPosRepository implements PosRepository {
         _rules = null; // most often "prices or promos changed" — reload them
         var reset = working.copyWith(checkoutAttempted: false);
         if (failure is ConflictFailure &&
+            failure.message.contains('Prices or promos changed')) {
+          // Lines keep the price they had when added, so without this the cashier would hit the
+          // same conflict on every retry until they removed and re-added each line.
+          reset = reset.copyWith(lines: await _repriceLines(working.lines));
+        }
+        if (failure is ConflictFailure &&
             failure.message.contains('Receipt number')) {
           // Another install or a re-pair already used it: take a fresh number,
           // starting from the server's own record, on the next attempt.
@@ -592,6 +603,41 @@ class LocalFirstPosRepository implements PosRepository {
   // ---------------------------------------------------------------------
   // Line resolution (mirrors TransactionService.AddLineAsync validation/pricing)
   // ---------------------------------------------------------------------
+
+  /// Re-prices every line against the current catalog, keeping each line's id and quantity. A line
+  /// that can no longer be resolved (item removed, a modifier now required) is left as it was, so
+  /// the server's own rejection reaches the cashier instead of the line silently vanishing.
+  Future<List<LocalCartLine>> _repriceLines(List<LocalCartLine> lines) async {
+    _variants.clear();
+    _modifierGroups.clear();
+    _comboSlots.clear();
+    try {
+      await _refreshCatalog?.call();
+    } on Object {
+      // Offline or failing: re-price against whatever catalog we already have.
+    }
+
+    final repriced = <LocalCartLine>[];
+    for (final line in lines) {
+      try {
+        final fresh = await _resolveLine(line.request);
+        repriced.add(
+          LocalCartLine(
+            id: line.id,
+            request: fresh.request,
+            itemName: fresh.itemName,
+            unitPrice: fresh.unitPrice,
+            variantAttributes: fresh.variantAttributes,
+            modifiers: fresh.modifiers,
+            comboSelections: fresh.comboSelections,
+          ),
+        );
+      } on Failure {
+        repriced.add(line);
+      }
+    }
+    return repriced;
+  }
 
   Future<LocalCartLine> _resolveLine(AddTransactionLineRequest request) async {
     final items = await _loadItems();
