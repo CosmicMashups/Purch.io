@@ -582,16 +582,14 @@ public sealed class TransactionService(
             return;
         }
 
-        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
-        foreach (var group in lines.GroupBy(line => line.ItemId))
+        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
         {
-            var item = await itemRepository.GetByIdAsync(group.Key, cancellationToken);
+            var item = await itemRepository.GetByIdAsync(itemId, cancellationToken);
             if (item is null)
             {
                 continue;
             }
 
-            var quantitySold = group.Sum(line => line.Quantity);
             item.StockOnHand -= quantitySold;
 
             inventoryMovementRepository.Add(new InventoryMovement
@@ -608,6 +606,38 @@ public sealed class TransactionService(
         }
     }
 
+    /// <summary>What a completed cart actually took off the shelves, per item. A combo is not itself
+    /// stocked: the customer receives the component items they picked, so those are what leave stock
+    /// (one of each per combo sold). A service has no stock to draw down. Everything else is its own
+    /// quantity. Both stock paths (Item.StockOnHand and separate InventoryItem tracking) read this.</summary>
+    private async Task<IReadOnlyList<(Guid ItemId, decimal Quantity)>> SoldUnitsAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        var units = new Dictionary<Guid, decimal>();
+
+        foreach (var line in await transactionRepository.ListLinesAsync(cart.Id, cancellationToken))
+        {
+            var pricingType = (await itemRepository.GetByIdAsync(line.ItemId, cancellationToken))?.PricingType;
+            if (pricingType == PricingType.Service)
+            {
+                continue;
+            }
+
+            if (pricingType == PricingType.Combo)
+            {
+                foreach (var selection in await transactionRepository.ListComboSelectionsAsync(line.Id, cancellationToken))
+                {
+                    units[selection.SelectedItemId] = units.GetValueOrDefault(selection.SelectedItemId) + line.Quantity;
+                }
+
+                continue;
+            }
+
+            units[line.ItemId] = units.GetValueOrDefault(line.ItemId) + line.Quantity;
+        }
+
+        return [.. units.Select(unit => (unit.Key, unit.Value))];
+    }
+
     /// <summary>When the tenant has opted into UseSeparateInventoryTracking, decrements each
     /// sold item's recipe ingredients (InventoryItem.QuantityOnHand) by QuantityPerOrder times
     /// the quantity sold, logging a Consumption InventoryMovement per ingredient — in the same
@@ -620,18 +650,16 @@ public sealed class TransactionService(
             return;
         }
 
-        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
-        foreach (var group in lines.GroupBy(line => line.ItemId))
+        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
         {
-            var quantitySold = group.Sum(line => line.Quantity);
-            var recipeLines = await itemRecipeRepository.ListByItemAsync(group.Key, cancellationToken);
+            var recipeLines = await itemRecipeRepository.ListByItemAsync(itemId, cancellationToken);
 
             // An item with no recipe is stocked through its auto-paired InventoryItem (the same
             // record ItemService reads for IsOutOfStock), so a sale must draw that down directly —
             // otherwise such items never deplete under separate tracking.
             if (recipeLines.Count == 0)
             {
-                var linkedInventoryItem = await inventoryItemRepository.GetByLinkedItemIdAsync(CurrentTenantId, group.Key, cancellationToken);
+                var linkedInventoryItem = await inventoryItemRepository.GetByLinkedItemIdAsync(CurrentTenantId, itemId, cancellationToken);
                 if (linkedInventoryItem is not null)
                 {
                     linkedInventoryItem.QuantityOnHand -= quantitySold;
@@ -640,7 +668,7 @@ public sealed class TransactionService(
                     {
                         TenantId = CurrentTenantId,
                         CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
-                        ItemId = group.Key,
+                        ItemId = itemId,
                         InventoryItemId = linkedInventoryItem.Id,
                         BranchId = cart.BranchId,
                         Type = MovementType.Sale,
@@ -673,13 +701,13 @@ public sealed class TransactionService(
                 {
                     TenantId = CurrentTenantId,
                     CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
-                    ItemId = group.Key,
+                    ItemId = itemId,
                     InventoryItemId = inventoryItem.Id,
                     BranchId = cart.BranchId,
                     Type = MovementType.Consumption,
                     Quantity = consumedQuantity,
                     StaffUserId = CurrentUserId,
-                    Note = $"Consumed for sale of item {group.Key}",
+                    Note = $"Consumed for sale of item {itemId}",
                 });
             }
         }

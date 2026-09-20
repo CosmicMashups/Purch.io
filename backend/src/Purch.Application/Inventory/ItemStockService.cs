@@ -1,6 +1,7 @@
 using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 
 namespace Purch.Application.Inventory;
 
@@ -17,9 +18,9 @@ public interface IItemStockService
     /// movement, or null when Item.StockOnHand was changed.</summary>
     Task<Guid?> AdjustAsync(Item item, decimal delta, CancellationToken cancellationToken = default);
 
-    /// <summary>The current on-hand quantity of each item, keyed by item id. For a tenant using
-    /// separate tracking, items made from a recipe are left out: they hold no stock of their own
-    /// (their availability comes from their ingredients).</summary>
+    /// <summary>The current on-hand quantity of each item, keyed by item id. Items that hold no stock of
+    /// their own are left out: services and combos, and (for a tenant using separate tracking) items
+    /// made from a recipe, whose availability comes from their ingredients.</summary>
     Task<IReadOnlyDictionary<Guid, decimal>> GetOnHandAsync(IReadOnlyCollection<Item> items, Guid tenantId, CancellationToken cancellationToken = default);
 }
 
@@ -54,7 +55,9 @@ public sealed class ItemStockService(
 
     public async Task<IReadOnlyDictionary<Guid, decimal>> GetOnHandAsync(IReadOnlyCollection<Item> items, Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var onHand = items.ToDictionary(item => item.Id, item => item.StockOnHand);
+        var onHand = items
+            .Where(item => item.PricingType is not (PricingType.Service or PricingType.Combo))
+            .ToDictionary(item => item.Id, item => item.StockOnHand);
 
         var tenant = await tenantRepository.GetByIdAsync(tenantId, cancellationToken);
         if (tenant is { UseSeparateInventoryTracking: true })

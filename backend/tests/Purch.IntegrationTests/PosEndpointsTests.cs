@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
+using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Application.Promotions;
@@ -469,6 +470,34 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var selection = Assert.Single(line.ComboSelections);
         Assert.Equal("Choose a Drink", selection.SlotLabel);
         Assert.Equal("Soda", selection.SelectedItemName);
+    }
+
+    [Fact]
+    public async Task Selling_a_combo_takes_the_chosen_component_items_off_stock_not_the_combo_itself()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+
+        var drinks = (await (await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Drinks", 1))).Content.ReadFromJsonAsync<CategoryDto>(JsonOptions))!;
+        var soda = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Soda", null, null, drinks.Id, 25m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var combo = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Value Meal", null, null, null, 150m, null, PricingType.Combo))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var slot = (await (await client.PostAsJsonAsync($"/items/{combo.Id}/combo-components", new CreateItemComboComponentRequest(drinks.Id, "Choose a Drink", 1, null))).Content.ReadFromJsonAsync<ItemComboComponentDto>(JsonOptions))!;
+        var haircut = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Haircut", null, null, null, 200m, null, PricingType.Service))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        _ = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(soda.Id, branches!.Single().Id, MovementType.StockIn, 10m, null, null, null, null));
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(combo.Id, null, 2m, [new ComboSelectionRequest(slot.Id, soda.Id)]));
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(haircut.Id, null, 1m));
+        var payment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 1000m));
+        Assert.Equal(HttpStatusCode.OK, payment.StatusCode);
+
+        var items = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
+        Assert.Equal(8m, items!.Single(i => i.Id == soda.Id).StockOnHand);
+        Assert.Equal(0m, items!.Single(i => i.Id == combo.Id).StockOnHand);
+        Assert.Equal(0m, items!.Single(i => i.Id == haircut.Id).StockOnHand);
     }
 
     [Fact]

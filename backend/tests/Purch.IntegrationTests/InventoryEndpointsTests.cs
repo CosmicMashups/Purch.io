@@ -326,6 +326,34 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Services_and_combos_are_never_out_of_stock_and_stay_out_of_the_stock_alerts()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var haircut = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Haircut", null, null, null, 200m, null, PricingType.Service))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var meal = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Value Meal", null, null, null, 150m, null, PricingType.Combo))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var water = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Water", null, null, null, 15m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        foreach (var item in new[] { haircut, meal, water })
+        {
+            _ = await client.PutAsJsonAsync($"/items/{item.Id}/low-stock-threshold", new UpdateLowStockThresholdRequest(5m));
+        }
+
+        var byId = (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.ToDictionary(i => i.Id);
+        Assert.False(byId[haircut.Id].IsOutOfStock);
+        Assert.False(byId[meal.Id].IsOutOfStock);
+        Assert.True(byId[water.Id].IsOutOfStock);
+
+        // Only the real, empty unit item is an alert; the service and the combo have nothing to restock.
+        var dashboard = await client.GetFromJsonAsync<InventoryDashboardDto>("/inventory/dashboard", JsonOptions);
+        Assert.Equal(1, dashboard!.OutOfStockCount);
+        var csv = await (await client.GetAsync("/reports/inventory/low-stock-export.csv")).Content.ReadAsStringAsync();
+        Assert.Contains("Water", csv);
+        Assert.DoesNotContain("Haircut", csv);
+        Assert.DoesNotContain("Value Meal", csv);
+    }
+
     private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)
     {
         var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);

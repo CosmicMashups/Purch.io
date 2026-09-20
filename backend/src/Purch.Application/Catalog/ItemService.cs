@@ -390,6 +390,12 @@ public sealed class ItemService(
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
     {
+        // A service or a combo has no stock of its own to run out of (a combo's stock is its components').
+        if (item.PricingType is PricingType.Service or PricingType.Combo)
+        {
+            return false;
+        }
+
         if (!tenant.UseSeparateInventoryTracking)
         {
             return item.StockOnHand <= 0;
