@@ -1102,10 +1102,10 @@ public sealed class TransactionService(
         ?? throw new InvalidOperationException("The POS requires an authenticated tenant context.");
 
     private Guid CurrentDeviceId => currentActorProvider.DeviceId
-        ?? throw new InvalidOperationException("The POS requires an authenticated device context.");
+        ?? throw new ForbiddenException("The POS requires an authenticated device context.");
 
     private Guid CurrentBranchId => currentActorProvider.BranchId
-        ?? throw new InvalidOperationException("The POS requires an authenticated device's branch.");
+        ?? throw new ForbiddenException("The POS requires an authenticated device's branch.");
 
     private Guid CurrentUserId => currentActorProvider.UserId
         ?? throw new InvalidOperationException("The POS requires an authenticated staff user.");

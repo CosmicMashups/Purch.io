@@ -56,7 +56,7 @@ public static class AuthEndpoints
 
                 _ => throw new InvalidOperationException($"Unhandled {nameof(TokenRefreshResult)} case: {result.GetType().Name}"),
             };
-        }).AllowAnonymous();
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
 
         // Best-effort: revokes the refresh token so it can't be redeemed later, but
         // never fails the client's own logout flow (see IRefreshTokenService.RevokeAsync).

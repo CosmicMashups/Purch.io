@@ -167,6 +167,44 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task An_admin_login_token_has_no_device_so_a_device_endpoint_answers_403_not_500()
+    {
+        var tenantId = Guid.NewGuid();
+        const string email = "web-admin@example.com";
+        const string password = "web-admin-password-123";
+        _ = await SeedAdminUserAsync(tenantId, email, password);
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync("/auth/admin-login", new AdminLoginRequest(email, password));
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+
+        var response = await client.GetAsync("/transactions/cart");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Tenant_bootstrap_is_rate_limited_per_client()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var attempt = 0; attempt < 11; attempt++)
+        {
+            var response = await client.PostAsJsonAsync(
+                "/onboarding/bootstrap",
+                new Purch.Application.Onboarding.BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Admin", "1234"));
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(10), status => Assert.Equal(HttpStatusCode.OK, status));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[10]);
+    }
+
+    [Fact]
     public async Task Requesting_and_confirming_a_password_reset_lets_the_admin_log_in_with_the_new_password_and_revokes_old_sessions()
     {
         var tenantId = Guid.NewGuid();

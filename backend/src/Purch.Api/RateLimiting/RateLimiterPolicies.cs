@@ -8,4 +8,9 @@ public static class RateLimiterPolicies
     /// <summary>Login, kiosk pairing, and password-reset endpoints — anonymous,
     /// credential-guessing surfaces that need a tight per-client limit.</summary>
     public const string AuthSensitive = "auth-sensitive";
+
+    /// <summary>Token refresh — anonymous, but every terminal and browser tab renews on a timer,
+    /// so a shop with many devices behind one public IP needs far more headroom than
+    /// AuthSensitive allows while still capping a token-guessing loop.</summary>
+    public const string Refresh = "refresh";
 }

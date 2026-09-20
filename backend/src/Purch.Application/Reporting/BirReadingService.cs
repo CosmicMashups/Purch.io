@@ -1,5 +1,6 @@
 using Purch.Application.Auth;
 using Purch.Application.Common;
+using Purch.Application.Common.Exceptions;
 using Purch.Application.Pos;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -149,8 +150,8 @@ public sealed class BirReadingService(
         ?? throw new InvalidOperationException("BIR readings require an authenticated tenant context.");
 
     private Guid CurrentDeviceId => currentActorProvider.DeviceId
-        ?? throw new InvalidOperationException("BIR readings require an authenticated device context.");
+        ?? throw new ForbiddenException("BIR readings require an authenticated device context.");
 
     private Guid CurrentBranchId => currentActorProvider.BranchId
-        ?? throw new InvalidOperationException("BIR readings require an authenticated device's branch.");
+        ?? throw new ForbiddenException("BIR readings require an authenticated device's branch.");
 }

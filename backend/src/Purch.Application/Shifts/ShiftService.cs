@@ -137,10 +137,10 @@ public sealed class ShiftService(
         ?? throw new InvalidOperationException("Shifts require an authenticated tenant context.");
 
     private Guid CurrentDeviceId => currentActorProvider.DeviceId
-        ?? throw new InvalidOperationException("Shifts require an authenticated device context.");
+        ?? throw new ForbiddenException("Shifts require an authenticated device context.");
 
     private Guid CurrentBranchId => currentActorProvider.BranchId
-        ?? throw new InvalidOperationException("Shifts require an authenticated device's branch.");
+        ?? throw new ForbiddenException("Shifts require an authenticated device's branch.");
 
     private Guid CurrentUserId => currentActorProvider.UserId
         ?? throw new InvalidOperationException("Shifts require an authenticated staff user.");

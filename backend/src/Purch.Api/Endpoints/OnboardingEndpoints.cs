@@ -1,3 +1,4 @@
+using Purch.Api.RateLimiting;
 using Purch.Application.Onboarding;
 using Purch.Domain.Enums;
 
@@ -15,7 +16,7 @@ public static class OnboardingEndpoints
         {
             var result = await bootstrapService.BootstrapAsync(request, cancellationToken);
             return Results.Ok(result);
-        }).AllowAnonymous();
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
 
         // --- Staff & roles (A4) ---
         var admin = nameof(Role.Admin);

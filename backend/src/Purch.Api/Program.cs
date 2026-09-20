@@ -242,6 +242,16 @@ builder.Services.AddRateLimiter(options =>
                 PermitLimit = 10,
                 QueueLimit = 0,
             }));
+
+    options.AddPolicy(RateLimiterPolicies.Refresh, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(15),
+                PermitLimit = 120,
+                QueueLimit = 0,
+            }));
 });
 
 var app = builder.Build();
