@@ -81,9 +81,9 @@ public sealed class BootstrapTenantService(
             errors[nameof(request.AdminName)] = ["Admin name is required."];
         }
 
-        if (string.IsNullOrWhiteSpace(request.AdminPin))
+        if (PinPolicy.Validate(request.AdminPin) is { } adminPinError)
         {
-            errors[nameof(request.AdminPin)] = ["Admin PIN is required."];
+            errors[nameof(request.AdminPin)] = [adminPinError.Replace("PIN", "Admin PIN", StringComparison.Ordinal)];
         }
 
         var hasEmail = !string.IsNullOrWhiteSpace(request.AdminEmail);

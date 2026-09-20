@@ -76,6 +76,58 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
     }
 
+    [Theory]
+    [InlineData("12")]
+    [InlineData("123456789")]
+    [InlineData("12a4")]
+    [InlineData("12 4")]
+    public async Task A_staff_pin_must_be_four_to_eight_digits(string pin)
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var response = await client.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Bad Pin", Role.Cashier, ScopeType.Tenant, null, null, pin));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Two_staff_cannot_share_a_pin_because_login_could_not_tell_them_apart()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        // "1234" is the admin's own PIN.
+        var duplicate = await client.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Copycat", Role.Cashier, ScopeType.Tenant, null, null, "1234"));
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+
+        var distinct = await client.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Ben Cashier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
+        Assert.Equal(HttpStatusCode.OK, distinct.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_admin_pin_chosen_at_bootstrap_must_be_digits()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/onboarding/bootstrap",
+            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "abcd"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Admin_can_create_a_branch_and_then_a_device_paired_to_it()
     {

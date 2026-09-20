@@ -24,9 +24,17 @@ public sealed class StaffService(
             throw new ValidationException(nameof(request.Name), "Name is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Pin))
+        if (PinPolicy.Validate(request.Pin) is { } pinError)
         {
-            throw new ValidationException(nameof(request.Pin), "PIN is required.");
+            throw new ValidationException(nameof(request.Pin), pinError);
+        }
+
+        // Login finds a user by PIN alone (the device already narrows it to one tenant), so two
+        // active staff sharing a PIN would be indistinguishable — one could sign in as the other.
+        var activeUsers = await userRepository.GetActiveUsersByTenantAsync(CurrentTenantId, cancellationToken);
+        if (activeUsers.Any(existing => pinHasher.Verify(request.Pin, existing.PinHash)))
+        {
+            throw new ValidationException(nameof(request.Pin), "That PIN is already in use by another staff member. Choose a different one.");
         }
 
         var user = new User
