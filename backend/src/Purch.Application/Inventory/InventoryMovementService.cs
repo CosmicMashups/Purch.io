@@ -14,6 +14,7 @@ namespace Purch.Application.Inventory;
 public sealed class InventoryMovementService(
     IInventoryMovementRepository movementRepository,
     IItemRepository itemRepository,
+    IItemStockService itemStockService,
     IBranchRepository branchRepository,
     IUserRepository userRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -89,7 +90,7 @@ public sealed class InventoryMovementService(
             SupplierReference = request.SupplierReference,
         };
 
-        item.StockOnHand += StockDelta(request.Type, request.Quantity);
+        movement.InventoryItemId = await itemStockService.AdjustAsync(item, StockDelta(request.Type, request.Quantity), cancellationToken);
 
         movementRepository.Add(movement);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

@@ -5,6 +5,7 @@ namespace Purch.Application.Inventory;
 
 public sealed class InventoryDashboardService(
     IItemRepository itemRepository,
+    IItemStockService itemStockService,
     ICurrentTenantProvider currentTenantProvider) : IInventoryDashboardService
 {
     public async Task<InventoryDashboardDto> GetDashboardAsync(CancellationToken cancellationToken = default)
@@ -12,12 +13,14 @@ public sealed class InventoryDashboardService(
         var items = await itemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
         var activeItems = items.Where(item => item.IsActive).ToList();
 
-        var outOfStockCount = activeItems.Count(item => item.StockOnHand <= 0);
+        var onHand = await itemStockService.GetOnHandAsync(activeItems, CurrentTenantId, cancellationToken);
+
+        var outOfStockCount = activeItems.Count(item => onHand[item.Id] <= 0);
 
         var lowStockItems = activeItems
-            .Where(item => item.LowStockThreshold is { } threshold && item.StockOnHand > 0 && item.StockOnHand <= threshold)
-            .OrderBy(item => item.StockOnHand)
-            .Select(item => new LowStockItemDto(item.Id, item.Name, item.StockOnHand, item.LowStockThreshold!.Value))
+            .Where(item => item.LowStockThreshold is { } threshold && onHand[item.Id] > 0 && onHand[item.Id] <= threshold)
+            .OrderBy(item => onHand[item.Id])
+            .Select(item => new LowStockItemDto(item.Id, item.Name, onHand[item.Id], item.LowStockThreshold!.Value))
             .ToList();
 
         return new InventoryDashboardDto(

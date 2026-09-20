@@ -6,6 +6,7 @@ using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
+using Purch.Application.Pos;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -157,6 +158,52 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
 
         var movement = Assert.Single(filtered!);
         Assert.Equal(firstItem.Id, movement.ItemId);
+    }
+
+    [Fact]
+    public async Task With_separate_inventory_tracking_stock_changes_and_sales_all_use_the_linked_inventory_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+
+        var toggle = await client.PutAsJsonAsync("/tenant/settings/inventory-tracking", new UpdateInventoryTrackingSettingRequest(true));
+        Assert.Equal(HttpStatusCode.OK, toggle.StatusCode);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Bottled Water", null, null, null, 15m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PutAsJsonAsync($"/items/{item!.Id}/low-stock-threshold", new UpdateLowStockThresholdRequest(10m));
+
+        // A delivery recorded against the item must land on the record the cashier reads.
+        var movement = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item.Id, branchId, MovementType.StockIn, 25m, null, null, null, null));
+        Assert.Equal(HttpStatusCode.OK, movement.StatusCode);
+        Assert.Equal(25m, await LinkedQuantityAsync(client, item.Id));
+        Assert.Equal(0m, (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.Single(i => i.Id == item.Id).StockOnHand);
+
+        // ...and a sale draws down that same record.
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 2m));
+        var payment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 100m));
+        Assert.Equal(HttpStatusCode.OK, payment.StatusCode);
+        Assert.Equal(23m, await LinkedQuantityAsync(client, item.Id));
+
+        // A correction moves it too, and the low-stock dashboard reads it (13 is above the threshold, 8 is not).
+        _ = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item.Id, branchId, MovementType.StockOut, 15m, null, null, null, null));
+        Assert.Equal(8m, await LinkedQuantityAsync(client, item.Id));
+        var dashboard = await client.GetFromJsonAsync<InventoryDashboardDto>("/inventory/dashboard", JsonOptions);
+        var alert = Assert.Single(dashboard!.LowStockItems);
+        Assert.Equal(8m, alert.StockOnHand);
+    }
+
+    private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)
+    {
+        var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
+        return inventoryItems!.Single(i => i.LinkedItemId == itemId).QuantityOnHand;
     }
 
     private static async Task<Guid> MainBranchIdAsync(HttpClient client)

@@ -1,5 +1,6 @@
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.Inventory;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
@@ -8,6 +9,7 @@ namespace Purch.Application.Catalog;
 public sealed class ItemBatchService(
     IItemBatchRepository itemBatchRepository,
     IItemRepository itemRepository,
+    IItemStockService itemStockService,
     ICurrentTenantProvider currentTenantProvider,
     IUnitOfWork unitOfWork) : IItemBatchService
 {
@@ -47,7 +49,7 @@ public sealed class ItemBatchService(
 
         // StockOnHand is the running total across all of an item's batches — the
         // per-batch FIFO stock-out breakdown matters once POS sales exist (Phase 4).
-        item.StockOnHand += request.QuantityReceived;
+        _ = await itemStockService.AdjustAsync(item, request.QuantityReceived, cancellationToken);
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 

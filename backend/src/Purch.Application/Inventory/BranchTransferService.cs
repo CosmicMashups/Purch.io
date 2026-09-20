@@ -18,6 +18,7 @@ public sealed class BranchTransferService(
     IBranchTransferRepository branchTransferRepository,
     IInventoryMovementRepository movementRepository,
     IItemRepository itemRepository,
+    IItemStockService itemStockService,
     IBranchRepository branchRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -104,12 +105,13 @@ public sealed class BranchTransferService(
             var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
                 ?? throw new NotFoundException("Item", line.ItemId);
 
-            item.StockOnHand -= line.Quantity;
+            var shippedFrom = await itemStockService.AdjustAsync(item, -line.Quantity, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
             {
                 TenantId = CurrentTenantId,
                 ItemId = line.ItemId,
+                InventoryItemId = shippedFrom,
                 BranchId = transfer.SourceBranchId,
                 Type = MovementType.Transfer,
                 Quantity = line.Quantity,
@@ -140,12 +142,13 @@ public sealed class BranchTransferService(
             var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
                 ?? throw new NotFoundException("Item", line.ItemId);
 
-            item.StockOnHand += line.Quantity;
+            var receivedInto = await itemStockService.AdjustAsync(item, line.Quantity, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
             {
                 TenantId = CurrentTenantId,
                 ItemId = line.ItemId,
+                InventoryItemId = receivedInto,
                 BranchId = transfer.DestinationBranchId,
                 Type = MovementType.Transfer,
                 Quantity = line.Quantity,

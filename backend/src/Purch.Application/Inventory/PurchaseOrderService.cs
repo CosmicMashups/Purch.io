@@ -14,6 +14,7 @@ public sealed class PurchaseOrderService(
     IInventoryMovementRepository movementRepository,
     ISupplierRepository supplierRepository,
     IItemRepository itemRepository,
+    IItemStockService itemStockService,
     IBranchRepository branchRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -160,12 +161,13 @@ public sealed class PurchaseOrderService(
                 ?? throw new NotFoundException("Item", line.ItemId);
 
             line.QuantityReceived += lineRequest.ReceivedQuantity;
-            item.StockOnHand += lineRequest.ReceivedQuantity;
+            var inventoryItemId = await itemStockService.AdjustAsync(item, lineRequest.ReceivedQuantity, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
             {
                 TenantId = CurrentTenantId,
                 ItemId = line.ItemId,
+                InventoryItemId = inventoryItemId,
                 BranchId = purchaseOrder.BranchId,
                 Type = MovementType.StockIn,
                 Quantity = lineRequest.ReceivedQuantity,
