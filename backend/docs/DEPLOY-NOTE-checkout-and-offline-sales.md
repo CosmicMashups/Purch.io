@@ -113,6 +113,27 @@ Run each of these against production (or staging) with a test tenant:
 7. **Tenant isolation:** log in as tenant A, log out, log in as tenant B on the same terminal → no tenant A data visible. If tenant A had waiting offline sales, the logout dialog warned about them.
 8. **Re-login problem:** leave a session open past 30 minutes (access-token lifetime) and confirm it keeps working without a login prompt. Watch `/auth/refresh` responses in the logs for 401s.
 
+## Discount rules changed: Senior/PWD and promotions no longer stack
+
+Philippine rules (RA 9994) do not let the Senior Citizen/PWD 20% discount combine with promotions or promo
+codes, and only one promotion applies at a time. Previously the app stacked all of them. Now:
+
+- The cashier chooses via the Senior/PWD switch (Admin/Manager only, as before). While it is on, **every
+  promotion is suppressed** and 20% is taken off the **regular** (pre-promo) subtotal.
+- Otherwise **one** promotion applies: the automatic item promos (BOGO / combo / item discount) **or** the
+  promo code, whichever is larger (a tie goes to the item promos). A second promo code replaces the first.
+- A promo code that isn't discounting stays on the cart, so switching Senior/PWD off restores it. The cashier
+  sees what each option would save, and why a code is not applied.
+- **No migration, no data change.** Completed sales are untouched; an open cart recalculates on its next edit.
+- **Ship the server and the Flutter client together.** An older client still stacks discounts locally, so for a
+  Senior/PWD + promo cart its total is lower than the server's, and the one-call checkout answers 409 "Prices or
+  promos changed" until that terminal is updated. (Offline sales are recorded at the server's price regardless.)
+- Also fixed: the customer-facing display double-counted a promo code's discount and omitted item promos, and the
+  thermal receipt printed a duplicate "Discount" line for a promo code and no line for item promos.
+- Not changed: the BIR reading's `GrossSales` (= net + discounts) still leaves out item-promo discounts, and the
+  Senior/PWD VAT-exemption treatment is still best-effort. Whether "20% of the regular subtotal, whole cart" is
+  what your accountant expects (e.g. for senior-only items or mixed groups) is worth confirming.
+
 ## Known limitations (unchanged by this deploy)
 
 - **Offline sales can be refused by the server** for good (e.g. an item deleted while offline). The customer already has a receipt; the sale then shows as *needs review* on that terminal only. Nothing alerts a manager elsewhere.
