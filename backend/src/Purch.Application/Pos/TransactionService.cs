@@ -82,6 +82,11 @@ public sealed class TransactionService(
 
     public async Task<TransactionDto> AddLineAsync(AddTransactionLineRequest request, CancellationToken cancellationToken = default)
     {
+        return await ToDtoAsync(await AddLineCoreAsync(request, cancellationToken), cancellationToken);
+    }
+
+    private async Task<Transaction> AddLineCoreAsync(AddTransactionLineRequest request, CancellationToken cancellationToken)
+    {
         if (request.Quantity <= 0)
         {
             throw new ValidationException(nameof(request.Quantity), "Quantity must be greater than zero.");
@@ -148,7 +153,7 @@ public sealed class TransactionService(
             await RecalculateTotalAsync(cart, cancellationToken);
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            return await ToDtoAsync(cart, cancellationToken);
+            return cart;
         }
 
         var resolvedUnitPrice = item.BasePrice;
@@ -225,7 +230,7 @@ public sealed class TransactionService(
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await ToDtoAsync(cart, cancellationToken);
+        return cart;
     }
 
     /// <summary>Validates that every combo slot got exactly its required number of
@@ -428,22 +433,22 @@ public sealed class TransactionService(
         // (e.g. a credit-ledger balance) the failed step left in the change tracker.
         foreach (var line in request.Lines)
         {
-            _ = await AddLineAsync(line, cancellationToken);
+            _ = await AddLineCoreAsync(line, cancellationToken);
         }
 
         if (request.SeniorPwdDiscountApplied)
         {
-            _ = await ApplySeniorPwdDiscountAsync(new ApplySeniorPwdDiscountRequest(true), cancellationToken);
+            _ = await ApplySeniorPwdDiscountCoreAsync(new ApplySeniorPwdDiscountRequest(true), cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(request.PromoCode))
         {
-            _ = await ApplyPromoCodeAsync(new ApplyPromoCodeRequest(request.PromoCode), cancellationToken);
+            _ = await ApplyPromoCodeCoreAsync(new ApplyPromoCodeRequest(request.PromoCode), cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(request.OrderType))
         {
-            _ = await SetOrderTypeAsync(new SetOrderTypeRequest(request.OrderType), cancellationToken);
+            _ = await SetOrderTypeCoreAsync(new SetOrderTypeRequest(request.OrderType), cancellationToken);
         }
 
         // An offline sale is already paid for at the device's price — refusing it now would leave the
@@ -835,6 +840,11 @@ public sealed class TransactionService(
 
     public async Task<TransactionDto> ApplySeniorPwdDiscountAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken = default)
     {
+        return await ToDtoAsync(await ApplySeniorPwdDiscountCoreAsync(request, cancellationToken), cancellationToken);
+    }
+
+    private async Task<Transaction> ApplySeniorPwdDiscountCoreAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken)
+    {
         var deviceId = CurrentDeviceId;
         var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
             ?? throw new NotFoundException("Open cart", deviceId);
@@ -843,10 +853,15 @@ public sealed class TransactionService(
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await ToDtoAsync(cart, cancellationToken);
+        return cart;
     }
 
     public async Task<TransactionDto> ApplyPromoCodeAsync(ApplyPromoCodeRequest request, CancellationToken cancellationToken = default)
+    {
+        return await ToDtoAsync(await ApplyPromoCodeCoreAsync(request, cancellationToken), cancellationToken);
+    }
+
+    private async Task<Transaction> ApplyPromoCodeCoreAsync(ApplyPromoCodeRequest request, CancellationToken cancellationToken)
     {
         // Auto-creates the cart like AddLineAsync — a cashier can key in a promo
         // code before scanning the first item, so requiring an existing open
@@ -871,10 +886,15 @@ public sealed class TransactionService(
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await ToDtoAsync(cart, cancellationToken);
+        return cart;
     }
 
     public async Task<TransactionDto> SetOrderTypeAsync(SetOrderTypeRequest request, CancellationToken cancellationToken = default)
+    {
+        return await ToDtoAsync(await SetOrderTypeCoreAsync(request, cancellationToken), cancellationToken);
+    }
+
+    private async Task<Transaction> SetOrderTypeCoreAsync(SetOrderTypeRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.OrderType))
         {
@@ -888,7 +908,7 @@ public sealed class TransactionService(
         cart.OrderType = request.OrderType.Trim();
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await ToDtoAsync(cart, cancellationToken);
+        return cart;
     }
 
     public async Task<TransactionDto> SubmitKioskOrderAsync(CancellationToken cancellationToken = default)
