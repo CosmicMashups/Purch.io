@@ -116,5 +116,73 @@ void main() {
       // BIR Disclaimer
       expect(decoded, contains('THIS SERVES AS AN OFFICIAL RECEIPT'));
     });
+
+    Transaction discounted({
+      required double discountAmount,
+      required double promoDiscountAmount,
+      required bool senior,
+      String? promoCode,
+      double itemPromo = 0,
+    }) => Transaction(
+      id: sampleTx.id,
+      branchId: sampleTx.branchId,
+      deviceId: sampleTx.deviceId,
+      status: TransactionStatus.completed,
+      receiptNumber: sampleTx.receiptNumber,
+      subtotal: 280.0,
+      discountAmount: discountAmount,
+      seniorPwdDiscountApplied: senior,
+      promoCode: promoCode,
+      promoDiscountAmount: promoDiscountAmount,
+      itemPromoDiscountAmount: itemPromo,
+      totalAmount: 280.0 - itemPromo - discountAmount,
+      lines: sampleTx.lines,
+      payments: sampleTx.payments,
+    );
+
+    String receiptFor(Transaction tx) => utf8.decode(
+      ReceiptEscPosFormatter.format(
+        transaction: tx,
+        tenantSettings: sampleSettings,
+        branchName: 'Main Store',
+        cashierName: 'Maria S.',
+        cutPaper: false,
+        kickDrawer: false,
+      ),
+      allowMalformed: true,
+    );
+
+    test('a Senior/PWD sale prints only the Senior/PWD discount, even with a promo code on the cart', () {
+      // The code is still on the cart but gave nothing (the two never combine).
+      final text = receiptFor(
+        discounted(discountAmount: 56, promoDiscountAmount: 0, senior: true, promoCode: 'SAVE10'),
+      );
+
+      expect(text, contains('Senior/PWD Discount (20%)'));
+      expect(text, contains('-PHP 56.00'));
+      expect(text, isNot(contains('Promo (SAVE10)')));
+      expect(text, contains('PHP 224.00')); // 280 - 56
+    });
+
+    test('a promo-code sale prints one promo line, not a duplicate generic Discount line', () {
+      final text = receiptFor(
+        discounted(discountAmount: 28, promoDiscountAmount: 28, senior: false, promoCode: 'SAVE10'),
+      );
+
+      expect(text, contains('Promo (SAVE10)'));
+      expect(text, contains('-PHP 28.00'));
+      expect(text, isNot(contains('Senior/PWD')));
+      expect('Discount'.allMatches(text).length, 0);
+    });
+
+    test('item promos are printed so subtotal minus discounts reconciles with the total', () {
+      final text = receiptFor(
+        discounted(discountAmount: 0, promoDiscountAmount: 0, senior: false, itemPromo: 40),
+      );
+
+      expect(text, contains('Item promos'));
+      expect(text, contains('-PHP 40.00'));
+      expect(text, contains('PHP 240.00')); // 280 - 40
+    });
   });
 }

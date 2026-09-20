@@ -89,7 +89,11 @@ class CfdService {
       storeLogoUrl: storeLogoUrl ?? _currentState.storeLogoUrl,
       lines: lines,
       subtotal: transaction.subtotal,
-      discountAmount: transaction.discountAmount + transaction.promoDiscountAmount,
+      // DiscountAmount already includes a promo code's discount; item promos are
+      // tracked separately. Adding promoDiscountAmount again double-counted the
+      // code, so the display's subtotal - discount never matched the total.
+      discountAmount:
+          transaction.discountAmount + transaction.itemPromoDiscountAmount,
       totalAmount: transaction.totalAmount,
       vatableSales: vatableSales,
       vatAmount: vatAmount,

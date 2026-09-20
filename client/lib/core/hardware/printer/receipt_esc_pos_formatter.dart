@@ -134,23 +134,32 @@ class ReceiptEscPosFormatter {
     // 5. Totals & Discounts
     builder.twoColumn('Subtotal', 'PHP ${transaction.subtotal.toStringAsFixed(2)}');
 
+    // Discounts never combine (Senior/PWD vs promotions, and one promotion at a
+    // time), so the receipt shows the single discount that applied; the lines
+    // below always reconcile: Subtotal - discount = Total.
+    if (transaction.itemPromoDiscountAmount > 0) {
+      builder.twoColumn(
+        'Item promos',
+        '-PHP ${transaction.itemPromoDiscountAmount.toStringAsFixed(2)}',
+      );
+    }
+
     if (transaction.seniorPwdDiscountApplied && transaction.discountAmount > 0) {
       builder.twoColumn(
         'Senior/PWD Discount (20%)',
         '-PHP ${transaction.discountAmount.toStringAsFixed(2)}',
         isBold: true,
       );
+    } else if (transaction.promoCode != null &&
+        transaction.promoDiscountAmount > 0) {
+      builder.twoColumn(
+        'Promo (${transaction.promoCode})',
+        '-PHP ${transaction.promoDiscountAmount.toStringAsFixed(2)}',
+      );
     } else if (transaction.discountAmount > 0) {
       builder.twoColumn(
         'Discount',
         '-PHP ${transaction.discountAmount.toStringAsFixed(2)}',
-      );
-    }
-
-    if (transaction.promoCode != null && transaction.promoDiscountAmount > 0) {
-      builder.twoColumn(
-        'Promo (${transaction.promoCode})',
-        '-PHP ${transaction.promoDiscountAmount.toStringAsFixed(2)}',
       );
     }
 

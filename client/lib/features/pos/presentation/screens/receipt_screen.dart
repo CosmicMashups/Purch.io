@@ -267,8 +267,12 @@ class ReceiptScreen extends ConsumerWidget {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          cart.promoCode != null
-                                              ? 'Discount (${cart.promoCode})'
+                                          cart.seniorPwdDiscountApplied
+                                              ? 'Senior/PWD (20%)'
+                                              : (cart.promoCode != null &&
+                                                      cart.promoDiscountAmount >
+                                                          0)
+                                              ? 'Promo code (${cart.promoCode})'
                                               : 'Discount',
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 13,
