@@ -17,6 +17,7 @@ public sealed class InventoryMovementService(
     IItemStockService itemStockService,
     IInventoryItemRepository inventoryItemRepository,
     IBranchRepository branchRepository,
+    IBranchScopeGuard branchScopeGuard,
     IUserRepository userRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -77,6 +78,8 @@ public sealed class InventoryMovementService(
         {
             throw new ValidationException(nameof(request.SupplierReference), "A supplier reference is required for a For Return movement.");
         }
+
+        await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
 
         var item = await itemRepository.GetByIdAsync(request.ItemId, cancellationToken)
             ?? throw new NotFoundException("Item", request.ItemId);

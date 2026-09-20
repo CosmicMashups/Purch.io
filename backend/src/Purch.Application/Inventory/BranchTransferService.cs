@@ -19,6 +19,7 @@ public sealed class BranchTransferService(
     IItemRepository itemRepository,
     IItemStockService itemStockService,
     IBranchRepository branchRepository,
+    IBranchScopeGuard branchScopeGuard,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IBranchTransferService
@@ -46,6 +47,9 @@ public sealed class BranchTransferService(
         {
             throw new ValidationException(nameof(request.Lines), "At least one item is required.");
         }
+
+        // A branch account may send stock out of its own branch, not out of someone else's.
+        await branchScopeGuard.EnsureAllowedAsync(request.SourceBranchId, cancellationToken);
 
         _ = await branchRepository.GetByIdAsync(request.SourceBranchId, cancellationToken)
             ?? throw new NotFoundException("Branch", request.SourceBranchId);
@@ -93,6 +97,8 @@ public sealed class BranchTransferService(
         var transfer = await branchTransferRepository.GetByIdAsync(branchTransferId, cancellationToken)
             ?? throw new NotFoundException("Branch transfer", branchTransferId);
 
+        await branchScopeGuard.EnsureAllowedAsync(transfer.SourceBranchId, cancellationToken);
+
         if (transfer.Status != BranchTransferStatus.Pending)
         {
             throw new ValidationException(nameof(transfer.Status), "Only a Pending transfer can be marked In Transit.");
@@ -139,6 +145,8 @@ public sealed class BranchTransferService(
         var transfer = await branchTransferRepository.GetByIdAsync(branchTransferId, cancellationToken)
             ?? throw new NotFoundException("Branch transfer", branchTransferId);
 
+        await branchScopeGuard.EnsureAllowedAsync(transfer.DestinationBranchId, cancellationToken);
+
         if (transfer.Status != BranchTransferStatus.InTransit)
         {
             throw new ValidationException(nameof(transfer.Status), "Only an In Transit transfer can be marked Received.");
@@ -175,6 +183,8 @@ public sealed class BranchTransferService(
     {
         var transfer = await branchTransferRepository.GetByIdAsync(branchTransferId, cancellationToken)
             ?? throw new NotFoundException("Branch transfer", branchTransferId);
+
+        await branchScopeGuard.EnsureAnyAllowedAsync([transfer.SourceBranchId, transfer.DestinationBranchId], cancellationToken);
 
         if (transfer.Status is not (BranchTransferStatus.Pending or BranchTransferStatus.InTransit))
         {

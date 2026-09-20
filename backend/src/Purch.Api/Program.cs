@@ -147,6 +147,7 @@ builder.Services.AddScoped<IItemDiscountPromoRuleService, ItemDiscountPromoRuleS
 builder.Services.AddScoped<IBirReadingService, BirReadingService>();
 builder.Services.AddScoped<IReportingRepository, EfReportingRepository>();
 builder.Services.AddScoped<IReportScopeResolver, ReportScopeResolver>();
+builder.Services.AddScoped<IBranchScopeGuard, BranchScopeGuard>();
 builder.Services.AddScoped<ISalesDashboardService, SalesDashboardService>();
 builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
 builder.Services.AddScoped<IStaffPerformanceService, StaffPerformanceService>();

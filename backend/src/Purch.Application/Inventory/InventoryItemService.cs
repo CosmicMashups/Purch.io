@@ -14,6 +14,7 @@ namespace Purch.Application.Inventory;
 public sealed class InventoryItemService(
     IInventoryItemRepository inventoryItemRepository,
     IInventoryMovementRepository movementRepository,
+    IBranchScopeGuard branchScopeGuard,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IInventoryItemService
@@ -83,6 +84,8 @@ public sealed class InventoryItemService(
 
     public async Task<InventoryItemDto> UpdatePhysicalCountAsync(Guid inventoryItemId, UpdatePhysicalCountRequest request, CancellationToken cancellationToken = default)
     {
+        await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
+
         if (request.QuantityOnHand < 0)
         {
             throw new ValidationException(nameof(request.QuantityOnHand), "Quantity on hand cannot be negative.");
@@ -110,6 +113,8 @@ public sealed class InventoryItemService(
 
     public async Task<InventoryItemDto> ReceiveStockAsync(Guid inventoryItemId, ReceiveInventoryStockRequest request, CancellationToken cancellationToken = default)
     {
+        await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
+
         if (request.PackagesReceived <= 0)
         {
             throw new ValidationException(nameof(request.PackagesReceived), "Packages received must be greater than zero.");

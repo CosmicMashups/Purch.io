@@ -16,6 +16,7 @@ public sealed class PurchaseOrderService(
     IItemRepository itemRepository,
     IItemStockService itemStockService,
     IBranchRepository branchRepository,
+    IBranchScopeGuard branchScopeGuard,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IPurchaseOrderService
@@ -38,6 +39,8 @@ public sealed class PurchaseOrderService(
         {
             throw new ValidationException(nameof(request.Lines), "At least one item is required.");
         }
+
+        await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
 
         _ = await supplierRepository.GetByIdAsync(request.SupplierId, cancellationToken)
             ?? throw new NotFoundException("Supplier", request.SupplierId);
@@ -92,6 +95,8 @@ public sealed class PurchaseOrderService(
         var purchaseOrder = await purchaseOrderRepository.GetByIdAsync(purchaseOrderId, cancellationToken)
             ?? throw new NotFoundException("Purchase order", purchaseOrderId);
 
+        await branchScopeGuard.EnsureAllowedAsync(purchaseOrder.BranchId, cancellationToken);
+
         if (purchaseOrder.Status != PurchaseOrderStatus.Draft)
         {
             throw new ValidationException(nameof(purchaseOrder.Status), "Only a Draft purchase order can be sent.");
@@ -109,6 +114,8 @@ public sealed class PurchaseOrderService(
         var purchaseOrder = await purchaseOrderRepository.GetByIdAsync(purchaseOrderId, cancellationToken)
             ?? throw new NotFoundException("Purchase order", purchaseOrderId);
 
+        await branchScopeGuard.EnsureAllowedAsync(purchaseOrder.BranchId, cancellationToken);
+
         if (purchaseOrder.Status is not (PurchaseOrderStatus.Draft or PurchaseOrderStatus.Sent))
         {
             throw new ValidationException(nameof(purchaseOrder.Status), "Only a Draft or Sent purchase order can be cancelled.");
@@ -124,6 +131,8 @@ public sealed class PurchaseOrderService(
     {
         var purchaseOrder = await purchaseOrderRepository.GetByIdAsync(purchaseOrderId, cancellationToken)
             ?? throw new NotFoundException("Purchase order", purchaseOrderId);
+
+        await branchScopeGuard.EnsureAllowedAsync(purchaseOrder.BranchId, cancellationToken);
 
         if (purchaseOrder.Status is not (PurchaseOrderStatus.Sent or PurchaseOrderStatus.PartiallyReceived))
         {
