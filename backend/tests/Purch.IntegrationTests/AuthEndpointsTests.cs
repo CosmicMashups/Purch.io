@@ -241,6 +241,25 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Refresh_attempts_are_capped_per_client_but_far_above_normal_use()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var statuses = new List<HttpStatusCode>();
+        for (var attempt = 0; attempt < 121; attempt++)
+        {
+            var response = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest($"not-a-real-token-{attempt}"));
+            statuses.Add(response.StatusCode);
+        }
+
+        // Every terminal and tab renews on a timer, so 120 per 15 minutes must not trip a busy shop...
+        Assert.All(statuses.Take(120), status => Assert.Equal(HttpStatusCode.Unauthorized, status));
+        // ...but an endless token-guessing loop is cut off.
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[120]);
+    }
+
+    [Fact]
     public async Task A_new_password_reset_request_retires_the_older_reset_link()
     {
         var tenantId = Guid.NewGuid();

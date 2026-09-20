@@ -23,6 +23,10 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
     /// would otherwise only ever reach the user's inbox.</summary>
     public CapturingPasswordResetTokenNotifier PasswordResetTokenNotifier { get; } = new();
 
+    /// <summary>Extra configuration for one test (set before the first request creates the host), e.g.
+    /// <c>new PurchApiFactory(cs) { ExtraSettings = { ["PUBLIC_BASE_URL"] = "https://cdn.example" } }</c>.</summary>
+    public Dictionary<string, string?> ExtraSettings { get; } = [];
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _ = builder.ConfigureAppConfiguration((webHostBuilderContext, configBuilder) =>
@@ -36,6 +40,7 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
                 ["JWT_SIGNING_KEY"] = TestJwtSigningKey,
                 ["JWT_ISSUER"] = TestJwtIssuer,
             });
+            _ = configBuilder.AddInMemoryCollection(ExtraSettings);
         });
 
         _ = builder.ConfigureServices(services =>

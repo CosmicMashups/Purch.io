@@ -155,6 +155,25 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task The_returned_url_uses_the_configured_public_base_url_not_the_callers_host_header()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString) { ExtraSettings = { ["PUBLIC_BASE_URL"] = "https://media.example.test/" } };
+        var (client, _) = await AdminClientAsync(factory, "Base Url Shop");
+        using var _client = client;
+
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D };
+        using var form = ImageForm(png, "pic.png", "image/png");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/uploads/image") { Content = form };
+        request.Headers.Host = "attacker.example";
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var url = (await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions)).GetProperty("url").GetString()!;
+        Assert.StartsWith("https://media.example.test/", url);
+        Assert.DoesNotContain("attacker.example", url);
+    }
+
+    [Fact]
     public async Task A_cashier_cannot_upload_images()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

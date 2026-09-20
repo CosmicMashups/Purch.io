@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
+using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
@@ -109,6 +110,22 @@ public sealed class ModifierAndBatchEndpointsTests(PostgresContainerFixture post
             .ToDictionary(b => b.LotNumber, b => b.QuantityRemaining);
         Assert.Equal(0m, remainingByLot["LOT-SOON"]);
         Assert.Equal(4m, remainingByLot["LOT-LATE"]);
+    }
+
+    [Fact]
+    public async Task With_separate_tracking_receiving_a_batch_adds_to_the_linked_inventory_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await client.PutAsJsonAsync("/tenant/settings/inventory-tracking", new UpdateInventoryTrackingSettingRequest(true));
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Rice", null, null, null, 55m, null, PricingType.WeightVolume))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var batch = await client.PostAsJsonAsync($"/items/{item.Id}/batches", new CreateItemBatchRequest("LOT-001", null, 50m));
+
+        Assert.Equal(HttpStatusCode.OK, batch.StatusCode);
+        var linked = (await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions))!.Single(i => i.LinkedItemId == item.Id);
+        Assert.Equal(50m, linked.QuantityOnHand);
+        Assert.Equal(0m, (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.Single(i => i.Id == item.Id).StockOnHand);
     }
 
     [Fact]

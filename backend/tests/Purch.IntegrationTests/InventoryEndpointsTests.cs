@@ -354,6 +354,29 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         Assert.DoesNotContain("Value Meal", csv);
     }
 
+    [Fact]
+    public async Task With_separate_tracking_receiving_a_purchase_order_adds_to_the_linked_inventory_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        _ = await client.PutAsJsonAsync("/tenant/settings/inventory-tracking", new UpdateInventoryTrackingSettingRequest(true));
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Flour", null, null, null, 40m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var supplier = (await (await client.PostAsJsonAsync("/suppliers", new CreateSupplierRequest("Acme Distribution", null))).Content.ReadFromJsonAsync<SupplierDto>(JsonOptions))!;
+        var order = (await (await client.PostAsJsonAsync(
+            "/purchase-orders",
+            new CreatePurchaseOrderRequest(supplier.Id, branchId, [new CreatePurchaseOrderLineRequest(item.Id, 30m, 10m)]))).Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions))!;
+        _ = await client.PostAsync($"/purchase-orders/{order.Id}/mark-sent", null);
+
+        var receive = await client.PostAsJsonAsync(
+            $"/purchase-orders/{order.Id}/receive",
+            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(order.Lines.Single().Id, 30m)]));
+
+        Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
+        Assert.Equal(30m, await LinkedQuantityAsync(client, item.Id));
+        Assert.Equal(0m, (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.Single(i => i.Id == item.Id).StockOnHand);
+    }
+
     private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)
     {
         var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);

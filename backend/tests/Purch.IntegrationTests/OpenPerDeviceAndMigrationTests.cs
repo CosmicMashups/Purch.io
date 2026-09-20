@@ -147,6 +147,70 @@ public sealed class OpenPerDeviceAndMigrationTests(PostgresContainerFixture post
     }
 
     [Fact]
+    public async Task Two_requests_closing_the_same_shift_cannot_both_be_saved()
+    {
+        var tenantId = Guid.NewGuid();
+        Guid shiftId;
+        await using (var seed = NewContext(postgres.ConnectionString, tenantId))
+        {
+            var shift = OpenShift(tenantId, Guid.NewGuid(), ShiftStatus.Open, DateTimeOffset.UtcNow);
+            _ = seed.Shifts.Add(shift);
+            _ = await seed.SaveChangesAsync();
+            shiftId = shift.Id;
+        }
+
+        await using var first = NewContext(postgres.ConnectionString, tenantId);
+        await using var second = NewContext(postgres.ConnectionString, tenantId);
+        var a = await first.Shifts.SingleAsync(s => s.Id == shiftId);
+        var b = await second.Shifts.SingleAsync(s => s.Id == shiftId);
+
+        a.Status = ShiftStatus.Closed;
+        _ = await first.SaveChangesAsync();
+
+        b.Status = ShiftStatus.Closed;
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Two_requests_receiving_the_same_purchase_order_line_cannot_both_be_saved()
+    {
+        var tenantId = Guid.NewGuid();
+        Guid lineId;
+        Guid orderId;
+        await using (var seed = NewContext(postgres.ConnectionString, tenantId))
+        {
+            var order = new PurchaseOrder { TenantId = tenantId, SupplierId = Guid.NewGuid(), BranchId = Guid.NewGuid(), Status = PurchaseOrderStatus.Sent };
+            var line = new PurchaseOrderLine { TenantId = tenantId, PurchaseOrderId = order.Id, ItemId = Guid.NewGuid(), QuantityOrdered = 10m };
+            _ = seed.PurchaseOrders.Add(order);
+            _ = seed.PurchaseOrderLines.Add(line);
+            _ = await seed.SaveChangesAsync();
+            orderId = order.Id;
+            lineId = line.Id;
+        }
+
+        // Both requests read "0 of 10 received" and each try to add 8: without a guard the line would end up
+        // at 16 of 10 and the stock counted twice.
+        await using var first = NewContext(postgres.ConnectionString, tenantId);
+        await using var second = NewContext(postgres.ConnectionString, tenantId);
+        var a = await first.PurchaseOrderLines.SingleAsync(l => l.Id == lineId);
+        var b = await second.PurchaseOrderLines.SingleAsync(l => l.Id == lineId);
+
+        a.QuantityReceived += 8m;
+        _ = await first.SaveChangesAsync();
+
+        b.QuantityReceived += 8m;
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+
+        // And the order itself (its status changes as it is received or cancelled) is guarded too.
+        var orderA = await first.PurchaseOrders.SingleAsync(o => o.Id == orderId);
+        var orderB = await second.PurchaseOrders.SingleAsync(o => o.Id == orderId);
+        orderA.Status = PurchaseOrderStatus.Cancelled;
+        _ = await first.SaveChangesAsync();
+        orderB.Status = PurchaseOrderStatus.PartiallyReceived;
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task Two_z_readings_or_receipt_numbers_from_the_same_sequence_cannot_both_be_saved()
     {
         var tenantId = Guid.NewGuid();
