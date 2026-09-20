@@ -625,34 +625,142 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(100m, cart.TotalAmount);
     }
 
+    // --- Discounts do not stack (RA 9994): Senior/PWD and promotions are either/or, and only one
+    // promotion (item promos OR a promo code) applies at a time. The cashier chooses via the Senior/PWD switch. ---
+
+    private static async Task<TransactionDto> CartWithOneAsync(HttpClient client, string name, decimal price)
+    {
+        var item = await CreateItemAsync(client, name, price);
+        var response = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item.Id, null, 1m));
+        return (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+    }
+
+    private static Task<HttpResponseMessage> CreatePromoCodeAsync(HttpClient client, string code, PromoDiscountType type, decimal value) =>
+        client.PostAsJsonAsync("/promo-codes", new CreatePromoCodeRequest(code, type, value, null));
+
+    private static async Task<TransactionDto> ReadCartAsync(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
     [Fact]
-    public async Task A_promo_code_and_the_senior_pwd_discount_stack()
+    public async Task A_promo_code_does_not_stack_with_the_senior_pwd_discount()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await CreatePromoCodeAsync(client, "SAVE10", PromoDiscountType.Percentage, 10m);
+        _ = await CartWithOneAsync(client, "Notebook", 100m);
+        _ = await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true));
 
+        var cart = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10")));
+
+        // Only the 20% Senior/PWD discount applies; the code is kept on the cart but gives nothing.
+        Assert.Equal("SAVE10", cart.PromoCode);
+        Assert.Equal(0m, cart.PromoDiscountAmount);
+        Assert.Equal(20m, cart.DiscountAmount);
+        Assert.Equal(80m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Turning_the_senior_pwd_discount_off_restores_a_promo_code_it_had_suppressed()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await CreatePromoCodeAsync(client, "SAVE10", PromoDiscountType.Percentage, 10m);
+        _ = await CartWithOneAsync(client, "Notebook", 100m);
+        _ = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10"));
+        _ = await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true));
+
+        var off = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(false)));
+
+        Assert.Equal(10m, off.PromoDiscountAmount);
+        Assert.Equal(90m, off.TotalAmount);
+    }
+
+    [Fact]
+    public async Task The_senior_pwd_discount_is_taken_on_the_regular_price_and_suppresses_item_promos()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Promo Item", 100m);
         _ = await client.PostAsJsonAsync(
-            "/promo-codes",
-            new CreatePromoCodeRequest("SAVE10", PromoDiscountType.Percentage, 10m, null));
+            "/promos/item-discounts",
+            new CreateItemDiscountPromoRuleRequest("Half off", item.Id, PromoDiscountType.Percentage, 50m, null, null));
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
 
-        var itemResponse = await client.PostAsJsonAsync(
-            "/items",
-            new CreateItemRequest("Notebook", null, null, null, 100m, null, PricingType.Unit));
-        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        var withPromo = await ReadCartAsync(await client.GetAsync("/transactions/cart"));
+        Assert.Equal(50m, withPromo.ItemPromoDiscountAmount);
+        Assert.Equal(50m, withPromo.TotalAmount);
+
+        var senior = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true)));
+
+        // 20% of the REGULAR 100, not of the promo price; the promo is suppressed entirely.
+        Assert.Equal(0m, senior.ItemPromoDiscountAmount);
+        Assert.Equal(20m, senior.DiscountAmount);
+        Assert.Equal(80m, senior.TotalAmount);
+        Assert.Equal(0m, Assert.Single(senior.Lines).PromoDiscountAmount);
+        Assert.Null(senior.Lines[0].AppliedPromoLabel);
+    }
+
+    [Fact]
+    public async Task A_promo_code_and_item_promos_do_not_stack_and_the_larger_one_applies()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Stack Item", 100m);
         _ = await client.PostAsJsonAsync(
-            "/transactions/cart/lines",
-            new AddTransactionLineRequest(item!.Id, null, 1m));
-        _ = await client.PutAsJsonAsync(
-            "/transactions/cart/senior-pwd-discount",
-            new ApplySeniorPwdDiscountRequest(true));
+            "/promos/item-discounts",
+            new CreateItemDiscountPromoRuleRequest("Ten off", item.Id, PromoDiscountType.FixedAmount, 10m, null, null));
+        _ = await CreatePromoCodeAsync(client, "CODE30", PromoDiscountType.FixedAmount, 30m);
+        _ = await CreatePromoCodeAsync(client, "CODE5", PromoDiscountType.FixedAmount, 5m);
+        _ = await CreatePromoCodeAsync(client, "CODE10", PromoDiscountType.FixedAmount, 10m);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
 
-        var response = await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10"));
-        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        // The code (30) beats the item promo (10): only the code applies.
+        var codeWins = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("CODE30")));
+        Assert.Equal(30m, codeWins.PromoDiscountAmount);
+        Assert.Equal(0m, codeWins.ItemPromoDiscountAmount);
+        Assert.Equal(70m, codeWins.TotalAmount);
 
-        // 20 senior/PWD + 10 promo (10% of the 100 subtotal, not the post-senior-discount remainder).
-        Assert.Equal(10m, cart!.PromoDiscountAmount);
-        Assert.Equal(30m, cart.DiscountAmount);
-        Assert.Equal(70m, cart.TotalAmount);
+        // A second code REPLACES the first (one promo code per order), and here loses to the item promo (5 < 10).
+        var promosWin = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("CODE5")));
+        Assert.Equal("CODE5", promosWin.PromoCode);
+        Assert.Equal(0m, promosWin.PromoDiscountAmount);
+        Assert.Equal(10m, promosWin.ItemPromoDiscountAmount);
+        Assert.Equal(90m, promosWin.TotalAmount);
+
+        // A tie goes to the automatic item promo.
+        var tie = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("CODE10")));
+        Assert.Equal(10m, tie.ItemPromoDiscountAmount);
+        Assert.Equal(0m, tie.PromoDiscountAmount);
+        Assert.Equal(90m, tie.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Checkout_prices_the_senior_pwd_discount_and_a_promo_code_exclusively()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Checkout Notebook", 100m);
+        _ = await CreatePromoCodeAsync(client, "SAVE10", PromoDiscountType.Percentage, 10m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                SeniorPwdDiscountApplied: true,
+                PromoCode: "SAVE10",
+                OrderType: null,
+                Payment: new RecordPaymentRequest(PaymentMethod.Cash, 100m),
+                // What the device shows: Senior/PWD only. Stacking would make it 70 and trip the 409.
+                ExpectedTotal: 80m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sale = await ReadCartAsync(response);
+        Assert.Equal(80m, sale.TotalAmount);
+        Assert.Equal(0m, sale.PromoDiscountAmount);
+        Assert.Equal(20m, sale.DiscountAmount);
     }
 
     [Fact]

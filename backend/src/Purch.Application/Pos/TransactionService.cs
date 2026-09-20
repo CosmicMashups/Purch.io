@@ -905,68 +905,106 @@ public sealed class TransactionService(
         return transaction;
     }
 
+    /// <summary>
+    /// Prices the cart. Discounts do NOT stack: under Philippine rules (RA 9994) the statutory Senior
+    /// Citizen/PWD 20% cannot be combined with an establishment's promotional discounts or voucher codes,
+    /// and a cart carries only one promotional discount at a time. The cashier chooses which one the
+    /// customer gets — via the Senior/PWD switch — so this applies exactly one of:
+    ///
+    ///  - Senior/PWD chosen: 20% of the regular (pre-promo) subtotal. Every promotion is suppressed.
+    ///  - Otherwise: ONE promotion — the automatic item promos (BOGO/combo/item discount) or the promo
+    ///    code, whichever gives the larger discount (a tie goes to the item promos).
+    ///
+    /// A promo code that isn't applied (Senior/PWD chosen, or item promos are larger) stays stored on the
+    /// cart with a zero amount, so switching Senior/PWD back off restores it. Everything is recomputed from
+    /// scratch on every call, never patched incrementally. Mirrored by the Flutter PricingEngine — keep the
+    /// two in step.
+    /// </summary>
     private async Task RecalculateTotalAsync(Transaction transaction, CancellationToken cancellationToken, Guid? excludingLineId = null)
     {
         var lines = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
         var pricedLines = lines.Where(line => line.Id != excludingLineId).ToList();
 
-        var itemPromoDiscountTotal = await ApplyItemPromosAsync(transaction, pricedLines, cancellationToken);
+        var grossSubtotal = pricedLines.Sum(line => line.LineTotal);
 
-        var subtotal = pricedLines.Sum(line => line.LineTotal) - itemPromoDiscountTotal;
-
-        var seniorPwdAmount = transaction.SeniorPwdDiscountApplied
-            ? Math.Round(subtotal * SeniorPwdDiscountRate, 2)
-            : 0m;
-
-        var promoAmount = 0m;
-        if (!string.IsNullOrWhiteSpace(transaction.PromoCode))
-        {
-            var promo = await promoCodeRepository.GetByCodeAsync(CurrentTenantId, transaction.PromoCode, cancellationToken);
-            if (promo is null || !promo.IsActive || (promo.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow))
-            {
-                // The code became invalid/expired mid-cart — drop it rather than erroring on every line edit.
-                transaction.PromoCode = null;
-            }
-            else
-            {
-                var remainingAfterSenior = Math.Max(subtotal - seniorPwdAmount, 0m);
-                promoAmount = promo.DiscountType == PromoDiscountType.Percentage
-                    ? Math.Round(subtotal * promo.DiscountValue / 100m, 2)
-                    : promo.DiscountValue;
-                promoAmount = Math.Min(promoAmount, remainingAfterSenior);
-            }
-        }
-
-        transaction.PromoDiscountAmount = promoAmount;
-        transaction.DiscountAmount = seniorPwdAmount + promoAmount;
-        transaction.TotalAmount = subtotal - transaction.DiscountAmount;
-    }
-
-    /// <summary>
-    /// Applies the automatic, no-code item-level promos (BOGO, combo bundle, item
-    /// discount) to the cart's lines, before the Senior/PWD and PromoCode discounts
-    /// that RecalculateTotalAsync layers on top. Idempotent: every call recomputes
-    /// each line's PromoDiscountAmount/AppliedPromoLabel from scratch, the same way
-    /// the rest of this method recomputes totals rather than incrementally patching
-    /// them. Returns the total item-promo discount, which the caller subtracts from
-    /// the subtotal before Senior/PWD and PromoCode are computed on what's left.
-    ///
-    /// The heavy lifting — which units get discounted, and by how much, without a
-    /// unit being discounted twice by two different rules — lives in
-    /// ItemPromoPricingCalculator so it can be unit tested directly.
-    /// </summary>
-    private async Task<decimal> ApplyItemPromosAsync(Transaction transaction, List<TransactionLine> lines, CancellationToken cancellationToken)
-    {
-        foreach (var line in lines)
+        // Line-level promo fields are persisted, so reset them first and re-apply only if item promos win.
+        foreach (var line in pricedLines)
         {
             line.PromoDiscountAmount = 0m;
             line.AppliedPromoLabel = null;
         }
 
+        var itemPromoResults = await CalculateItemPromosAsync(pricedLines, cancellationToken);
+        var itemPromoAmount = itemPromoResults.Sum(result => result.DiscountAmount);
+        var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, grossSubtotal, cancellationToken);
+
+        var seniorPwdAmount = 0m;
+        var appliedItemPromoAmount = 0m;
+        var appliedPromoCodeAmount = 0m;
+
+        if (transaction.SeniorPwdDiscountApplied)
+        {
+            // On the regular price, not on a price already reduced by a promotion.
+            seniorPwdAmount = Math.Round(grossSubtotal * SeniorPwdDiscountRate, 2);
+        }
+        else if (itemPromoAmount >= promoCodeAmount)
+        {
+            appliedItemPromoAmount = itemPromoAmount;
+            var linesById = pricedLines.ToDictionary(line => line.Id);
+            foreach (var result in itemPromoResults)
+            {
+                if (linesById.TryGetValue(result.LineId, out var line))
+                {
+                    line.PromoDiscountAmount = result.DiscountAmount;
+                    line.AppliedPromoLabel = result.Label;
+                }
+            }
+        }
+        else
+        {
+            appliedPromoCodeAmount = promoCodeAmount;
+        }
+
+        transaction.ItemPromoDiscountAmount = appliedItemPromoAmount;
+        transaction.PromoDiscountAmount = appliedPromoCodeAmount;
+        transaction.DiscountAmount = seniorPwdAmount + appliedPromoCodeAmount;
+        transaction.TotalAmount = grossSubtotal - appliedItemPromoAmount - transaction.DiscountAmount;
+    }
+
+    /// <summary>The discount the cart's promo code WOULD give on the regular subtotal (0 if there is no code).
+    /// A code that became invalid or expired mid-cart is dropped rather than erroring on every line edit.</summary>
+    private async Task<decimal> CalculatePromoCodeAmountAsync(Transaction transaction, decimal grossSubtotal, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(transaction.PromoCode))
+        {
+            return 0m;
+        }
+
+        var promo = await promoCodeRepository.GetByCodeAsync(CurrentTenantId, transaction.PromoCode, cancellationToken);
+        if (promo is null || !promo.IsActive || (promo.ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow))
+        {
+            transaction.PromoCode = null;
+            return 0m;
+        }
+
+        var amount = promo.DiscountType == PromoDiscountType.Percentage
+            ? Math.Round(grossSubtotal * promo.DiscountValue / 100m, 2)
+            : promo.DiscountValue;
+        return Math.Min(amount, grossSubtotal);
+    }
+
+    /// <summary>
+    /// The discount the automatic, no-code item-level promos (BOGO, combo bundle, item discount) WOULD give
+    /// on these lines, per line. Pure — it changes nothing; RecalculateTotalAsync decides whether these are
+    /// the promotion that applies. The heavy lifting (which units get discounted, and by how much, without a
+    /// unit being discounted twice by two different rules) lives in ItemPromoPricingCalculator so it can be
+    /// unit tested directly.
+    /// </summary>
+    private async Task<IReadOnlyList<ItemPromoLineResult>> CalculateItemPromosAsync(List<TransactionLine> lines, CancellationToken cancellationToken)
+    {
         if (lines.Count == 0)
         {
-            transaction.ItemPromoDiscountAmount = 0m;
-            return 0m;
+            return [];
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -976,32 +1014,14 @@ public sealed class TransactionService(
 
         if (bogoRules.Count == 0 && comboRules.Count == 0 && itemDiscountRules.Count == 0)
         {
-            transaction.ItemPromoDiscountAmount = 0m;
-            return 0m;
+            return [];
         }
 
         var lineInputs = lines
             .Select(line => new ItemPromoPricingCalculator.LineInput(line.Id, line.ItemId, line.Quantity, line.UnitPrice))
             .ToList();
 
-        var results = ItemPromoPricingCalculator.Calculate(lineInputs, bogoRules, comboRules, itemDiscountRules);
-
-        var linesById = lines.ToDictionary(line => line.Id);
-        var total = 0m;
-        foreach (var result in results)
-        {
-            if (!linesById.TryGetValue(result.LineId, out var line))
-            {
-                continue;
-            }
-
-            line.PromoDiscountAmount = result.DiscountAmount;
-            line.AppliedPromoLabel = result.Label;
-            total += result.DiscountAmount;
-        }
-
-        transaction.ItemPromoDiscountAmount = total;
-        return total;
+        return ItemPromoPricingCalculator.Calculate(lineInputs, bogoRules, comboRules, itemDiscountRules);
     }
 
     private async Task<TransactionDto> ToDtoAsync(Transaction transaction, CancellationToken cancellationToken)
