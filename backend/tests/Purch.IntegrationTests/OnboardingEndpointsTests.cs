@@ -128,6 +128,37 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
     }
 
+    [Fact]
+    public async Task Read_access_to_staff_and_promo_codes_is_limited_to_the_roles_that_need_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = factory.CreateClient();
+        var (adminToken, pairingCode) = await BootstrapAndLoginAsAdminAsync(admin);
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cash Ier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Ware House", Role.Warehouse, ScopeType.Tenant, null, null, "6789"));
+
+        async Task<HttpClient> SignedInAsync(string pin)
+        {
+            var client = factory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await LoginAsync(client, pairingCode, pin));
+            return client;
+        }
+
+        using var cashier = await SignedInAsync("5678");
+        using var warehouse = await SignedInAsync("6789");
+
+        // The staff list (names, roles, scopes) is for managers only.
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/staff")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/staff")).StatusCode);
+
+        // The cashier's POS prices with promo data, so it keeps read access; warehouse has no use for it.
+        Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/promo-codes")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/promos/bogo")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.GetAsync("/promo-codes")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.GetAsync("/promos/bogo")).StatusCode);
+    }
+
     [Theory]
     [InlineData("12")]
     [InlineData("123456789")]

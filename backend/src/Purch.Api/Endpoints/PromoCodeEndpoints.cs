@@ -9,12 +9,17 @@ public static class PromoCodeEndpoints
     {
         var promoManager = new[] { nameof(Role.Admin), nameof(Role.Manager) };
 
+        // Who may read promo codes and rules: the cashier's POS prices with them locally. Unattended
+        // devices (kiosk, order board, kitchen display) and warehouse staff have no use for them, and
+        // the code list is effectively a list of discounts anyone holding the code can claim.
+        var promoReader = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Cashier) };
+
         // --- Promo codes (D4/FR12) — cashier-entered cart-level discount codes ---
         _ = app.MapGet("/promo-codes", async (
             IPromoCodeService promoCodeService,
             CancellationToken cancellationToken) =>
             Results.Ok(await promoCodeService.ListAsync(cancellationToken)))
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole(promoReader));
 
         _ = app.MapPost("/promo-codes", async (
             CreatePromoCodeRequest request,
@@ -28,7 +33,7 @@ public static class PromoCodeEndpoints
             IBogoPromoRuleService bogoPromoRuleService,
             CancellationToken cancellationToken) =>
             Results.Ok(await bogoPromoRuleService.ListAsync(cancellationToken)))
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole(promoReader));
 
         _ = app.MapPost("/promos/bogo", async (
             CreateBogoPromoRuleRequest request,
@@ -50,7 +55,7 @@ public static class PromoCodeEndpoints
             IComboPromoRuleService comboPromoRuleService,
             CancellationToken cancellationToken) =>
             Results.Ok(await comboPromoRuleService.ListAsync(cancellationToken)))
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole(promoReader));
 
         _ = app.MapPost("/promos/combos", async (
             CreateComboPromoRuleRequest request,
@@ -72,7 +77,7 @@ public static class PromoCodeEndpoints
             IItemDiscountPromoRuleService itemDiscountPromoRuleService,
             CancellationToken cancellationToken) =>
             Results.Ok(await itemDiscountPromoRuleService.ListAsync(cancellationToken)))
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole(promoReader));
 
         _ = app.MapPost("/promos/item-discounts", async (
             CreateItemDiscountPromoRuleRequest request,

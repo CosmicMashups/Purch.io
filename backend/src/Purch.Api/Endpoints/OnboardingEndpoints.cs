@@ -22,7 +22,8 @@ public static class OnboardingEndpoints
         var admin = nameof(Role.Admin);
 
         _ = app.MapGet("/staff", async (IStaffService staffService, CancellationToken cancellationToken) =>
-            Results.Ok(await staffService.ListAsync(cancellationToken))).RequireAuthorization();
+            Results.Ok(await staffService.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(admin, nameof(Role.Manager)));
 
         _ = app.MapPost("/staff", async (
             CreateStaffRequest request,
