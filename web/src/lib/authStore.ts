@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { queryClient } from './queryClient';
 
 const ACCESS_TOKEN_KEY = 'purch.accessToken';
 const REFRESH_TOKEN_KEY = 'purch.refreshToken';
@@ -24,12 +25,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     set({ accessToken: null, refreshToken: null });
+    // The cache is not keyed by tenant, so whoever signs in next must never see this session's data.
+    queryClient.clear();
   },
-  syncFromStorage: () =>
-    set({
-      accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
-      refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
-    }),
+  syncFromStorage: () => {
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!accessToken) queryClient.clear();
+    set({ accessToken, refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) });
+  },
 }));
 
 // Refresh tokens are single-use, so two tabs must never each hold their own copy: the moment one

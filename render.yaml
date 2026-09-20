@@ -42,6 +42,8 @@ services:
         generateValue: true
       - key: JWT_ISSUER
         value: purch.io
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
       - key: XENDIT_API_KEY
         sync: false
       - key: XENDIT_WEBHOOK_SECRET

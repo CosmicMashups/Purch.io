@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -177,7 +178,10 @@ builder.Services
         // so capturing these values any earlier reads stale defaults during tests while
         // JwtTokenService (DI-injected IConfiguration, read post-Build) signs with the
         // real values — a signing-key/issuer mismatch that 401s every authenticated call.
-        var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"] ?? "development-only-signing-key-change-me";
+        // No fallback key: JwtTokenService already refuses to issue tokens without one, and a
+        // well-known default here would let anyone forge tokens the API would accept.
+        var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"]
+            ?? throw new InvalidOperationException("JWT_SIGNING_KEY is not configured.");
         var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
 
         // JwtSecurityTokenHandler otherwise remaps short claim names it recognizes
@@ -203,6 +207,22 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// The web admin SPA is served from a different origin than the API, so browsers block its
+// requests unless that origin is listed here. Native clients aren't subject to CORS, so with
+// no origins configured no policy is registered at all.
+builder.Services.AddCors(options =>
+{
+    var allowedOrigins = (builder.Configuration["CORS_ALLOWED_ORIGINS"] ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (allowedOrigins.Length > 0)
+    {
+        options.AddDefaultPolicy(policy => policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+    }
+});
 
 // Throttles the anonymous credential-guessing surfaces (login, kiosk pairing,
 // password-reset request/confirm) — partitioned per client IP so one abusive caller
@@ -313,6 +333,20 @@ using (var startupScope = app.Services.CreateScope())
 // and turned into a consistent ProblemDetails response, never a raw 500 with no body.
 app.UseExceptionHandler();
 
+// Cloud deploys (Render, Vercel) sit behind a reverse proxy, so without this every request's
+// RemoteIpAddress is the proxy and the per-IP rate limiter below shares one bucket for everyone.
+// Local mode is reached directly, where a client-supplied X-Forwarded-For would be spoofable.
+if (deploymentMode != DeploymentMode.Local)
+{
+    var forwardedHeadersOptions = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    };
+    forwardedHeadersOptions.KnownNetworks.Clear();
+    forwardedHeadersOptions.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeadersOptions);
+}
+
 // Catches status codes set without a response body (e.g. JWT auth failing with a bare
 // 401, [Authorize] failing with a bare 403, an unmatched route's default 404) and fills
 // in a ProblemDetails body for those too, so no error response is ever silently empty.
@@ -341,6 +375,7 @@ if (deploymentMode == DeploymentMode.Local)
     app.UseStaticFiles();
 }
 
+app.UseCors();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
