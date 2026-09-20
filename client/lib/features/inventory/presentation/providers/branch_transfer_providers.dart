@@ -66,6 +66,9 @@ class BranchTransferActionController extends _$BranchTransferActionController {
   Future<bool> markReceived() =>
       _act((repository) => repository.markReceived(branchTransferId));
 
+  Future<bool> cancel() =>
+      _act((repository) => repository.cancel(branchTransferId));
+
   Future<bool> _act(
     Future<BranchTransfer> Function(BranchTransferRepository) action,
   ) async {

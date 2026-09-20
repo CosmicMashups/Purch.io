@@ -1,11 +1,12 @@
 /// Mirrors Purch.Domain.Enums.BranchTransferStatus exactly, in declared order.
-enum BranchTransferStatus { pending, inTransit, received }
+enum BranchTransferStatus { pending, inTransit, received, cancelled }
 
 extension BranchTransferStatusLabel on BranchTransferStatus {
   String get label => switch (this) {
     BranchTransferStatus.pending => 'Pending',
     BranchTransferStatus.inTransit => 'In Transit',
     BranchTransferStatus.received => 'Received',
+    BranchTransferStatus.cancelled => 'Cancelled',
   };
 }
 

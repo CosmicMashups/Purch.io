@@ -91,6 +91,8 @@ class _TransferCard extends ConsumerWidget {
         return AppColors.brandPrimary;
       case BranchTransferStatus.received:
         return AppColors.accentEmerald;
+      case BranchTransferStatus.cancelled:
+        return AppColors.textMuted;
     }
   }
 
@@ -180,7 +182,8 @@ class _TransferCard extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error),
               ),
             ],
-            if (transfer.status != BranchTransferStatus.received) ...[
+            if (transfer.status == BranchTransferStatus.pending ||
+                transfer.status == BranchTransferStatus.inTransit) ...[
               const SizedBox(height: AppSpacing.md),
               Align(
                 alignment: Alignment.centerRight,
@@ -214,6 +217,24 @@ class _TransferCard extends ConsumerWidget {
                         ? 'Mark In Transit'
                         : 'Mark Received',
                   ),
+                ),
+              ),
+              // Calling it off is always possible until it has arrived; shipped stock is put back.
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed:
+                      isLoading
+                          ? null
+                          : () =>
+                              ref
+                                  .read(
+                                    branchTransferActionControllerProvider(
+                                      transfer.id,
+                                    ).notifier,
+                                  )
+                                  .cancel(),
+                  child: const Text('Cancel'),
                 ),
               ),
             ],

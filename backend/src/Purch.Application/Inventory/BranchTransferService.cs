@@ -8,12 +8,11 @@ using Purch.Domain.Enums;
 namespace Purch.Application.Inventory;
 
 /// <summary>C4 — moving stock between two branches of the same tenant.
-/// Item.StockOnHand is a single tenant-wide total (not per-branch), so a
-/// transfer's net effect on it is zero — a Transfer-type InventoryMovement
-/// is recorded at each leg (a decrease at the source branch when it ships,
-/// an increase at the destination branch when it's received) purely for the
-/// per-branch audit trail in the movement log, the same MovementType.Transfer
-/// C2/C3 already uses for a manually-recorded transfer-out entry.</summary>
+/// Item.StockOnHand is a single tenant-wide total (not per-branch). Stock that is on a truck is not
+/// on a shelf anyone can sell from, so shipping takes it off the total and receiving puts it back
+/// (net effect over a completed transfer: zero). Each leg also records a Transfer-type
+/// InventoryMovement against its own branch for the per-branch audit trail. A transfer that is
+/// cancelled while in transit returns the stock; shipping more than is on hand is refused.</summary>
 public sealed class BranchTransferService(
     IBranchTransferRepository branchTransferRepository,
     IInventoryMovementRepository movementRepository,
@@ -105,6 +104,15 @@ public sealed class BranchTransferService(
             var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
                 ?? throw new NotFoundException("Item", line.ItemId);
 
+            // Can't ship what isn't there: the total would go negative and the count stop meaning anything.
+            var onHand = await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken);
+            if (onHand.TryGetValue(item.Id, out var available) && available < line.Quantity)
+            {
+                throw new ValidationException(
+                    nameof(line.Quantity),
+                    $"Only {available:0.##} of {item.Name} on hand; can't ship {line.Quantity:0.##}.");
+            }
+
             var shippedFrom = await itemStockService.AdjustAsync(item, -line.Quantity, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
@@ -158,6 +166,46 @@ public sealed class BranchTransferService(
         }
 
         transfer.Status = BranchTransferStatus.Received;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(transfer, cancellationToken);
+    }
+
+    public async Task<BranchTransferDto> CancelAsync(Guid branchTransferId, CancellationToken cancellationToken = default)
+    {
+        var transfer = await branchTransferRepository.GetByIdAsync(branchTransferId, cancellationToken)
+            ?? throw new NotFoundException("Branch transfer", branchTransferId);
+
+        if (transfer.Status is not (BranchTransferStatus.Pending or BranchTransferStatus.InTransit))
+        {
+            throw new ValidationException(nameof(transfer.Status), "Only a Pending or In Transit transfer can be cancelled.");
+        }
+
+        if (transfer.Status == BranchTransferStatus.InTransit)
+        {
+            // It already left the source's count when it shipped; put it back.
+            foreach (var line in await branchTransferRepository.ListLinesAsync(transfer.Id, cancellationToken))
+            {
+                var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
+                    ?? throw new NotFoundException("Item", line.ItemId);
+
+                var returnedTo = await itemStockService.AdjustAsync(item, line.Quantity, cancellationToken);
+
+                movementRepository.Add(new InventoryMovement
+                {
+                    TenantId = CurrentTenantId,
+                    ItemId = line.ItemId,
+                    InventoryItemId = returnedTo,
+                    BranchId = transfer.SourceBranchId,
+                    Type = MovementType.Transfer,
+                    Quantity = line.Quantity,
+                    StaffUserId = CurrentUserId,
+                    Note = $"Returned to source: transfer {transfer.Id} cancelled",
+                });
+            }
+        }
+
+        transfer.Status = BranchTransferStatus.Cancelled;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(transfer, cancellationToken);

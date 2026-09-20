@@ -61,6 +61,13 @@ public static class InventoryEndpoints
             Results.Ok(await branchTransferService.MarkReceivedAsync(branchTransferId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        _ = app.MapPost("/branch-transfers/{branchTransferId:guid}/cancel", async (
+            Guid branchTransferId,
+            IBranchTransferService branchTransferService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await branchTransferService.CancelAsync(branchTransferId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- C5 — suppliers ---
         _ = app.MapGet("/suppliers", async (
             ISupplierService supplierService,

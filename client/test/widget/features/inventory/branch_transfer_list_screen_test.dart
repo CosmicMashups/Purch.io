@@ -69,6 +69,35 @@ void main() {
     expect(repository.transfers.single.status, BranchTransferStatus.inTransit);
   });
 
+  testWidgets('a pending transfer can be cancelled', (tester) async {
+    final repository = FakeBranchTransferRepository(
+      initialTransfers: [_pendingTransfer],
+    );
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.transfers.single.status, BranchTransferStatus.cancelled);
+    expect(find.text('Cancelled'), findsOneWidget);
+    // Nothing more can be done to a cancelled transfer.
+    expect(find.byType(FilledButton), findsNothing);
+    expect(find.widgetWithText(TextButton, 'Cancel'), findsNothing);
+  });
+
+  testWidgets('a received transfer offers neither action nor cancel', (
+    tester,
+  ) async {
+    final repository = FakeBranchTransferRepository(
+      initialTransfers: [_receivedTransfer],
+    );
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextButton, 'Cancel'), findsNothing);
+  });
+
   testWidgets('a received transfer shows no action button', (tester) async {
     final repository = FakeBranchTransferRepository(
       initialTransfers: [_receivedTransfer],

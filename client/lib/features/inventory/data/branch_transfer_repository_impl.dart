@@ -43,6 +43,11 @@ class BranchTransferRepositoryImpl implements BranchTransferRepository {
     return _post('/branch-transfers/$branchTransferId/mark-received', null);
   }
 
+  @override
+  Future<BranchTransfer> cancel(String branchTransferId) {
+    return _post('/branch-transfers/$branchTransferId/cancel', null);
+  }
+
   Future<BranchTransfer> _post(String path, Map<String, dynamic>? data) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(

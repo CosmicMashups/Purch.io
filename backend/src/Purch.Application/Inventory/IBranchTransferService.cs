@@ -11,4 +11,8 @@ public interface IBranchTransferService
 
     /// <summary>InTransit -> Received. Adds every line's quantity to the destination branch's stock.</summary>
     Task<BranchTransferDto> MarkReceivedAsync(Guid branchTransferId, CancellationToken cancellationToken = default);
+
+    /// <summary>Calls off a transfer that hasn't arrived. A Pending one had not touched stock, so nothing
+    /// changes; an InTransit one had already left the source's count, so that stock is put back.</summary>
+    Task<BranchTransferDto> CancelAsync(Guid branchTransferId, CancellationToken cancellationToken = default);
 }

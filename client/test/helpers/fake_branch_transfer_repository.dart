@@ -64,6 +64,11 @@ class FakeBranchTransferRepository implements BranchTransferRepository {
     return _updateStatus(branchTransferId, BranchTransferStatus.received);
   }
 
+  @override
+  Future<BranchTransfer> cancel(String branchTransferId) async {
+    return _updateStatus(branchTransferId, BranchTransferStatus.cancelled);
+  }
+
   BranchTransfer _updateStatus(String id, BranchTransferStatus status) {
     final index = transfers.indexWhere((transfer) => transfer.id == id);
     final current = transfers[index];
