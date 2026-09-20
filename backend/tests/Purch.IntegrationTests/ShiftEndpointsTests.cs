@@ -108,6 +108,25 @@ public sealed class ShiftEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Guessing_manager_pins_on_shift_close_is_cut_off_after_ten_attempts()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await client.PostAsJsonAsync("/shifts/open", new OpenShiftRequest(1000m));
+
+        var statuses = new List<HttpStatusCode>();
+        for (var attempt = 0; attempt < 11; attempt++)
+        {
+            // A wrong count with a wrong PIN: rejected each time, never closes the shift.
+            var response = await client.PostAsJsonAsync("/shifts/close", new CloseShiftRequest(1.00m, null, $"{attempt:D4}"));
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(10), status => Assert.Equal(HttpStatusCode.BadRequest, status));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[10]);
+    }
+
+    [Fact]
     public async Task Closing_a_shift_with_a_mismatched_count_and_no_approver_pin_is_rejected()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

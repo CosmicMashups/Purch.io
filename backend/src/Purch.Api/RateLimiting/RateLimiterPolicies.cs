@@ -13,4 +13,9 @@ public static class RateLimiterPolicies
     /// so a shop with many devices behind one public IP needs far more headroom than
     /// AuthSensitive allows while still capping a token-guessing loop.</summary>
     public const string Refresh = "refresh";
+
+    /// <summary>Shift close — a cash discrepancy is approved by typing a manager's PIN, so an
+    /// unthrottled endpoint lets any cashier guess manager PINs. Counted per signed-in user, not
+    /// per IP: everyone in a shop shares one address.</summary>
+    public const string ShiftApproval = "shift-approval";
 }

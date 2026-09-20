@@ -1,3 +1,4 @@
+using Purch.Api.RateLimiting;
 using Purch.Application.Shifts;
 using Purch.Domain.Enums;
 
@@ -37,7 +38,8 @@ public static class ShiftEndpoints
             IShiftService shiftService,
             CancellationToken cancellationToken) =>
             Results.Ok(await shiftService.CloseShiftAsync(request, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posOperator))
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
         return app;
     }

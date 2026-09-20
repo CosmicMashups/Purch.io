@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -236,6 +237,18 @@ builder.Services.AddRateLimiter(options =>
     _ = options.AddPolicy(RateLimiterPolicies.AuthSensitive, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(15),
+                PermitLimit = 10,
+                QueueLimit = 0,
+            }));
+
+    _ = options.AddPolicy(RateLimiterPolicies.ShiftApproval, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(15),
