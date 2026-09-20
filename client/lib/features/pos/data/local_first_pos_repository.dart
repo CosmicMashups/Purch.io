@@ -140,6 +140,18 @@ class LocalFirstPosRepository implements PosRepository {
   final _modifierGroups = <String, Future<List<ModifierGroup>>>{};
   final _comboSlots = <String, Future<List<ItemComboComponent>>>{};
 
+  // Every cart mutation is load -> await -> save from that snapshot, so two
+  // overlapping ones (a scanner beeping twice, a double tap) would each start
+  // from the same cart and the later save would silently drop the earlier edit.
+  // Running them one at a time makes each see the previous one's result.
+  Future<void> _mutationTail = Future<void>.value();
+
+  Future<T> _serial<T>(Future<T> Function() action) {
+    final result = _mutationTail.then((_) => action());
+    _mutationTail = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
+
   LocalCart? _cart;
   PricingRules? _rules;
   PricingRules? _lastRules;
@@ -158,7 +170,10 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> addLine(AddTransactionLineRequest request) async {
+  Future<Transaction> addLine(AddTransactionLineRequest request) =>
+      _serial(() => _addLine(request));
+
+  Future<Transaction> _addLine(AddTransactionLineRequest request) async {
     final cart = await _load();
     if (cart.serverBacked) {
       return _remote.addLine(request);
@@ -193,6 +208,11 @@ class LocalFirstPosRepository implements PosRepository {
   Future<Transaction> updateLine(
     String lineId,
     UpdateTransactionLineRequest request,
+  ) => _serial(() => _updateLine(lineId, request));
+
+  Future<Transaction> _updateLine(
+    String lineId,
+    UpdateTransactionLineRequest request,
   ) async {
     final cart = await _load();
     if (cart.serverBacked) {
@@ -211,7 +231,10 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> removeLine(String lineId) async {
+  Future<Transaction> removeLine(String lineId) =>
+      _serial(() => _removeLine(lineId));
+
+  Future<Transaction> _removeLine(String lineId) async {
     final cart = await _load();
     if (cart.serverBacked) {
       return _remote.removeLine(lineId);
@@ -222,7 +245,9 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> voidCart() async {
+  Future<Transaction> voidCart() => _serial(_voidCart);
+
+  Future<Transaction> _voidCart() async {
     final cart = await _load();
     if (cart.serverBacked) {
       final voided = await _remote.voidCart();
@@ -246,6 +271,10 @@ class LocalFirstPosRepository implements PosRepository {
   @override
   Future<Transaction> applySeniorPwdDiscount(
     ApplySeniorPwdDiscountRequest request,
+  ) => _serial(() => _applySeniorPwdDiscount(request));
+
+  Future<Transaction> _applySeniorPwdDiscount(
+    ApplySeniorPwdDiscountRequest request,
   ) async {
     final cart = await _load();
     if (cart.serverBacked) {
@@ -255,7 +284,10 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> applyPromoCode(ApplyPromoCodeRequest request) async {
+  Future<Transaction> applyPromoCode(ApplyPromoCodeRequest request) =>
+      _serial(() => _applyPromoCode(request));
+
+  Future<Transaction> _applyPromoCode(ApplyPromoCodeRequest request) async {
     final cart = await _load();
     if (cart.serverBacked) {
       return _remote.applyPromoCode(request);
@@ -289,7 +321,10 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> setOrderType(SetOrderTypeRequest request) async {
+  Future<Transaction> setOrderType(SetOrderTypeRequest request) =>
+      _serial(() => _setOrderType(request));
+
+  Future<Transaction> _setOrderType(SetOrderTypeRequest request) async {
     final cart = await _load();
     if (cart.serverBacked) {
       return _remote.setOrderType(request);

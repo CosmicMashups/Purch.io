@@ -307,6 +307,22 @@ void main() {
     expect(remote.calls, isEmpty);
   });
 
+  test('overlapping adds (a double scan) are all kept, none overwrites another', () async {
+    final repo = build();
+
+    // Fired without awaiting in between, like a scanner or a double tap.
+    final results = await Future.wait([
+      repo.addLine(add('coffee')),
+      repo.addLine(add('coffee')),
+      repo.addLine(add('coffee', 2)),
+    ]);
+
+    expect(results.last.lines.single.quantity, 4);
+    final cart = await repo.getOrCreateOpenCart();
+    expect(cart.lines.single.quantity, 4);
+    expect(cart.totalAmount, 400);
+  });
+
   test('the draft survives an app restart', () async {
     await build().addLine(add('coffee', 2));
 
