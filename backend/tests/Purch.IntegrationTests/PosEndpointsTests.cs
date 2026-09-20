@@ -72,6 +72,35 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Adding_a_plain_item_after_a_modified_one_keeps_them_as_separate_lines_at_their_own_prices()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Iced Latte", null, null, null, 100m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var groupResponse = await client.PostAsJsonAsync("/modifier-groups", new CreateModifierGroupRequest("Add-ons", true, false));
+        var group = await groupResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions);
+        var modifierResponse = await client.PostAsJsonAsync($"/modifier-groups/{group!.Id}/modifiers", new CreateItemModifierRequest("Extra Shot", 20m));
+        var modifier = (await modifierResponse.Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions))!.Modifiers[0];
+        _ = await client.PostAsJsonAsync($"/items/{item!.Id}/modifier-groups", new AttachModifierGroupRequest(group.Id));
+
+        _ = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item.Id, null, 1m, SelectedModifierIds: [modifier.Id]));
+        var plainAdd = await client.PostAsJsonAsync(
+            "/transactions/cart/lines",
+            new AddTransactionLineRequest(item.Id, null, 1m));
+        var cart = await plainAdd.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(2, cart!.Lines.Count);
+        Assert.Equal(220m, cart.TotalAmount);
+    }
+
+    [Fact]
     public async Task Updating_a_line_quantity_recomputes_the_total()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

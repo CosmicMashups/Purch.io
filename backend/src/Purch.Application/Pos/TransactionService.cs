@@ -632,6 +632,33 @@ public sealed class TransactionService(
             var quantitySold = group.Sum(line => line.Quantity);
             var recipeLines = await itemRecipeRepository.ListByItemAsync(group.Key, cancellationToken);
 
+            // An item with no recipe is stocked through its auto-paired InventoryItem (the same
+            // record ItemService reads for IsOutOfStock), so a sale must draw that down directly —
+            // otherwise such items never deplete under separate tracking.
+            if (recipeLines.Count == 0)
+            {
+                var linkedInventoryItem = await inventoryItemRepository.GetByLinkedItemIdAsync(CurrentTenantId, group.Key, cancellationToken);
+                if (linkedInventoryItem is not null)
+                {
+                    linkedInventoryItem.QuantityOnHand -= quantitySold;
+
+                    inventoryMovementRepository.Add(new InventoryMovement
+                    {
+                        TenantId = CurrentTenantId,
+                        CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
+                        ItemId = group.Key,
+                        InventoryItemId = linkedInventoryItem.Id,
+                        BranchId = cart.BranchId,
+                        Type = MovementType.Sale,
+                        Quantity = quantitySold,
+                        StaffUserId = CurrentUserId,
+                        Note = $"Sale — receipt #{cart.ReceiptNumber}",
+                    });
+                }
+
+                continue;
+            }
+
             foreach (var recipeLine in recipeLines)
             {
                 if (recipeLine.QuantityPerOrder is not { } quantityPerOrder)
