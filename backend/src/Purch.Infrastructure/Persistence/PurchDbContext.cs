@@ -107,6 +107,16 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
         _ = modelBuilder.ApplyConfigurationsFromAssembly(typeof(PurchDbContext).Assembly);
 
+        // Optimistic concurrency on the rows that are read, changed in memory, then saved: the
+        // cart being paid, stock counters, and a customer's credit balance. Postgres' own xmin
+        // system column is the version (Npgsql maps IsRowVersion() to it, so there is no extra
+        // column). Two requests that loaded the same row can no longer both save — the second gets
+        // a DbUpdateConcurrencyException (a 409) instead of double-charging or losing an update.
+        _ = modelBuilder.Entity<Transaction>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<Item>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<InventoryItem>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<CustomerCreditLedger>().Property<uint>("Version").IsRowVersion();
+
         // Single enforcement point for shared-database multi-tenant isolation (NFR14):
         // every ITenantScoped entity gets this filter applied, so no repository/query
         // can accidentally omit it.

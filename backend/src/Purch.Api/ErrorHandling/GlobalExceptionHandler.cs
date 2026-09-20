@@ -65,6 +65,16 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
                 badRequestException.StatusCode,
                 BuildProblemDetails(badRequestException.StatusCode, "Bad request.", badRequestException.Message, httpContext)),
 
+            // Another request changed the same cart, stock count or credit balance between this
+            // request reading and saving it. Nothing was written; retrying re-reads current data.
+            DbUpdateConcurrencyException => (
+                StatusCodes.Status409Conflict,
+                BuildProblemDetails(
+                    StatusCodes.Status409Conflict,
+                    "Conflict.",
+                    "This record was changed by another request at the same time. Please try again.",
+                    httpContext)),
+
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } => (
                 StatusCodes.Status409Conflict,
                 BuildProblemDetails(
