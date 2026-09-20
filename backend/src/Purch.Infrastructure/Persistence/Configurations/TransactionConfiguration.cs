@@ -19,6 +19,15 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
             .IsUnique()
             .HasFilter("\"ReceiptNumber\" IS NOT NULL");
 
+        // A device has at most one open cart. GetOpenByDeviceAsync assumes it, and nothing enforced it, so
+        // two racing requests could each create one. (A submitted kiosk order leaves Open for
+        // AwaitingPayment, and claiming one is refused while the cashier holds an open cart, so the real
+        // flows already keep to this.) Status 0 = TransactionStatus.Open.
+        _ = builder.HasIndex(t => t.DeviceId)
+            .IsUnique()
+            .HasFilter("\"Status\" = 0")
+            .HasDatabaseName("IX_Transactions_OneOpenCartPerDevice");
+
         // One transaction per client-generated sale id — the idempotency guard for
         // checkout retries, including two concurrent requests carrying the same id.
         _ = builder.HasIndex(t => new { t.TenantId, t.ClientSaleId })

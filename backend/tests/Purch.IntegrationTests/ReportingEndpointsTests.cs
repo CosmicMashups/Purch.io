@@ -7,6 +7,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Promotions;
 using Purch.Application.Reporting;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
@@ -33,6 +34,27 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Null(reading.BeginningReceiptNumber);
         Assert.Null(reading.EndingReceiptNumber);
         Assert.Equal(0m, reading.NetSales);
+    }
+
+    [Fact]
+    public async Task A_reading_counts_item_promo_discounts_so_gross_minus_discounts_equals_net()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Rice", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await client.PostAsJsonAsync(
+            "/promos/item-discounts",
+            new CreateItemDiscountPromoRuleRequest("10% off rice", item.Id, PromoDiscountType.Percentage, 10m, null, null));
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        _ = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 200m));
+
+        var reading = await (await client.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        Assert.Equal(90m, reading!.NetSales);
+        Assert.Equal(10m, reading.PromoDiscountTotal);
+        Assert.Equal(10m, reading.TotalDiscounts);
+        Assert.Equal(100m, reading.GrossSales);
+        Assert.Equal(reading.NetSales, reading.GrossSales - reading.TotalDiscounts);
     }
 
     [Fact]

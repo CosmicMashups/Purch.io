@@ -62,10 +62,15 @@ public sealed class BirReadingService(
             .ToList();
         var missingReceiptNumbers = FindMissingReceiptNumbers(transactions, previousEnding, endingReceiptNumber);
 
+        // A sale's total is gross - item promos (BOGO / combo / item discount) - cart discounts, and the cart
+        // discounts (DiscountAmount) are the Senior/PWD amount plus the promo code. Item promos are stored
+        // apart from them, so leaving them out understated gross sales and hid promo discounts entirely:
+        // gross minus the reported discounts has to equal net.
         var netSales = transactions.Sum(t => t.TotalAmount);
-        var totalDiscounts = transactions.Sum(t => t.DiscountAmount);
-        var promoDiscountTotal = transactions.Sum(t => t.PromoDiscountAmount);
-        var seniorPwdDiscountTotal = totalDiscounts - promoDiscountTotal;
+        var promoCodeDiscountTotal = transactions.Sum(t => t.PromoDiscountAmount);
+        var seniorPwdDiscountTotal = transactions.Sum(t => t.DiscountAmount) - promoCodeDiscountTotal;
+        var promoDiscountTotal = promoCodeDiscountTotal + transactions.Sum(t => t.ItemPromoDiscountAmount);
+        var totalDiscounts = seniorPwdDiscountTotal + promoDiscountTotal;
         var grossSales = netSales + totalDiscounts;
 
         // VAT computed off net sales (post-Senior/PWD discount, which is VAT-exempt under RA 9994) —

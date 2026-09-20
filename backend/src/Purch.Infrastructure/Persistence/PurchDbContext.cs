@@ -117,6 +117,15 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<InventoryItem>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<CustomerCreditLedger>().Property<uint>("Version").IsRowVersion();
 
+        // Same idea for the rows whose status or counters are checked and then changed: a transfer being
+        // shipped or cancelled, the receipt sequence (which also carries the Z-reading counters), a shift
+        // being closed, and a purchase order line being received.
+        _ = modelBuilder.Entity<BranchTransfer>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<ReceiptSequence>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<Shift>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<PurchaseOrder>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<PurchaseOrderLine>().Property<uint>("Version").IsRowVersion();
+
         // Single enforcement point for shared-database multi-tenant isolation (NFR14):
         // every ITenantScoped entity gets this filter applied, so no repository/query
         // can accidentally omit it.
