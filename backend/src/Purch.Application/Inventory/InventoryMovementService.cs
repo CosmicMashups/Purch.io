@@ -15,6 +15,7 @@ public sealed class InventoryMovementService(
     IInventoryMovementRepository movementRepository,
     IItemRepository itemRepository,
     IItemStockService itemStockService,
+    IInventoryItemRepository inventoryItemRepository,
     IBranchRepository branchRepository,
     IUserRepository userRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -50,6 +51,13 @@ public sealed class InventoryMovementService(
 
     public async Task<InventoryMovementDto> RecordAsync(RecordMovementRequest request, CancellationToken cancellationToken = default)
     {
+        // Sale rows are written by a completed Cashier sale — recording one by hand would take stock
+        // off a shelf with no receipt behind it. (The apps hide it from their pickers too.)
+        if (request.Type == MovementType.Sale)
+        {
+            throw new ValidationException(nameof(request.Type), "Sale movements are recorded automatically by completed sales and can't be entered by hand.");
+        }
+
         if (request.Quantity == 0)
         {
             throw new ValidationException(nameof(request.Quantity), "Quantity must not be zero.");
@@ -111,13 +119,16 @@ public sealed class InventoryMovementService(
     private async Task<InventoryMovementDto> ToDtoAsync(InventoryMovement movement, CancellationToken cancellationToken)
     {
         var item = await itemRepository.GetByIdAsync(movement.ItemId, cancellationToken);
+        var inventoryItem = item is null && movement.InventoryItemId is { } inventoryItemId
+            ? await inventoryItemRepository.GetByIdAsync(inventoryItemId, cancellationToken)
+            : null;
         var branch = await branchRepository.GetByIdAsync(movement.BranchId, cancellationToken);
         var staffUser = await userRepository.GetByIdAsync(movement.StaffUserId, cancellationToken);
 
         return new InventoryMovementDto(
             movement.Id,
             movement.ItemId,
-            item?.Name ?? "(deleted item)",
+            item?.Name ?? inventoryItem?.Name ?? "(deleted item)",
             movement.BranchId,
             branch?.Name ?? "(deleted branch)",
             movement.Type,

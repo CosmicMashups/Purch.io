@@ -673,6 +673,7 @@ public sealed class TransactionService(
                 {
                     TenantId = CurrentTenantId,
                     CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
+                    ItemId = group.Key,
                     InventoryItemId = inventoryItem.Id,
                     BranchId = cart.BranchId,
                     Type = MovementType.Consumption,

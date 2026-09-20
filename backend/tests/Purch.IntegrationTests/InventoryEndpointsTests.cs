@@ -283,6 +283,49 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Ingredient_movements_are_named_in_the_log_instead_of_showing_as_a_deleted_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var (item, ingredient) = await RecipeSetupAsync(client, "Flat White");
+        _ = await SetRecipeAsync(client, item.Id, ingredient.Id);
+
+        var receive = await client.PostAsJsonAsync(
+            $"/inventory-items/{ingredient.Id}/receive",
+            new ReceiveInventoryStockRequest(2m, branchId, null));
+        Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        var payment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 100m));
+        Assert.Equal(HttpStatusCode.OK, payment.StatusCode);
+
+        var movements = await client.GetFromJsonAsync<List<InventoryMovementDto>>("/inventory/movements", JsonOptions);
+
+        Assert.DoesNotContain(movements!, m => m.ItemName == "(deleted item)");
+        Assert.Contains(movements!, m => m.Type == MovementType.StockIn && m.ItemName == "Coffee Beans");
+        Assert.Contains(movements!, m => m.Type == MovementType.Consumption && m.ItemName == "Flat White");
+    }
+
+    [Fact]
+    public async Task A_sale_movement_cannot_be_recorded_by_hand()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Candy", null, null, null, 5m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+
+        var response = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item!.Id, branchId, MovementType.Sale, 3m, null, null, null, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)
     {
         var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
