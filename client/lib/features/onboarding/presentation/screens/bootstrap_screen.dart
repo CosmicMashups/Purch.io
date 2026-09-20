@@ -1,3 +1,4 @@
+import '../../../../core/validation/pin_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -555,11 +556,12 @@ class _AdminStep extends StatelessWidget {
             enabled: !isLoading,
             decoration: const InputDecoration(
               labelText: 'Choose a PIN',
+              helperText: '4-8 digits',
               prefixIcon: Icon(Icons.lock_rounded, size: 20),
             ),
             keyboardType: TextInputType.number,
             obscureText: true,
-            validator: _requiredValidator,
+            validator: validatePin,
           ),
           const SizedBox(height: 12),
           LegalAgreementCheckbox(

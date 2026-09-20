@@ -7,7 +7,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../onboarding/domain/branch_models.dart';
-import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../onboarding/presentation/providers/branch_scope_providers.dart';
 import '../../domain/inventory_item_models.dart';
 import '../providers/inventory_item_providers.dart';
 
@@ -495,7 +495,7 @@ class _PhysicalCountDialogState extends ConsumerState<_PhysicalCountDialog> {
     final isLoading = ref.watch(physicalCountControllerProvider).isLoading;
     final failure =
         ref.read(physicalCountControllerProvider.notifier).currentFailure;
-    final branchesAsync = ref.watch(branchListProvider);
+    final branchesAsync = ref.watch(selectableBranchesProvider);
 
     return AlertDialog(
       title: Text('Physical Count — ${widget.item.name}'),
@@ -634,7 +634,7 @@ class _ReceiveStockDialogState extends ConsumerState<_ReceiveStockDialog> {
     final failure = ref
         .read(receiveInventoryStockControllerProvider.notifier)
         .currentFailure;
-    final branchesAsync = ref.watch(branchListProvider);
+    final branchesAsync = ref.watch(selectableBranchesProvider);
 
     return AlertDialog(
       title: Text('Receive Stock — ${widget.item.name}'),

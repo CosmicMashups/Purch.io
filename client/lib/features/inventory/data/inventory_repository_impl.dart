@@ -69,9 +69,12 @@ class InventoryRepositoryImpl implements InventoryRepository {
       final response = await _apiClient.dio.get<List<dynamic>>(
         '/inventory-items',
       );
+      // Giving a Cashier item a recipe retires its own auto-paired stock record (inactive, kept only for
+      // its movement history). It has no place in the list or as a recipe ingredient.
       return response.data!
           .cast<Map<String, dynamic>>()
           .map(InventoryItem.fromJson)
+          .where((item) => item.isActive)
           .toList();
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);

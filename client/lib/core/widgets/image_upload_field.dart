@@ -39,7 +39,7 @@ class _ImageUploadFieldState extends ConsumerState<ImageUploadField> {
   Future<void> _pickAndUpload() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'],
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
       withData: false,
     );
 

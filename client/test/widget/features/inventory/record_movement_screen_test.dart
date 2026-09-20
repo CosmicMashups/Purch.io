@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purch_client/features/auth/presentation/providers/auth_providers.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
@@ -12,6 +15,7 @@ import 'package:purch_client/features/onboarding/domain/branch_models.dart';
 import 'package:purch_client/features/onboarding/domain/hardware_enums.dart';
 import 'package:purch_client/features/onboarding/presentation/providers/onboarding_providers.dart';
 
+import '../../../helpers/fake_token_storage.dart';
 import '../../../helpers/fake_catalog_repository.dart';
 import '../../../helpers/fake_inventory_repository.dart';
 import '../../../helpers/fake_onboarding_repository.dart';
@@ -51,10 +55,14 @@ const _branch = Branch(
 Widget _wrap(
   FakeCatalogRepository catalogRepository,
   FakeOnboardingRepository onboardingRepository,
-  FakeInventoryRepository inventoryRepository,
-) {
+  FakeInventoryRepository inventoryRepository, {
+  FakeTokenStorage? tokenStorage,
+}) {
   return ProviderScope(
     overrides: [
+      secureTokenStorageProvider.overrideWithValue(
+        tokenStorage ?? FakeTokenStorage(),
+      ),
       catalogRepositoryProvider.overrideWithValue(catalogRepository),
       onboardingRepositoryProvider.overrideWithValue(onboardingRepository),
       inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
@@ -102,6 +110,44 @@ void main() {
     expect(inventoryRepository.lastRecordRequest?.branchId, 'branch-1');
     expect(inventoryRepository.lastRecordRequest?.type, MovementType.stockIn);
     expect(inventoryRepository.lastRecordRequest?.quantity, 25);
+  });
+
+  testWidgets('a branch-scoped account is offered only its own branch', (
+    tester,
+  ) async {
+    const other = Branch(
+      id: 'branch-2',
+      name: 'Second Branch',
+      address: null,
+      receiptPrinterProfile: ReceiptPrinterProfile.none,
+      cashDrawerEnabled: false,
+      cashDrawerPolicy: CashDrawerPolicy.kickOnSaleOnly,
+      manualGcashQrImageUrl: null,
+      manualGcashAccountName: null,
+      manualGcashAccountNumber: null,
+    );
+    String part(Object o) =>
+        base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
+    final token =
+        '${part({'alg': 'none'})}.${part({'scope_type': 'Branch', 'scope_id': 'branch-2'})}.sig';
+
+    await tester.pumpWidget(
+      _wrap(
+        FakeCatalogRepository(initialItems: [_water]),
+        FakeOnboardingRepository(initialBranches: [_branch, other]),
+        FakeInventoryRepository(),
+        tokenStorage: FakeTokenStorage(accessToken: token),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(DropdownButtonFormField<Branch>, 'Branch'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Second Branch'), findsWidgets);
+    expect(find.text('Main Branch'), findsNothing);
   });
 
   testWidgets('spoiled requires a reason category before submitting', (

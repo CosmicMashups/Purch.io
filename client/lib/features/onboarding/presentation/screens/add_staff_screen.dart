@@ -1,3 +1,4 @@
+import '../../../../core/validation/pin_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -132,18 +133,14 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                         enabled: !isLoading,
                         decoration: const InputDecoration(
                           labelText: 'PIN',
-                          hintText: '4-6 digit passcode',
+                          hintText: '4-8 digit passcode',
                           prefixIcon: Icon(Icons.lock_outline),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
                         keyboardType: TextInputType.number,
                         obscureText: true,
-                        validator:
-                            (value) =>
-                                (value == null || value.trim().isEmpty)
-                                    ? 'Required'
-                                    : null,
+                        validator: validatePin,
                       ),
                       if (failure != null) ...[
                         const SizedBox(height: AppSpacing.sm),

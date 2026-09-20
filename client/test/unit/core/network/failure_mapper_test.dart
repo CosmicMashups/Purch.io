@@ -53,6 +53,37 @@ void main() {
       },
     );
 
+    test('a 400 with no detail reads as the first specific field message, not the generic title', () {
+      final failure = mapDioExceptionToFailure(
+        _badResponse(400, {
+          'title': 'Validation failed.',
+          'errors': {
+            'Quantity': ['Only 5 of Canned Goods on hand; can\'t ship 20.'],
+          },
+        }),
+      );
+
+      expect(failure, isA<ValidationFailure>());
+      expect(failure.message, 'Only 5 of Canned Goods on hand; can\'t ship 20.');
+      expect((failure as ValidationFailure).fieldErrors['Quantity'], isNotEmpty);
+    });
+
+    test('a 400 that has a detail keeps it', () {
+      final failure = mapDioExceptionToFailure(
+        _badResponse(400, {'detail': 'Explicit detail.', 'errors': {'X': ['other']}}),
+      );
+      expect(failure.message, 'Explicit detail.');
+    });
+
+    test('429 (rate limited) becomes a friendly retry-later failure', () {
+      final failure = mapDioExceptionToFailure(
+        _badResponse(429, {'title': 'Too Many Requests'}),
+      );
+
+      expect(failure, isA<ServiceUnavailableFailure>());
+      expect(failure.message, contains('Too many attempts'));
+    });
+
     test('403 becomes a ForbiddenFailure', () {
       final failure = mapDioExceptionToFailure(
         _badResponse(403, {'detail': 'Not allowed.'}),

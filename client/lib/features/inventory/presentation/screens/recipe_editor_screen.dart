@@ -88,7 +88,12 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final inventoryItemsAsync = ref.watch(inventoryItemListProvider);
+    // An item's own paired stock record can't be an ingredient of its own recipe.
+    final inventoryItemsAsync = ref
+        .watch(inventoryItemListProvider)
+        .whenData(
+          (all) => all.where((i) => i.linkedItemId != widget.itemId).toList(),
+        );
     final recipeAsync = ref.watch(itemRecipeProvider(widget.itemId));
     final isSaving = ref.watch(replaceItemRecipeControllerProvider).isLoading;
     final failure =
@@ -138,6 +143,21 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
 
             return Column(
               children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                    0,
+                  ),
+                  child: Text(
+                    'An item is either its own inventory item or made from a '
+                    'recipe — never both. Saving a recipe retires this item\'s '
+                    'own stock record (its stock must be zero first). Save an '
+                    'empty recipe to make it an inventory item again.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
                 if (failure != null)
                   Container(
                     width: double.infinity,

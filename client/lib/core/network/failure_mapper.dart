@@ -53,7 +53,12 @@ Failure _mapBadResponse(DioException exception) {
           }
         }
       }
-      return ValidationFailure(message, fieldErrors);
+      // The backend reports a rule that was broken as { title: 'Validation failed.', errors: {...} } with
+      // no `detail`, so the generic title would hide the one sentence that says what to fix ("Only 5 of
+      // Canned Goods on hand..."). Prefer the first specific message; screens that bind field errors
+      // still get the full map.
+      final firstFieldMessage = fieldErrors.values.expand((m) => m).firstOrNull;
+      return ValidationFailure(detail ?? firstFieldMessage ?? message, fieldErrors);
     case 401:
       return UnauthorizedFailure(message);
     case 403:
@@ -62,6 +67,12 @@ Failure _mapBadResponse(DioException exception) {
       return NotFoundFailure(message);
     case 409:
       return ConflictFailure(message);
+    case 429:
+      // Rate limited (login, token refresh, shift close, bootstrap). Not a fault and not the
+      // request's doing: wait and retry, which is what ServiceUnavailable already means everywhere.
+      return ServiceUnavailableFailure(
+        'Too many attempts. Please wait a few minutes and try again.',
+      );
     case 503:
       return ServiceUnavailableFailure(message);
     default:

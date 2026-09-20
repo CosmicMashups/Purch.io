@@ -42,6 +42,26 @@ String? staffIdFromJwt(String token) {
   return _decodeJwtPayload(token)?['sub'] as String?;
 }
 
+/// What the signed-in staff member's account is confined to — the token's `scope_type` (the enum name:
+/// Tenant, Branch or Department) and `scope_id`. Mirrors backend JwtClaimTypes.
+class StaffScope {
+  const StaffScope({required this.type, this.id});
+
+  final String type;
+  final String? id;
+
+  /// Confined to one branch, whose id is [id].
+  bool get isBranch => type == 'Branch' && id != null;
+}
+
+StaffScope? staffScopeFromJwt(String token) {
+  final payload = _decodeJwtPayload(token);
+  final type = payload?['scope_type'] as String?;
+  return type == null
+      ? null
+      : StaffScope(type: type, id: payload?['scope_id'] as String?);
+}
+
 /// This device's own id, tenant id, and branch id, exactly as the server put
 /// them in the token at login — mirrors backend JwtClaimTypes. The server is
 /// still the source of truth for pairing; this is just how the client learns

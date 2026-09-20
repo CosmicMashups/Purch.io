@@ -5,7 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../onboarding/domain/branch_models.dart';
-import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../onboarding/presentation/providers/branch_scope_providers.dart';
 import '../../domain/inventory_movement_models.dart';
 import '../providers/inventory_providers.dart';
 import '../../../../core/errors/failure.dart';
@@ -93,7 +93,7 @@ class _RecordMovementScreenState extends ConsumerState<RecordMovementScreen> {
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(itemListProvider);
-    final branchesAsync = ref.watch(branchListProvider);
+    final branchesAsync = ref.watch(selectableBranchesProvider);
     final recordState = ref.watch(recordMovementControllerProvider);
     final isLoading = recordState.isLoading;
     final failure =

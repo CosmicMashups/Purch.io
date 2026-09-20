@@ -29,7 +29,8 @@ class UploadResult {
 }
 
 /// Talks to the backend's generic `POST /uploads/image` endpoint (10MB
-/// limit, .jpg/.jpeg/.png/.webp/.gif/.svg only — enforced server-side) used
+/// limit, .jpg/.jpeg/.png/.webp/.gif only, checked against the file's real bytes
+/// server-side; SVG is refused) used
 /// for branding logo, category image, and item image uploads alike.
 class UploadRepository {
   UploadRepository({required ApiClient apiClient}) : _apiClient = apiClient;

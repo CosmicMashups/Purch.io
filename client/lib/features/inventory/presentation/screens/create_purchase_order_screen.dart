@@ -5,7 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../onboarding/domain/branch_models.dart';
-import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../onboarding/presentation/providers/branch_scope_providers.dart';
 import '../../domain/purchase_order_models.dart';
 import '../../domain/supplier_models.dart';
 import '../providers/purchase_order_providers.dart';
@@ -90,7 +90,7 @@ class _CreatePurchaseOrderScreenState
   @override
   Widget build(BuildContext context) {
     final suppliersAsync = ref.watch(supplierListProvider);
-    final branchesAsync = ref.watch(branchListProvider);
+    final branchesAsync = ref.watch(selectableBranchesProvider);
     final itemsAsync = ref.watch(itemListProvider);
     final createState = ref.watch(createPurchaseOrderControllerProvider);
     final isLoading = createState.isLoading;

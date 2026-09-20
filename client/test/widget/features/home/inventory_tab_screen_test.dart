@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purch_client/features/auth/presentation/providers/auth_providers.dart';
 import 'package:purch_client/features/catalog/domain/category_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
@@ -13,6 +14,7 @@ import 'package:purch_client/features/inventory/presentation/providers/inventory
 import 'package:purch_client/features/inventory/presentation/providers/purchase_order_providers.dart';
 import 'package:purch_client/features/onboarding/presentation/providers/onboarding_providers.dart';
 
+import '../../../helpers/fake_token_storage.dart';
 import '../../../helpers/fake_catalog_repository.dart';
 import '../../../helpers/fake_inventory_repository.dart';
 import '../../../helpers/fake_onboarding_repository.dart';
@@ -135,6 +137,7 @@ Widget _wrap({
 }) {
   return ProviderScope(
     overrides: [
+      secureTokenStorageProvider.overrideWithValue(FakeTokenStorage()),
       inventoryRepositoryProvider.overrideWithValue(inventoryRepository),
       catalogRepositoryProvider.overrideWithValue(
         catalogRepository ?? FakeCatalogRepository(),

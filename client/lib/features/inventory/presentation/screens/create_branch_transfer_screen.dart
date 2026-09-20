@@ -6,6 +6,7 @@ import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
 import '../../../onboarding/domain/branch_models.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../../onboarding/presentation/providers/branch_scope_providers.dart';
 import '../../domain/branch_transfer_models.dart';
 import '../providers/branch_transfer_providers.dart';
 import '../../../../core/errors/failure.dart';
@@ -81,6 +82,8 @@ class _CreateBranchTransferScreenState
   @override
   Widget build(BuildContext context) {
     final branchesAsync = ref.watch(branchListProvider);
+    // A branch account may only send stock out of its own branch, but may send it to any branch.
+    final sourceBranchesAsync = ref.watch(selectableBranchesProvider);
     final itemsAsync = ref.watch(itemListProvider);
     final createState = ref.watch(createBranchTransferControllerProvider);
     final isLoading = createState.isLoading;
@@ -122,7 +125,7 @@ class _CreateBranchTransferScreenState
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      branchesAsync.when(
+                      sourceBranchesAsync.when(
                         loading: () => const LinearProgressIndicator(),
                         error:
                             (error, stackTrace) =>

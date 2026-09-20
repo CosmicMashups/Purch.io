@@ -73,7 +73,13 @@ function mapError(error: AxiosError): ApiError {
 
   const { status, data } = error.response;
   const body = (data ?? {}) as { title?: string; detail?: string; errors?: Record<string, string[]> };
-  const message = body.detail ?? body.title ?? error.message;
+  // A broken rule comes back as { title: 'Validation failed.', errors: {...} } with no detail, so the generic
+  // title would hide the one sentence that says what to fix. Prefer the first specific message.
+  const firstFieldMessage = Object.values(body.errors ?? {}).flat()[0];
+  const message =
+    status === 429
+      ? 'Too many attempts. Please wait a few minutes and try again.'
+      : (body.detail ?? firstFieldMessage ?? body.title ?? error.message);
 
   const kindByStatus: Record<number, ApiErrorKind> = {
     400: 'validation',
@@ -81,6 +87,7 @@ function mapError(error: AxiosError): ApiError {
     403: 'forbidden',
     404: 'notFound',
     409: 'conflict',
+    429: 'serviceUnavailable', // rate limited: wait and retry
     503: 'serviceUnavailable',
   };
 

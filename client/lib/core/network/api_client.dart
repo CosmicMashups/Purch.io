@@ -9,7 +9,14 @@ import '../storage/secure_token_storage.dart';
 /// genuine "wrong credentials"/"bad refresh token" response, not an expired
 /// access token, so it must never trigger the refresh-and-retry dance below
 /// (that would either loop forever or mask the real error).
-const _tokenIssuingPaths = ['/auth/login', '/auth/admin-login', '/auth/refresh', '/kiosk/session'];
+const _tokenIssuingPaths = [
+  '/auth/login',
+  '/auth/admin-login',
+  '/auth/refresh',
+  '/kiosk/session',
+  '/order-board/session',
+  '/kitchen-display/session',
+];
 
 /// The single configured Dio instance the whole app talks to the backend
 /// through. Every feature's repository takes this in, rather than each one
