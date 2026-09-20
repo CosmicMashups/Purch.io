@@ -48,7 +48,7 @@ public sealed class InventoryReportService(
         // at or under its threshold — an item at zero stock needs reordering too.
         var onHand = await itemStockService.GetOnHandAsync(items, tenantId, cancellationToken);
         var reorderItems = items
-            .Where(item => item.IsActive && item.LowStockThreshold is { } threshold && onHand[item.Id] <= threshold)
+            .Where(item => item.IsActive && onHand.ContainsKey(item.Id) && item.LowStockThreshold is { } threshold && onHand[item.Id] <= threshold)
             .OrderBy(item => onHand[item.Id]);
 
         var csv = new StringBuilder();

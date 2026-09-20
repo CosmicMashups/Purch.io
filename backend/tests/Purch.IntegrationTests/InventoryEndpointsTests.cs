@@ -200,6 +200,89 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(8m, alert.StockOnHand);
     }
 
+    private static async Task<(ItemDto Item, InventoryItemDto Ingredient)> RecipeSetupAsync(HttpClient client, string itemName)
+    {
+        var toggle = await client.PutAsJsonAsync("/tenant/settings/inventory-tracking", new UpdateInventoryTrackingSettingRequest(true));
+        Assert.Equal(HttpStatusCode.OK, toggle.StatusCode);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest(itemName, null, null, null, 90m, null, PricingType.Unit));
+        var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var ingredientResponse = await client.PostAsJsonAsync(
+            "/inventory-items",
+            new CreateInventoryItemRequest("Coffee Beans", null, "g", "kg", 1000m, null));
+        var ingredient = (await ingredientResponse.Content.ReadFromJsonAsync<InventoryItemDto>(JsonOptions))!;
+        return (item, ingredient);
+    }
+
+    private static Task<HttpResponseMessage> SetRecipeAsync(HttpClient client, Guid itemId, params Guid[] ingredientIds)
+    {
+        return client.PutAsJsonAsync(
+            $"/items/{itemId}/recipe",
+            new ReplaceItemRecipeRequest([.. ingredientIds.Select(id => new ReplaceItemRecipeLineRequest(id, 18m))]));
+    }
+
+    [Fact]
+    public async Task Giving_an_item_a_recipe_retires_its_own_inventory_item_and_clearing_it_restores_one()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var (item, ingredient) = await RecipeSetupAsync(client, "Latte");
+
+        var before = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
+        _ = Assert.Single(before!, i => i.LinkedItemId == item.Id && i.IsActive);
+
+        var withRecipe = await SetRecipeAsync(client, item.Id, ingredient.Id);
+        Assert.Equal(HttpStatusCode.OK, withRecipe.StatusCode);
+
+        var during = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
+        Assert.DoesNotContain(during!, i => i.LinkedItemId == item.Id);
+        Assert.DoesNotContain(during!, i => i.IsAutoCreatedForItem && i.IsActive);
+
+        var cleared = await SetRecipeAsync(client, item.Id);
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+
+        var after = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
+        _ = Assert.Single(after!, i => i.LinkedItemId == item.Id && i.IsActive);
+    }
+
+    [Fact]
+    public async Task An_item_that_still_has_its_own_stock_cannot_be_given_a_recipe()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var (item, ingredient) = await RecipeSetupAsync(client, "Iced Tea");
+
+        _ = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item.Id, branchId, MovementType.StockIn, 5m, null, null, null, null));
+
+        var response = await SetRecipeAsync(client, item.Id, ingredient.Id);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);
+        Assert.Equal(5m, inventoryItems!.Single(i => i.LinkedItemId == item.Id).QuantityOnHand);
+    }
+
+    [Fact]
+    public async Task A_recipe_item_has_no_stock_of_its_own_so_manual_stock_changes_are_rejected()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var (item, ingredient) = await RecipeSetupAsync(client, "Mocha");
+        _ = await SetRecipeAsync(client, item.Id, ingredient.Id);
+
+        var response = await client.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(item.Id, branchId, MovementType.StockIn, 10m, null, null, null, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)
     {
         var inventoryItems = await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions);

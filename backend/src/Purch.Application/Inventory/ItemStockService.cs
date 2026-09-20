@@ -1,3 +1,4 @@
+using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
 
@@ -16,13 +17,16 @@ public interface IItemStockService
     /// movement, or null when Item.StockOnHand was changed.</summary>
     Task<Guid?> AdjustAsync(Item item, decimal delta, CancellationToken cancellationToken = default);
 
-    /// <summary>The current on-hand quantity of each item, keyed by item id.</summary>
+    /// <summary>The current on-hand quantity of each item, keyed by item id. For a tenant using
+    /// separate tracking, items made from a recipe are left out: they hold no stock of their own
+    /// (their availability comes from their ingredients).</summary>
     Task<IReadOnlyDictionary<Guid, decimal>> GetOnHandAsync(IReadOnlyCollection<Item> items, Guid tenantId, CancellationToken cancellationToken = default);
 }
 
 public sealed class ItemStockService(
     ITenantRepository tenantRepository,
-    IInventoryItemRepository inventoryItemRepository) : IItemStockService
+    IInventoryItemRepository inventoryItemRepository,
+    IItemRecipeRepository recipeRepository) : IItemStockService
 {
     public async Task<Guid?> AdjustAsync(Item item, decimal delta, CancellationToken cancellationToken = default)
     {
@@ -34,6 +38,13 @@ public sealed class ItemStockService(
             {
                 linked.QuantityOnHand += delta;
                 return linked.Id;
+            }
+
+            if ((await recipeRepository.ListByItemAsync(item.Id, cancellationToken)).Count > 0)
+            {
+                throw new ValidationException(
+                    nameof(item.Id),
+                    $"{item.Name} is made from a recipe, so it has no stock of its own. Change the stock of its ingredients instead.");
             }
         }
 
@@ -48,6 +59,11 @@ public sealed class ItemStockService(
         var tenant = await tenantRepository.GetByIdAsync(tenantId, cancellationToken);
         if (tenant is { UseSeparateInventoryTracking: true })
         {
+            foreach (var recipeLine in await recipeRepository.ListByTenantAsync(tenantId, cancellationToken))
+            {
+                _ = onHand.Remove(recipeLine.ItemId);
+            }
+
             foreach (var inventoryItem in await inventoryItemRepository.ListByTenantAsync(tenantId, cancellationToken))
             {
                 if (inventoryItem.LinkedItemId is { } itemId && onHand.ContainsKey(itemId))

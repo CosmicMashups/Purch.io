@@ -15,9 +15,11 @@ public sealed class InventoryDashboardService(
 
         var onHand = await itemStockService.GetOnHandAsync(activeItems, CurrentTenantId, cancellationToken);
 
-        var outOfStockCount = activeItems.Count(item => onHand[item.Id] <= 0);
+        // Recipe items hold no stock of their own; their ingredients carry the counts.
+        var counted = activeItems.Where(item => onHand.ContainsKey(item.Id)).ToList();
+        var outOfStockCount = counted.Count(item => onHand[item.Id] <= 0);
 
-        var lowStockItems = activeItems
+        var lowStockItems = counted
             .Where(item => item.LowStockThreshold is { } threshold && onHand[item.Id] > 0 && onHand[item.Id] <= threshold)
             .OrderBy(item => onHand[item.Id])
             .Select(item => new LowStockItemDto(item.Id, item.Name, onHand[item.Id], item.LowStockThreshold!.Value))
