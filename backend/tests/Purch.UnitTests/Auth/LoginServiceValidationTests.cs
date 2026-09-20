@@ -147,6 +147,11 @@ public sealed class LoginServiceValidationTests
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
 
+        public Task StageRevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
         public Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");

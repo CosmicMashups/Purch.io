@@ -241,6 +241,49 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_new_password_reset_request_retires_the_older_reset_link()
+    {
+        var tenantId = Guid.NewGuid();
+        const string email = "two-links@example.com";
+        var userId = await SeedAdminUserAsync(tenantId, email, "old-password-123");
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+
+        _ = await client.PostAsJsonAsync("/auth/password-reset/request", new PasswordResetRequest(email));
+        var firstToken = factory.PasswordResetTokenNotifier.LastTokenFor(userId);
+        _ = await client.PostAsJsonAsync("/auth/password-reset/request", new PasswordResetRequest(email));
+        var secondToken = factory.PasswordResetTokenNotifier.LastTokenFor(userId);
+        Assert.NotEqual(firstToken, secondToken);
+
+        var withOld = await client.PostAsJsonAsync("/auth/password-reset/confirm", new PasswordResetConfirmRequest(firstToken, "brand-new-password-456"));
+        Assert.Equal(HttpStatusCode.BadRequest, withOld.StatusCode);
+
+        var withNew = await client.PostAsJsonAsync("/auth/password-reset/confirm", new PasswordResetConfirmRequest(secondToken, "brand-new-password-456"));
+        Assert.Equal(HttpStatusCode.NoContent, withNew.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_password_reset_to_a_short_password_is_refused_and_keeps_the_link_usable()
+    {
+        var tenantId = Guid.NewGuid();
+        const string email = "weak@example.com";
+        var userId = await SeedAdminUserAsync(tenantId, email, "old-password-123");
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        _ = await client.PostAsJsonAsync("/auth/password-reset/request", new PasswordResetRequest(email));
+        var token = factory.PasswordResetTokenNotifier.LastTokenFor(userId);
+
+        var weak = await client.PostAsJsonAsync("/auth/password-reset/confirm", new PasswordResetConfirmRequest(token, "short"));
+        Assert.Equal(HttpStatusCode.BadRequest, weak.StatusCode);
+
+        // The refusal didn't burn the token: a proper password still works with the same link.
+        var strong = await client.PostAsJsonAsync("/auth/password-reset/confirm", new PasswordResetConfirmRequest(token, "a-proper-password-1"));
+        Assert.Equal(HttpStatusCode.NoContent, strong.StatusCode);
+    }
+
+    [Fact]
     public async Task Requesting_and_confirming_a_password_reset_lets_the_admin_log_in_with_the_new_password_and_revokes_old_sessions()
     {
         var tenantId = Guid.NewGuid();

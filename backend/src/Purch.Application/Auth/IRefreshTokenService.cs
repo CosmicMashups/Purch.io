@@ -29,6 +29,11 @@ public interface IRefreshTokenService
     /// change so a session issued before the change can't keep renewing itself.</summary>
     Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>Same as <see cref="RevokeAllForUserAsync"/> but only stages the change: the caller's own
+    /// SaveChangesAsync commits it, so it lands atomically with whatever else that save contains
+    /// (e.g. the new password hash).</summary>
+    Task StageRevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>Revokes every outstanding refresh token for this device — used when a
     /// device's pairing code or pairing PIN is reset, so a session from before the reset
     /// can't keep renewing itself.</summary>

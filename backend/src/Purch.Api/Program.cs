@@ -95,7 +95,7 @@ builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, EfPasswordResetTokenRepository>();
-builder.Services.AddSingleton<IPasswordResetTokenNotifier, ConsolePasswordResetTokenNotifier>();
+builder.Services.AddSingleton<IPasswordResetTokenNotifier>(new ConsolePasswordResetTokenNotifier(revealToken: builder.Environment.IsDevelopment()));
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();

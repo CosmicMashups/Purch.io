@@ -33,6 +33,14 @@ public sealed class PasswordResetService(
             return;
         }
 
+        // Only the newest link should work: an older email sitting in an inbox (or a mail log) must
+        // not stay usable just because a newer one was requested.
+        var now = DateTimeOffset.UtcNow;
+        foreach (var outstanding in await passwordResetTokenRepository.ListOutstandingByUserAsync(user.Id, cancellationToken))
+        {
+            outstanding.UsedAt = now;
+        }
+
         var rawToken = GenerateRawToken();
         passwordResetTokenRepository.Add(new PasswordResetToken
         {
@@ -49,9 +57,14 @@ public sealed class PasswordResetService(
 
     public async Task<PasswordResetResult> ConfirmAsync(string rawToken, string newPassword, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(rawToken) || string.IsNullOrWhiteSpace(newPassword))
+        if (string.IsNullOrWhiteSpace(rawToken))
         {
             return new PasswordResetResult.InvalidToken();
+        }
+
+        if (PasswordPolicy.Validate(newPassword) is { } passwordError)
+        {
+            throw new ValidationException(nameof(newPassword), passwordError);
         }
 
         var existing = await passwordResetTokenRepository.FindByTokenHashAsync(Hash(rawToken), cancellationToken);
@@ -66,11 +79,12 @@ public sealed class PasswordResetService(
         user.PasswordHash = passwordHasher.Hash(newPassword);
         existing.UsedAt = DateTimeOffset.UtcNow;
 
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        // Closes out every session issued before the change so a stolen-but-still-valid refresh token
+        // can't keep renewing itself past the reset. Staged, not saved separately, so the new password
+        // and the end of the old sessions commit together or not at all.
+        await refreshTokenService.StageRevokeAllForUserAsync(user.Id, cancellationToken);
 
-        // Closes out every session issued before the change so a stolen-but-still-valid
-        // refresh token can't keep renewing itself past the reset.
-        await refreshTokenService.RevokeAllForUserAsync(user.Id, cancellationToken);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new PasswordResetResult.Success();
     }

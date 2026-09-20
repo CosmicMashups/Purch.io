@@ -104,19 +104,18 @@ public sealed class RefreshTokenService(
 
     public async Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var activeTokens = await refreshTokenRepository.ListActiveByUserIdAsync(userId, cancellationToken);
-        if (activeTokens.Count == 0)
-        {
-            return;
-        }
+        await StageRevokeAllForUserAsync(userId, cancellationToken);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
 
+    public async Task StageRevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var activeTokens = await refreshTokenRepository.ListActiveByUserIdAsync(userId, cancellationToken);
         var revokedAt = DateTimeOffset.UtcNow;
         foreach (var token in activeTokens)
         {
             Expire(token, revokedAt);
         }
-
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RevokeAllForDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)

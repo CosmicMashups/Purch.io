@@ -88,6 +88,11 @@ public sealed class BootstrapTenantService(
 
         var hasEmail = !string.IsNullOrWhiteSpace(request.AdminEmail);
         var hasPassword = !string.IsNullOrWhiteSpace(request.AdminPassword);
+        if (hasPassword && PasswordPolicy.Validate(request.AdminPassword) is { } adminPasswordError)
+        {
+            errors[nameof(request.AdminPassword)] = [adminPasswordError];
+        }
+
         if (hasEmail != hasPassword)
         {
             errors[nameof(request.AdminEmail)] =
