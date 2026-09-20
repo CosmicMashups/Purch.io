@@ -88,9 +88,8 @@ public sealed class InventoryMovementService(
             ReasonCategory = request.ReasonCategory,
             PhotoUrl = request.PhotoUrl,
             SupplierReference = request.SupplierReference,
+            InventoryItemId = await itemStockService.AdjustAsync(item, StockDelta(request.Type, request.Quantity), cancellationToken)
         };
-
-        movement.InventoryItemId = await itemStockService.AdjustAsync(item, StockDelta(request.Type, request.Quantity), cancellationToken);
 
         movementRepository.Add(movement);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

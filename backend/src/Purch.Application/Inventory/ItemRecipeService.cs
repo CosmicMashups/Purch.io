@@ -21,7 +21,7 @@ public sealed class ItemRecipeService(
 {
     public async Task<IReadOnlyList<ItemRecipeLineDto>> GetRecipeAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
-        await GetOwnedItemAsync(itemId, cancellationToken);
+        _ = await GetOwnedItemAsync(itemId, cancellationToken);
 
         var lines = await recipeRepository.ListByItemAsync(itemId, cancellationToken);
         return await ToDtosAsync(lines, cancellationToken);
@@ -113,12 +113,7 @@ public sealed class ItemRecipeService(
         var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
             ?? throw new NotFoundException("Item", itemId);
 
-        if (item.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("Item", itemId);
-        }
-
-        return item;
+        return item.TenantId != CurrentTenantId ? throw new NotFoundException("Item", itemId) : item;
     }
 
     private async Task<IReadOnlyList<ItemRecipeLineDto>> ToDtosAsync(IReadOnlyCollection<ItemRecipeLine> lines, CancellationToken cancellationToken)

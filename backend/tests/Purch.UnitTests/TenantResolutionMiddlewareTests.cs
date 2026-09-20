@@ -130,14 +130,20 @@ public sealed class TenantResolutionMiddlewareTests
 
     private sealed class FakeDeviceRepository(Device? device = null) : IDeviceRepository
     {
-        public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default) =>
-            Task.FromResult<Device?>(null);
+        public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<Device?>(null);
+        }
 
-        public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(device?.Id == id ? device : null);
+        public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(device?.Id == id ? device : null);
+        }
 
-        public Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<Device>>([]);
+        public Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<Device>>([]);
+        }
 
         public void Add(Device device)
         {

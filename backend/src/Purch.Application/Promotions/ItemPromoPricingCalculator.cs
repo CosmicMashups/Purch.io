@@ -37,7 +37,10 @@ public static class ItemPromoPricingCalculator
         var discount = lines.ToDictionary(line => line.LineId, _ => 0m);
         var label = lines.ToDictionary(line => line.LineId, string? (_) => null);
 
-        decimal Unclaimed(LineInput line) => line.Quantity - claimed[line.LineId];
+        decimal Unclaimed(LineInput line)
+        {
+            return line.Quantity - claimed[line.LineId];
+        }
 
         // --- BOGO pass ---
         foreach (var rule in bogoRules)
@@ -123,7 +126,7 @@ public static class ItemPromoPricingCalculator
 
             // Distribute the discount across the two items proportionally to each
             // item's contribution to the combined normal price.
-            var discountA = normalTotal > 0 ? totalDiscount * (pairs * unitPriceA) / normalTotal : totalDiscount / 2;
+            var discountA = normalTotal > 0 ? totalDiscount * pairs * unitPriceA / normalTotal : totalDiscount / 2;
             var discountB = totalDiscount - discountA;
 
             var comboLabel = $"COMBO ₱{rule.ComboPrice:F2}";

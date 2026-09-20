@@ -90,8 +90,8 @@ public sealed class BogoPromoRuleService(
             throw new ValidationException(nameof(endsAt), "End date must be after the start date.");
         }
 
-        await GetOwnedItemAsync(triggerItemId, cancellationToken);
-        await GetOwnedItemAsync(freeItemId, cancellationToken);
+        _ = await GetOwnedItemAsync(triggerItemId, cancellationToken);
+        _ = await GetOwnedItemAsync(freeItemId, cancellationToken);
     }
 
     private async Task<Item> GetOwnedItemAsync(Guid itemId, CancellationToken cancellationToken)
@@ -99,12 +99,7 @@ public sealed class BogoPromoRuleService(
         var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
             ?? throw new NotFoundException("Item", itemId);
 
-        if (item.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("Item", itemId);
-        }
-
-        return item;
+        return item.TenantId != CurrentTenantId ? throw new NotFoundException("Item", itemId) : item;
     }
 
     private async Task<BogoPromoRule> GetOwnedRuleAsync(Guid id, CancellationToken cancellationToken)
@@ -112,12 +107,7 @@ public sealed class BogoPromoRuleService(
         var rule = await bogoPromoRuleRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException("BogoPromoRule", id);
 
-        if (rule.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("BogoPromoRule", id);
-        }
-
-        return rule;
+        return rule.TenantId != CurrentTenantId ? throw new NotFoundException("BogoPromoRule", id) : rule;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

@@ -87,8 +87,8 @@ public sealed class ComboPromoRuleService(
             throw new ValidationException(nameof(endsAt), "End date must be after the start date.");
         }
 
-        await GetOwnedItemAsync(itemAId, cancellationToken);
-        await GetOwnedItemAsync(itemBId, cancellationToken);
+        _ = await GetOwnedItemAsync(itemAId, cancellationToken);
+        _ = await GetOwnedItemAsync(itemBId, cancellationToken);
     }
 
     private async Task<Item> GetOwnedItemAsync(Guid itemId, CancellationToken cancellationToken)
@@ -96,12 +96,7 @@ public sealed class ComboPromoRuleService(
         var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
             ?? throw new NotFoundException("Item", itemId);
 
-        if (item.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("Item", itemId);
-        }
-
-        return item;
+        return item.TenantId != CurrentTenantId ? throw new NotFoundException("Item", itemId) : item;
     }
 
     private async Task<ComboPromoRule> GetOwnedRuleAsync(Guid id, CancellationToken cancellationToken)
@@ -109,12 +104,7 @@ public sealed class ComboPromoRuleService(
         var rule = await comboPromoRuleRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException("ComboPromoRule", id);
 
-        if (rule.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("ComboPromoRule", id);
-        }
-
-        return rule;
+        return rule.TenantId != CurrentTenantId ? throw new NotFoundException("ComboPromoRule", id) : rule;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

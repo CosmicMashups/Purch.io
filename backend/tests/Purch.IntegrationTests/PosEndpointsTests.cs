@@ -637,11 +637,15 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         return (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
     }
 
-    private static Task<HttpResponseMessage> CreatePromoCodeAsync(HttpClient client, string code, PromoDiscountType type, decimal value) =>
-        client.PostAsJsonAsync("/promo-codes", new CreatePromoCodeRequest(code, type, value, null));
+    private static Task<HttpResponseMessage> CreatePromoCodeAsync(HttpClient client, string code, PromoDiscountType type, decimal value)
+    {
+        return client.PostAsJsonAsync("/promo-codes", new CreatePromoCodeRequest(code, type, value, null));
+    }
 
-    private static async Task<TransactionDto> ReadCartAsync(HttpResponseMessage response) =>
-        (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+    private static async Task<TransactionDto> ReadCartAsync(HttpResponseMessage response)
+    {
+        return (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+    }
 
     [Fact]
     public async Task A_promo_code_does_not_stack_with_the_senior_pwd_discount()
@@ -786,7 +790,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(TransactionStatus.Completed, sale!.Status);
         Assert.Equal(30m, sale.TotalAmount);
         Assert.Equal("Take Out", sale.OrderType);
-        Assert.NotNull(sale.ReceiptNumber);
+        _ = Assert.NotNull(sale.ReceiptNumber);
         Assert.Equal(20m, Assert.Single(sale.Payments).ChangeGiven);
     }
 
@@ -812,7 +816,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var second = await retry.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
         Assert.Equal(first!.Id, second!.Id);
         Assert.Equal(first.ReceiptNumber, second.ReceiptNumber);
-        Assert.Single(second.Payments);
+        _ = Assert.Single(second.Payments);
     }
 
     [Fact]
@@ -914,7 +918,9 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         using var client = await AuthenticatedAdminClientAsync(factory);
         var item = await CreateItemAsync(client, "Duplicate Number Water", 10m);
 
-        CheckoutRequest Sale(long number) => new(
+        CheckoutRequest Sale(long number)
+        {
+            return new(
             Guid.NewGuid(),
             [new AddTransactionLineRequest(item.Id, null, 1m)],
             false,
@@ -922,6 +928,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
             null,
             new RecordPaymentRequest(PaymentMethod.Cash, 10m),
             ReceiptNumber: number);
+        }
 
         var first = await client.PostAsJsonAsync("/transactions/checkout", Sale(3));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);

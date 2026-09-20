@@ -338,7 +338,7 @@ public sealed class ItemService(
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Catalog management requires an authenticated tenant context.");
 
-    private async Task<Domain.Entities.Tenant> GetTenantAsync(CancellationToken cancellationToken)
+    private async Task<Tenant> GetTenantAsync(CancellationToken cancellationToken)
     {
         return await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken)
             ?? throw new NotFoundException("Tenant", CurrentTenantId);
@@ -347,7 +347,7 @@ public sealed class ItemService(
     /// <summary>Single-item path used by Create/Update/etc. mutation endpoints, where a couple
     /// of extra queries per call is negligible. The catalog listing (ListAsync) instead batches
     /// these lookups once for the whole tenant via <see cref="ToDto"/> to avoid O(items) round trips.</summary>
-    private async Task<ItemDto> ToDtoAsync(Item item, Domain.Entities.Tenant tenant, CancellationToken cancellationToken)
+    private async Task<ItemDto> ToDtoAsync(Item item, Tenant tenant, CancellationToken cancellationToken)
     {
         IReadOnlyList<ItemRecipeLine> recipeLines = [];
         var inventoryItemsById = new Dictionary<Guid, InventoryItem>();
@@ -385,7 +385,7 @@ public sealed class ItemService(
     /// Pure/synchronous so ListAsync can batch-load every lookup once for the whole catalog.</summary>
     private static bool ComputeIsOutOfStock(
         Item item,
-        Domain.Entities.Tenant tenant,
+        Tenant tenant,
         IReadOnlyList<ItemRecipeLine> recipeLines,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
@@ -424,7 +424,7 @@ public sealed class ItemService(
 
     private static ItemDto ToDto(
         Item item,
-        Domain.Entities.Tenant tenant,
+        Tenant tenant,
         IReadOnlyList<ItemRecipeLine> recipeLines,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)

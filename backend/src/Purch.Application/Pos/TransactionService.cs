@@ -286,14 +286,11 @@ public sealed class TransactionService(
         var attachedGroupIds = await itemModifierGroupRepository.ListGroupIdsForItemAsync(item.Id, cancellationToken);
         if (attachedGroupIds.Count == 0)
         {
-            if (selectedModifierIds is { Count: > 0 })
-            {
-                throw new ValidationException(
+            return selectedModifierIds is { Count: > 0 }
+                ? throw new ValidationException(
                     nameof(AddTransactionLineRequest.SelectedModifierIds),
-                    "This item has no modifier groups to select from.");
-            }
-
-            return (0m, []);
+                    "This item has no modifier groups to select from.")
+                : ((decimal PriceDeltaTotal, IReadOnlyList<Guid> ModifierIds))(0m, []);
         }
 
         var attachedGroups = (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken))
@@ -421,13 +418,10 @@ public sealed class TransactionService(
 
         // An offline sale is already paid for at the device's price — refusing it now would leave the
         // customer with a receipt for a sale the books never see. It is recorded at the server's price.
-        if (!request.OfflineSale && request.ExpectedTotal is { } expectedTotal && Math.Abs(cart.TotalAmount - expectedTotal) > 0.005m)
-        {
-            throw new ConflictException(
-                $"Prices or promos changed: the total is now {cart.TotalAmount:F2} (the device showed {expectedTotal:F2}). Review the cart and try again.");
-        }
-
-        return await RecordPaymentCoreAsync(request.Payment, request.ReceiptNumber, cancellationToken);
+        return !request.OfflineSale && request.ExpectedTotal is { } expectedTotal && Math.Abs(cart.TotalAmount - expectedTotal) > 0.005m
+            ? throw new ConflictException(
+                $"Prices or promos changed: the total is now {cart.TotalAmount:F2} (the device showed {expectedTotal:F2}). Review the cart and try again.")
+            : await RecordPaymentCoreAsync(request.Payment, request.ReceiptNumber, cancellationToken);
     }
 
     public async Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default)

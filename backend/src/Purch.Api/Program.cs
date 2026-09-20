@@ -2,7 +2,6 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Purch.Api.Endpoints;
@@ -234,7 +233,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddPolicy(RateLimiterPolicies.AuthSensitive, httpContext =>
+    _ = options.AddPolicy(RateLimiterPolicies.AuthSensitive, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
@@ -244,7 +243,7 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
-    options.AddPolicy(RateLimiterPolicies.Refresh, httpContext =>
+    _ = options.AddPolicy(RateLimiterPolicies.Refresh, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
@@ -302,14 +301,14 @@ using (var startupScope = app.Services.CreateScope())
             var pending = (await dbContext.Database.GetPendingMigrationsAsync()).ToList();
             if (pending.Count > 0)
             {
-                Program.LogApplyingMigrations(startupLogger, pending.Count, string.Join(", ", pending));
+                LogApplyingMigrations(startupLogger, pending.Count, string.Join(", ", pending));
                 await dbContext.Database.MigrateAsync();
-                Program.LogMigrationsApplied(startupLogger);
+                LogMigrationsApplied(startupLogger);
             }
         }
         catch (Exception exception)
         {
-            Program.LogMigrationFailed(startupLogger, exception);
+            LogMigrationFailed(startupLogger, exception);
         }
 #pragma warning restore CA1031
     }
@@ -355,7 +354,7 @@ if (deploymentMode != DeploymentMode.Local)
     };
     forwardedHeadersOptions.KnownNetworks.Clear();
     forwardedHeadersOptions.KnownProxies.Clear();
-    app.UseForwardedHeaders(forwardedHeadersOptions);
+    _ = app.UseForwardedHeaders(forwardedHeadersOptions);
 }
 
 // Catches status codes set without a response body (e.g. JWT auth failing with a bare
@@ -375,15 +374,15 @@ if (deploymentMode == DeploymentMode.Local)
     var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
     if (!Directory.Exists(webRootPath))
     {
-        Directory.CreateDirectory(webRootPath);
+        _ = Directory.CreateDirectory(webRootPath);
     }
     var defaultUploadsPath = Path.Combine(webRootPath, "uploads");
     if (!Directory.Exists(defaultUploadsPath))
     {
-        Directory.CreateDirectory(defaultUploadsPath);
+        _ = Directory.CreateDirectory(defaultUploadsPath);
     }
 
-    app.UseStaticFiles();
+    _ = app.UseStaticFiles();
 }
 
 app.UseCors();

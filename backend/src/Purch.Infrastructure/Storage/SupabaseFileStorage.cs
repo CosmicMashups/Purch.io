@@ -8,20 +8,12 @@ namespace Purch.Infrastructure.Storage;
 /// this is one PUT call). Used for Cloud mode, where the API container may be
 /// stateless/scaled-to-zero between requests, so local disk can't hold uploads.
 /// </summary>
-public sealed class SupabaseFileStorage : IFileStorage
+public sealed class SupabaseFileStorage(HttpClient httpClient, string storageUrl, string storageKey, string bucket) : IFileStorage
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _storageUrl;
-    private readonly string _storageKey;
-    private readonly string _bucket;
-
-    public SupabaseFileStorage(HttpClient httpClient, string storageUrl, string storageKey, string bucket)
-    {
-        _httpClient = httpClient;
-        _storageUrl = storageUrl.TrimEnd('/');
-        _storageKey = storageKey;
-        _bucket = bucket;
-    }
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly string _storageUrl = storageUrl.TrimEnd('/');
+    private readonly string _storageKey = storageKey;
+    private readonly string _bucket = bucket;
 
     public async Task<StoredFile> SaveAsync(
         Stream content,

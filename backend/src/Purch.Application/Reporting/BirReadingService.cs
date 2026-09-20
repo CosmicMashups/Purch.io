@@ -53,8 +53,8 @@ public sealed class BirReadingService(
         var transactions = await transactionRepository.ListUnreportedCompletedByDeviceAsync(deviceId, cancellationToken);
         var previousEnding = sequence.LastZReadingReceiptNumber;
 
-        var beginningReceiptNumber = transactions.Count > 0 ? transactions[0].ReceiptNumber : (long?)null;
-        var endingReceiptNumber = transactions.Count > 0 ? transactions[^1].ReceiptNumber : (long?)null;
+        var beginningReceiptNumber = transactions.Count > 0 ? transactions[0].ReceiptNumber : null;
+        var endingReceiptNumber = transactions.Count > 0 ? transactions[^1].ReceiptNumber : null;
 
         var lateReceiptNumbers = transactions
             .Where(t => t.ReceiptNumber <= previousEnding)

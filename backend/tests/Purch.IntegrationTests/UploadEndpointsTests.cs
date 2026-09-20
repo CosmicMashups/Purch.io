@@ -20,8 +20,10 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = factory.CreateClient();
 
-        using var content = new MultipartFormDataContent();
-        content.Add(new ByteArrayContent([1, 2, 3]), "file", "test.jpg");
+        using var content = new MultipartFormDataContent
+        {
+            { new ByteArrayContent([1, 2, 3]), "file", "test.jpg" }
+        };
 
         var response = await client.PostAsync("/uploads/image", content);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -79,8 +81,10 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
 
-        using var content = new MultipartFormDataContent();
-        content.Add(new ByteArrayContent([1, 2, 3]), "file", "malicious.exe");
+        using var content = new MultipartFormDataContent
+        {
+            { new ByteArrayContent([1, 2, 3]), "file", "malicious.exe" }
+        };
 
         var response = await client.PostAsync("/uploads/image", content);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

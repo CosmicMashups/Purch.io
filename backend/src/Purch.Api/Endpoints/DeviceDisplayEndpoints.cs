@@ -66,16 +66,21 @@ public static class DeviceDisplayEndpoints
     /// <summary>PickedUp orders are done as far as the kitchen/board workflow is
     /// concerned — they stay in the cashier's own kiosk-pending list (payment
     /// status is separate) but drop off these two live queues.</summary>
-    private static IReadOnlyList<TransactionDto> ExcludePickedUp(IReadOnlyList<TransactionDto> orders) =>
-        [.. orders.Where(order => order.KitchenStatus != KitchenStatus.PickedUp)];
-
-    private static IResult MapSessionResult(UnattendedSessionResult result) => result switch
+    private static IReadOnlyList<TransactionDto> ExcludePickedUp(IReadOnlyList<TransactionDto> orders)
     {
-        UnattendedSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
-        UnattendedSessionResult.InvalidDevice => Results.Problem(
-            statusCode: StatusCodes.Status401Unauthorized,
-            title: "Invalid credentials.",
-            detail: "The device pairing code or PIN was not recognized."),
-        _ => throw new InvalidOperationException($"Unhandled {nameof(UnattendedSessionResult)} case: {result.GetType().Name}"),
-    };
+        return [.. orders.Where(order => order.KitchenStatus != KitchenStatus.PickedUp)];
+    }
+
+    private static IResult MapSessionResult(UnattendedSessionResult result)
+    {
+        return result switch
+        {
+            UnattendedSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
+            UnattendedSessionResult.InvalidDevice => Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Invalid credentials.",
+                detail: "The device pairing code or PIN was not recognized."),
+            _ => throw new InvalidOperationException($"Unhandled {nameof(UnattendedSessionResult)} case: {result.GetType().Name}"),
+        };
+    }
 }

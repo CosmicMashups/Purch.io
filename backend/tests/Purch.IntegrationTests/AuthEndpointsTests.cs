@@ -196,7 +196,7 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         {
             var response = await client.PostAsJsonAsync(
                 "/onboarding/bootstrap",
-                new Purch.Application.Onboarding.BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Admin", "1234"));
+                new Application.Onboarding.BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Admin", "1234"));
             statuses.Add(response.StatusCode);
         }
 

@@ -6,14 +6,9 @@ namespace Purch.Infrastructure.Storage;
 /// Writes to the API's own wwwroot, served back out via app.UseStaticFiles().
 /// Only safe for Local mode's single long-lived instance — see IFileStorage.
 /// </summary>
-public sealed class LocalFileStorage : IFileStorage
+public sealed class LocalFileStorage(string webRootPath) : IFileStorage
 {
-    private readonly string _webRootPath;
-
-    public LocalFileStorage(string webRootPath)
-    {
-        _webRootPath = webRootPath;
-    }
+    private readonly string _webRootPath = webRootPath;
 
     public async Task<StoredFile> SaveAsync(
         Stream content,
@@ -24,7 +19,7 @@ public sealed class LocalFileStorage : IFileStorage
         CancellationToken cancellationToken)
     {
         var uploadsDir = Path.Combine(_webRootPath, "uploads", tenantFolder);
-        Directory.CreateDirectory(uploadsDir);
+        _ = Directory.CreateDirectory(uploadsDir);
 
         var filePath = Path.Combine(uploadsDir, fileName);
         await using (var fileStream = new FileStream(filePath, FileMode.Create))

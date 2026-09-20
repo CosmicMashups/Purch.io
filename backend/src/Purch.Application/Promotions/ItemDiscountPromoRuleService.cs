@@ -88,7 +88,7 @@ public sealed class ItemDiscountPromoRuleService(
             throw new ValidationException(nameof(endsAt), "End date must be after the start date.");
         }
 
-        await GetOwnedItemAsync(itemId, cancellationToken);
+        _ = await GetOwnedItemAsync(itemId, cancellationToken);
     }
 
     private async Task<Item> GetOwnedItemAsync(Guid itemId, CancellationToken cancellationToken)
@@ -96,12 +96,7 @@ public sealed class ItemDiscountPromoRuleService(
         var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
             ?? throw new NotFoundException("Item", itemId);
 
-        if (item.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("Item", itemId);
-        }
-
-        return item;
+        return item.TenantId != CurrentTenantId ? throw new NotFoundException("Item", itemId) : item;
     }
 
     private async Task<ItemDiscountPromoRule> GetOwnedRuleAsync(Guid id, CancellationToken cancellationToken)
@@ -109,12 +104,7 @@ public sealed class ItemDiscountPromoRuleService(
         var rule = await itemDiscountPromoRuleRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException("ItemDiscountPromoRule", id);
 
-        if (rule.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("ItemDiscountPromoRule", id);
-        }
-
-        return rule;
+        return rule.TenantId != CurrentTenantId ? throw new NotFoundException("ItemDiscountPromoRule", id) : rule;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

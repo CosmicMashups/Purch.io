@@ -140,12 +140,7 @@ public sealed class InventoryItemService(
         var inventoryItem = await inventoryItemRepository.GetByIdAsync(inventoryItemId, cancellationToken)
             ?? throw new NotFoundException("InventoryItem", inventoryItemId);
 
-        if (inventoryItem.TenantId != CurrentTenantId)
-        {
-            throw new NotFoundException("InventoryItem", inventoryItemId);
-        }
-
-        return inventoryItem;
+        return inventoryItem.TenantId != CurrentTenantId ? throw new NotFoundException("InventoryItem", inventoryItemId) : inventoryItem;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

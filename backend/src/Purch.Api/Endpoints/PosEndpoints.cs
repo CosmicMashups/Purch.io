@@ -70,13 +70,10 @@ public static class PosEndpoints
         {
             // The cart endpoint that toggles this discount is Admin/Manager-only; a sale must not
             // be a way around that just because it arrives in one call.
-            if (request.SeniorPwdDiscountApplied && !posSupervisor.Any(user.IsInRole))
-            {
-                throw new Purch.Application.Common.Exceptions.ForbiddenException(
-                    "Only a manager or admin can apply the Senior Citizen/PWD discount.");
-            }
-
-            return Results.Ok(await transactionService.CheckoutAsync(request, cancellationToken));
+            return request.SeniorPwdDiscountApplied && !posSupervisor.Any(user.IsInRole)
+                ? throw new Application.Common.Exceptions.ForbiddenException(
+                    "Only a manager or admin can apply the Senior Citizen/PWD discount.")
+                : Results.Ok(await transactionService.CheckoutAsync(request, cancellationToken));
         })
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 

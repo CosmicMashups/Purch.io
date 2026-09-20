@@ -40,15 +40,15 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
 
         _ = builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IPasswordResetTokenNotifier>();
-            services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
+            _ = services.RemoveAll<IPasswordResetTokenNotifier>();
+            _ = services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
 
             // Real IFileStorage in Cloud mode hits Supabase Storage over HTTP, which
             // has nothing to talk to in tests (SUPABASE_STORAGE_URL above is a fake
             // host). Swap in LocalFileStorage against a temp dir so upload tests
             // still exercise the endpoint end-to-end without real network I/O.
-            services.RemoveAll<IFileStorage>();
-            services.AddSingleton<IFileStorage>(
+            _ = services.RemoveAll<IFileStorage>();
+            _ = services.AddSingleton<IFileStorage>(
                 new LocalFileStorage(Path.Combine(Path.GetTempPath(), "purch-test-uploads", Guid.NewGuid().ToString("N"))));
         });
     }
@@ -64,5 +64,8 @@ public sealed class CapturingPasswordResetTokenNotifier : IPasswordResetTokenNot
         return Task.CompletedTask;
     }
 
-    public string LastTokenFor(Guid userId) => _tokensByUserId[userId];
+    public string LastTokenFor(Guid userId)
+    {
+        return _tokensByUserId[userId];
+    }
 }

@@ -24,8 +24,8 @@ public sealed class ConfigDeploymentContext : IDeploymentContext
                     ?? throw new InvalidOperationException("LOCAL_DB_CONNECTION_STRING is required when PURCH_DEPLOYMENT_MODE=Local."),
                 configuration["LOCAL_STORAGE_PATH"]
                     ?? throw new InvalidOperationException("LOCAL_STORAGE_PATH is required when PURCH_DEPLOYMENT_MODE=Local."),
-                (string?)null,
-                (string?)null),
+                null,
+                null),
             DeploymentMode.Cloud => (
                 configuration["SUPABASE_DB_CONNECTION_STRING"]
                     ?? throw new InvalidOperationException("SUPABASE_DB_CONNECTION_STRING is required when PURCH_DEPLOYMENT_MODE=Cloud."),

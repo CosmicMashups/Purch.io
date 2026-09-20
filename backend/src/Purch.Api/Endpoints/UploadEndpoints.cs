@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Purch.Application.Common;
 
 namespace Purch.Api.Endpoints;
