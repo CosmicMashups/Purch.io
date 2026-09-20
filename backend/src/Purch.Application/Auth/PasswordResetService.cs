@@ -73,7 +73,7 @@ public sealed class PasswordResetService(
             return new PasswordResetResult.InvalidToken();
         }
 
-        var user = await userRepository.GetByIdAsync(existing.UserId, cancellationToken)
+        var user = await userRepository.GetByIdUnscopedAsync(existing.UserId, cancellationToken)
             ?? throw new InvalidOperationException($"PasswordResetToken {existing.Id} references a missing user {existing.UserId}.");
 
         user.PasswordHash = passwordHasher.Hash(newPassword);

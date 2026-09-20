@@ -139,6 +139,9 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
     private Expression<Func<TEntity, bool>> BuildTenantFilter<TEntity>()
         where TEntity : class, ITenantScoped
     {
-        return entity => _currentTenantProvider.TenantId == null || entity.TenantId == _currentTenantProvider.TenantId;
+        // Fail closed: with no tenant in context (an anonymous request, a background job, a bug) a query
+        // sees nothing, rather than every tenant's rows. The few reads that legitimately span tenants
+        // (pairing code, email, refresh/reset token lookups) opt out explicitly with IgnoreQueryFilters().
+        return entity => _currentTenantProvider.TenantId != null && entity.TenantId == _currentTenantProvider.TenantId;
     }
 }

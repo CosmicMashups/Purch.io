@@ -30,10 +30,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             var deviceIdClaim = context.User.FindFirst(JwtClaimTypes.DeviceId)?.Value;
             if (Guid.TryParse(deviceIdClaim, out var deviceId))
             {
-                _ = int.TryParse(context.User.FindFirst(JwtClaimTypes.DeviceSessionVersion)?.Value, out var tokenSessionVersion);
+                // A missing or unreadable version must not default to 0 and match a device that has
+                // never been reset: it is rejected like any other stale session.
+                var hasSessionVersion = int.TryParse(context.User.FindFirst(JwtClaimTypes.DeviceSessionVersion)?.Value, out var tokenSessionVersion);
                 var device = await deviceRepository.GetByIdAsync(deviceId, context.RequestAborted);
 
-                if (device is null || device.SessionVersion != tokenSessionVersion)
+                if (device is null || !hasSessionVersion || device.SessionVersion != tokenSessionVersion)
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     await context.Response.WriteAsync("Device session has been reset.");

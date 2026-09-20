@@ -16,8 +16,8 @@ public sealed class TokenRefreshService(
             return new TokenRefreshResult.InvalidToken();
         }
 
-        var user = owner.UserId is { } userId ? await userRepository.GetByIdAsync(userId, cancellationToken) : null;
-        var device = owner.DeviceId is { } deviceId ? await deviceRepository.GetByIdAsync(deviceId, cancellationToken) : null;
+        var user = owner.UserId is { } userId ? await userRepository.GetByIdUnscopedAsync(userId, cancellationToken) : null;
+        var device = owner.DeviceId is { } deviceId ? await deviceRepository.GetByIdUnscopedAsync(deviceId, cancellationToken) : null;
 
         // A deactivated staff member must not be able to keep renewing their session.
         if (user is { IsActive: false })

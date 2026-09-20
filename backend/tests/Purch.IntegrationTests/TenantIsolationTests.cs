@@ -35,20 +35,29 @@ public sealed class TenantIsolationTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
-    public async Task Items_query_with_no_current_tenant_sees_every_tenant()
+    public async Task Items_query_with_no_current_tenant_sees_nothing()
     {
-        // Intentional fallback (e.g. the anonymous login flow needs cross-tenant device
-        // lookup) — documented on PurchDbContext's query filter, verified here so the
-        // behavior can't silently change without a failing test.
+        // Fail closed: no tenant in context must never mean "every tenant". The few reads that
+        // legitimately span tenants (pairing code, email, refresh/reset tokens) opt out explicitly.
         var tenantId = Guid.NewGuid();
-        await SeedItemAsync(tenantId, "Unscoped-visible Item");
+        await SeedItemAsync(tenantId, "Hidden Item");
 
         var unscopedProvider = new TestCurrentTenantProvider { TenantId = null };
         await using var dbContext = CreateDbContext(unscopedProvider);
 
-        var visibleItems = await dbContext.Items.Where(item => item.TenantId == tenantId).ToListAsync();
+        Assert.Empty(await dbContext.Items.Where(item => item.TenantId == tenantId).ToListAsync());
+        Assert.Empty(await dbContext.Items.ToListAsync());
+    }
 
-        _ = Assert.Single(visibleItems);
+    [Fact]
+    public async Task An_explicit_IgnoreQueryFilters_is_the_only_way_to_read_across_tenants()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedItemAsync(tenantId, "Opt-in Visible Item");
+
+        await using var dbContext = CreateDbContext(new TestCurrentTenantProvider { TenantId = null });
+
+        _ = Assert.Single(await dbContext.Items.IgnoreQueryFilters().Where(item => item.TenantId == tenantId).ToListAsync());
     }
 
     private async Task SeedItemAsync(Guid tenantId, string itemName)

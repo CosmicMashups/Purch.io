@@ -9,9 +9,16 @@ public sealed class EfDeviceRepository(PurchDbContext dbContext) : IDeviceReposi
 {
     public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default)
     {
+        // The pairing code is what identifies the tenant here, so this cannot be tenant-filtered.
         return dbContext.Devices
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(device => device.PairingCode == pairingCode, cancellationToken);
+    }
+
+    public Task<Device?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(device => device.Id == id, cancellationToken);
     }
 
     public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)

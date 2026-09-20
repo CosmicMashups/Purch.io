@@ -233,6 +233,34 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
         Assert.NotEmpty(device.PairingCode);
     }
 
+    [Theory]
+    [InlineData(DeviceType.OrderBoard, "/order-board/session", nameof(Role.OrderBoard))]
+    [InlineData(DeviceType.KitchenDisplay, "/kitchen-display/session", nameof(Role.KitchenDisplay))]
+    [InlineData(DeviceType.Kiosk, "/kiosk/session", nameof(Role.Kiosk))]
+    public async Task An_unattended_device_pairs_and_keeps_its_own_role_when_its_token_is_refreshed(DeviceType deviceType, string sessionPath, string expectedRole)
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = factory.CreateClient();
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var branches = await admin.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var deviceResponse = await admin.PostAsJsonAsync("/devices", new CreateDeviceRequest(branches!.Single().Id, "Screen-1", deviceType, "4321"));
+        var device = await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
+
+        // Pairing is anonymous: it must find the device by its code even though no tenant is in context.
+        using var screen = factory.CreateClient();
+        var pair = await screen.PostAsJsonAsync(sessionPath, new { devicePairingCode = device!.PairingCode, pairingPin = "4321" });
+        Assert.Equal(HttpStatusCode.OK, pair.StatusCode);
+        var session = await pair.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
+        Assert.Equal(expectedRole, new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(session!.AccessToken).Claims.Single(c => c.Type == JwtClaimTypes.Role).Value);
+
+        // Refreshing is anonymous too, and must not turn the device into a different role.
+        var refresh = await screen.PostAsJsonAsync("/auth/refresh", new { refreshToken = session.RefreshToken });
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        var refreshed = await refresh.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
+        Assert.Equal(expectedRole, new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(refreshed!.AccessToken).Claims.Single(c => c.Type == JwtClaimTypes.Role).Value);
+    }
+
     [Fact]
     public async Task Creating_a_device_for_a_nonexistent_branch_returns_404()
     {

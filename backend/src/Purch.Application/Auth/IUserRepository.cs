@@ -11,6 +11,10 @@ public interface IUserRepository
 
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>One of the few deliberately unscoped reads: used before a tenant is known (anonymous refresh
+    /// and password reset), so it can't go through the tenant filter. Authenticated code must keep using GetByIdAsync.</summary>
+    Task<User?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>Looks up an admin/owner account by email for the email+password login
     /// path — deliberately not tenant-scoped, since the caller doesn't know which
     /// tenant they belong to until this returns (mirrors device pairing-code lookup).</summary>
