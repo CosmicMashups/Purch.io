@@ -45,7 +45,12 @@ export function LowStockThresholdPage() {
       <ItemSubPageHeader itemId={itemId!} title="Low-Stock Threshold" />
       <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-sm flex-col gap-3">
         <Field label="Threshold (blank clears it)" error={errors.threshold?.message}>
-          <input type="number" {...register('threshold')} className={inputClass} />
+          <input
+            type="number"
+            // A blank field must clear the threshold (null); left alone, z.coerce.number() turns '' into 0.
+            {...register('threshold', { setValueAs: (value) => (value === '' ? null : value) })}
+            className={inputClass}
+          />
         </Field>
         {submitError && <p className="text-sm text-red-600">{submitError}</p>}
         <button

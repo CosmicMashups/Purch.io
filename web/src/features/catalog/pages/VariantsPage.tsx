@@ -5,6 +5,7 @@ import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 import { useState } from 'react';
+import { ApiError } from '../../../lib/apiError';
 
 interface FormValues {
   attributeKey: string;
@@ -29,13 +30,17 @@ export function VariantsPage() {
       setError('Add at least one attribute (e.g. Size = Large)');
       return;
     }
-    await createVariant.mutateAsync({
-      attributes: { [values.attributeKey.trim()]: values.attributeValue.trim() },
-      sku: values.sku.trim() || null,
-      priceOverride: values.priceOverride ? Number(values.priceOverride) : null,
-      imageUrl: values.imageUrl.trim() || null,
-    });
-    reset();
+    try {
+      await createVariant.mutateAsync({
+        attributes: { [values.attributeKey.trim()]: values.attributeValue.trim() },
+        sku: values.sku.trim() || null,
+        priceOverride: values.priceOverride ? Number(values.priceOverride) : null,
+        imageUrl: values.imageUrl.trim() || null,
+      });
+      reset();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to add variant');
+    }
   }
 
   return (
