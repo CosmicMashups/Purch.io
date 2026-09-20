@@ -76,6 +76,58 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task Changing_a_staff_members_role_ends_their_existing_refresh_sessions()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = factory.CreateClient();
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        _ = await admin.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Ben Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
+        var ben = staff!.Single(s => s.Role == Role.Manager);
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+
+        using var benClient = factory.CreateClient();
+        var loginResponse = await benClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
+        var session = await loginResponse.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
+
+        // Demoted: whatever he could do as a manager must not survive on a 30-day refresh token.
+        var demote = await admin.PutAsJsonAsync(
+            $"/staff/{ben.Id}",
+            new UpdateStaffRequest(Role.Cashier, ScopeType.Tenant, null, null, true));
+        Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
+
+        var refresh = await benClient.PostAsJsonAsync("/auth/refresh", new { refreshToken = session!.RefreshToken });
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+    }
+
+    [Fact]
+    public async Task Saving_a_staff_member_without_changing_anything_keeps_their_session()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = factory.CreateClient();
+        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        _ = await admin.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Ben Cashier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
+        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
+        var ben = staff!.Single(s => s.Role == Role.Cashier);
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+
+        using var benClient = factory.CreateClient();
+        var loginResponse = await benClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
+        var session = await loginResponse.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
+
+        _ = await admin.PutAsJsonAsync($"/staff/{ben.Id}", new UpdateStaffRequest(Role.Cashier, ScopeType.Tenant, null, null, true));
+
+        var refresh = await benClient.PostAsJsonAsync("/auth/refresh", new { refreshToken = session!.RefreshToken });
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+    }
+
     [Theory]
     [InlineData("12")]
     [InlineData("123456789")]
@@ -369,4 +421,6 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     private sealed record LoginResponseBody(string AccessToken);
+
+    private sealed record SessionBody(string AccessToken, string RefreshToken);
 }

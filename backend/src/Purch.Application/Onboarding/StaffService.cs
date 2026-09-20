@@ -8,6 +8,7 @@ namespace Purch.Application.Onboarding;
 public sealed class StaffService(
     IUserRepository userRepository,
     IPinHasher pinHasher,
+    IRefreshTokenService refreshTokenService,
     ICurrentTenantProvider currentTenantProvider,
     IUnitOfWork unitOfWork) : IStaffService
 {
@@ -63,6 +64,15 @@ public sealed class StaffService(
         var user = await userRepository.GetByIdAsync(staffId, cancellationToken)
             ?? throw new NotFoundException("Staff member", staffId);
 
+        // Access tokens carry the role and scope they were issued with, so a session opened before this
+        // change would keep its old authority. Ending the refresh tokens limits that to the access
+        // token's remaining lifetime (30 minutes) instead of the refresh token's (30 days).
+        var authorityChanged = user.Role != request.Role
+            || user.ScopeType != request.ScopeType
+            || user.ScopeId != request.ScopeId
+            || user.BranchId != request.BranchId
+            || user.IsActive != request.IsActive;
+
         user.Role = request.Role;
         user.ScopeType = request.ScopeType;
         user.ScopeId = request.ScopeId;
@@ -70,6 +80,11 @@ public sealed class StaffService(
         user.IsActive = request.IsActive;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (authorityChanged)
+        {
+            await refreshTokenService.RevokeAllForUserAsync(user.Id, cancellationToken);
+        }
 
         return ToDto(user);
     }
