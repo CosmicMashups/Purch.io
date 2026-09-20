@@ -22,6 +22,7 @@ public sealed class TransactionService(
     IReceiptSequenceRepository receiptSequenceRepository,
     IKioskPrepSequenceRepository kioskPrepSequenceRepository,
     IItemRepository itemRepository,
+    IItemBatchRepository itemBatchRepository,
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
     IItemModifierGroupRepository itemModifierGroupRepository,
@@ -560,6 +561,7 @@ public sealed class TransactionService(
 
         await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
         await ConsumeInventoryForCompletedSaleAsync(cart, cancellationToken);
+        await ConsumeBatchesForCompletedSaleAsync(cart, cancellationToken);
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -603,6 +605,36 @@ public sealed class TransactionService(
                 StaffUserId = CurrentUserId,
                 Note = $"Sale — receipt #{cart.ReceiptNumber}",
             });
+        }
+    }
+
+    /// <summary>Weight/volume items are received in batches (lots with an expiry date), so a sale has to
+    /// draw the sold quantity down from those batches too — earliest expiry first — or every batch would
+    /// keep showing everything it was received with. Item-level stock is handled separately; this only
+    /// keeps the per-batch remainder honest. A quantity beyond what the batches hold (overselling) is
+    /// simply not attributed to any batch.</summary>
+    private async Task ConsumeBatchesForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
+        {
+            var item = await itemRepository.GetByIdAsync(itemId, cancellationToken);
+            if (item?.PricingType != PricingType.WeightVolume)
+            {
+                continue;
+            }
+
+            var remaining = quantitySold;
+            foreach (var batch in await itemBatchRepository.ListConsumableAsync(itemId, cancellationToken))
+            {
+                if (remaining <= 0)
+                {
+                    break;
+                }
+
+                var taken = Math.Min(batch.QuantityRemaining, remaining);
+                batch.QuantityRemaining -= taken;
+                remaining -= taken;
+            }
         }
     }
 

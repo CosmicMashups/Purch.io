@@ -5,6 +5,7 @@ using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Onboarding;
+using Purch.Application.Pos;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -84,6 +85,30 @@ public sealed class ModifierAndBatchEndpointsTests(PostgresContainerFixture post
         var itemsAfter = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
         var updatedItem = itemsAfter!.Single(i => i.Id == item.Id);
         Assert.Equal(50m, updatedItem.StockOnHand);
+    }
+
+    [Fact]
+    public async Task A_sale_draws_batches_down_earliest_expiry_first()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var item = (await (await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Rice", null, null, null, 55m, null, PricingType.WeightVolume))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        // Received first but expires last, then received second but expires first.
+        _ = await client.PostAsJsonAsync($"/items/{item.Id}/batches", new CreateItemBatchRequest("LOT-LATE", new DateOnly(2027, 6, 1), 5m));
+        _ = await client.PostAsJsonAsync($"/items/{item.Id}/batches", new CreateItemBatchRequest("LOT-SOON", new DateOnly(2026, 12, 1), 5m));
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 6m));
+        var payment = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 1000m));
+        Assert.Equal(HttpStatusCode.OK, payment.StatusCode);
+
+        var remainingByLot = (await client.GetFromJsonAsync<List<ItemBatchDto>>($"/items/{item.Id}/batches", JsonOptions))!
+            .ToDictionary(b => b.LotNumber, b => b.QuantityRemaining);
+        Assert.Equal(0m, remainingByLot["LOT-SOON"]);
+        Assert.Equal(4m, remainingByLot["LOT-LATE"]);
     }
 
     [Fact]
