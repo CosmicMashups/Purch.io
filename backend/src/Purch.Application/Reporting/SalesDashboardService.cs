@@ -16,7 +16,7 @@ public sealed class SalesDashboardService(
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
-        var todayStart = new DateTimeOffset(now.Date, TimeSpan.Zero);
+        var todayStart = ReportTimeZone.StartOfDay(now);
         var last7Start = todayStart.AddDays(-6);
         var last30Start = todayStart.AddDays(-29);
 
@@ -32,7 +32,7 @@ public sealed class SalesDashboardService(
         var trend = Enumerable.Range(0, 14)
             .Select(offset => todayStart.AddDays(-13 + offset))
             .Select(day => new DailyRevenuePointDto(
-                DateOnly.FromDateTime(day.UtcDateTime),
+                DateOnly.FromDateTime(day.ToOffset(ReportTimeZone.Offset).DateTime),
                 transactions.Where(t => t.CreatedAt >= day && t.CreatedAt < day.AddDays(1)).Sum(t => t.TotalAmount)))
             .ToList();
 

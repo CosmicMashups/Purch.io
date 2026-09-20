@@ -71,6 +71,13 @@ public sealed class InventoryReportService(
 
     private static string CsvField(string value)
     {
+        // A cell that starts with one of these is run as a formula when the file is opened in a
+        // spreadsheet, and item names are user-entered. A leading apostrophe makes it plain text.
+        if (value.Length > 0 && value[0] is '=' or '+' or '-' or '@' or '\t' or '\r')
+        {
+            value = "'" + value;
+        }
+
         return value.Contains(',') || value.Contains('"')
             ? $"\"{value.Replace("\"", "\"\"")}\""
             : value;

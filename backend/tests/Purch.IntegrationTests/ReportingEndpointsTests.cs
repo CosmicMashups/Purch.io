@@ -274,6 +274,25 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task The_low_stock_export_defuses_item_names_that_would_run_as_spreadsheet_formulas()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("=HYPERLINK(\"http://evil.example\")", null, null, null, 15m, null, PricingType.Unit));
+        var item = await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PutAsJsonAsync($"/items/{item!.Id}/low-stock-threshold", new UpdateLowStockThresholdRequest(10m));
+
+        var csv = await (await client.GetAsync("/reports/inventory/low-stock-export.csv")).Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("\n=HYPERLINK", csv);
+        Assert.DoesNotContain("\"=HYPERLINK", csv);
+        Assert.Contains("'=HYPERLINK", csv);
+    }
+
+    [Fact]
     public async Task The_staff_performance_report_summarizes_sales_and_shift_attendance()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
