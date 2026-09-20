@@ -30,11 +30,13 @@ public sealed class EfUserRepository(PurchDbContext dbContext) : IUserRepository
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalized = email.Trim();
+        // ILIKE is only used for case-insensitivity: escape its wildcards so an email of "%" or "_"
+        // can't match an arbitrary account.
+        var normalized = email.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
         return dbContext.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                user => user.Email != null && EF.Functions.ILike(user.Email, normalized),
+                user => user.Email != null && EF.Functions.ILike(user.Email, normalized, "\\"),
                 cancellationToken);
     }
 

@@ -1,3 +1,5 @@
+using Purch.Domain.Enums;
+
 namespace Purch.Application.Auth;
 
 public sealed class TokenRefreshService(
@@ -23,6 +25,13 @@ public sealed class TokenRefreshService(
             return new TokenRefreshResult.InvalidToken();
         }
 
+        // A token bound to a device that no longer exists must die, not fall through to an
+        // admin token below (which would silently drop the device binding of a staff session).
+        if (owner.DeviceId is not null && device is null)
+        {
+            return new TokenRefreshResult.InvalidToken();
+        }
+
         // Mirrors exactly which Issue* method originally produced the access token
         // this refresh token was paired with (see RefreshTokenOwner).
         string accessToken;
@@ -32,7 +41,14 @@ public sealed class TokenRefreshService(
         }
         else if (device is not null)
         {
-            accessToken = jwtTokenService.IssueKioskAccessToken(device);
+            // Re-issue with the device's own role: OrderBoard/KitchenDisplay tokens must not
+            // turn into Kiosk tokens on refresh (they'd lose their endpoints and gain cart rights).
+            accessToken = device.DeviceType switch
+            {
+                DeviceType.OrderBoard => jwtTokenService.IssueUnattendedAccessToken(device, Role.OrderBoard),
+                DeviceType.KitchenDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.KitchenDisplay),
+                _ => jwtTokenService.IssueKioskAccessToken(device),
+            };
         }
         else if (user is not null)
         {

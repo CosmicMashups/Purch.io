@@ -167,9 +167,20 @@ public sealed class TransactionService(
         // carries a modifier selection — a "No Ice" latte and a regular one are
         // meaningfully different lines, so merging them would silently drop
         // which cups actually got which modifiers.
-        var existingLine = modifierIds.Count == 0
-            ? lines.FirstOrDefault(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId)
-            : null;
+        // The same holds in reverse: a plain add must not fold into an existing line that
+        // already carries modifiers, or it would be charged that line's modified unit price.
+        TransactionLine? existingLine = null;
+        if (modifierIds.Count == 0)
+        {
+            foreach (var candidate in lines.Where(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId))
+            {
+                if ((await transactionRepository.ListModifierSelectionsAsync(candidate.Id, cancellationToken)).Count == 0)
+                {
+                    existingLine = candidate;
+                    break;
+                }
+            }
+        }
         if (existingLine is not null)
         {
             existingLine.Quantity += request.Quantity;

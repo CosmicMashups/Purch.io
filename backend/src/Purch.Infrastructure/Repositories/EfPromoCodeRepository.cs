@@ -17,8 +17,9 @@ public sealed class EfPromoCodeRepository(PurchDbContext dbContext) : IPromoCode
 
     public Task<PromoCode?> GetByCodeAsync(Guid tenantId, string code, CancellationToken cancellationToken = default)
     {
+        var pattern = code.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
         return dbContext.PromoCodes
-            .FirstOrDefaultAsync(promoCode => promoCode.TenantId == tenantId && EF.Functions.ILike(promoCode.Code, code), cancellationToken);
+            .FirstOrDefaultAsync(promoCode => promoCode.TenantId == tenantId && EF.Functions.ILike(promoCode.Code, pattern, "\\"), cancellationToken);
     }
 
     public void Add(PromoCode promoCode)

@@ -16,14 +16,14 @@ public sealed class EfRefreshTokenRepository(PurchDbContext dbContext) : IRefres
     public async Task<IReadOnlyList<RefreshToken>> ListActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RefreshTokens
-            .Where(token => token.UserId == userId && token.RevokedAt == null && token.ExpiresAt > DateTimeOffset.UtcNow)
+            .Where(token => token.UserId == userId && token.ExpiresAt > DateTimeOffset.UtcNow)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<RefreshToken>> ListActiveByDeviceIdAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
         return await dbContext.RefreshTokens
-            .Where(token => token.DeviceId == deviceId && token.RevokedAt == null && token.ExpiresAt > DateTimeOffset.UtcNow)
+            .Where(token => token.DeviceId == deviceId && token.ExpiresAt > DateTimeOffset.UtcNow)
             .ToListAsync(cancellationToken);
     }
 
