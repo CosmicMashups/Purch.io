@@ -83,6 +83,42 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Replaying_a_spent_refresh_token_after_the_grace_window_ends_every_session_of_that_user()
+    {
+        var tenantId = Guid.NewGuid();
+        const string pairingCode = "DEVICE-REPLAY";
+        const string pin = "1234";
+        await SeedTenantDeviceAndUserAsync(tenantId, pairingCode, pin, Role.Admin);
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync("/auth/login", new LoginRequest(pairingCode, pin));
+        var stolen = (await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!;
+
+        // The legitimate client rotates it and carries on with the newer token.
+        var rotated = await (await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(stolen.RefreshToken)))
+            .Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+
+        // Time passes beyond the grace window.
+        var options = new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(postgres.ConnectionString).Options;
+        await using (var dbContext = new PurchDbContext(options, new TestCurrentTenantProvider { TenantId = tenantId }))
+        {
+            var longAgo = DateTimeOffset.UtcNow.AddMinutes(-5);
+            _ = await dbContext.RefreshTokens
+                .Where(token => token.RevokedAt != null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(token => token.RevokedAt, longAgo));
+        }
+
+        // Someone replays the old copy...
+        var replay = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(stolen.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
+
+        // ...and the newer token, which the legitimate client holds, is no longer trusted either.
+        var newer = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(rotated!.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, newer.StatusCode);
+    }
+
+    [Fact]
     public async Task A_logged_out_refresh_token_can_never_be_redeemed_not_even_within_the_rotation_grace_window()
     {
         var tenantId = Guid.NewGuid();

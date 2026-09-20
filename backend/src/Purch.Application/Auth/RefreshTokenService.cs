@@ -53,6 +53,19 @@ public sealed class RefreshTokenService(
         // Expire below), so it fails the check above and can never come back through the grace path.
         if (existing.RevokedAt is { } revokedAt && now - revokedAt > RotationGrace)
         {
+            // A token that was already exchanged for a new one, presented again after the grace
+            // window, is not a dropped response — it is a copy. Whoever holds the newer token can't
+            // be told apart from whoever replayed this one, so end all of that owner's sessions and
+            // make them sign in again.
+            if (existing.UserId is { } userId)
+            {
+                await RevokeAllForUserAsync(userId, cancellationToken);
+            }
+            else if (existing.DeviceId is { } deviceId)
+            {
+                await RevokeAllForDeviceAsync(deviceId, cancellationToken);
+            }
+
             return null;
         }
 
