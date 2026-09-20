@@ -7,6 +7,11 @@ namespace Purch.Infrastructure.Repositories;
 
 public sealed class EfAuditLogRepository(PurchDbContext dbContext) : IAuditLogRepository
 {
+    public void Add(AuditLog log)
+    {
+        _ = dbContext.AuditLogs.Add(log);
+    }
+
     public async Task<IReadOnlyList<AuditLog>> QueryAsync(Guid tenantId, AuditLogQuery query, CancellationToken cancellationToken = default)
     {
         var logs = dbContext.AuditLogs.AsNoTracking().Where(log => log.TenantId == tenantId);

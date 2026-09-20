@@ -543,6 +543,53 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, null))).StatusCode);
     }
 
+    private static async Task<List<AuditLogDto>> VoidAuditEntriesAsync(HttpClient client)
+    {
+        return (await client.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=Void", JsonOptions))!;
+    }
+
+    private static CheckoutRequest PlainCashSale(ItemDto item)
+    {
+        return new CheckoutRequest(
+            Guid.NewGuid(),
+            [new AddTransactionLineRequest(item.Id, null, 1m)],
+            false,
+            null,
+            null,
+            new RecordPaymentRequest(PaymentMethod.Cash, 500m));
+    }
+
+    [Fact]
+    public async Task Voiding_a_cart_by_hand_leaves_an_audit_entry()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var cart = (await (await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 2m))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        _ = await client.PostAsync("/transactions/cart/void", null);
+
+        Assert.Contains(await VoidAuditEntriesAsync(client), entry => entry.TargetEntityId == cart.Id && entry.TargetEntityType == "Transaction");
+    }
+
+    [Fact]
+    public async Task Checkout_discarding_a_cart_that_had_items_is_audited_but_an_empty_cart_is_not()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        // An empty cart is thrown away silently by the next checkout: nothing worth recording.
+        var emptyCart = (await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/transactions/checkout", PlainCashSale(item))).StatusCode);
+        Assert.DoesNotContain(await VoidAuditEntriesAsync(client), entry => entry.TargetEntityId == emptyCart.Id);
+
+        // A cart holding items is discarded by the next checkout: that is recorded.
+        var fullCart = (await (await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 3m))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/transactions/checkout", PlainCashSale(item))).StatusCode);
+        Assert.Contains(await VoidAuditEntriesAsync(client), entry => entry.TargetEntityId == fullCart.Id);
+    }
+
     [Fact]
     public async Task Selling_a_combo_takes_the_chosen_component_items_off_stock_not_the_combo_itself()
     {

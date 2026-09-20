@@ -34,6 +34,7 @@ public sealed class TransactionService(
     IItemDiscountPromoRuleRepository itemDiscountPromoRuleRepository,
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
+    IAuditLogRepository auditLogRepository,
     IUserRepository userRepository,
     IItemRecipeRepository itemRecipeRepository,
     IInventoryItemRepository inventoryItemRepository,
@@ -384,6 +385,15 @@ public sealed class TransactionService(
                 throw new ConflictException("Finish or void the claimed kiosk order before starting a new sale.");
             }
 
+            // Starting a sale discards whatever unpaid cart the device was holding. That is fine for an empty
+            // one, but a cart with items being thrown away by whoever happens to check out next should leave
+            // a trace: the manual void of a cart is supervisor-only and audited, and this must not be a way
+            // around it.
+            if (open.TotalAmount > 0)
+            {
+                AuditVoid(open, "Discarded when a new sale was checked out");
+            }
+
             open.Status = TransactionStatus.Voided;
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
@@ -488,10 +498,27 @@ public sealed class TransactionService(
         var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
             ?? throw new NotFoundException("Open cart", deviceId);
 
+        AuditVoid(cart, "Voided by staff");
         cart.Status = TransactionStatus.Voided;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    /// <summary>Records that a cart with content was voided and by whom, staged so it commits in the same
+    /// save as the void. Call before changing the cart's status, which the entry captures.</summary>
+    private void AuditVoid(Transaction cart, string reason)
+    {
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.Void,
+            TargetEntityType = nameof(Transaction),
+            TargetEntityId = cart.Id,
+            BeforeStateJson = JsonSerializer.Serialize(new { status = cart.Status.ToString(), total = cart.TotalAmount }),
+            AfterStateJson = JsonSerializer.Serialize(new { status = nameof(TransactionStatus.Voided), reason }),
+        });
     }
 
     public async Task<long> GetLastIssuedReceiptNumberAsync(CancellationToken cancellationToken = default)

@@ -127,6 +127,42 @@ public sealed class ShiftEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Expected_cash_counts_an_offline_sale_by_when_it_was_rung_up_not_when_it_synced()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Bottled Water", null, null, null, 15m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await client.PostAsJsonAsync("/shifts/open", new OpenShiftRequest(1000m));
+
+        CheckoutRequest OfflineSale(DateTimeOffset soldAt)
+        {
+            return new CheckoutRequest(
+                Guid.NewGuid(),
+                [new AddTransactionLineRequest(item.Id, null, 1m)],
+                false,
+                null,
+                null,
+                new RecordPaymentRequest(PaymentMethod.Cash, 100m),
+                ExpectedTotal: null,
+                ReceiptNumber: null,
+                OfflineSale: true,
+                SoldAt: soldAt);
+        }
+
+        // Rung up before this shift opened but only synced now: its cash belongs to the earlier shift.
+        _ = await client.PostAsJsonAsync("/transactions/checkout", OfflineSale(DateTimeOffset.UtcNow.AddHours(-2)));
+        // Rung up during this shift and synced during it: counted.
+        _ = await client.PostAsJsonAsync("/transactions/checkout", OfflineSale(DateTimeOffset.UtcNow));
+
+        var closeResponse = await client.PostAsJsonAsync("/shifts/close", new CloseShiftRequest(1015m, null, null));
+        var closed = await closeResponse.Content.ReadFromJsonAsync<ShiftDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+        Assert.Equal(1015m, closed!.ExpectedCashAmount);
+        Assert.Equal(0m, closed.VarianceAmount);
+    }
+
+    [Fact]
     public async Task Closing_a_shift_with_a_mismatched_count_and_no_approver_pin_is_rejected()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
