@@ -2,11 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Purch.Api.Endpoints;
 using Purch.Api.ErrorHandling;
+using Purch.Api.Health;
 using Purch.Api.Middleware;
 using Purch.Api.RateLimiting;
 using Purch.Application.Auth;
@@ -55,6 +57,14 @@ builder.Services.AddProblemDetails(options =>
 });
 
 builder.Services.AddHttpContextAccessor();
+
+// Readiness (is the database reachable?) is tagged so /health/ready runs it while /health stays a pure
+// liveness check. See DatabaseHealthCheck.
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+
+// On a deploy or scale-down the host sends SIGTERM; give in-flight requests (a checkout mid-save) time to
+// finish instead of the .NET default of 30s being an accident of the framework.
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
 builder.Services.AddSingleton<IDeploymentContext, ConfigDeploymentContext>();
 
@@ -358,9 +368,12 @@ using (var startupScope = app.Services.CreateScope())
     }
 }
 
-// Must be first: wraps every later middleware/endpoint so any thrown exception
-// (including ones from TenantResolutionMiddleware or endpoint handlers) is caught
-// and turned into a consistent ProblemDetails response, never a raw 500 with no body.
+// Correlation id and request logging come first so every later log line and the final status (including a 500
+// produced by the exception handler) are covered. The exception handler then wraps every later
+// middleware/endpoint so any thrown exception (including ones from TenantResolutionMiddleware or endpoint
+// handlers) is caught and turned into a consistent ProblemDetails response, never a raw 500 with no body.
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseExceptionHandler();
 app.UseResponseCompression();
 
@@ -413,6 +426,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") })
+    .AllowAnonymous();
 app.MapAuthEndpoints();
 app.MapOnboardingEndpoints();
 app.MapCatalogEndpoints();
