@@ -41,6 +41,11 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// The catalog and report payloads are large, repetitive JSON; on a store connection this is the cheapest
+// bandwidth win there is. The API authenticates with a bearer header, not cookies, so there is no
+// BREACH-style secret reflected into compressed bodies.
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
@@ -113,6 +118,7 @@ builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
 
 builder.Services.AddScoped<ICategoryRepository, EfCategoryRepository>();
 builder.Services.AddScoped<IItemRepository, EfItemRepository>();
+builder.Services.AddScoped<ICatalogVersionProvider, EfCatalogVersionProvider>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IModifierGroupRepository, EfModifierGroupRepository>();
@@ -356,6 +362,7 @@ using (var startupScope = app.Services.CreateScope())
 // (including ones from TenantResolutionMiddleware or endpoint handlers) is caught
 // and turned into a consistent ProblemDetails response, never a raw 500 with no body.
 app.UseExceptionHandler();
+app.UseResponseCompression();
 
 // Cloud deploys (Render, Vercel) sit behind a reverse proxy, so without this every request's
 // RemoteIpAddress is the proxy and the per-IP rate limiter below shares one bucket for everyone.

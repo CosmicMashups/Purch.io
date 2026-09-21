@@ -1,3 +1,4 @@
+using Purch.Api.Http;
 using Purch.Application.Catalog;
 using Purch.Application.Inventory;
 using Purch.Domain.Enums;
@@ -11,8 +12,15 @@ public static class CatalogEndpoints
         var catalogManager = new[] { nameof(Role.Admin), nameof(Role.Manager) };
 
         // --- Categories (B5) ---
-        _ = app.MapGet("/categories", async (ICategoryService categoryService, CancellationToken cancellationToken) =>
-            Results.Ok(await categoryService.ListAsync(cancellationToken))).RequireAuthorization();
+        _ = app.MapGet("/categories", (
+            HttpContext httpContext,
+            ICategoryService categoryService,
+            ICatalogVersionProvider catalogVersion,
+            CancellationToken cancellationToken) =>
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => catalogVersion.GetCategoriesVersionAsync(cancellationToken),
+                () => categoryService.ListAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPost("/categories", async (
             CreateCategoryRequest request,
@@ -30,8 +38,15 @@ public static class CatalogEndpoints
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
         // --- Items (B1–B2 base form; pricing-type sub-resources land with their own screens) ---
-        _ = app.MapGet("/items", async (IItemService itemService, CancellationToken cancellationToken) =>
-            Results.Ok(await itemService.ListAsync(cancellationToken))).RequireAuthorization();
+        _ = app.MapGet("/items", (
+            HttpContext httpContext,
+            IItemService itemService,
+            ICatalogVersionProvider catalogVersion,
+            CancellationToken cancellationToken) =>
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => catalogVersion.GetItemsVersionAsync(cancellationToken),
+                () => itemService.ListAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPost("/items", async (
             CreateItemRequest request,

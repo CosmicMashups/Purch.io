@@ -95,6 +95,32 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampUpdatedAt();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampUpdatedAt();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>Every inserted or changed entity gets UpdatedAt = now, which is what the catalog ETag
+    /// (and any later change feed) keys off. ChangeTracker.Entries runs change detection first.</summary>
+    private void StampUpdatedAt()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<Entity>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+            {
+                entry.Entity.UpdatedAt = now;
+            }
+        }
+    }
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         base.ConfigureConventions(configurationBuilder);
