@@ -41,6 +41,79 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<BranchRevenueTotals>> GetBranchRevenueTotalsAsync(
+        Guid? branchId,
+        DateTimeOffset todayStart,
+        DateTimeOffset last7Start,
+        DateTimeOffset last30Start,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await CompletedTransactions(branchId, last30Start, toUtc)
+            .GroupBy(transaction => transaction.BranchId)
+            .Select(group => new
+            {
+                BranchId = group.Key,
+                Today = group.Sum(t => t.CreatedAt >= todayStart ? t.TotalAmount : 0m),
+                Last7Days = group.Sum(t => t.CreatedAt >= last7Start ? t.TotalAmount : 0m),
+                Last30Days = group.Sum(t => t.TotalAmount),
+            })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new BranchRevenueTotals(r.BranchId, r.Today, r.Last7Days, r.Last30Days))];
+    }
+
+    public async Task<IReadOnlyList<DayRevenue>> GetDailyRevenueAsync(
+        Guid? branchId,
+        DateTimeOffset firstDayStart,
+        int dayCount,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await CompletedTransactions(branchId, firstDayStart, firstDayStart.AddDays(dayCount))
+            .GroupBy(transaction => (int)Math.Floor((transaction.CreatedAt - firstDayStart).TotalDays))
+            .Select(group => new { DayIndex = group.Key, Revenue = group.Sum(t => t.TotalAmount) })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new DayRevenue(r.DayIndex, r.Revenue))];
+    }
+
+    public async Task<IReadOnlyList<ItemSalesTotals>> GetTopItemsByRevenueAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await (
+                from line in dbContext.TransactionLines.AsNoTracking()
+                join transaction in CompletedTransactions(branchId, fromUtc, toUtc)
+                    on line.TransactionId equals transaction.Id
+                group line by line.ItemId into itemGroup
+                orderby itemGroup.Sum(l => l.LineTotal) descending
+                select new
+                {
+                    ItemId = itemGroup.Key,
+                    Quantity = itemGroup.Sum(l => l.Quantity),
+                    Revenue = itemGroup.Sum(l => l.LineTotal),
+                })
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId, r.Quantity, r.Revenue))];
+    }
+
+    private IQueryable<Transaction> CompletedTransactions(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc)
+    {
+        var query = dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.Status == TransactionStatus.Completed
+                && transaction.CreatedAt >= fromUtc
+                && transaction.CreatedAt < toUtc);
+
+        return branchId is { } id ? query.Where(transaction => transaction.BranchId == id) : query;
+    }
+
     public async Task<IReadOnlyList<InventoryMovement>> ListMovementsInRangeAsync(
         Guid? branchId,
         DateTimeOffset fromUtc,

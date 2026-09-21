@@ -11,6 +11,8 @@ public sealed class SalesDashboardService(
     IReportScopeResolver reportScopeResolver,
     ICurrentTenantProvider currentTenantProvider) : ISalesDashboardService
 {
+    private const int TrendDays = 14;
+
     public async Task<SalesDashboardDto> GetDashboardAsync(Guid? branchId, CancellationToken cancellationToken = default)
     {
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
@@ -19,38 +21,37 @@ public sealed class SalesDashboardService(
         var todayStart = ReportTimeZone.StartOfDay(now);
         var last7Start = todayStart.AddDays(-6);
         var last30Start = todayStart.AddDays(-29);
+        var to = now.AddTicks(1);
 
-        // The 30-day window is a superset of every other window this dashboard
-        // needs, so one fetch covers today/last7/last30/trend/top-items/branch-comparison.
-        var transactions = await reportingRepository.ListCompletedTransactionsAsync(
-            resolvedBranchId, last30Start, now.AddTicks(1), cancellationToken);
+        // Everything below is aggregated in SQL; only the small grouped results come back.
+        var branchTotals = await reportingRepository.GetBranchRevenueTotalsAsync(
+            resolvedBranchId, todayStart, last7Start, last30Start, to, cancellationToken);
 
-        var revenueToday = transactions.Where(t => t.CreatedAt >= todayStart).Sum(t => t.TotalAmount);
-        var revenueLast7 = transactions.Where(t => t.CreatedAt >= last7Start).Sum(t => t.TotalAmount);
-        var revenueLast30 = transactions.Sum(t => t.TotalAmount);
+        var revenueToday = branchTotals.Sum(t => t.Today);
+        var revenueLast7 = branchTotals.Sum(t => t.Last7Days);
+        var revenueLast30 = branchTotals.Sum(t => t.Last30Days);
 
-        var trend = Enumerable.Range(0, 14)
-            .Select(offset => todayStart.AddDays(-13 + offset))
-            .Select(day => new DailyRevenuePointDto(
-                DateOnly.FromDateTime(day.ToOffset(ReportTimeZone.Offset).DateTime),
-                transactions.Where(t => t.CreatedAt >= day && t.CreatedAt < day.AddDays(1)).Sum(t => t.TotalAmount)))
+        var trendStart = todayStart.AddDays(-(TrendDays - 1));
+        var dailyRevenue = (await reportingRepository.GetDailyRevenueAsync(
+                resolvedBranchId, trendStart, TrendDays, cancellationToken))
+            .ToDictionary(d => d.DayIndex, d => d.Revenue);
+        var trend = Enumerable.Range(0, TrendDays)
+            .Select(offset => new DailyRevenuePointDto(
+                DateOnly.FromDateTime(trendStart.AddDays(offset).ToOffset(ReportTimeZone.Offset).DateTime),
+                dailyRevenue.GetValueOrDefault(offset)))
             .ToList();
 
-        var lines = await reportingRepository.ListLinesForTransactionsAsync(
-            [.. transactions.Select(t => t.Id)], cancellationToken);
-
+        var topItems = await reportingRepository.GetTopItemsByRevenueAsync(
+            resolvedBranchId, last30Start, to, 10, cancellationToken);
         var items = await itemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
         var itemNamesById = items.ToDictionary(item => item.Id, item => item.Name);
 
-        var topSellingItems = lines
-            .GroupBy(line => line.ItemId)
-            .Select(group => new TopSellingItemDto(
-                group.Key,
-                itemNamesById.TryGetValue(group.Key, out var name) ? name : "(deleted item)",
-                group.Sum(line => line.Quantity),
-                group.Sum(line => line.LineTotal)))
-            .OrderByDescending(dto => dto.Revenue)
-            .Take(10)
+        var topSellingItems = topItems
+            .Select(top => new TopSellingItemDto(
+                top.ItemId,
+                itemNamesById.TryGetValue(top.ItemId, out var name) ? name : "(deleted item)",
+                top.Quantity,
+                top.Revenue))
             .ToList();
 
         var allBranches = await branchRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
@@ -58,11 +59,9 @@ public sealed class SalesDashboardService(
             ? allBranches.Where(branch => branch.Id == singleBranchId)
             : allBranches;
 
+        var last30ByBranch = branchTotals.ToDictionary(t => t.BranchId, t => t.Last30Days);
         var branchComparison = branches
-            .Select(branch => new BranchRevenueDto(
-                branch.Id,
-                branch.Name,
-                transactions.Where(t => t.BranchId == branch.Id).Sum(t => t.TotalAmount)))
+            .Select(branch => new BranchRevenueDto(branch.Id, branch.Name, last30ByBranch.GetValueOrDefault(branch.Id)))
             .OrderByDescending(dto => dto.Revenue)
             .ToList();
 

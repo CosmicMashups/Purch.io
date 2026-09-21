@@ -13,5 +13,9 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         _ = builder.HasIndex(item => new { item.TenantId, item.Barcode })
             .IsUnique()
             .HasFilter("\"Barcode\" IS NOT NULL");
+
+        // Catalog listings and category filters.
+        _ = builder.HasIndex(item => new { item.TenantId, item.CategoryId })
+            .HasDatabaseName("IX_Items_TenantCategory");
     }
 }

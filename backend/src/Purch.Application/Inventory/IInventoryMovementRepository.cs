@@ -10,6 +10,8 @@ public interface IInventoryMovementRepository
         Guid? itemId,
         Guid? branchId,
         MovementType? type,
+        DateTimeOffset? before = null,
+        int? limit = null,
         CancellationToken cancellationToken = default);
 
     void Add(InventoryMovement movement);

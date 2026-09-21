@@ -147,10 +147,12 @@ public static class OnboardingEndpoints
             AuditActionType? actionType,
             DateTimeOffset? from,
             DateTimeOffset? to,
+            DateTimeOffset? before,
+            int? limit,
             IAuditLogQueryService auditLogQueryService,
             CancellationToken cancellationToken) =>
         {
-            var query = new AuditLogQuery(actorUserId, actionType, from, to);
+            var query = new AuditLogQuery(actorUserId, actionType, from, to, before, limit);
             return Results.Ok(await auditLogQueryService.QueryAsync(query, cancellationToken));
         }).RequireAuthorization(policy => policy.RequireRole(admin, nameof(Role.Manager)));
 

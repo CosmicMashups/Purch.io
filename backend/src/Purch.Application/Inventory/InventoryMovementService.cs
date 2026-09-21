@@ -38,9 +38,11 @@ public sealed class InventoryMovementService(
         Guid? itemId,
         Guid? branchId,
         MovementType? type,
+        DateTimeOffset? before = null,
+        int? limit = null,
         CancellationToken cancellationToken = default)
     {
-        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, cancellationToken);
+        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, before, limit, cancellationToken);
 
         var dtos = new List<InventoryMovementDto>();
         foreach (var movement in movements.OrderByDescending(m => m.CreatedAt))

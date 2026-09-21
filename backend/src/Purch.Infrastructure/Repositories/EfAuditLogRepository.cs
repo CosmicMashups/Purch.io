@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Purch.Application.Common;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
 using Purch.Infrastructure.Persistence;
@@ -36,6 +37,14 @@ public sealed class EfAuditLogRepository(PurchDbContext dbContext) : IAuditLogRe
             logs = logs.Where(log => log.CreatedAt <= to);
         }
 
-        return await logs.OrderByDescending(log => log.CreatedAt).ToListAsync(cancellationToken);
+        if (query.Before is { } before)
+        {
+            logs = logs.Where(log => log.CreatedAt < before);
+        }
+
+        return await logs
+            .OrderByDescending(log => log.CreatedAt)
+            .Take(Paging.ClampLimit(query.Limit))
+            .ToListAsync(cancellationToken);
     }
 }

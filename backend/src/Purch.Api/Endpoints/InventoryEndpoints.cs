@@ -21,9 +21,11 @@ public static class InventoryEndpoints
             Guid? itemId,
             Guid? branchId,
             MovementType? type,
+            DateTimeOffset? before,
+            int? limit,
             IInventoryMovementService movementService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await movementService.ListAsync(itemId, branchId, type, cancellationToken)))
+            Results.Ok(await movementService.ListAsync(itemId, branchId, type, before, limit, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
         _ = app.MapPost("/inventory/movements", async (

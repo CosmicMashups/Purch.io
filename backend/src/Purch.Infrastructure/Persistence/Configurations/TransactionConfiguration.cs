@@ -33,5 +33,9 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         _ = builder.HasIndex(t => new { t.TenantId, t.ClientSaleId })
             .IsUnique()
             .HasFilter("\"ClientSaleId\" IS NOT NULL");
+
+        // Report and history queries filter completed sales by branch and date range.
+        _ = builder.HasIndex(t => new { t.TenantId, t.BranchId, t.Status, t.CreatedAt })
+            .HasDatabaseName("IX_Transactions_Reporting");
     }
 }

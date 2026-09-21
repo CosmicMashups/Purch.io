@@ -10,5 +10,8 @@ public class SyncedRecordConfiguration : IEntityTypeConfiguration<SyncedRecord>
     {
         // Idempotency: the same client-generated key must never be applied twice.
         _ = builder.HasIndex(s => new { s.TenantId, s.DeviceId, s.IdempotencyKey }).IsUnique();
+
+        _ = builder.HasIndex(s => new { s.TenantId, s.EntityType, s.EntityId })
+            .HasDatabaseName("IX_SyncedRecords_Entity");
     }
 }

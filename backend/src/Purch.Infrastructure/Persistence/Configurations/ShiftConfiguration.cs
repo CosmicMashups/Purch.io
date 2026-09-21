@@ -14,5 +14,8 @@ public class ShiftConfiguration : IEntityTypeConfiguration<Shift>
             .IsUnique()
             .HasFilter("\"Status\" = 0")
             .HasDatabaseName("IX_Shifts_OneOpenShiftPerDevice");
+
+        _ = builder.HasIndex(s => new { s.BranchId, s.ClosedAt })
+            .HasDatabaseName("IX_Shifts_BranchClosedAt");
     }
 }

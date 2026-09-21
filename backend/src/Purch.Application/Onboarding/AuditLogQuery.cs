@@ -7,4 +7,6 @@ public sealed record AuditLogQuery(
     Guid? ActorUserId,
     AuditActionType? ActionType,
     DateTimeOffset? From,
-    DateTimeOffset? To);
+    DateTimeOffset? To,
+    DateTimeOffset? Before = null,
+    int? Limit = null);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Purch.Application.Common;
 using Purch.Application.Inventory;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -13,6 +14,8 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
         Guid? itemId,
         Guid? branchId,
         MovementType? type,
+        DateTimeOffset? before = null,
+        int? limit = null,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.InventoryMovements
@@ -34,7 +37,15 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
             query = query.Where(movement => movement.Type == requiredType);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        if (before is { } cursor)
+        {
+            query = query.Where(movement => movement.CreatedAt < cursor);
+        }
+
+        return await query
+            .OrderByDescending(movement => movement.CreatedAt)
+            .Take(Paging.ClampLimit(limit))
+            .ToListAsync(cancellationToken);
     }
 
     public void Add(InventoryMovement movement)
