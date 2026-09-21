@@ -5,11 +5,13 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'daos/catalog_cache_dao.dart';
 import 'daos/device_identity_dao.dart';
 import 'daos/local_cart_draft_dao.dart';
 import 'daos/queued_sale_dao.dart';
 import 'daos/sync_queue_dao.dart';
 import 'tables/cached_branding_table.dart';
+import 'tables/cached_catalog_list_table.dart';
 import 'tables/device_identity_table.dart';
 import 'tables/local_cart_draft_table.dart';
 import 'tables/pending_sync_queue_table.dart';
@@ -28,8 +30,15 @@ part 'app_database.g.dart';
     DeviceIdentity,
     LocalCartDrafts,
     QueuedSales,
+    CachedCatalogLists,
   ],
-  daos: [SyncQueueDao, DeviceIdentityDao, LocalCartDraftDao, QueuedSaleDao],
+  daos: [
+    SyncQueueDao,
+    DeviceIdentityDao,
+    LocalCartDraftDao,
+    QueuedSaleDao,
+    CatalogCacheDao,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -37,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -68,6 +77,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // v5 → v6: sales completed offline, waiting to be sent to the server.
         await m.createTable(queuedSales);
+      }
+      if (from < 7) {
+        // v6 → v7: last-known copy of the item and category lists, for ETag revalidation and offline start.
+        await m.createTable(cachedCatalogLists);
       }
     },
   );

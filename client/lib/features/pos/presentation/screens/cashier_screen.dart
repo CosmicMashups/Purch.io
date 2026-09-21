@@ -25,6 +25,7 @@ import 'item_modifier_customization_dialog.dart';
 import 'payment_screen.dart';
 import 'tingi_weight_dialog.dart';
 import 'variant_picker_screen.dart';
+import '../../../catalog/presentation/widgets/stale_catalog_banner.dart';
 import '../widgets/offline_sales_banner.dart';
 
 /// The Cashier screen — D1's item grid and cart, merged.
@@ -374,6 +375,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   ),
           body: Column(
             children: [
+              const StaleCatalogBanner(),
               const OfflineSalesBanner(),
               Expanded(
                 child: _buildBody(showSidePanel, categorySelector, itemGrid),

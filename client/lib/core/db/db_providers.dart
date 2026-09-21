@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'app_database.dart';
+import 'daos/catalog_cache_dao.dart';
 import 'daos/device_identity_dao.dart';
 import 'daos/local_cart_draft_dao.dart';
 import 'daos/queued_sale_dao.dart';
@@ -36,4 +37,9 @@ LocalCartDraftDao localCartDraftDao(Ref ref) {
 @Riverpod(keepAlive: true)
 QueuedSaleDao queuedSaleDao(Ref ref) {
   return ref.watch(appDatabaseProvider).queuedSaleDao;
+}
+
+@Riverpod(keepAlive: true)
+CatalogCacheDao catalogCacheDao(Ref ref) {
+  return ref.watch(appDatabaseProvider).catalogCacheDao;
 }

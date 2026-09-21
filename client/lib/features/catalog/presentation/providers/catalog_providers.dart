@@ -2,6 +2,7 @@ import '../../../../core/data/data_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/catalog_repository_impl.dart';
@@ -20,7 +21,27 @@ part 'catalog_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 CatalogRepository catalogRepository(Ref ref) {
-  return CatalogRepositoryImpl(apiClient: ref.watch(apiClientProvider));
+  final identityDao = ref.watch(deviceIdentityDaoProvider);
+  return CatalogRepositoryImpl(
+    apiClient: ref.watch(apiClientProvider),
+    cache: ref.watch(catalogCacheDaoProvider),
+    tenantId: () async => (await identityDao.getIdentity())?.tenantId,
+    // Loaded from inside other providers' build(), where Riverpod forbids writing state synchronously.
+    onFreshness: (staleSince) => Future.microtask(
+      () => ref.read(catalogStaleSinceProvider.notifier).set(staleSince),
+    ),
+  );
+}
+
+/// Null while the catalog on screen is confirmed current; otherwise when the server last confirmed it
+/// (the app is showing its saved copy because the server could not be reached).
+@Riverpod(keepAlive: true)
+class CatalogStaleSince extends _$CatalogStaleSince {
+  @override
+  DateTime? build() => null;
+
+  // ignore: use_setters_to_change_properties
+  void set(DateTime? value) => state = value;
 }
 
 @riverpod

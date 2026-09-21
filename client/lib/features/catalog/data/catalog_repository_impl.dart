@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
+import '../../../core/db/daos/catalog_cache_dao.dart';
+import '../../../core/errors/failure.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
 import '../domain/bundle_promo_rule_models.dart';
@@ -12,14 +16,28 @@ import '../domain/item_variant_models.dart';
 import '../domain/modifier_models.dart';
 
 class CatalogRepositoryImpl implements CatalogRepository {
-  CatalogRepositoryImpl({required ApiClient apiClient})
-    : _apiClient = apiClient;
+  /// [cache] and [tenantId] together switch on the offline-capable item and category lists: revalidated
+  /// with the server's ETag, and served from the last good copy when the server can't be reached.
+  /// [onFreshness] is told `null` after a confirmed-current load, or the time of the last confirmation
+  /// when a stale copy had to be served.
+  CatalogRepositoryImpl({
+    required ApiClient apiClient,
+    CatalogCacheDao? cache,
+    Future<String?> Function()? tenantId,
+    void Function(DateTime? staleSince)? onFreshness,
+  }) : _apiClient = apiClient,
+       _cache = cache,
+       _tenantId = tenantId,
+       _onFreshness = onFreshness;
 
   final ApiClient _apiClient;
+  final CatalogCacheDao? _cache;
+  final Future<String?> Function()? _tenantId;
+  final void Function(DateTime? staleSince)? _onFreshness;
 
   @override
   Future<List<Category>> listCategories() {
-    return _getList('/categories', Category.fromJson);
+    return _getCachedList('categories', '/categories', Category.fromJson);
   }
 
   @override
@@ -41,7 +59,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Item>> listItems() {
-    return _getList('/items', Item.fromJson);
+    return _getCachedList('items', '/items', Item.fromJson);
   }
 
   @override
@@ -235,6 +253,78 @@ class CatalogRepositoryImpl implements CatalogRepository {
       return fromJson(response.data!);
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  Future<List<T>> _getCachedList<T>(
+    String kind,
+    String path,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    final cache = _cache;
+    final tenant = cache == null ? null : await _tenantId?.call();
+    if (cache == null || tenant == null) {
+      return _getList(path, fromJson);
+    }
+
+    final cached = await cache.read(tenant, kind);
+    // A copy the current app version can no longer parse is as good as none.
+    final cachedItems = cached == null ? null : _decode(cached.payloadJson, fromJson);
+
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        path,
+        options: Options(
+          headers: {
+            if (cachedItems != null && cached?.etag != null)
+              'If-None-Match': cached!.etag,
+          },
+          validateStatus: (status) =>
+              status != null && ((status >= 200 && status < 300) || status == 304),
+        ),
+      );
+      final now = DateTime.now();
+
+      if (response.statusCode == 304 && cachedItems != null) {
+        await cache.markValidated(tenant, kind, now);
+        _onFreshness?.call(null);
+        return cachedItems;
+      }
+
+      final body = response.data!;
+      final items = body.cast<Map<String, dynamic>>().map(fromJson).toList();
+      await cache.save(
+        tenantId: tenant,
+        kind: kind,
+        etag: response.headers.value('etag'),
+        payloadJson: jsonEncode(body),
+        validatedAt: now,
+      );
+      _onFreshness?.call(null);
+      return items;
+    } on DioException catch (exception) {
+      final failure = mapDioExceptionToFailure(exception);
+      final unreachable =
+          failure is NetworkFailure || failure is ServiceUnavailableFailure;
+      if (unreachable && cachedItems != null) {
+        _onFreshness?.call(cached!.validatedAt);
+        return cachedItems;
+      }
+      throw failure;
+    }
+  }
+
+  static List<T>? _decode<T>(
+    String payloadJson,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
+    try {
+      return (jsonDecode(payloadJson) as List<dynamic>)
+          .cast<Map<String, dynamic>>()
+          .map(fromJson)
+          .toList();
+    } on Object {
+      return null;
     }
   }
 
