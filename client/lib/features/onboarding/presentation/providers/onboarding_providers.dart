@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/db/app_database.dart';
+import '../../../../core/data/paging.dart';
 import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -320,8 +321,34 @@ bool isDineInTakeOutVertical(Ref ref) {
 @riverpod
 class AuditLogList extends _$AuditLogList {
   @override
-  Future<List<AuditLogEntry>> build() {
-    return ref.watch(onboardingRepositoryProvider).listAuditLogs();
+  Future<List<AuditLogEntry>> build() async {
+    final page = await ref
+        .watch(onboardingRepositoryProvider)
+        .listAuditLogs(limit: kLogPageSize);
+    _hasMore = page.length >= kLogPageSize;
+    return page;
+  }
+
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
+  /// True while an older page may exist beyond what is loaded.
+  bool get hasMore => _hasMore;
+
+  /// Appends the next-older page. No-op while a load is running or when exhausted.
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (!_hasMore || _loadingMore || current == null || current.isEmpty) return;
+    _loadingMore = true;
+    try {
+      final page = await ref
+          .read(onboardingRepositoryProvider)
+          .listAuditLogs(before: current.last.createdAt, limit: kLogPageSize);
+      _hasMore = page.length >= kLogPageSize;
+      state = AsyncData([...current, ...page]);
+    } finally {
+      _loadingMore = false;
+    }
   }
 
   Future<void> refresh() async {

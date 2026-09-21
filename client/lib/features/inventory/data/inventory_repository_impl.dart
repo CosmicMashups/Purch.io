@@ -29,6 +29,8 @@ class InventoryRepositoryImpl implements InventoryRepository {
     String? itemId,
     String? branchId,
     MovementType? type,
+    DateTime? before,
+    int? limit,
   }) async {
     try {
       final response = await _apiClient.dio.get<List<dynamic>>(
@@ -37,6 +39,8 @@ class InventoryRepositoryImpl implements InventoryRepository {
           if (itemId != null) 'itemId': itemId,
           if (branchId != null) 'branchId': branchId,
           if (type != null) 'type': type.index,
+          if (before != null) 'before': before.toUtc().toIso8601String(),
+          if (limit != null) 'limit': limit,
         },
       );
       return response.data!

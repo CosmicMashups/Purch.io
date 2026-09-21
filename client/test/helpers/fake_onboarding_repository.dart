@@ -318,7 +318,16 @@ class FakeOnboardingRepository implements OnboardingRepository {
   }
 
   @override
-  Future<List<AuditLogEntry>> listAuditLogs() async => auditLogs;
+  Future<List<AuditLogEntry>> listAuditLogs({
+    DateTime? before,
+    int? limit,
+  }) async {
+    final page = auditLogs
+        .where((e) => before == null || e.createdAt.isBefore(before))
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return limit == null ? page : page.take(limit).toList();
+  }
 
   @override
   Future<List<Department>> listDepartments(String branchId) async =>

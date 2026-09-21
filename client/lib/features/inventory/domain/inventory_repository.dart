@@ -9,6 +9,8 @@ abstract class InventoryRepository {
     String? itemId,
     String? branchId,
     MovementType? type,
+    DateTime? before,
+    int? limit,
   });
 
   Future<InventoryMovement> recordMovement(RecordMovementRequest request);

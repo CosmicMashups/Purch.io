@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../../../core/widgets/load_more_footer.dart';
 import '../../domain/audit_log_models.dart';
 import '../providers/onboarding_providers.dart';
 
@@ -44,15 +45,21 @@ class AuditLogScreen extends ConsumerWidget {
             );
           }
 
+          final notifier = ref.read(auditLogListProvider.notifier);
+          final showFooter = notifier.hasMore;
+
           return RefreshIndicator(
             color: AppColors.brandPrimary,
             onRefresh: () => ref.read(auditLogListProvider.notifier).refresh(),
             child: ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: logs.length,
+              itemCount: logs.length + (showFooter ? 1 : 0),
               separatorBuilder: (context, index) =>
                   const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
+                if (index == logs.length) {
+                  return LoadMoreFooter(onLoadMore: notifier.loadMore);
+                }
                 final entry = logs[index];
                 return Container(
                   decoration: BoxDecoration(

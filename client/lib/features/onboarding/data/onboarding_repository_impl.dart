@@ -139,8 +139,22 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
-  Future<List<AuditLogEntry>> listAuditLogs() {
-    return _getList('/audit-logs', AuditLogEntry.fromJson);
+  Future<List<AuditLogEntry>> listAuditLogs({DateTime? before, int? limit}) async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/audit-logs',
+        queryParameters: {
+          if (before != null) 'before': before.toUtc().toIso8601String(),
+          if (limit != null) 'limit': limit,
+        },
+      );
+      return response.data!
+          .cast<Map<String, dynamic>>()
+          .map(AuditLogEntry.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
   }
 
   @override

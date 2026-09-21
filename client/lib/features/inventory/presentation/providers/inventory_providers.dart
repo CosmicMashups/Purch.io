@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/data/data_refresh.dart';
+import '../../../../core/data/paging.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -62,10 +63,45 @@ class MovementLog extends _$MovementLog {
     String? itemId,
     String? branchId,
     MovementType? type,
-  }) {
-    return ref
+  }) async {
+    final page = await ref
         .watch(inventoryRepositoryProvider)
-        .listMovements(itemId: itemId, branchId: branchId, type: type);
+        .listMovements(
+          itemId: itemId,
+          branchId: branchId,
+          type: type,
+          limit: kLogPageSize,
+        );
+    _hasMore = page.length >= kLogPageSize;
+    return page;
+  }
+
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
+  /// True while an older page may exist beyond what is loaded.
+  bool get hasMore => _hasMore;
+
+  /// Appends the next-older page. No-op while a load is running or when exhausted.
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (!_hasMore || _loadingMore || current == null || current.isEmpty) return;
+    _loadingMore = true;
+    try {
+      final page = await ref
+          .read(inventoryRepositoryProvider)
+          .listMovements(
+            itemId: itemId,
+            branchId: branchId,
+            type: type,
+            before: current.last.createdAt,
+            limit: kLogPageSize,
+          );
+      _hasMore = page.length >= kLogPageSize;
+      state = AsyncData([...current, ...page]);
+    } finally {
+      _loadingMore = false;
+    }
   }
 
   Future<void> refresh() async {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../../../core/widgets/load_more_footer.dart';
 import '../../domain/inventory_movement_models.dart';
 import '../providers/inventory_providers.dart';
 import 'record_movement_screen.dart';
@@ -117,11 +118,19 @@ class _MovementLogScreenState extends ConsumerState<MovementLogScreen> {
                   );
                 }
 
+                final notifier = ref.read(
+                  movementLogProvider(type: _typeFilter).notifier,
+                );
+                final showFooter = notifier.hasMore;
+
                 return ListView.separated(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  itemCount: movements.length,
+                  itemCount: movements.length + (showFooter ? 1 : 0),
                   separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (context, index) {
+                    if (index == movements.length) {
+                      return LoadMoreFooter(onLoadMore: notifier.loadMore);
+                    }
                     final movement = movements[index];
                     final isIncrease =
                         movement.type == MovementType.stockIn ||
