@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/hardware/hardware_providers.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../providers/pos_providers.dart';
@@ -156,7 +157,7 @@ class ReceiptScreen extends ConsumerWidget {
                                                 ),
                                               ),
                                               Text(
-                                                '₱${line.lineTotal.toStringAsFixed(2)}',
+                                                formatCurrency(line.lineTotal),
                                                 style: GoogleFonts.jetBrainsMono(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w600,
@@ -203,7 +204,7 @@ class ReceiptScreen extends ConsumerWidget {
                                                   for (final mod in line.modifierSelections)
                                                     Text(
                                                       mod.priceDelta > 0
-                                                          ? '  + ${mod.modifierName} (+₱${mod.priceDelta.toStringAsFixed(2)})'
+                                                          ? '  + ${mod.modifierName} (+${formatCurrency(mod.priceDelta)})'
                                                           : '  + ${mod.modifierName}',
                                                       style: GoogleFonts.plusJakartaSans(
                                                         fontSize: 12,
@@ -250,7 +251,7 @@ class ReceiptScreen extends ConsumerWidget {
                                           ),
                                         ),
                                         Text(
-                                          '-₱${cart.itemPromoDiscountAmount.toStringAsFixed(2)}',
+                                          '-${formatCurrency(cart.itemPromoDiscountAmount)}',
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
@@ -281,7 +282,7 @@ class ReceiptScreen extends ConsumerWidget {
                                           ),
                                         ),
                                         Text(
-                                          '-₱${cart.discountAmount.toStringAsFixed(2)}',
+                                          '-${formatCurrency(cart.discountAmount)}',
                                           style: GoogleFonts.jetBrainsMono(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
@@ -307,7 +308,7 @@ class ReceiptScreen extends ConsumerWidget {
                                         ),
                                       ),
                                       Text(
-                                        '₱${cart.totalAmount.toStringAsFixed(2)}',
+                                        formatCurrency(cart.totalAmount),
                                         style: GoogleFonts.jetBrainsMono(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w800,
@@ -335,7 +336,7 @@ class ReceiptScreen extends ConsumerWidget {
                                               ),
                                             ),
                                             Text(
-                                              '₱${payment.changeGiven!.toStringAsFixed(2)}',
+                                              formatCurrency(payment.changeGiven!),
                                               style: GoogleFonts.jetBrainsMono(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w700,

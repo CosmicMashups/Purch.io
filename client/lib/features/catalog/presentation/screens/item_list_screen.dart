@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../../../core/widgets/status_badge.dart';
@@ -150,8 +151,8 @@ class ItemListScreen extends ConsumerWidget {
                         const SizedBox(height: 2),
                         Text(
                           isWeightVolume
-                              ? '₱${item.basePrice.toStringAsFixed(2)} · ${item.stockOnHand} in stock'
-                              : '₱${item.basePrice.toStringAsFixed(2)}${item.sku != null && item.sku!.isNotEmpty ? ' · SKU: ${item.sku}' : ''}',
+                              ? '${formatCurrency(item.basePrice)} · ${item.stockOnHand} in stock'
+                              : '${formatCurrency(item.basePrice)}${item.sku != null && item.sku!.isNotEmpty ? ' · SKU: ${item.sku}' : ''}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -389,7 +390,7 @@ Future<void> _scanAndLookUp(BuildContext context, WidgetRef ref) async {
     SnackBar(
       content: Text(
         match != null
-            ? 'Found: ${match.name} (₱${match.basePrice.toStringAsFixed(2)})'
+            ? 'Found: ${match.name} (${formatCurrency(match.basePrice)})'
             : 'No item found with barcode "$scanned".',
       ),
     ),

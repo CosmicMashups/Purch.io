@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../domain/bir_reading_models.dart';
 import '../providers/bir_reading_providers.dart';
 
@@ -215,43 +216,43 @@ class _ReadingReport extends StatelessWidget {
             ),
             _Row('Transaction count', '${reading.transactionCount}'),
             const Divider(height: 24),
-            _Row('Gross sales', '₱${reading.grossSales.toStringAsFixed(2)}'),
+            _Row('Gross sales', formatCurrency(reading.grossSales)),
             _Row(
               'VATable sales',
-              '₱${reading.vatableSales.toStringAsFixed(2)}',
+              formatCurrency(reading.vatableSales),
             ),
-            _Row('VAT (12%)', '₱${reading.vatAmount.toStringAsFixed(2)}'),
+            _Row('VAT (12%)', formatCurrency(reading.vatAmount)),
             _Row(
               'Senior/PWD discounts',
-              '₱${reading.seniorPwdDiscountTotal.toStringAsFixed(2)}',
+              formatCurrency(reading.seniorPwdDiscountTotal),
             ),
             _Row(
               'Promo discounts',
-              '₱${reading.promoDiscountTotal.toStringAsFixed(2)}',
+              formatCurrency(reading.promoDiscountTotal),
             ),
             _Row(
               'Total discounts',
-              '₱${reading.totalDiscounts.toStringAsFixed(2)}',
+              formatCurrency(reading.totalDiscounts),
             ),
             _Row(
               'Net sales',
-              '₱${reading.netSales.toStringAsFixed(2)}',
+              formatCurrency(reading.netSales),
               emphasize: true,
             ),
             const Divider(height: 24),
             _Row('Voided count', '${reading.voidedCount}'),
             _Row(
               'Voided amount',
-              '₱${reading.voidedAmount.toStringAsFixed(2)}',
+              formatCurrency(reading.voidedAmount),
             ),
             const Divider(height: 24),
             _Row(
               'Old grand accumulated sales',
-              '₱${reading.oldGrandAccumulatedSales.toStringAsFixed(2)}',
+              formatCurrency(reading.oldGrandAccumulatedSales),
             ),
             _Row(
               'New grand accumulated sales',
-              '₱${reading.newGrandAccumulatedSales.toStringAsFixed(2)}',
+              formatCurrency(reading.newGrandAccumulatedSales),
             ),
             _Row('Reset counter', '${reading.resetCounter}'),
             if (reading.lateReceiptNumbers.isNotEmpty)

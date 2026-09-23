@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../domain/shift_models.dart';
 import '../providers/shift_providers.dart';
 import '../../../../core/errors/failure.dart';
@@ -321,7 +322,7 @@ class _OpenShiftDetailState extends ConsumerState<_OpenShiftDetail> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Opening cash: ₱${widget.shift.openingCashAmount.toStringAsFixed(2)}',
+                'Opening cash: ${formatCurrency(widget.shift.openingCashAmount)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -461,8 +462,8 @@ class _ClosedShiftSummary extends ConsumerWidget {
         variance == 0
             ? 'Matched exactly'
             : variance > 0
-            ? 'Over by ₱${variance.toStringAsFixed(2)}'
-            : 'Short by ₱${(-variance).toStringAsFixed(2)}';
+            ? 'Over by ${formatCurrency(variance)}'
+            : 'Short by ${formatCurrency(-variance)}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -489,7 +490,7 @@ class _ClosedShiftSummary extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Opening cash: ₱${shift.openingCashAmount.toStringAsFixed(2)}',
+                'Opening cash: ${formatCurrency(shift.openingCashAmount)}',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
@@ -497,7 +498,7 @@ class _ClosedShiftSummary extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Expected cash: ₱${(shift.expectedCashAmount ?? 0).toStringAsFixed(2)}',
+                'Expected cash: ${formatCurrency(shift.expectedCashAmount ?? 0)}',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
@@ -505,7 +506,7 @@ class _ClosedShiftSummary extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Actual cash: ₱${(shift.closingCashAmount ?? 0).toStringAsFixed(2)}',
+                'Actual cash: ${formatCurrency(shift.closingCashAmount ?? 0)}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

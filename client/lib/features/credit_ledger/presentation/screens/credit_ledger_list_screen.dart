@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/credit_ledger_models.dart';
@@ -81,8 +82,8 @@ class CreditLedgerListScreen extends ConsumerWidget {
                       ),
                     ),
                     subtitle: Text(
-                      'Balance: ₱${ledger.balance.toStringAsFixed(2)} / '
-                      '₱${ledger.creditLimit.toStringAsFixed(2)} limit'
+                      'Balance: ${formatCurrency(ledger.balance)} / '
+                      '${formatCurrency(ledger.creditLimit)} limit'
                       '${ledger.dueDate != null ? ' — due ${ledger.dueDate!.month}/${ledger.dueDate!.day}/${ledger.dueDate!.year}' : ''}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: ledger.balance > 0 ? AppColors.accentWarm : AppColors.textSecondary,
@@ -160,7 +161,7 @@ class CreditLedgerListScreen extends ConsumerWidget {
                   return 'Enter a valid amount';
                 }
                 if (parsed > ledger.balance) {
-                  return 'Can\'t exceed the ₱${ledger.balance.toStringAsFixed(2)} balance';
+                  return 'Can\'t exceed the ${formatCurrency(ledger.balance)} balance';
                 }
                 return null;
               },

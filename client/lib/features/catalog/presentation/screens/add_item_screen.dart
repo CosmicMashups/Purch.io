@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/image_upload_field.dart';
 import '../../domain/bundle_promo_rule_models.dart';
 import '../../domain/category_models.dart';
@@ -207,7 +208,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
             double.tryParse(_bundlePriceController.text.trim());
         if (triggerQty != null && triggerQty > 0 && bundlePrice != null) {
           final desc = _bundleDescController.text.trim().isEmpty
-              ? 'Buy $triggerQty for ₱${bundlePrice.toStringAsFixed(2)}'
+              ? 'Buy $triggerQty for ${formatCurrency(bundlePrice)}'
               : _bundleDescController.text.trim();
           await repository.createBundleRule(
             createdItem.id,

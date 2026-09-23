@@ -39,7 +39,8 @@ void main() {
 
     expect(repository.lastOpenShiftRequest?.openingCashAmount, 1000);
     expect(find.text('Shift open'), findsOneWidget);
-    expect(find.text('Opening cash: ₱1000.00'), findsOneWidget);
+    // formatCurrency adds the thousands separator now used everywhere else in the app.
+    expect(find.text('Opening cash: ₱1,000.00'), findsOneWidget);
   });
 
   testWidgets('closing a shift with a matching count needs no PIN', (

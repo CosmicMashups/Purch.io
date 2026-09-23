@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/hardware/hardware_providers.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../credit_ledger/presentation/providers/credit_ledger_providers.dart';
@@ -311,7 +312,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    '₱${widget.total.toStringAsFixed(2)}',
+                                    formatCurrency(widget.total),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -419,7 +420,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 ),
               ),
               Text(
-                'Total: ₱${widget.total.toStringAsFixed(2)}',
+                'Total: ${formatCurrency(widget.total)}',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -499,7 +500,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     ),
                   ),
                   Text(
-                    '₱${widget.total.toStringAsFixed(2)}',
+                    formatCurrency(widget.total),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -581,7 +582,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         children: [
                           Text(
                             _change != null
-                                ? 'Change: ₱${_change!.toStringAsFixed(2)}'
+                                ? 'Change: ${formatCurrency(_change!)}'
                                 : 'Enter an amount of at least the total.',
                             style: TextStyle(
                               fontSize: 14,
@@ -603,7 +604,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     ),
                     if (_change != null)
                       Text(
-                        '₱${_change!.toStringAsFixed(2)}',
+                        formatCurrency(_change!),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -637,13 +638,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           children: [
             _DenominationChip(
               label: 'Exact',
-              amount: '₱${widget.total.toStringAsFixed(2)}',
+              amount: formatCurrency(widget.total),
               isPrimary: true,
               onTap: _setExact,
             ),
             _DenominationChip(
               label: 'Round Up',
-              amount: '₱${(((widget.total / 100).ceil()) * 100).toStringAsFixed(2)}',
+              amount: formatCurrency(((widget.total / 100).ceil()) * 100),
               isPrimaryContainer: true,
               onTap: _roundUp,
             ),
@@ -1144,7 +1145,7 @@ class _CreditLedgerPicker extends ConsumerWidget {
               DropdownMenuItem(
                 value: ledger.id,
                 child: Text(
-                  '${ledger.customerFullName} (₱${ledger.availableCredit.toStringAsFixed(2)} available)',
+                  '${ledger.customerFullName} (${formatCurrency(ledger.availableCredit)} available)',
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

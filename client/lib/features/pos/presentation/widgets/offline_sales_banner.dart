@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../data/sale_queue.dart';
 import '../../domain/offline_limits.dart';
 import '../providers/pos_providers.dart';
@@ -182,7 +183,7 @@ class _SaleTile extends ConsumerWidget {
         color: rejected ? AppColors.error : AppColors.textSecondary,
       ),
       title: Text(
-        'Receipt No. ${entry.receiptNumber} · ₱${entry.totalAmount.toStringAsFixed(2)}',
+        'Receipt No. ${entry.receiptNumber} · ${formatCurrency(entry.totalAmount)}',
         style: const TextStyle(fontWeight: FontWeight.w700),
       ),
       subtitle: Text(

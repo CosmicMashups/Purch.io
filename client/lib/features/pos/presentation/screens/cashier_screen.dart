@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/routing/auth_gate.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
@@ -741,7 +742,7 @@ class _CartSummaryBar extends StatelessWidget {
                     style: AppTypography.bodySm,
                   ),
                   Text(
-                    '₱${cart.totalAmount.toStringAsFixed(2)}',
+                    formatCurrency(cart.totalAmount),
                     style: AppTypography.priceLine.copyWith(fontSize: 18),
                   ),
                 ],
@@ -1086,7 +1087,7 @@ class _ItemTile extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
-                          '₱${item.basePrice.toStringAsFixed(2)}',
+                          formatCurrency(item.basePrice),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -1772,7 +1773,7 @@ class _CartLineTile extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '₱${line.unitPrice.toStringAsFixed(2)} each',
+                      '${formatCurrency(line.unitPrice)} each',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -1839,7 +1840,7 @@ class _CartLineTile extends ConsumerWidget {
                                 ),
                                 child: Text(
                                   mod.priceDelta > 0
-                                      ? '+ ${mod.modifierName} (₱${mod.priceDelta.toStringAsFixed(2)})'
+                                      ? '+ ${mod.modifierName} (${formatCurrency(mod.priceDelta)})'
                                       : '+ ${mod.modifierName}',
                                   style: const TextStyle(
                                     fontSize: 10,
@@ -1888,7 +1889,7 @@ class _CartLineTile extends ConsumerWidget {
                 ),
               ),
               Text(
-                '₱${line.lineTotal.toStringAsFixed(2)}',
+                formatCurrency(line.lineTotal),
                 style: AppTypography.priceLine.copyWith(
                   fontWeight: FontWeight.w800,
                   fontSize: 15,
@@ -2011,9 +2012,7 @@ class _TotalsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          amount < 0
-              ? '₱-${(-amount).toStringAsFixed(2)}'
-              : '₱${amount.toStringAsFixed(2)}',
+          formatCurrency(amount),
           style: amountStyle,
         ),
       ],
@@ -2021,7 +2020,7 @@ class _TotalsRow extends StatelessWidget {
   }
 }
 
-String _peso(double amount) => '\u20b1${amount.toStringAsFixed(2)}';
+String _peso(double amount) => formatCurrency(amount);
 
 /// The line under the Senior/PWD switch. Senior/PWD and promotions never
 /// combine, so it puts both amounts side by side for the cashier to let the

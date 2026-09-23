@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../formatting/money.dart';
 import '../../theming/app_tokens.dart';
 
 /// One chart visual language for the whole app.
@@ -60,22 +61,9 @@ abstract class ChartTheme {
 
   /// Peso amounts on axes are abbreviated so dense tablet charts stay legible
   /// (₱12.4k, not ₱12,432.00 — the exact figure lives in the tooltip).
-  static String compactPeso(double value) {
-    final sign = value < 0 ? '-' : '';
-    final abs = value.abs();
-    if (abs >= 1000000) {
-      return '$sign₱${(abs / 1000000).toStringAsFixed(abs >= 10000000 ? 0 : 1)}M';
-    }
-    if (abs >= 1000) {
-      return '$sign₱${(abs / 1000).toStringAsFixed(abs >= 10000 ? 0 : 1)}k';
-    }
-    return '$sign₱${abs.toStringAsFixed(0)}';
-  }
+  static String compactPeso(double value) => formatCurrencyCompact(value);
 
-  static String peso(double value) {
-    final sign = value < 0 ? '-' : '';
-    return '$sign₱${value.abs().toStringAsFixed(2)}';
-  }
+  static String peso(double value) => formatCurrency(value);
 
   static String compactCount(double value) {
     final abs = value.abs();

@@ -455,7 +455,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.cart.seniorPwdDiscountApplied, isTrue);
-      expect(find.text('₱-6.00'), findsOneWidget);
+      // formatCurrency puts the sign before the symbol ('-₱6.00'), matching the receipt and every
+      // other discount display in the app — the old '₱-6.00' ordering here was a one-off inconsistency.
+      expect(find.text('-₱6.00'), findsOneWidget);
       expect(find.text('₱24.00'), findsOneWidget);
     });
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../providers/credit_ledger_providers.dart';
@@ -109,7 +110,7 @@ class CreditRemindersScreen extends ConsumerWidget {
                     ),
                   ),
                   trailing: Text(
-                    '₱${reminder.balance.toStringAsFixed(2)}',
+                    formatCurrency(reminder.balance),
                     style: TextStyle(
                       fontFeatures: const [FontFeature.tabularFigures()],
                       fontWeight: FontWeight.w700,
