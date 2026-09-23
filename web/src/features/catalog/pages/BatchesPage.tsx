@@ -6,13 +6,15 @@ import { batchSchema } from '../schemas';
 import { useItemBatches, useReceiveBatch } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 
 type FormValues = z.infer<typeof batchSchema>;
 
 export function BatchesPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const { data: batches, isLoading } = useItemBatches(itemId!);
+  const { data: batches, isLoading, isError, error, refetch } = useItemBatches(itemId!);
   const receiveBatch = useReceiveBatch(itemId!);
   const {
     register,
@@ -53,9 +55,10 @@ export function BatchesPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (batches ?? []).length === 0 && <EmptyState title="No batches received yet" />}
-      {(batches ?? []).length > 0 && (
+      {isLoading && <SkeletonRows rows={3} />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (batches ?? []).length === 0 && <EmptyState title="No batches received yet" />}
+      {!isError && (batches ?? []).length > 0 && (
         <table className="min-w-full divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white text-sm">
           <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
             <tr>

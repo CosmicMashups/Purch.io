@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { useCreateVariant, useVariants } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 import { useState } from 'react';
 import { ApiError } from '../../../lib/apiError';
@@ -17,7 +19,7 @@ interface FormValues {
 
 export function VariantsPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const { data: variants, isLoading } = useVariants(itemId!);
+  const { data: variants, isLoading, isError, error: queryError, refetch } = useVariants(itemId!);
   const createVariant = useCreateVariant(itemId!);
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, reset } = useForm<FormValues>({
@@ -75,9 +77,10 @@ export function VariantsPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (variants ?? []).length === 0 && <EmptyState title="No variants yet" />}
-      {(variants ?? []).length > 0 && (
+      {isLoading && <SkeletonRows rows={3} />}
+      {isError && <ErrorState message={describeQueryError(queryError)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (variants ?? []).length === 0 && <EmptyState title="No variants yet" />}
+      {!isError && (variants ?? []).length > 0 && (
         <table className="min-w-full divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white text-sm">
           <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
             <tr>

@@ -1,13 +1,15 @@
 import { useParams } from 'react-router-dom';
 import { useAttachModifierGroup, useItemModifierGroups, useModifierGroups } from '../queries';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 import { Field, inputClass } from '../../../components/Field';
 import { useState } from 'react';
 
 export function ItemModifierGroupsPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const { data: attached, isLoading } = useItemModifierGroups(itemId!);
+  const { data: attached, isLoading, isError, error, refetch } = useItemModifierGroups(itemId!);
   const { data: allGroups } = useModifierGroups();
   const attachModifierGroup = useAttachModifierGroup(itemId!);
   const [selectedGroupId, setSelectedGroupId] = useState('');
@@ -46,9 +48,10 @@ export function ItemModifierGroupsPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (attached ?? []).length === 0 && <EmptyState title="No modifier groups attached" />}
-      {(attached ?? []).length > 0 && (
+      {isLoading && <SkeletonRows rows={3} />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (attached ?? []).length === 0 && <EmptyState title="No modifier groups attached" />}
+      {!isError && (attached ?? []).length > 0 && (
         <ul className="flex flex-col gap-2">
           {attached!.map((g) => (
             <li key={g.id} className="rounded-lg border border-gray-200 bg-white px-4 py-3">

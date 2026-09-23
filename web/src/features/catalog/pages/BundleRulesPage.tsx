@@ -6,13 +6,15 @@ import { bundleRuleSchema } from '../schemas';
 import { useBundleRules, useCreateBundleRule } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 
 type FormValues = z.infer<typeof bundleRuleSchema>;
 
 export function BundleRulesPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const { data: rules, isLoading } = useBundleRules(itemId!);
+  const { data: rules, isLoading, isError, error, refetch } = useBundleRules(itemId!);
   const createBundleRule = useCreateBundleRule(itemId!);
   const {
     register,
@@ -49,9 +51,10 @@ export function BundleRulesPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (rules ?? []).length === 0 && <EmptyState title="No bundle rules yet" />}
-      {(rules ?? []).length > 0 && (
+      {isLoading && <SkeletonRows rows={3} />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (rules ?? []).length === 0 && <EmptyState title="No bundle rules yet" />}
+      {!isError && (rules ?? []).length > 0 && (
         <table className="min-w-full divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white text-sm">
           <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
             <tr>

@@ -5,13 +5,15 @@ import { modifierGroupSchema, modifierSchema } from '../schemas';
 import { useAddModifier, useCreateModifierGroup, useModifierGroups } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonList } from '../../../components/Skeleton';
 import { useState } from 'react';
 
 type GroupFormValues = z.infer<typeof modifierGroupSchema>;
 type ModifierFormValues = z.infer<typeof modifierSchema>;
 
 export function ModifierGroupsPage() {
-  const { data: groups, isLoading } = useModifierGroups();
+  const { data: groups, isLoading, isError, error, refetch } = useModifierGroups();
   const createModifierGroup = useCreateModifierGroup();
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
 
@@ -55,10 +57,11 @@ export function ModifierGroupsPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (groups ?? []).length === 0 && <EmptyState title="No modifier groups yet" />}
+      {isLoading && <SkeletonList />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (groups ?? []).length === 0 && <EmptyState title="No modifier groups yet" />}
       <ul className="flex flex-col gap-3">
-        {(groups ?? []).map((g) => (
+        {!isError && (groups ?? []).map((g) => (
           <li key={g.id} className="rounded-lg border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between">
               <div>

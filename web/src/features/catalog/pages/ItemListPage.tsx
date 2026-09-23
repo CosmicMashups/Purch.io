@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { useCategories, useItems } from '../queries';
 import { SearchBar } from '../../../components/SearchBar';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { PricingType } from '../types';
 import { pricingTypeLabels } from '../labels';
 
 export function ItemListPage() {
-  const { data: items, isLoading } = useItems();
+  const { data: items, isLoading, isError, error, refetch } = useItems();
   const { data: categories } = useCategories();
   const [search, setSearch] = useState('');
 
@@ -41,16 +43,18 @@ export function ItemListPage() {
         </Link>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
+      {isLoading && <SkeletonRows columns={5} />}
 
-      {!isLoading && filteredItems.length === 0 && (
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+
+      {!isLoading && !isError && filteredItems.length === 0 && (
         <EmptyState
           title="No items found"
           description={search ? 'Try a different search.' : 'Add your first item to get started.'}
         />
       )}
 
-      {filteredItems.length > 0 && (
+      {!isError && filteredItems.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">

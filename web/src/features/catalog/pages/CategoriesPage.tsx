@@ -5,13 +5,15 @@ import { categorySchema } from '../schemas';
 import { useCategories, useCreateCategory, useUpdateCategory } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonList } from '../../../components/Skeleton';
 import { useState } from 'react';
 import type { Category } from '../types';
 
 type FormValues = z.infer<typeof categorySchema>;
 
 export function CategoriesPage() {
-  const { data: categories, isLoading } = useCategories();
+  const { data: categories, isLoading, isError, error, refetch } = useCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const [editing, setEditing] = useState<Category | null>(null);
@@ -81,9 +83,10 @@ export function CategoriesPage() {
         </div>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (categories ?? []).length === 0 && <EmptyState title="No categories yet" />}
-      {(categories ?? []).length > 0 && (
+      {isLoading && <SkeletonList />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (categories ?? []).length === 0 && <EmptyState title="No categories yet" />}
+      {!isError && (categories ?? []).length > 0 && (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
           {[...categories!].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => (
             <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">

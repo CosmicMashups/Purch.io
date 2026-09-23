@@ -6,13 +6,15 @@ import { comboComponentSchema } from '../schemas';
 import { useCategories, useComboComponents, useCreateComboComponent } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState, describeQueryError } from '../../../components/ErrorState';
+import { SkeletonRows } from '../../../components/Skeleton';
 import { ItemSubPageHeader } from './ItemSubPageHeader';
 
 type FormValues = z.infer<typeof comboComponentSchema>;
 
 export function ComboComponentsPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const { data: components, isLoading } = useComboComponents(itemId!);
+  const { data: components, isLoading, isError, error, refetch } = useComboComponents(itemId!);
   const { data: categories } = useCategories();
   const createComboComponent = useCreateComboComponent(itemId!);
   const {
@@ -62,9 +64,10 @@ export function ComboComponentsPage() {
         </button>
       </form>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {!isLoading && (components ?? []).length === 0 && <EmptyState title="No combo components yet" />}
-      {(components ?? []).length > 0 && (
+      {isLoading && <SkeletonRows rows={3} />}
+      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {!isLoading && !isError && (components ?? []).length === 0 && <EmptyState title="No combo components yet" />}
+      {!isError && (components ?? []).length > 0 && (
         <table className="min-w-full divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white text-sm">
           <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
             <tr>
