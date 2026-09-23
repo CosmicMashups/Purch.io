@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Purch.Application.Auth;
 using Purch.Application.Common;
 using Purch.Domain.Entities;
@@ -55,6 +56,12 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
             _ = services.RemoveAll<IFileStorage>();
             _ = services.AddSingleton<IFileStorage>(
                 new LocalFileStorage(Path.Combine(Path.GetTempPath(), "purch-test-uploads", Guid.NewGuid().ToString("N"))));
+
+            // Every test class shares one Postgres container (see PostgresContainerFixture), so a real
+            // background sweep here would race other tests' rows — including RetentionSweeperTests'
+            // own deliberately-old rows — with no ordering guarantee. Retention logic is covered directly
+            // against RetentionSweeper instead; nothing here needs it actually running.
+            _ = services.RemoveAll<IHostedService>();
         });
     }
 }

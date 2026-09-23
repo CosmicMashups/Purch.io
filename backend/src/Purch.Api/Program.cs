@@ -29,6 +29,7 @@ using Purch.Infrastructure.Auth;
 using Purch.Infrastructure.Deployment;
 using Purch.Infrastructure.Persistence;
 using Purch.Infrastructure.Repositories;
+using Purch.Infrastructure.Retention;
 using Purch.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +66,12 @@ builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tag
 // On a deploy or scale-down the host sends SIGTERM; give in-flight requests (a checkout mid-save) time to
 // finish instead of the .NET default of 30s being an accident of the framework.
 builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
+
+// Periodically purges stale refresh/password-reset tokens and synced-record idempotency rows; audit log and
+// inventory movement purging stays off unless a retention period is explicitly configured — see RetentionOptions.
+builder.Services.Configure<RetentionOptions>(builder.Configuration.GetSection(RetentionOptions.SectionName));
+builder.Services.AddScoped<RetentionSweeper>();
+builder.Services.AddHostedService<RetentionHostedService>();
 
 builder.Services.AddSingleton<IDeploymentContext, ConfigDeploymentContext>();
 
@@ -166,6 +173,7 @@ builder.Services.AddScoped<IReportScopeResolver, ReportScopeResolver>();
 builder.Services.AddScoped<IBranchScopeGuard, BranchScopeGuard>();
 builder.Services.AddScoped<ISalesDashboardService, SalesDashboardService>();
 builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
+builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
 builder.Services.AddScoped<IStaffPerformanceService, StaffPerformanceService>();
 builder.Services.AddScoped<IDepartmentSalesReportService, DepartmentSalesReportService>();
 builder.Services.AddScoped<ICustomerCreditLedgerRepository, EfCustomerCreditLedgerRepository>();
