@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -98,7 +99,7 @@ class ComboComponentsScreen extends ConsumerWidget {
                     ),
                     subtitle: Text(
                       'From ${component.componentCategoryName} · qty ${component.quantity}'
-                      '${component.substitutionUpchargeAmount != null ? ' · +₱${component.substitutionUpchargeAmount!.toStringAsFixed(2)} to substitute' : ''}',
+                      '${component.substitutionUpchargeAmount != null ? ' · +${formatCurrency(component.substitutionUpchargeAmount!)} to substitute' : ''}',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,

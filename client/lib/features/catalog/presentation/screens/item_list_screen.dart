@@ -6,6 +6,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
@@ -57,9 +58,7 @@ class ItemListScreen extends ConsumerWidget {
         ],
       ),
       body: itemsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.brandPrimary),
-        ),
+        loading: () => const ItemListSkeleton(),
         error: (error, stackTrace) => ErrorStateView(
           message: 'Could not load items: ${describeError(error)}',
           onRetry: () => ref.read(itemListProvider.notifier).refresh(),

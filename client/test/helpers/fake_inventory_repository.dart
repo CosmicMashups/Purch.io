@@ -39,16 +39,25 @@ class FakeInventoryRepository implements InventoryRepository {
     String? branchId,
     MovementType? type,
     DateTime? before,
+    String? beforeId,
     int? limit,
   }) async {
     final page = movements.where((movement) {
       if (itemId != null && movement.itemId != itemId) return false;
       if (branchId != null && movement.branchId != branchId) return false;
       if (type != null && movement.type != type) return false;
-      if (before != null && !movement.createdAt.isBefore(before)) return false;
+      if (before != null) {
+        if (movement.createdAt.isAfter(before)) return false;
+        if (movement.createdAt.isAtSameMomentAs(before) && beforeId != null) {
+          if (movement.id.compareTo(beforeId) >= 0) return false;
+        }
+      }
       return true;
     }).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      ..sort((a, b) {
+        final c = b.createdAt.compareTo(a.createdAt);
+        return c != 0 ? c : b.id.compareTo(a.id);
+      });
     return limit == null ? page : page.take(limit).toList();
   }
 

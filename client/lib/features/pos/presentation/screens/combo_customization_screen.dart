@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_combo_component_models.dart';
 import '../../../catalog/domain/item_models.dart';
@@ -180,7 +181,7 @@ class _ComboCustomizationScreenState
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '₱${widget.item.basePrice.toStringAsFixed(2)}',
+                  formatCurrency(widget.item.basePrice),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -302,7 +303,7 @@ class _ComboCustomizationScreenState
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          '₱${total.toStringAsFixed(2)}',
+                          formatCurrency(total),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -662,7 +663,7 @@ class _OptionCard extends StatelessWidget {
                 ),
                 child: Text(
                   upcharge != null && upcharge! > 0
-                      ? '+₱${upcharge!.toStringAsFixed(2)}'
+                      ? '+${formatCurrency(upcharge!)}'
                       : 'INCLUDED',
                   style: TextStyle(
                     fontSize: 10,

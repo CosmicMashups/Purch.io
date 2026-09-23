@@ -650,22 +650,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
             _DenominationChip(
               label: 'Bill',
-              amount: '₱1,000.00',
+              amount: formatCurrency(1000),
               onTap: () => _setDenomination(1000),
             ),
             _DenominationChip(
               label: 'Bill',
-              amount: '₱500.00',
+              amount: formatCurrency(500),
               onTap: () => _setDenomination(500),
             ),
             _DenominationChip(
               label: 'Bill',
-              amount: '₱200.00',
+              amount: formatCurrency(200),
               onTap: () => _setDenomination(200),
             ),
             _DenominationChip(
               label: 'Add',
-              amount: '+₱20.00',
+              amount: '+${formatCurrency(20)}',
               onTap: () => _addQuick(20),
             ),
           ],

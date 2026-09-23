@@ -5,6 +5,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../../../core/widgets/purch_image.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../catalog/domain/category_models.dart';
 import '../../../catalog/domain/pricing_type.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -15,6 +16,7 @@ import '../../../pos/presentation/screens/variant_picker_screen.dart';
 import '../providers/kiosk_providers.dart';
 import 'kiosk_cart_screen.dart';
 import '../../../../core/errors/failure.dart';
+import '../../../../core/formatting/money.dart';
 
 /// Bridges E2 (category carousel) to E3 (item customize) — reuses the exact
 /// same VariantPickerScreen/ComboCustomizationScreen D2/D3 logic the cashier
@@ -74,9 +76,7 @@ class KioskItemListScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: itemsAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.brandPrimary),
-          ),
+          loading: () => const CatalogGridSkeleton(),
           error: (error, stackTrace) => ErrorStateView(
             message: 'Could not load menu items: ${describeError(error)}',
             onRetry: () => ref.read(itemListProvider.notifier).refresh(),
@@ -325,7 +325,7 @@ class KioskItemListScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '₱',
+                            formatCurrency(item.basePrice),
                             style: AppTypography.priceBadge.copyWith(
                               fontSize: 18,
                             ),

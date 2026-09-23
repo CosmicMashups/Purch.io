@@ -1,15 +1,25 @@
+import 'dart:io' as io;
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../config/app_config.dart';
 import '../theming/app_tokens.dart';
+
+bool get _isFlutterTest {
+  if (kIsWeb) return false;
+  return io.Platform.environment.containsKey('FLUTTER_TEST');
+}
 
 /// Renders an image from either:
 /// 1. Local bundled Flutter assets (`assets/...`)
 /// 2. Dynamic tenant backend uploads (`/uploads/...`)
 /// 3. Remote external URLs (`http://`, `https://`)
 ///
-/// Provides graceful fallback handling, shimmering placeholders,
-/// and rounded corner clipping.
+/// Uses [CachedNetworkImage] for persistent disk and memory caching in
+/// production, falling back to [Image.network] under flutter test or when
+/// cache is explicitly disabled to avoid native path_provider channel hangs.
 class PurchImage extends StatelessWidget {
   const PurchImage({
     super.key,
@@ -21,6 +31,7 @@ class PurchImage extends StatelessWidget {
     this.fallbackAsset,
     this.semanticLabel,
     this.errorWidget,
+    this.enableCache,
   });
 
   final String? imageUrlOrPath;
@@ -31,6 +42,7 @@ class PurchImage extends StatelessWidget {
   final String? fallbackAsset;
   final String? semanticLabel;
   final Widget? errorWidget;
+  final bool? enableCache;
 
   /// Resolves relative paths like `/uploads/...` to full URLs using [AppConfig.apiBaseUrl].
   static String resolveUrl(String pathOrUrl) {
@@ -68,31 +80,57 @@ class PurchImage extends StatelessWidget {
       );
     } else {
       final fullUrl = resolveUrl(effectiveSource);
-      imageContent = Image.network(
-        fullUrl,
-        width: width,
-        height: height,
-        fit: fit,
-        semanticLabel: semanticLabel,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return _defaultLoading();
-        },
-        errorBuilder: (context, error, stackTrace) {
-          if (fallbackAsset != null && fallbackAsset!.isNotEmpty) {
-            return Image.asset(
-              fallbackAsset!,
-              width: width,
-              height: height,
-              fit: fit,
-              semanticLabel: semanticLabel,
-              errorBuilder: (_, __, ___) =>
-                  errorWidget ?? _defaultPlaceholder(),
-            );
-          }
-          return errorWidget ?? _defaultPlaceholder();
-        },
-      );
+      final useCache = enableCache ?? !_isFlutterTest;
+
+      if (useCache) {
+        imageContent = CachedNetworkImage(
+          imageUrl: fullUrl,
+          width: width,
+          height: height,
+          fit: fit,
+          placeholder: (context, url) => _defaultLoading(),
+          errorWidget: (context, url, error) {
+            if (fallbackAsset != null && fallbackAsset!.isNotEmpty) {
+              return Image.asset(
+                fallbackAsset!,
+                width: width,
+                height: height,
+                fit: fit,
+                semanticLabel: semanticLabel,
+                errorBuilder: (_, __, ___) =>
+                    errorWidget ?? _defaultPlaceholder(),
+              );
+            }
+            return errorWidget ?? _defaultPlaceholder();
+          },
+        );
+      } else {
+        imageContent = Image.network(
+          fullUrl,
+          width: width,
+          height: height,
+          fit: fit,
+          semanticLabel: semanticLabel,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _defaultLoading();
+          },
+          errorBuilder: (context, error, stackTrace) {
+            if (fallbackAsset != null && fallbackAsset!.isNotEmpty) {
+              return Image.asset(
+                fallbackAsset!,
+                width: width,
+                height: height,
+                fit: fit,
+                semanticLabel: semanticLabel,
+                errorBuilder: (_, __, ___) =>
+                    errorWidget ?? _defaultPlaceholder(),
+              );
+            }
+            return errorWidget ?? _defaultPlaceholder();
+          },
+        );
+      }
     }
 
     if (borderRadius != null) {

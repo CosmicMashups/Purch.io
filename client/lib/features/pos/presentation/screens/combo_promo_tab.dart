@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -93,7 +94,7 @@ class ComboPromoTab extends ConsumerWidget {
                     ),
                     subtitle: Text(
                       '${nameFor(rule.itemAId)} + ${nameFor(rule.itemBId)} = '
-                      '₱${rule.comboPrice.toStringAsFixed(2)}',
+                      '${formatCurrency(rule.comboPrice)}',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     trailing: PromoStatusBadge(

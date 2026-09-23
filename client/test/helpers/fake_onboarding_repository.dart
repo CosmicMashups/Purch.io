@@ -320,12 +320,23 @@ class FakeOnboardingRepository implements OnboardingRepository {
   @override
   Future<List<AuditLogEntry>> listAuditLogs({
     DateTime? before,
+    String? beforeId,
     int? limit,
   }) async {
     final page = auditLogs
-        .where((e) => before == null || e.createdAt.isBefore(before))
+        .where((e) {
+          if (before == null) return true;
+          if (e.createdAt.isBefore(before)) return true;
+          if (e.createdAt.isAtSameMomentAs(before) && beforeId != null) {
+            return e.id.compareTo(beforeId) < 0;
+          }
+          return false;
+        })
         .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      ..sort((a, b) {
+        final c = b.createdAt.compareTo(a.createdAt);
+        return c != 0 ? c : b.id.compareTo(a.id);
+      });
     return limit == null ? page : page.take(limit).toList();
   }
 

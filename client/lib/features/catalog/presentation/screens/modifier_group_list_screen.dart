@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../providers/catalog_providers.dart';
 import 'add_modifier_group_screen.dart';
@@ -151,7 +152,9 @@ class ModifierGroupListScreen extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(AppRadius.full),
                             ),
                             child: Text(
-                              '+₱${modifier.priceDelta.toStringAsFixed(2)}',
+                              modifier.priceDelta > 0
+                                  ? '+${formatCurrency(modifier.priceDelta)}'
+                                  : formatCurrency(modifier.priceDelta),
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,

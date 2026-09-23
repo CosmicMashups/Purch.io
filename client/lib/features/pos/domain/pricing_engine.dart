@@ -1,3 +1,4 @@
+import '../../../core/formatting/money.dart';
 import 'item_promo_models.dart';
 import 'promo_code_models.dart';
 
@@ -215,7 +216,7 @@ class PricingEngine {
               ? totalDiscount * (pairs * unitPriceA) / normalTotal
               : totalDiscount / 2;
       final discountB = totalDiscount - discountA;
-      final comboLabel = 'COMBO ₱${rule.comboPrice.toStringAsFixed(2)}';
+      final comboLabel = 'COMBO ${formatCurrency(rule.comboPrice)}';
       _claimAcrossLines(
         aLines,
         pairs,
@@ -265,7 +266,7 @@ class PricingEngine {
         label[line.lineId] = switch (rule.discountType) {
           PromoDiscountType.percentage => '${_trimNumber(rule.discountValue)}% OFF',
           PromoDiscountType.fixedAmount =>
-            '₱${rule.discountValue.toStringAsFixed(2)} OFF',
+            '${formatCurrency(rule.discountValue)} OFF',
           PromoDiscountType.fixedPrice => 'SALE PRICE',
         };
       }

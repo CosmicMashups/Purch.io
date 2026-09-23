@@ -65,6 +65,9 @@ dependencies:
   # Windows desktop tablets, which image_picker doesn't support.
   file_picker: ^8.1.6
 
+  # Safe disk-backed image caching for catalog & kiosk item images
+  cached_network_image: ^3.4.1
+
   # Charts (Home dashboard: sales trend, movement summary, low-stock,
   # staff/cashier performance, shift attendance, department/category sales)
   fl_chart: ^0.69.0

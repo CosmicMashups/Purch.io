@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/errors/failure.dart';
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/domain/item_variant_models.dart';
@@ -376,7 +377,7 @@ class _ItemModifierCustomizationDialogState
                                 ),
                               ),
                               Text(
-                                '₱${totalPrice.toStringAsFixed(2)}',
+                                formatCurrency(totalPrice),
                                 style: GoogleFonts.jetBrainsMono(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
@@ -411,7 +412,7 @@ class _ItemModifierCustomizationDialogState
                                 )
                               : Text(
                                   canAdd
-                                      ? 'Add to Cart — ₱${totalPrice.toStringAsFixed(2)}'
+                                      ? 'Add to Cart — ${formatCurrency(totalPrice)}'
                                       : 'Select Required Options',
                                   style: const TextStyle(
                                     fontSize: 15,
@@ -438,9 +439,9 @@ class _ItemModifierCustomizationDialogState
     required VoidCallback onTap,
   }) {
     final priceText = option.priceDelta > 0
-        ? ' (+₱${option.priceDelta.toStringAsFixed(2)})'
+        ? ' (+${formatCurrency(option.priceDelta)})'
         : (option.priceDelta < 0
-            ? ' (-₱${(-option.priceDelta).toStringAsFixed(2)})'
+            ? ' (-${formatCurrencyAbs(option.priceDelta)})'
             : '');
 
     return InkWell(

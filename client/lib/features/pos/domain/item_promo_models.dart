@@ -4,6 +4,7 @@
 /// cashier types in) in promo_code_models.dart.
 library;
 
+import '../../../core/formatting/money.dart';
 import 'promo_code_models.dart';
 
 /// Mirrors Purch.Application.Promotions.BogoPromoRuleDto.
@@ -263,9 +264,9 @@ class ItemDiscountPromoRule {
       case PromoDiscountType.percentage:
         return '${discountValue.toStringAsFixed(0)}% off';
       case PromoDiscountType.fixedAmount:
-        return '₱${discountValue.toStringAsFixed(2)} off';
+        return '${formatCurrency(discountValue)} off';
       case PromoDiscountType.fixedPrice:
-        return 'Fixed ₱${discountValue.toStringAsFixed(2)}';
+        return 'Fixed ${formatCurrency(discountValue)}';
     }
   }
 }

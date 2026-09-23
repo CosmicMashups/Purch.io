@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -161,7 +162,7 @@ class ItemModifierGroupsScreen extends ConsumerWidget {
                               child: Text(
                                 modifier.priceDelta == 0
                                     ? 'Free'
-                                    : '+₱${modifier.priceDelta.toStringAsFixed(2)}',
+                                    : '+${formatCurrency(modifier.priceDelta)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,

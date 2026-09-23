@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -162,7 +163,7 @@ class _ItemPickerSheetState extends State<_ItemPickerSheet> {
                             return ListTile(
                               title: Text(item.name),
                               trailing: Text(
-                                '₱${item.basePrice.toStringAsFixed(2)}',
+                                formatCurrency(item.basePrice),
                               ),
                               onTap: () => Navigator.of(context).pop(item),
                             );

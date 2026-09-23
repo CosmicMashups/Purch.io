@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/presentation/providers/catalog_providers.dart';
@@ -118,7 +119,7 @@ class VariantPickerScreen extends ConsumerWidget {
                           )
                           : null,
                   trailing: Text(
-                    '₱${price.toStringAsFixed(2)}',
+                    formatCurrency(price),
                     style: AppTypography.priceBadge,
                   ),
                   onTap: () async {

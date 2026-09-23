@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -100,7 +101,7 @@ class VariantsScreen extends ConsumerWidget {
                         if (variant.sku != null) 'SKU: ${variant.sku}',
                         '${variant.stockOnHand} in stock',
                         if (variant.priceOverride != null)
-                          '₱${variant.priceOverride!.toStringAsFixed(2)}',
+                          formatCurrency(variant.priceOverride!),
                       ].join(' · '),
                       style: const TextStyle(
                         fontSize: 13,

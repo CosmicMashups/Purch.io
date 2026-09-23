@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -99,7 +100,7 @@ class BundleRulesScreen extends ConsumerWidget {
                       ),
                     ),
                     subtitle: Text(
-                      'Buy ${rule.triggerQuantity} for ₱${rule.bundlePrice.toStringAsFixed(2)}'
+                      'Buy ${rule.triggerQuantity} for ${formatCurrency(rule.bundlePrice)}'
                       '${rule.isActive ? '' : ' · inactive'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textSecondary,

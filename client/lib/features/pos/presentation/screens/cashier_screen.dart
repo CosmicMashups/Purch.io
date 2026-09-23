@@ -9,6 +9,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
 import '../../../../core/widgets/purch_image.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/hardware/hardware_providers.dart';
 import '../../../catalog/domain/item_models.dart';
 import '../../../catalog/domain/pricing_type.dart';
@@ -796,10 +797,7 @@ class ItemGridPanel extends ConsumerWidget {
     final itemsAsync = ref.watch(itemListProvider);
 
     return itemsAsync.when(
-      loading:
-          () => const Center(
-            child: CircularProgressIndicator(color: AppColors.brandPrimary),
-          ),
+      loading: () => const CatalogGridSkeleton(),
       error:
           (error, stackTrace) => ErrorStateView(
             message: 'Could not load items: ${describeError(error)}',

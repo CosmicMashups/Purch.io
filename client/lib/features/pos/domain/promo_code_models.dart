@@ -1,3 +1,5 @@
+import '../../../core/formatting/money.dart';
+
 /// Mirrors Purch.Domain.Enums.PromoDiscountType exactly, in declared order.
 /// fixedPrice was appended for the automatic item-discount promo rules (see
 /// item_promo_models.dart) — index-based serialization, so it must stay last.
@@ -41,7 +43,7 @@ class PromoCode {
   String get discountLabel =>
       discountType == PromoDiscountType.percentage
           ? '${discountValue.toStringAsFixed(0)}% off'
-          : '₱${discountValue.toStringAsFixed(2)} off';
+          : '${formatCurrency(discountValue)} off';
 }
 
 /// Mirrors Purch.Application.Promotions.CreatePromoCodeRequest.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/hardware/hardware_providers.dart';
 import '../../../../core/hardware/scale/scale_driver.dart';
 import '../../../../core/theming/app_tokens.dart';
@@ -110,7 +111,7 @@ class _TingiWeightDialogState extends ConsumerState<TingiWeightDialog> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '₱${widget.item.basePrice.toStringAsFixed(2)} / kg',
+                          '${formatCurrency(widget.item.basePrice)} / kg',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -394,7 +395,7 @@ class _TingiWeightDialogState extends ConsumerState<TingiWeightDialog> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '₱${lineTotal.toStringAsFixed(2)}',
+                      formatCurrency(lineTotal),
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,

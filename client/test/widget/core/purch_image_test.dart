@@ -55,4 +55,23 @@ void main() {
     expect(find.byType(PurchImage), findsOneWidget);
     expect(find.byType(Image), findsOneWidget);
   });
+
+  testWidgets('PurchImage renders network image safely without hanging under test mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PurchImage(
+            imageUrlOrPath: 'https://example.com/item.png',
+            width: 100,
+            height: 100,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(PurchImage), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+  });
 }

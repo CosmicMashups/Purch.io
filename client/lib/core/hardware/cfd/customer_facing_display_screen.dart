@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'cfd_models.dart';
 import '../hardware_providers.dart';
+import '../../formatting/money.dart';
 import '../../theming/app_tokens.dart';
 
 /// Full-screen Customer Facing Display UI designed for secondary HDMI monitors,
@@ -258,7 +259,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                       Expanded(
                         flex: 3,
                         child: Text(
-                          '₱${line.lineTotal.toStringAsFixed(2)}',
+                          formatCurrency(line.lineTotal),
                           textAlign: TextAlign.right,
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 18,
@@ -302,7 +303,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                '₱${state.subtotal.toStringAsFixed(2)}',
+                formatCurrency(state.subtotal),
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -325,7 +326,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '-₱${state.discountAmount.toStringAsFixed(2)}',
+                  '-${formatCurrency(state.discountAmount)}',
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -348,7 +349,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                '₱${state.vatableSales.toStringAsFixed(2)}',
+                formatCurrency(state.vatableSales),
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 14,
                   color: const Color(0xFF94A3B8),
@@ -368,7 +369,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                '₱${state.vatAmount.toStringAsFixed(2)}',
+                formatCurrency(state.vatAmount),
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 14,
                   color: const Color(0xFF94A3B8),
@@ -400,7 +401,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '₱${state.totalAmount.toStringAsFixed(2)}',
+                  formatCurrency(state.totalAmount),
                   style: GoogleFonts.jetBrainsMono(
                     fontSize: 42,
                     fontWeight: FontWeight.w800,
@@ -470,7 +471,7 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '₱${state.changeGiven!.toStringAsFixed(2)}',
+                    formatCurrency(state.changeGiven!),
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,

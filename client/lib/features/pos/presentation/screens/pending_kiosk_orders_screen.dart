@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -130,7 +131,7 @@ class _PendingOrderCardState extends ConsumerState<_PendingOrderCard> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '₱${order.totalAmount.toStringAsFixed(2)}',
+                  formatCurrency(order.totalAmount),
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
               ],

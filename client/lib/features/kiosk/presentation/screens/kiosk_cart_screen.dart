@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
@@ -83,7 +84,7 @@ class KioskCartScreen extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${line.quantity.toStringAsFixed(0)} × ₱${line.unitPrice.toStringAsFixed(2)}',
+                              '${line.quantity.toStringAsFixed(0)} × ${formatCurrency(line.unitPrice)}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
@@ -150,7 +151,7 @@ class KioskCartScreen extends ConsumerWidget {
                                         ),
                                         child: Text(
                                           mod.priceDelta > 0
-                                              ? '+ ${mod.modifierName} (₱${mod.priceDelta.toStringAsFixed(2)})'
+                                              ? '+ ${mod.modifierName} (${formatCurrency(mod.priceDelta)})'
                                               : '+ ${mod.modifierName}',
                                           style: const TextStyle(
                                             fontSize: 10,
@@ -201,7 +202,7 @@ class KioskCartScreen extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '₱${line.lineTotal.toStringAsFixed(2)}',
+                              formatCurrency(line.lineTotal),
                               style: AppTypography.priceLine.copyWith(
                                 fontSize: 17,
                               ),
@@ -260,7 +261,7 @@ class _TotalBar extends StatelessWidget {
                 children: [
                   const Text('Total', style: TextStyle(fontSize: 18)),
                   Text(
-                    '₱${cart.totalAmount.toStringAsFixed(2)}',
+                    formatCurrency(cart.totalAmount),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

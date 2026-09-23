@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/theming/theme_builder.dart';
 import '../../../../core/widgets/image_upload_field.dart';
@@ -870,7 +871,7 @@ class _TypographyPreviewCard extends StatelessWidget {
                 Expanded(
                   child: Text('1× Iced Spanish Latte (16oz)', style: bodyStyle),
                 ),
-                Text('₱165.00', style: priceStyle),
+                Text(formatCurrency(165.00), style: priceStyle),
               ],
             ),
           ),

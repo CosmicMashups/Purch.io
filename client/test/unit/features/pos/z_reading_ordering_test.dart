@@ -115,6 +115,7 @@ void main() {
       saleQueue: queue,
       isConnected: () async => true,
       drainQueue: () => coordinator.drain(),
+      clock: () => DateTime(2026, 9, 20, 10, 0),
     );
 
     const cash = RecordPaymentRequest(
