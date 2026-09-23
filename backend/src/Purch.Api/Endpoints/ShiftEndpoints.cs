@@ -41,6 +41,14 @@ public static class ShiftEndpoints
             .RequireAuthorization(policy => policy.RequireRole(posOperator))
             .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
+        _ = app.MapPost("/shifts/manual-drawer-open", async (
+            ManualDrawerOpenRequest request,
+            IShiftService shiftService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await shiftService.RecordManualDrawerOpenAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator))
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
+
         return app;
     }
 }

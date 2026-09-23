@@ -43,6 +43,8 @@ public sealed class TransactionService(
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ITransactionService
 {
+    private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
+
     private static readonly HashSet<PaymentMethod> SupportedPaymentMethods =
     [
         PaymentMethod.Cash,
@@ -526,6 +528,44 @@ public sealed class TransactionService(
         });
     }
 
+    public async Task<TransactionDto> RefundTransactionAsync(Guid transactionId, RefundTransactionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            throw new ValidationException(nameof(request.Reason), "Refund reason is required.");
+        }
+
+        var transaction = await transactionRepository.GetByIdAsync(transactionId, cancellationToken)
+            ?? throw new NotFoundException("Transaction", transactionId);
+
+        if (transaction.TenantId != CurrentTenantId)
+        {
+            throw new NotFoundException("Transaction", transactionId);
+        }
+
+        if (transaction.Status != TransactionStatus.Completed)
+        {
+            throw new ValidationException(nameof(transaction.Status), "Only completed transactions can be refunded.");
+        }
+
+        var beforeState = new { status = transaction.Status.ToString(), total = transaction.TotalAmount };
+        transaction.Status = TransactionStatus.Refunded;
+
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.Refund,
+            TargetEntityType = nameof(Transaction),
+            TargetEntityId = transaction.Id,
+            BeforeStateJson = JsonSerializer.Serialize(beforeState),
+            AfterStateJson = JsonSerializer.Serialize(new { status = nameof(TransactionStatus.Refunded), reason = request.Reason, total = transaction.TotalAmount }),
+        });
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(transaction, cancellationToken);
+    }
+
     public async Task<long> GetLastIssuedReceiptNumberAsync(CancellationToken cancellationToken = default)
     {
         var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, CurrentBranchId, CurrentDeviceId, cancellationToken);
@@ -568,7 +608,7 @@ public sealed class TransactionService(
 
         if (request.Method == PaymentMethod.UtangCredit)
         {
-            await ChargeToCreditLedgerAsync(cart, request.CustomerCreditLedgerId, cancellationToken);
+            await ChargeToCreditLedgerAsync(cart, request, cancellationToken);
         }
 
         paymentRepository.Add(new Payment
@@ -803,9 +843,9 @@ public sealed class TransactionService(
     /// CreditTransaction recorded in the same SaveChangesAsync as the payment
     /// and transaction-completion below, so a rollback can't charge a customer
     /// without actually completing the sale (or vice versa).</summary>
-    private async Task ChargeToCreditLedgerAsync(Transaction cart, Guid? customerCreditLedgerId, CancellationToken cancellationToken)
+    private async Task ChargeToCreditLedgerAsync(Transaction cart, RecordPaymentRequest request, CancellationToken cancellationToken)
     {
-        if (customerCreditLedgerId is not { } ledgerId)
+        if (request.CustomerCreditLedgerId is not { } ledgerId)
         {
             throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "A customer credit account is required for Utang/Credit payments.");
         }
@@ -824,7 +864,27 @@ public sealed class TransactionService(
 
         if (ledger.Balance + cart.TotalAmount > ledger.CreditLimit)
         {
-            throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.");
+            if (!request.AllowCreditLimitOverride)
+            {
+                throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.");
+            }
+
+            var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+            if (caller is null || !ApproverRoles.Contains(caller.Role))
+            {
+                throw new ForbiddenException("Only a manager or admin can override a customer's credit limit.");
+            }
+
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.CreditLimitOverride,
+                TargetEntityType = nameof(CustomerCreditLedger),
+                TargetEntityId = ledger.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { creditLimit = ledger.CreditLimit, balance = ledger.Balance }),
+                AfterStateJson = JsonSerializer.Serialize(new { newBalance = ledger.Balance + cart.TotalAmount, saleId = cart.Id, reason = request.CreditLimitOverrideReason ?? "Manager approved credit limit override at checkout" }),
+            });
         }
 
         ledger.Balance += cart.TotalAmount;
@@ -848,6 +908,20 @@ public sealed class TransactionService(
         var deviceId = CurrentDeviceId;
         var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
             ?? throw new NotFoundException("Open cart", deviceId);
+
+        if (cart.SeniorPwdDiscountApplied != request.Apply)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.DiscountOverride,
+                TargetEntityType = nameof(Transaction),
+                TargetEntityId = cart.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { seniorPwdDiscountApplied = cart.SeniorPwdDiscountApplied, total = cart.TotalAmount }),
+                AfterStateJson = JsonSerializer.Serialize(new { seniorPwdDiscountApplied = request.Apply }),
+            });
+        }
 
         cart.SeniorPwdDiscountApplied = request.Apply;
         await RecalculateTotalAsync(cart, cancellationToken);

@@ -1,14 +1,18 @@
+using System.Text.Json;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 
 namespace Purch.Application.CreditLedger;
 
 public sealed class CustomerCreditLedgerService(
     ICustomerCreditLedgerRepository creditLedgerRepository,
     ITenantRepository tenantRepository,
+    IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
+    ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : ICustomerCreditLedgerService
 {
     public async Task<CustomerCreditLedgerDto> CreateAsync(CreateCustomerCreditLedgerRequest request, CancellationToken cancellationToken = default)
@@ -138,6 +142,76 @@ public sealed class CustomerCreditLedgerService(
             ledger.IsActive);
     }
 
+    public async Task<CustomerCreditLedgerDto> UpdateCreditLimitAsync(Guid ledgerId, UpdateCreditLimitRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.CreditLimit < 0)
+        {
+            throw new ValidationException(nameof(request.CreditLimit), "Credit limit can't be negative.");
+        }
+
+        var ledger = await creditLedgerRepository.GetByIdAsync(ledgerId, cancellationToken);
+        if (ledger is null || ledger.TenantId != CurrentTenantId)
+        {
+            throw new NotFoundException("Customer credit account", ledgerId);
+        }
+
+        if (ledger.CreditLimit != request.CreditLimit)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.CreditLimitOverride,
+                TargetEntityType = nameof(CustomerCreditLedger),
+                TargetEntityId = ledger.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { creditLimit = ledger.CreditLimit }),
+                AfterStateJson = JsonSerializer.Serialize(new { creditLimit = request.CreditLimit, reason = request.Reason }),
+            });
+        }
+
+        ledger.CreditLimit = request.CreditLimit;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(ledger);
+    }
+
+    public async Task<CustomerCreditLedgerDto> AnonymizeCustomerAsync(Guid ledgerId, CancellationToken cancellationToken = default)
+    {
+        var ledger = await creditLedgerRepository.GetByIdAsync(ledgerId, cancellationToken);
+        if (ledger is null || ledger.TenantId != CurrentTenantId)
+        {
+            throw new NotFoundException("Customer credit account", ledgerId);
+        }
+
+        if (ledger.Balance != 0)
+        {
+            throw new ValidationException(nameof(ledger.Balance), "Cannot anonymize customer with an outstanding balance. Balance must be zero before erasure.");
+        }
+
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.CustomerAnonymized,
+            TargetEntityType = nameof(CustomerCreditLedger),
+            TargetEntityId = ledger.Id,
+            BeforeStateJson = JsonSerializer.Serialize(new { name = ledger.CustomerFullName, phone = ledger.CustomerPhoneNumber, address = ledger.CustomerAddress }),
+            AfterStateJson = JsonSerializer.Serialize(new { name = "[ANONYMIZED]", phone = "00000000000", address = (string?)null, isActive = false }),
+        });
+
+        ledger.CustomerFullName = "[ANONYMIZED]";
+        ledger.CustomerPhoneNumber = "00000000000";
+        ledger.CustomerAddress = null;
+        ledger.IsActive = false;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(ledger);
+    }
+
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("The credit ledger requires an authenticated tenant context.");
+
+    private Guid CurrentUserId => currentActorProvider.UserId
+        ?? throw new InvalidOperationException("The credit ledger requires an authenticated user.");
 }

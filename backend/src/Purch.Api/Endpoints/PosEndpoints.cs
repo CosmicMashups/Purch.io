@@ -47,6 +47,14 @@ public static class PosEndpoints
             Results.Ok(await transactionService.VoidCartAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
 
+        _ = app.MapPost("/transactions/{transactionId:guid}/refund", async (
+            Guid transactionId,
+            RefundTransactionRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.RefundTransactionAsync(transactionId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
+
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,
             ITransactionService transactionService,

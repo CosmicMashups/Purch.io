@@ -185,6 +185,95 @@ public sealed class RetentionSweeperTests(PostgresContainerFixture postgres)
         Assert.False(await dbContext.AuditLogs.IgnoreQueryFilters().AnyAsync(a => a.Id == auditLog.Id));
     }
 
+    [Fact]
+    public async Task Audit_logs_are_archived_to_gzip_file_before_deletion_when_archive_directory_is_configured()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await using var dbContext = OpenDbContext();
+        var auditLog = new AuditLog
+        {
+            TenantId = Guid.NewGuid(),
+            ActorUserId = Guid.NewGuid(),
+            TargetEntityType = "Transaction",
+            TargetEntityId = Guid.NewGuid(),
+            CreatedAt = now.AddDays(-1000),
+        };
+        _ = dbContext.AuditLogs.Add(auditLog);
+        _ = await dbContext.SaveChangesAsync();
+
+        var tempArchiveDir = Path.Combine(Path.GetTempPath(), $"purch_test_archive_{Guid.NewGuid():N}");
+        try
+        {
+            var result = await Sweeper(dbContext, new RetentionOptions
+            {
+                AuditLogRetentionDays = 730,
+                ArchiveDirectory = tempArchiveDir,
+            }).RunAsync();
+
+            Assert.True(result.AuditLogsPurged >= 1);
+            Assert.False(await dbContext.AuditLogs.IgnoreQueryFilters().AnyAsync(a => a.Id == auditLog.Id));
+            Assert.True(Directory.Exists(tempArchiveDir));
+            var archiveFiles = Directory.GetFiles(tempArchiveDir, "audit_logs_*.json.gz");
+            Assert.NotEmpty(archiveFiles);
+            Assert.True(new FileInfo(archiveFiles[0]).Length > 0);
+        }
+        finally
+        {
+            if (Directory.Exists(tempArchiveDir))
+            {
+                Directory.Delete(tempArchiveDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Orphaned_uploads_older_than_grace_period_are_purged_while_referenced_files_are_kept()
+    {
+        await using var dbContext = OpenDbContext();
+        var tempUploadsDir = Path.Combine(Path.GetTempPath(), $"purch_test_uploads_{Guid.NewGuid():N}");
+        _ = Directory.CreateDirectory(tempUploadsDir);
+
+        try
+        {
+            var unreferencedFile = Path.Combine(tempUploadsDir, "orphaned_test.jpg");
+            var referencedFile = Path.Combine(tempUploadsDir, "active_item.jpg");
+            await File.WriteAllTextAsync(unreferencedFile, "dummy-image-bytes");
+            await File.WriteAllTextAsync(referencedFile, "active-image-bytes");
+
+            // Backdate last write time to 48 hours ago
+            File.SetLastWriteTimeUtc(unreferencedFile, DateTime.UtcNow.AddHours(-48));
+            File.SetLastWriteTimeUtc(referencedFile, DateTime.UtcNow.AddHours(-48));
+
+            // Link referenced file in DB
+            var item = new Item
+            {
+                TenantId = Guid.NewGuid(),
+                Name = "Active Test Item",
+                BasePrice = 100m,
+                ImageUrl = $"/uploads/public/active_item.jpg",
+            };
+            _ = dbContext.Items.Add(item);
+            _ = await dbContext.SaveChangesAsync();
+
+            var result = await Sweeper(dbContext, new RetentionOptions
+            {
+                UploadsDirectory = tempUploadsDir,
+                OrphanedUploadGraceHours = 24,
+            }).RunAsync();
+
+            Assert.True(result.OrphanedUploadsPurged >= 1);
+            Assert.False(File.Exists(unreferencedFile));
+            Assert.True(File.Exists(referencedFile));
+        }
+        finally
+        {
+            if (Directory.Exists(tempUploadsDir))
+            {
+                Directory.Delete(tempUploadsDir, recursive: true);
+            }
+        }
+    }
+
     private PurchDbContext OpenDbContext()
     {
         var options = new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(postgres.ConnectionString).Options;

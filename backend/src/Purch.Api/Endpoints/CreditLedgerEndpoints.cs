@@ -41,6 +41,21 @@ public static class CreditLedgerEndpoints
             Results.Ok(await creditLedgerService.ListRemindersAsync(withinDays ?? 7, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(manager));
 
+        _ = app.MapPut("/credit-ledger/{ledgerId:guid}/credit-limit", async (
+            Guid ledgerId,
+            UpdateCreditLimitRequest request,
+            ICustomerCreditLedgerService creditLedgerService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await creditLedgerService.UpdateCreditLimitAsync(ledgerId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(manager));
+
+        _ = app.MapPost("/credit-ledger/{ledgerId:guid}/anonymize", async (
+            Guid ledgerId,
+            ICustomerCreditLedgerService creditLedgerService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await creditLedgerService.AnonymizeCustomerAsync(ledgerId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(manager));
+
         return app;
     }
 }

@@ -18,4 +18,9 @@ public sealed record PaymentDto(
 /// message rather than faking a confirmation for something that touches
 /// real money; Split isn't built yet either.
 /// </summary>
-public sealed record RecordPaymentRequest(PaymentMethod Method, decimal? AmountTendered, Guid? CustomerCreditLedgerId = null);
+public sealed record RecordPaymentRequest(
+    PaymentMethod Method,
+    decimal? AmountTendered,
+    Guid? CustomerCreditLedgerId = null,
+    bool AllowCreditLimitOverride = false,
+    string? CreditLimitOverrideReason = null);

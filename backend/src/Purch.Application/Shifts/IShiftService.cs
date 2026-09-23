@@ -8,4 +8,6 @@ public interface IShiftService
     Task<ShiftDto> OpenShiftAsync(OpenShiftRequest request, CancellationToken cancellationToken = default);
 
     Task<ShiftDto> CloseShiftAsync(CloseShiftRequest request, CancellationToken cancellationToken = default);
+
+    Task<ShiftDto> RecordManualDrawerOpenAsync(ManualDrawerOpenRequest request, CancellationToken cancellationToken = default);
 }

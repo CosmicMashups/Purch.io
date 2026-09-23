@@ -13,6 +13,9 @@ public interface ITransactionService
 
     Task<TransactionDto> VoidCartAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Refunds a completed transaction, marking it Refunded and auditing the action.</summary>
+    Task<TransactionDto> RefundTransactionAsync(Guid transactionId, RefundTransactionRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>Toggles the Senior Citizen/PWD 20% discount on the current open cart — a cashier-facing toggle, applied only after the cashier has verified the customer's physical ID.</summary>
     Task<TransactionDto> ApplySeniorPwdDiscountAsync(ApplySeniorPwdDiscountRequest request, CancellationToken cancellationToken = default);
 

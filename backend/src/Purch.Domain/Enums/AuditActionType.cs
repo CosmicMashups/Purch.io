@@ -18,4 +18,7 @@ public enum AuditActionType
     /// <summary>An item's selling price changed via the catalog editor — see ItemService.UpdateAsync.
     /// Distinct from PriceOverride, which is a one-off override applied at the point of sale.</summary>
     CatalogPriceChanged,
+
+    /// <summary>A customer's personal data was anonymized/erased under the Data Privacy Act (RA 10173) / GDPR.</summary>
+    CustomerAnonymized,
 }

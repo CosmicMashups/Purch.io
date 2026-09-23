@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -13,6 +15,7 @@ public sealed class ShiftService(
     IShiftRepository shiftRepository,
     IPaymentRepository paymentRepository,
     IUserRepository userRepository,
+    IAuditLogRepository auditLogRepository,
     IPinHasher pinHasher,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -97,6 +100,50 @@ public sealed class ShiftService(
         shift.HandoverNotes = request.HandoverNotes;
         shift.ApprovedByUserId = approvedByUserId;
         shift.ClosedAt = DateTimeOffset.UtcNow;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(shift, cancellationToken);
+    }
+
+    public async Task<ShiftDto> RecordManualDrawerOpenAsync(ManualDrawerOpenRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            throw new ValidationException(nameof(request.Reason), "A reason is required to manually open the cash drawer.");
+        }
+
+        var deviceId = CurrentDeviceId;
+        var shift = await shiftRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new NotFoundException("Open shift", deviceId);
+
+        Guid? approvedByUserId = null;
+        var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+        var callerIsApprover = caller is not null && ApproverRoles.Contains(caller.Role);
+        if (!callerIsApprover)
+        {
+            if (string.IsNullOrWhiteSpace(request.SupervisorPin))
+            {
+                throw new ValidationException(nameof(request.SupervisorPin), "A supervisor PIN is required to manually open the cash drawer.");
+            }
+
+            var activeUsers = await userRepository.GetActiveUsersByTenantAsync(CurrentTenantId, cancellationToken);
+            var approver = activeUsers.FirstOrDefault(user => ApproverRoles.Contains(user.Role) && pinHasher.Verify(request.SupervisorPin, user.PinHash))
+                ?? throw new ValidationException(nameof(request.SupervisorPin), "That PIN doesn't match an active manager or admin.");
+
+            approvedByUserId = approver.Id;
+        }
+
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.CashDrawerManualOpen,
+            TargetEntityType = nameof(Shift),
+            TargetEntityId = shift.Id,
+            BeforeStateJson = JsonSerializer.Serialize(new { shiftId = shift.Id, status = shift.Status.ToString() }),
+            AfterStateJson = JsonSerializer.Serialize(new { reason = request.Reason.Trim(), approvedByUserId, openedAt = DateTimeOffset.UtcNow }),
+        });
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 

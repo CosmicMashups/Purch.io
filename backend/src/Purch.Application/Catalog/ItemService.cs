@@ -143,6 +143,20 @@ public sealed class ItemService(
             });
         }
 
+        if (item.DepartmentId != request.DepartmentId)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.DepartmentReassignment,
+                TargetEntityType = nameof(Item),
+                TargetEntityId = item.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { departmentId = item.DepartmentId }),
+                AfterStateJson = JsonSerializer.Serialize(new { departmentId = request.DepartmentId }),
+            });
+        }
+
         item.Name = request.Name.Trim();
         item.Sku = request.Sku?.Trim();
         item.Barcode = request.Barcode?.Trim();
@@ -312,6 +326,20 @@ public sealed class ItemService(
             ?? throw new NotFoundException("Item", itemId);
 
         await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
+
+        if (item.DepartmentId != request.DepartmentId)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.DepartmentReassignment,
+                TargetEntityType = nameof(Item),
+                TargetEntityId = item.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { departmentId = item.DepartmentId }),
+                AfterStateJson = JsonSerializer.Serialize(new { departmentId = request.DepartmentId }),
+            });
+        }
 
         item.DepartmentId = request.DepartmentId;
 

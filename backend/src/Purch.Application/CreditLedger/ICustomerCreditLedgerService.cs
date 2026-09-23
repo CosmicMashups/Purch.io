@@ -14,4 +14,10 @@ public interface ICustomerCreditLedgerService
     /// <summary>B7's due-date reminders — ledgers with a balance due within
     /// (or already past) the given lookahead window.</summary>
     Task<IReadOnlyList<CreditReminderDto>> ListRemindersAsync(int withinDays, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates or overrides a customer's credit limit, recording an audit log.</summary>
+    Task<CustomerCreditLedgerDto> UpdateCreditLimitAsync(Guid ledgerId, UpdateCreditLimitRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Anonymizes a customer's personal data (DPA RA 10173 / GDPR right to erasure) while preserving ledger accounting records.</summary>
+    Task<CustomerCreditLedgerDto> AnonymizeCustomerAsync(Guid ledgerId, CancellationToken cancellationToken = default);
 }
