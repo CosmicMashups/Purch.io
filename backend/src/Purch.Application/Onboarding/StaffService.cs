@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 
 namespace Purch.Application.Onboarding;
 
@@ -9,7 +11,9 @@ public sealed class StaffService(
     IUserRepository userRepository,
     IPinHasher pinHasher,
     IRefreshTokenService refreshTokenService,
+    IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
+    ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IStaffService
 {
     public async Task<IReadOnlyList<StaffDto>> ListAsync(CancellationToken cancellationToken = default)
@@ -73,6 +77,36 @@ public sealed class StaffService(
             || user.BranchId != request.BranchId
             || user.IsActive != request.IsActive;
 
+        if (authorityChanged)
+        {
+            // Staged before the fields change, so Before/After capture the actual transition — who
+            // could act as what, before and after this edit — for A6's audit log viewer.
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.StaffAccessChanged,
+                TargetEntityType = nameof(User),
+                TargetEntityId = user.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new
+                {
+                    role = user.Role.ToString(),
+                    scopeType = user.ScopeType.ToString(),
+                    scopeId = user.ScopeId,
+                    branchId = user.BranchId,
+                    isActive = user.IsActive,
+                }),
+                AfterStateJson = JsonSerializer.Serialize(new
+                {
+                    role = request.Role.ToString(),
+                    scopeType = request.ScopeType.ToString(),
+                    scopeId = request.ScopeId,
+                    branchId = request.BranchId,
+                    isActive = request.IsActive,
+                }),
+            });
+        }
+
         user.Role = request.Role;
         user.ScopeType = request.ScopeType;
         user.ScopeId = request.ScopeId;
@@ -91,6 +125,9 @@ public sealed class StaffService(
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Staff management requires an authenticated tenant context.");
+
+    private Guid CurrentUserId => currentActorProvider.UserId
+        ?? throw new InvalidOperationException("Staff management requires an authenticated staff user.");
 
     private static StaffDto ToDto(User user)
     {

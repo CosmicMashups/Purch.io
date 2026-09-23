@@ -15,7 +15,9 @@ public sealed class ItemService(
     IDepartmentRepository departmentRepository,
     IItemRecipeRepository itemRecipeRepository,
     IInventoryItemRepository inventoryItemRepository,
+    IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
+    ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IItemService
 {
     public async Task<IReadOnlyList<ItemDto>> ListAsync(CancellationToken cancellationToken = default)
@@ -126,6 +128,20 @@ public sealed class ItemService(
 
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
         await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
+
+        if (item.BasePrice != request.BasePrice)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.CatalogPriceChanged,
+                TargetEntityType = nameof(Item),
+                TargetEntityId = item.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { name = item.Name, basePrice = item.BasePrice }),
+                AfterStateJson = JsonSerializer.Serialize(new { name = request.Name.Trim(), basePrice = request.BasePrice }),
+            });
+        }
 
         item.Name = request.Name.Trim();
         item.Sku = request.Sku?.Trim();
@@ -337,6 +353,9 @@ public sealed class ItemService(
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Catalog management requires an authenticated tenant context.");
+
+    private Guid CurrentUserId => currentActorProvider.UserId
+        ?? throw new InvalidOperationException("Catalog management requires an authenticated staff user.");
 
     private async Task<Tenant> GetTenantAsync(CancellationToken cancellationToken)
     {

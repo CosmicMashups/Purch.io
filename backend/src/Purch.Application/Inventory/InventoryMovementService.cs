@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
@@ -19,6 +20,7 @@ public sealed class InventoryMovementService(
     IBranchRepository branchRepository,
     IBranchScopeGuard branchScopeGuard,
     IUserRepository userRepository,
+    IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IInventoryMovementService
@@ -89,6 +91,10 @@ public sealed class InventoryMovementService(
         _ = await branchRepository.GetByIdAsync(request.BranchId, cancellationToken)
             ?? throw new NotFoundException("Branch", request.BranchId);
 
+        // Captured before AdjustAsync mutates it in place, so the audit entry below records the actual
+        // before/after transition rather than the same (already-updated) value twice.
+        var stockOnHandBeforeAdjustment = item.StockOnHand;
+
         var movement = new InventoryMovement
         {
             TenantId = CurrentTenantId,
@@ -105,6 +111,25 @@ public sealed class InventoryMovementService(
         };
 
         movementRepository.Add(movement);
+
+        // A hand-entered Adjustment is the one movement type that corrects a miscount rather than
+        // recording a real-world stock event (a delivery, a sale, damage), so it gets an audit entry
+        // the way a price or staff-access change does — the others already carry their own record
+        // (a receipt, a supplier reference) and don't need one.
+        if (request.Type == MovementType.Adjustment)
+        {
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = CurrentUserId,
+                ActionType = AuditActionType.InventoryAdjustment,
+                TargetEntityType = nameof(Item),
+                TargetEntityId = item.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { stockOnHand = stockOnHandBeforeAdjustment }),
+                AfterStateJson = JsonSerializer.Serialize(new { stockOnHand = item.StockOnHand, delta = request.Quantity, note = request.Note }),
+            });
+        }
+
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(movement, cancellationToken);
