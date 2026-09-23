@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -74,6 +75,8 @@ class _PurchAppState extends ConsumerState<PurchApp>
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Purch.io',
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       // Built at runtime from the tenant's cached branding colours, so an
       // admin's Business Settings change re-themes the app immediately.
       theme: ref.watch(staffThemeProvider),

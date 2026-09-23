@@ -83,7 +83,7 @@ class PurchImage extends StatelessWidget {
       final useCache = enableCache ?? !_isFlutterTest;
 
       if (useCache) {
-        imageContent = CachedNetworkImage(
+        final cachedWidget = CachedNetworkImage(
           imageUrl: fullUrl,
           width: width,
           height: height,
@@ -104,6 +104,9 @@ class PurchImage extends StatelessWidget {
             return errorWidget ?? _defaultPlaceholder();
           },
         );
+        imageContent = semanticLabel != null
+            ? Semantics(label: semanticLabel, image: true, child: cachedWidget)
+            : cachedWidget;
       } else {
         imageContent = Image.network(
           fullUrl,
@@ -159,15 +162,17 @@ class PurchImage extends StatelessWidget {
   }
 
   Widget _defaultPlaceholder() {
-    return Container(
-      width: width,
-      height: height,
-      color: AppColors.cardHover,
-      child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: AppColors.textMuted,
-          size: 32,
+    return ExcludeSemantics(
+      child: Container(
+        width: width,
+        height: height,
+        color: AppColors.cardHover,
+        child: const Center(
+          child: Icon(
+            Icons.image_outlined,
+            color: AppColors.textMuted,
+            size: 32,
+          ),
         ),
       ),
     );

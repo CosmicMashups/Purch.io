@@ -1,3 +1,39 @@
+# Set default behaviour to automatically normalize line endings.
+* text=auto
+
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout.
+*.cs text eol=crlf
+*.csproj text eol=crlf
+*.sln text eol=crlf
+
 # Shell scripts must keep LF line endings regardless of core.autocrlf —
 # a CRLF-converted .sh file fails in bash with `$'\r': command not found`.
 *.sh text eol=lf
+*.bash text eol=lf
+
+# Dart / Web files keep LF line endings
+*.dart text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.arb text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Denote all binary files that should not be modified by Git
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

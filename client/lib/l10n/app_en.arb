@@ -1,0 +1,35 @@
+{
+  "@@locale": "en",
+  "appTitle": "Purch.io",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "cart": "Cart",
+  "checkout": "Checkout",
+  "pay": "Pay",
+  "subtotal": "Subtotal",
+  "total": "Total",
+  "vat": "VAT",
+  "discount": "Discount",
+  "seniorPwdDiscount": "Senior Citizen / PWD Discount",
+  "orderType": "Order Type",
+  "dineIn": "Dine In",
+  "takeOut": "Take Out",
+  "kioskWelcome": "Welcome! Tap to Start",
+  "kioskOrderNumber": "Order #{number}",
+  "@kioskOrderNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "cash": "Cash",
+  "credit": "Utang / Credit",
+  "voidSale": "Void Sale",
+  "refund": "Refund",
+  "receipt": "Receipt",
+  "search": "Search items...",
+  "emptyCatalog": "No items found",
+  "tryAgain": "Try Again"
+}
