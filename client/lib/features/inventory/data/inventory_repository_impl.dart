@@ -30,6 +30,7 @@ class InventoryRepositoryImpl implements InventoryRepository {
     String? branchId,
     MovementType? type,
     DateTime? before,
+    String? beforeId,
     int? limit,
   }) async {
     try {
@@ -40,6 +41,7 @@ class InventoryRepositoryImpl implements InventoryRepository {
           if (branchId != null) 'branchId': branchId,
           if (type != null) 'type': type.index,
           if (before != null) 'before': before.toUtc().toIso8601String(),
+          if (beforeId != null) 'beforeId': beforeId,
           if (limit != null) 'limit': limit,
         },
       );

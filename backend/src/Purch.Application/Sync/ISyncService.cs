@@ -6,7 +6,7 @@ public interface ISyncService
     /// ("don't make the client sync item-by-item").</summary>
     Task<SyncBatchResultDto> SyncBatchAsync(SyncBatchRequest request, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<FlaggedSyncRecordDto>> ListFlaggedAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FlaggedSyncRecordDto>> ListFlaggedAsync(int? limit = null, CancellationToken cancellationToken = default);
 
     Task<FlaggedSyncRecordDto> AcknowledgeFlaggedAsync(Guid syncedRecordId, CancellationToken cancellationToken = default);
 }

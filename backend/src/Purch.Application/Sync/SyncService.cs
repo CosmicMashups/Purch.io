@@ -90,9 +90,9 @@ public sealed class SyncService(
         return new SyncItemResultDto(item.IdempotencyKey, SyncItemStatus.Applied, "Recorded — superseded a later-timestamped conflicting change, which was flagged for review.");
     }
 
-    public async Task<IReadOnlyList<FlaggedSyncRecordDto>> ListFlaggedAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FlaggedSyncRecordDto>> ListFlaggedAsync(int? limit = null, CancellationToken cancellationToken = default)
     {
-        var flagged = await syncedRecordRepository.ListFlaggedAsync(CurrentTenantId, cancellationToken);
+        var flagged = await syncedRecordRepository.ListFlaggedAsync(CurrentTenantId, limit, cancellationToken);
         return [.. flagged.Select(ToDto)];
     }
 

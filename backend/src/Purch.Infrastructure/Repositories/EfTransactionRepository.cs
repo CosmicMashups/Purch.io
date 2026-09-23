@@ -80,6 +80,25 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<VoidedTotals> GetVoidedTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var row = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.DeviceId == deviceId
+                && transaction.Status == TransactionStatus.Voided
+                && transaction.CreatedAt >= since)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                Amount = g.Sum(t => t.TotalAmount),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? new VoidedTotals(0, 0m) : new VoidedTotals(row.Count, row.Amount);
+    }
+
     public async Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions

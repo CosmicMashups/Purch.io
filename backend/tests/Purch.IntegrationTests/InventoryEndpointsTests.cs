@@ -2,12 +2,16 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Common.TestUtilities;
+using Purch.Domain.Entities;
 using Purch.Domain.Enums;
+using Purch.Infrastructure.Persistence;
 using Purch.IntegrationTests.Fixtures;
 
 namespace Purch.IntegrationTests;
@@ -375,6 +379,73 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
         Assert.Equal(30m, await LinkedQuantityAsync(client, item.Id));
         Assert.Equal(0m, (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.Single(i => i.Id == item.Id).StockOnHand);
+    }
+
+    [Fact]
+    public async Task Paging_with_before_and_beforeId_breaks_timestamp_ties()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+
+        var itemResponse = await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Tied Movements Item", null, null, null, 10m, null, PricingType.Unit));
+        var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var options = new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(postgres.ConnectionString).Options;
+        var fixedTime = DateTimeOffset.UtcNow.AddMinutes(-10);
+
+        await using var dbContext = new PurchDbContext(options, new TestCurrentTenantProvider());
+        var dbItem = await dbContext.Items.IgnoreQueryFilters().SingleAsync(i => i.Id == item.Id);
+        var tenantId = dbItem.TenantId;
+
+        var m1 = new InventoryMovement
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            BranchId = branchId,
+            ItemId = item.Id,
+            Type = MovementType.StockIn,
+            Quantity = 10m,
+            CreatedAt = fixedTime
+        };
+        var m2 = new InventoryMovement
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            BranchId = branchId,
+            ItemId = item.Id,
+            Type = MovementType.StockIn,
+            Quantity = 20m,
+            CreatedAt = fixedTime
+        };
+        var m3 = new InventoryMovement
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            BranchId = branchId,
+            ItemId = item.Id,
+            Type = MovementType.StockIn,
+            Quantity = 30m,
+            CreatedAt = fixedTime
+        };
+
+        dbContext.InventoryMovements.AddRange(m1, m2, m3);
+        await dbContext.SaveChangesAsync();
+
+        var page1 = await client.GetFromJsonAsync<List<InventoryMovementDto>>(
+            $"/inventory/movements?itemId={item.Id}&limit=2", JsonOptions);
+        Assert.NotNull(page1);
+        Assert.Equal(2, page1.Count);
+
+        var lastOfPage1 = page1.Last();
+        var page2 = await client.GetFromJsonAsync<List<InventoryMovementDto>>(
+            $"/inventory/movements?itemId={item.Id}&before={Uri.EscapeDataString(lastOfPage1.CreatedAt.ToString("O"))}&beforeId={lastOfPage1.Id}&limit=2", JsonOptions);
+
+        Assert.NotNull(page2);
+        Assert.Single(page2);
+        Assert.DoesNotContain(page2, m => page1.Any(p => p.Id == m.Id));
     }
 
     private static async Task<decimal> LinkedQuantityAsync(HttpClient client, Guid itemId)

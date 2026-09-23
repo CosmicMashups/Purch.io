@@ -20,9 +20,10 @@ public static class SyncEndpoints
 
         // --- Manual review of conflict-flagged records ---
         _ = app.MapGet("/sync/flagged", async (
+            int? limit,
             ISyncService syncService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await syncService.ListFlaggedAsync(cancellationToken)))
+            Results.Ok(await syncService.ListFlaggedAsync(limit, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reviewer));
 
         _ = app.MapPost("/sync/flagged/{syncedRecordId:guid}/acknowledge", async (

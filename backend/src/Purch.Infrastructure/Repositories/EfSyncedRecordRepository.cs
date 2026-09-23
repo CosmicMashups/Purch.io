@@ -30,11 +30,12 @@ public sealed class EfSyncedRecordRepository(PurchDbContext dbContext) : ISynced
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<SyncedRecord>> ListFlaggedAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SyncedRecord>> ListFlaggedAsync(Guid tenantId, int? limit = null, CancellationToken cancellationToken = default)
     {
         return await dbContext.SyncedRecords
             .Where(record => record.TenantId == tenantId && record.FlaggedForReview)
             .OrderByDescending(record => record.ClientTimestamp)
+            .Take(Purch.Application.Common.Paging.ClampLimit(limit))
             .ToListAsync(cancellationToken);
     }
 

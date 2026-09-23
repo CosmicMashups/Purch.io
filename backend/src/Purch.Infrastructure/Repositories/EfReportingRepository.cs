@@ -153,4 +153,80 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
 
         return await query.ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<DepartmentRevenueTotals>> GetDepartmentSalesAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await (
+                from line in dbContext.TransactionLines.AsNoTracking()
+                join transaction in CompletedTransactions(branchId, fromUtc, toUtc)
+                    on line.TransactionId equals transaction.Id
+                join item in dbContext.Items.AsNoTracking()
+                    on line.ItemId equals item.Id into itemJoin
+                from item in itemJoin.DefaultIfEmpty()
+                group line by item.DepartmentId into deptGroup
+                select new
+                {
+                    DepartmentId = deptGroup.Key,
+                    Revenue = deptGroup.Sum(l => l.LineTotal),
+                })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new DepartmentRevenueTotals(r.DepartmentId, r.Revenue))];
+    }
+
+    public async Task<IReadOnlyList<StaffSalesTotals>> GetStaffSalesAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await CompletedTransactions(branchId, fromUtc, toUtc)
+            .Where(t => t.StaffUserId != null)
+            .GroupBy(t => t.StaffUserId!.Value)
+            .Select(group => new
+            {
+                StaffUserId = group.Key,
+                TransactionCount = group.Count(),
+                TotalSales = group.Sum(t => t.TotalAmount),
+            })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new StaffSalesTotals(r.StaffUserId, r.TransactionCount, r.TotalSales))];
+    }
+
+    public async Task<IReadOnlyList<StaffAttendanceTotals>> GetStaffShiftAttendanceAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Shifts
+            .AsNoTracking()
+            .Where(shift =>
+                shift.Status == ShiftStatus.Closed
+                && shift.ClosedAt != null
+                && shift.ClosedAt >= fromUtc
+                && shift.ClosedAt < toUtc);
+
+        if (branchId is { } id)
+        {
+            query = query.Where(shift => shift.BranchId == id);
+        }
+
+        var rows = await query
+            .GroupBy(shift => shift.OpenedByUserId)
+            .Select(group => new
+            {
+                StaffUserId = group.Key,
+                ShiftsOpened = group.Count(),
+                ShiftsWithDiscrepancy = group.Count(s => s.VarianceAmount != null && s.VarianceAmount != 0m),
+            })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new StaffAttendanceTotals(r.StaffUserId, r.ShiftsOpened, r.ShiftsWithDiscrepancy))];
+    }
 }

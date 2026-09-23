@@ -55,6 +55,24 @@ public interface IReportingRepository
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DepartmentRevenueTotals>> GetDepartmentSalesAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StaffSalesTotals>> GetStaffSalesAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StaffAttendanceTotals>> GetStaffShiftAttendanceAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record BranchRevenueTotals(Guid BranchId, decimal Today, decimal Last7Days, decimal Last30Days);
@@ -63,3 +81,9 @@ public sealed record BranchRevenueTotals(Guid BranchId, decimal Today, decimal L
 public sealed record DayRevenue(int DayIndex, decimal Revenue);
 
 public sealed record ItemSalesTotals(Guid ItemId, decimal Quantity, decimal Revenue);
+
+public sealed record DepartmentRevenueTotals(Guid? DepartmentId, decimal Revenue);
+
+public sealed record StaffSalesTotals(Guid StaffUserId, int TransactionCount, decimal TotalSales);
+
+public sealed record StaffAttendanceTotals(Guid StaffUserId, int ShiftsOpened, int ShiftsWithDiscrepancy);

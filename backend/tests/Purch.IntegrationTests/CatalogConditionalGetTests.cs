@@ -93,6 +93,26 @@ public sealed class CatalogConditionalGetTests(PostgresContainerFixture postgres
         Assert.Empty((await bWithAsTag.Content.ReadFromJsonAsync<List<ItemDto>>(JsonOptions))!);
     }
 
+    [Fact]
+    public async Task Modifier_groups_list_returns_an_etag_and_answers_304_when_nothing_changed()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await client.PostAsJsonAsync("/modifier-groups", new CreateModifierGroupRequest("Sweetness", false, true));
+
+        var first = await client.GetAsync("/modifier-groups");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var etag = first.Headers.ETag;
+        Assert.NotNull(etag);
+        Assert.Contains("no-cache", first.Headers.CacheControl!.ToString());
+
+        var revalidate = await SendWithIfNoneMatchAsync(client, "/modifier-groups", etag!.ToString());
+
+        Assert.Equal(HttpStatusCode.NotModified, revalidate.StatusCode);
+        Assert.Equal(etag.ToString(), revalidate.Headers.ETag!.ToString());
+        Assert.Empty(await revalidate.Content.ReadAsByteArrayAsync());
+    }
+
     private static Task<HttpResponseMessage> SendWithIfNoneMatchAsync(HttpClient client, string path, string etag)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);

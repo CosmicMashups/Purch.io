@@ -79,8 +79,7 @@ public sealed class BirReadingService(
         var vatAmount = netSales - vatableSales;
 
         var lastZReadingAt = sequence.LastZReadingAt ?? DateTimeOffset.MinValue;
-        var voided = await transactionRepository.ListVoidedByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
-        var voidedAmount = voided.Sum(t => t.TotalAmount);
+        var voidedTotals = await transactionRepository.GetVoidedTotalsByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
 
         var oldGrandAccumulatedSales = sequence.GrandAccumulatedSales;
         var newGrandAccumulatedSales = oldGrandAccumulatedSales + netSales;
@@ -119,8 +118,8 @@ public sealed class BirReadingService(
             promoDiscountTotal,
             totalDiscounts,
             netSales,
-            voided.Count,
-            voidedAmount,
+            voidedTotals.Count,
+            voidedTotals.Amount,
             oldGrandAccumulatedSales,
             newGrandAccumulatedSales,
             resetCounter,

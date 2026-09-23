@@ -343,7 +343,11 @@ class AuditLogList extends _$AuditLogList {
     try {
       final page = await ref
           .read(onboardingRepositoryProvider)
-          .listAuditLogs(before: current.last.createdAt, limit: kLogPageSize);
+          .listAuditLogs(
+            before: current.last.createdAt,
+            beforeId: current.last.id,
+            limit: kLogPageSize,
+          );
       _hasMore = page.length >= kLogPageSize;
       state = AsyncData([...current, ...page]);
     } finally {

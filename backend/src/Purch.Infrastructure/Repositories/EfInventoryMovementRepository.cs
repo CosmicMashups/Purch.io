@@ -16,6 +16,7 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
         MovementType? type,
         DateTimeOffset? before = null,
         int? limit = null,
+        Guid? beforeId = null,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.InventoryMovements
@@ -39,11 +40,19 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
 
         if (before is { } cursor)
         {
-            query = query.Where(movement => movement.CreatedAt < cursor);
+            if (beforeId is { } cursorId)
+            {
+                query = query.Where(movement => movement.CreatedAt < cursor || (movement.CreatedAt == cursor && movement.Id.CompareTo(cursorId) < 0));
+            }
+            else
+            {
+                query = query.Where(movement => movement.CreatedAt < cursor);
+            }
         }
 
         return await query
             .OrderByDescending(movement => movement.CreatedAt)
+            .ThenByDescending(movement => movement.Id)
             .Take(Paging.ClampLimit(limit))
             .ToListAsync(cancellationToken);
     }

@@ -10,4 +10,6 @@ public interface ICatalogVersionProvider
     Task<string> GetItemsVersionAsync(CancellationToken cancellationToken = default);
 
     Task<string> GetCategoriesVersionAsync(CancellationToken cancellationToken = default);
+
+    Task<string> GetModifierGroupsVersionAsync(CancellationToken cancellationToken = default);
 }

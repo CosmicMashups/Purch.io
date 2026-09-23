@@ -9,4 +9,5 @@ public sealed record AuditLogQuery(
     DateTimeOffset? From,
     DateTimeOffset? To,
     DateTimeOffset? Before = null,
-    int? Limit = null);
+    int? Limit = null,
+    Guid? BeforeId = null);

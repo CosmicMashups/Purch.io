@@ -139,12 +139,13 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
-  Future<List<AuditLogEntry>> listAuditLogs({DateTime? before, int? limit}) async {
+  Future<List<AuditLogEntry>> listAuditLogs({DateTime? before, String? beforeId, int? limit}) async {
     try {
       final response = await _apiClient.dio.get<List<dynamic>>(
         '/audit-logs',
         queryParameters: {
           if (before != null) 'before': before.toUtc().toIso8601String(),
+          if (beforeId != null) 'beforeId': beforeId,
           if (limit != null) 'limit': limit,
         },
       );

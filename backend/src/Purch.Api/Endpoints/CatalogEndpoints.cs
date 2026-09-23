@@ -64,8 +64,15 @@ public static class CatalogEndpoints
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
         // --- Modifier groups (B5's other half) ---
-        _ = app.MapGet("/modifier-groups", async (IModifierGroupService modifierGroupService, CancellationToken cancellationToken) =>
-            Results.Ok(await modifierGroupService.ListAsync(cancellationToken))).RequireAuthorization();
+        _ = app.MapGet("/modifier-groups", (
+            HttpContext httpContext,
+            IModifierGroupService modifierGroupService,
+            ICatalogVersionProvider catalogVersion,
+            CancellationToken cancellationToken) =>
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => catalogVersion.GetModifierGroupsVersionAsync(cancellationToken),
+                () => modifierGroupService.ListAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPost("/modifier-groups", async (
             CreateModifierGroupRequest request,

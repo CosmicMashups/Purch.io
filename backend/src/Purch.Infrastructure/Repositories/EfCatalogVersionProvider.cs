@@ -39,6 +39,16 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
         return Hash([await StampAsync(dbContext.Categories, cancellationToken)]);
     }
 
+    public async Task<string> GetModifierGroupsVersionAsync(CancellationToken cancellationToken = default)
+    {
+        var parts = new List<string>
+        {
+            await StampAsync(dbContext.ModifierGroups, cancellationToken),
+            await StampAsync(dbContext.ItemModifiers, cancellationToken),
+        };
+        return Hash(parts);
+    }
+
     private static async Task<string> StampAsync<TEntity>(IQueryable<TEntity> source, CancellationToken cancellationToken)
         where TEntity : Entity
     {

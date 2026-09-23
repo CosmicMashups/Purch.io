@@ -12,7 +12,7 @@ public interface ISyncedRecordRepository
     /// most one at any time — see SyncService), or null if none has synced yet.</summary>
     Task<SyncedRecord?> GetCurrentWinnerAsync(Guid tenantId, string entityType, Guid entityId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<SyncedRecord>> ListFlaggedAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SyncedRecord>> ListFlaggedAsync(Guid tenantId, int? limit = null, CancellationToken cancellationToken = default);
 
     void Add(SyncedRecord record);
 }

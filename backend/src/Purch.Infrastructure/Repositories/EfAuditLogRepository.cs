@@ -39,11 +39,19 @@ public sealed class EfAuditLogRepository(PurchDbContext dbContext) : IAuditLogRe
 
         if (query.Before is { } before)
         {
-            logs = logs.Where(log => log.CreatedAt < before);
+            if (query.BeforeId is { } beforeId)
+            {
+                logs = logs.Where(log => log.CreatedAt < before || (log.CreatedAt == before && log.Id.CompareTo(beforeId) < 0));
+            }
+            else
+            {
+                logs = logs.Where(log => log.CreatedAt < before);
+            }
         }
 
         return await logs
             .OrderByDescending(log => log.CreatedAt)
+            .ThenByDescending(log => log.Id)
             .Take(Paging.ClampLimit(query.Limit))
             .ToListAsync(cancellationToken);
     }

@@ -74,7 +74,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<ModifierGroup>> listModifierGroups() {
-    return _getList('/modifier-groups', ModifierGroup.fromJson);
+    return _getCachedList('modifier-groups', '/modifier-groups', ModifierGroup.fromJson);
   }
 
   @override

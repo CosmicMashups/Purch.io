@@ -95,6 +95,7 @@ class MovementLog extends _$MovementLog {
             branchId: branchId,
             type: type,
             before: current.last.createdAt,
+            beforeId: current.last.id,
             limit: kLogPageSize,
           );
       _hasMore = page.length >= kLogPageSize;

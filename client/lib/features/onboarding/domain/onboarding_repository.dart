@@ -47,8 +47,8 @@ abstract class OnboardingRepository {
     bool useSeparateInventoryTracking,
   );
 
-  /// Newest first. Pass the last entry's `createdAt` as [before] for the next page.
-  Future<List<AuditLogEntry>> listAuditLogs({DateTime? before, int? limit});
+  /// Newest first. Pass the last entry's `createdAt` and `id` as [before] and [beforeId] for the next page.
+  Future<List<AuditLogEntry>> listAuditLogs({DateTime? before, String? beforeId, int? limit});
 
   Future<List<Department>> listDepartments(String branchId);
 

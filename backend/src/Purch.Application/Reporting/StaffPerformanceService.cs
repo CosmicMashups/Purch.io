@@ -17,29 +17,26 @@ public sealed class StaffPerformanceService(
     {
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
 
-        var transactions = await reportingRepository.ListCompletedTransactionsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
-        var shifts = await reportingRepository.ListClosedShiftsInRangeAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
+        var staffSales = await reportingRepository.GetStaffSalesAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
+        var attendance = await reportingRepository.GetStaffShiftAttendanceAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
         var staff = await userRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
         var staffNamesById = staff.ToDictionary(user => user.Id, user => user.Name);
 
-        var sales = transactions
-            .Where(t => t.StaffUserId is not null)
-            .GroupBy(t => t.StaffUserId!.Value)
-            .Select(group => new StaffSalesSummaryDto(
-                group.Key,
-                staffNamesById.TryGetValue(group.Key, out var name) ? name : "(former staff)",
-                group.Count(),
-                group.Sum(t => t.TotalAmount)))
+        var sales = staffSales
+            .Select(s => new StaffSalesSummaryDto(
+                s.StaffUserId,
+                staffNamesById.TryGetValue(s.StaffUserId, out var name) ? name : "(former staff)",
+                s.TransactionCount,
+                s.TotalSales))
             .OrderByDescending(dto => dto.TotalSales)
             .ToList();
 
-        var shiftAttendance = shifts
-            .GroupBy(shift => shift.OpenedByUserId)
-            .Select(group => new StaffShiftAttendanceDto(
-                group.Key,
-                staffNamesById.TryGetValue(group.Key, out var name) ? name : "(former staff)",
-                group.Count(),
-                group.Count(shift => shift.VarianceAmount is not null and not 0)))
+        var shiftAttendance = attendance
+            .Select(a => new StaffShiftAttendanceDto(
+                a.StaffUserId,
+                staffNamesById.TryGetValue(a.StaffUserId, out var name) ? name : "(former staff)",
+                a.ShiftsOpened,
+                a.ShiftsWithDiscrepancy))
             .OrderByDescending(dto => dto.ShiftsOpened)
             .ToList();
 

@@ -12,6 +12,7 @@ public interface IInventoryMovementRepository
         MovementType? type,
         DateTimeOffset? before = null,
         int? limit = null,
+        Guid? beforeId = null,
         CancellationToken cancellationToken = default);
 
     void Add(InventoryMovement movement);

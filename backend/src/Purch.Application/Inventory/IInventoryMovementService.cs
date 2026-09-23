@@ -10,6 +10,7 @@ public interface IInventoryMovementService
         MovementType? type,
         DateTimeOffset? before = null,
         int? limit = null,
+        Guid? beforeId = null,
         CancellationToken cancellationToken = default);
 
     Task<InventoryMovementDto> RecordAsync(RecordMovementRequest request, CancellationToken cancellationToken = default);

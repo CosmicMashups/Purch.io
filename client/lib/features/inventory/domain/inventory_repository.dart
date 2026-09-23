@@ -10,6 +10,7 @@ abstract class InventoryRepository {
     String? branchId,
     MovementType? type,
     DateTime? before,
+    String? beforeId,
     int? limit,
   });
 
