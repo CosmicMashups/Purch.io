@@ -377,6 +377,54 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(15m, generalRow.Revenue);
     }
 
+    [Fact]
+    public async Task The_transactions_export_lists_completed_sales_but_not_voided_carts()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        await CompleteACashSaleAsync(client, 150m);
+
+        var voidedItem = await CreateItemAsync(client, "Voided Item", 40m);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(voidedItem.Id, null, 1m));
+        _ = await client.PostAsync("/transactions/cart/void", null);
+
+        var from = DateTimeOffset.UtcNow.AddDays(-1);
+        var to = DateTimeOffset.UtcNow.AddDays(1);
+        var response = await client.GetAsync(
+            $"/reports/sales/transactions-export.csv?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.TrimEnd('\n', '\r').Split('\n');
+        Assert.Equal(2, lines.Length); // header + the one completed sale
+        Assert.Contains("150", lines[1]);
+        Assert.DoesNotContain("40", csv);
+    }
+
+    [Fact]
+    public async Task The_transactions_export_is_refused_to_a_manager()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await AuthenticatedAdminClientAsync(factory);
+        _ = await admin.PostAsJsonAsync(
+            "/staff",
+            new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+
+        using var managerClient = factory.CreateClient();
+        var loginResponse = await managerClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
+        managerClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+
+        var from = DateTimeOffset.UtcNow.AddDays(-1);
+        var to = DateTimeOffset.UtcNow.AddDays(1);
+        var response = await managerClient.GetAsync(
+            $"/reports/sales/transactions-export.csv?from={Uri.EscapeDataString(from.ToString("o"))}&to={Uri.EscapeDataString(to.ToString("o"))}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static async Task CompleteACashSaleAsync(HttpClient client, decimal price)
     {
         var itemResponse = await client.PostAsJsonAsync(

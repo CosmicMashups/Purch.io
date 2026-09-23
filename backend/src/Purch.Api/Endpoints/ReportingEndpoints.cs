@@ -49,6 +49,20 @@ public static class ReportingEndpoints
                 "text/csv"))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        // --- Data export: the tenant's own sales record, independent of this app (accounting, a
+        // system switch, or a Data Privacy Act/GDPR access request). Admin-only — broader than the
+        // reporting roles above, since it hands over raw rows rather than an aggregate. ---
+        _ = app.MapGet("/reports/sales/transactions-export.csv", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            ITransactionExportService transactionExportService,
+            CancellationToken cancellationToken) =>
+            Results.Text(
+                await transactionExportService.GenerateTransactionsCsvAsync(branchId, fromUtc, toUtc, cancellationToken),
+                "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin)));
+
         // --- F4 — staff performance ---
         _ = app.MapGet("/reports/staff-performance", async (
             Guid? branchId,

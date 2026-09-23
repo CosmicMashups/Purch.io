@@ -105,6 +105,11 @@ The application runtime adapts based on the `PURCH_DEPLOYMENT_MODE` environment 
    - Designed for isolated local LAN installations running directly inside a store.
    - Executes automatic database migrations (`context.Database.Migrate()`) on startup against an embedded or local PostgreSQL service.
 
+See [docs/BACKUPS.md](docs/BACKUPS.md) for how each mode is backed up and restored, and
+[`RetentionOptions`](src/Purch.Infrastructure/Retention/RetentionOptions.cs) for how long routine data
+(expired tokens, old sync records, and — if configured — audit logs/inventory movements) is kept before
+being purged.
+
 ---
 
 ## Development & Build Commands
