@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "web/**"
+      - "backend/**"
       - ".github/workflows/web-ci.yml"
   push:
     branches: [main]
     paths:
       - "web/**"
+      - "backend/**"
 
 jobs:
   build:
@@ -26,5 +28,35 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - run: npm run e2e:types
       # Runs the type check (tsc -b) and the production build.
       - run: npm run build
+
+  # Real browser, real backend, real Postgres. See web/playwright.config.ts and web/e2e/stack/run-backend.mjs.
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-diagnostics
+          path: |
+            web/playwright-report
+            web/test-results
+            web/e2e/.logs
+          if-no-files-found: ignore
