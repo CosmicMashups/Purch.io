@@ -11,6 +11,12 @@ import { RecordMovementPage } from './features/inventory/pages/RecordMovementPag
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
+import { CustomersPage } from './features/credit/CustomersPage';
+import { KioskOrdersPage } from './features/pos/KioskOrdersPage';
+import { ShiftPage } from './features/shifts/ShiftPage';
+import { PaymentPage } from './features/pos/PaymentPage';
+import { ReceiptPage } from './features/pos/ReceiptPage';
+import { SellPage } from './features/pos/SellPage';
 import { ItemListPage } from './features/catalog/pages/ItemListPage';
 import { AddItemPage } from './features/catalog/pages/AddItemPage';
 import { EditItemPage } from './features/catalog/pages/EditItemPage';
@@ -36,6 +42,11 @@ export function App() {
         <Route element={<AppShell />}>
 
           <Route element={<RequireTab tab="sell" />}>
+            <Route path="/sell" element={<SellPage />} />
+            <Route path="/sell/shift" element={<ShiftPage />} />
+            <Route path="/sell/kiosk-orders" element={<KioskOrdersPage />} />
+            <Route path="/sell/payment" element={<PaymentPage />} />
+            <Route path="/sell/receipt" element={<ReceiptPage />} />
             <Route path="/sell/*" element={<Navigate to="/sell" replace />} />
           </Route>
 
@@ -52,6 +63,7 @@ export function App() {
 
           <Route element={<RequireTab tab="business" />}>
             <Route path="/business/promotions" element={<PromotionsPage />} />
+            <Route path="/business/customers" element={<CustomersPage />} />
             <Route path="/catalog/items" element={<ItemListPage />} />
             <Route path="/catalog/items/new" element={<AddItemPage />} />
             <Route path="/catalog/items/:itemId/edit" element={<EditItemPage />} />
