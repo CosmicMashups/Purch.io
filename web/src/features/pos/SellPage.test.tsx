@@ -7,6 +7,7 @@ import { catalogApi } from '../catalog/api';
 import { PricingType } from '../catalog/types';
 import { posApi } from './api';
 import { SellPage } from './SellPage';
+import { posAddQueue } from './queries';
 
 vi.mock('./api', () => ({
   posApi: {
@@ -25,6 +26,7 @@ vi.mock('../catalog/api', () => ({
   catalogApi: {
     listItems: vi.fn(),
     listCategories: vi.fn(),
+    listModifierGroups: vi.fn(),
     listItemModifierGroups: vi.fn(),
     listVariants: vi.fn(),
     listComboComponents: vi.fn(),
@@ -43,6 +45,7 @@ const driveSession = { device_id: 'dev1', branch_id: 'kat', scope_type: 'Branch'
 
 beforeEach(() => {
   vi.clearAllMocks();
+  posAddQueue.reset();
   useToastStore.setState({ toasts: [] });
   signInAs('Cashier', driveSession);
   vi.mocked(catalogApi.listItems).mockResolvedValue(items);
@@ -355,5 +358,129 @@ describe('SellPage hardware', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add to cart' }));
     await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'rice', itemVariantId: null, quantity: 0.35 }));
     useScale.setState({ status: 'disconnected', reading: null });
+  });
+});
+
+describe('SellPage adding items quickly', () => {
+  const deferred = <T,>() => {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
+    return { promise, resolve };
+  };
+  const cartWith = (lines: { id: string; name: string; qty: number; total: number }[]) =>
+    makeCart({
+      lines: lines.map((l) => makeLine({ id: l.id, itemName: l.name, quantity: l.qty, lineTotal: l.total })),
+      subtotal: lines.reduce((s, l) => s + l.total, 0),
+      totalAmount: lines.reduce((s, l) => s + l.total, 0),
+    });
+
+  it('never blocks a tap while an earlier add is still on its way', async () => {
+    const first = deferred<ReturnType<typeof makeCart>>();
+    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 150 }, { id: 'b', name: 'Mocha', qty: 1, total: 170 }]));
+    renderPage(<SellPage />);
+    const latte = await screen.findByRole('button', { name: /Iced Latte/ });
+    fireEvent.click(latte);
+    const mocha = screen.getByRole('button', { name: /Mocha/ });
+    expect(mocha).toBeEnabled();
+    fireEvent.click(mocha);
+
+    expect(await screen.findByLabelText('Adding Iced Latte')).toBeInTheDocument();
+    expect(screen.getByLabelText('Adding Mocha')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Updating...' })).toBeDisabled();
+
+    first.resolve(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 150 }]));
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByLabelText(/^Adding /)).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Charge ₱320\.00/ })).toBeEnabled();
+  });
+
+  it('sends items one at a time, in the order they were tapped', async () => {
+    const first = deferred<ReturnType<typeof makeCart>>();
+    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(1));
+    expect(posApi.addLine).toHaveBeenLastCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 });
+    first.resolve(makeCart());
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    expect(posApi.addLine).toHaveBeenLastCalledWith({ itemId: 'mocha', itemVariantId: null, quantity: 1 });
+  });
+
+  it('turns repeated taps on one item into a single request for the total quantity', async () => {
+    const first = deferred<ReturnType<typeof makeCart>>();
+    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    const latte = await screen.findByRole('button', { name: /Iced Latte/ });
+    fireEvent.click(latte);
+    fireEvent.click(latte);
+    fireEvent.click(latte);
+    fireEvent.click(latte);
+    expect(await screen.findByLabelText('Adding Iced Latte')).toHaveTextContent('x 4');
+
+    first.resolve(makeCart());
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    expect(posApi.addLine).toHaveBeenNthCalledWith(1, { itemId: 'latte', itemVariantId: null, quantity: 1 });
+    expect(posApi.addLine).toHaveBeenNthCalledWith(2, { itemId: 'latte', itemVariantId: null, quantity: 3 });
+  });
+
+  it('names the item that could not be added and keeps the others', async () => {
+    vi.mocked(posApi.addLine).mockRejectedValueOnce(new Error('boom')).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));
+    await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toMatch(/Iced Latte could not be added/));
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByLabelText(/^Adding /)).not.toBeInTheDocument());
+  });
+
+  it('closes the options dialog at once instead of waiting for the server', async () => {
+    const never = deferred<ReturnType<typeof makeCart>>();
+    vi.mocked(posApi.addLine).mockReturnValue(never.promise);
+    vi.mocked(catalogApi.listVariants).mockResolvedValue([{ id: 'v1', itemId: 'tee', attributes: { Size: 'M' }, priceOverride: null, sku: null, barcode: null, isActive: true } as never]);
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Logo Tee/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(await within(dialog).findByRole('radio', { name: /M/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByLabelText('Adding Logo Tee')).toBeInTheDocument();
+  });
+
+  it('skips the per-item modifier check when the business has no modifier groups', async () => {
+    vi.mocked(catalogApi.listModifierGroups).mockResolvedValue([]);
+    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    await screen.findByRole('button', { name: /Iced Latte/ });
+    await waitFor(() => expect(catalogApi.listModifierGroups).toHaveBeenCalled());
+    await waitFor(() => new Promise((r) => setTimeout(r, 30)));
+    fireEvent.click(screen.getByRole('button', { name: /Iced Latte/ }));
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(1));
+    expect(catalogApi.listItemModifierGroups).not.toHaveBeenCalled();
+  });
+
+  it('still checks an item for modifiers when the business has modifier groups', async () => {
+    vi.mocked(catalogApi.listModifierGroups).mockResolvedValue([{ id: 'g1', name: 'Ice' } as never]);
+    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    await screen.findByRole('button', { name: /Iced Latte/ });
+    await waitFor(() => new Promise((r) => setTimeout(r, 30)));
+    fireEvent.click(screen.getByRole('button', { name: /Iced Latte/ }));
+    await waitFor(() => expect(catalogApi.listItemModifierGroups).toHaveBeenCalledWith('latte'));
+  });
+});
+
+describe('SellPage adds and the session', () => {
+  it('drops adds that were still waiting when the session ends', async () => {
+    const { useAuthStore } = await import('../../lib/authStore');
+    const never = new Promise<ReturnType<typeof makeCart>>(() => undefined);
+    vi.mocked(posApi.addLine).mockReturnValue(never);
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));
+    expect(await screen.findByLabelText('Adding Mocha')).toBeInTheDocument();
+
+    useAuthStore.setState({ accessToken: null, refreshToken: null });
+    expect(posAddQueue.useQueue.getState()).toEqual({ waiting: [], inFlight: [] });
   });
 });

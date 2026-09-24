@@ -6,37 +6,37 @@ import { Skeleton } from '../../components/Skeleton';
 import { toast } from '../../components/feedback/toastStore';
 import { userMessage } from '../../lib/apiError';
 import { catalogApi } from '../catalog/api';
-import { catalogKeys, useCategories, useItems } from '../catalog/queries';
+import { catalogKeys, useCategories, useItems, useModifierGroups } from '../catalog/queries';
 import type { Item } from '../catalog/types';
 import { formatPeso } from '../dashboard/format';
 import { addFlowFor, filterItems } from '../pos/catalogView';
 import { OptionsDialog } from '../pos/components/OptionsDialog';
 import { PricingType } from '../catalog/types';
 import type { AddLineRequest } from '../pos/types';
-import { useKioskAddLine, useKioskCart } from './queries';
+import { useKioskAdds, useKioskCart } from './queries';
 
 export function KioskMenuPage() {
   const items = useItems();
   const categories = useCategories();
   const cart = useKioskCart();
-  const addLine = useKioskAddLine();
+  const adds = useKioskAdds();
+  const modifierGroups = useModifierGroups();
   const qc = useQueryClient();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Item | null>(null);
-  const [resolving, setResolving] = useState(false);
 
   const visible = filterItems(items.data ?? [], { categoryId, query: '' });
-  const count = cart.data?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0;
-  const busy = addLine.isPending || resolving;
+  const count = (cart.data?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0) + adds.pending.reduce((sum, row) => sum + row.quantity, 0);
 
-  function add(request: AddLineRequest, item?: Item) {
-    addLine.mutate(request, {
-      onSuccess: () => {
-        setDialog(null);
-        if (item) toast.success(`${item.name} added to your order`);
-      },
-    });
+  /** The tap is recorded and confirmed on screen at once; the order catches up as the server answers. */
+  function add(request: AddLineRequest, item: Item) {
+    setDialog(null);
+    adds.add(item.name, request);
+    toast.success(`${item.name} added to your order`);
   }
+
+  // A business with no modifier groups at all cannot have any attached to an item, so the per-item check is skipped.
+  const mayHaveModifiers = modifierGroups.data === undefined || modifierGroups.data.length > 0;
 
   async function pick(item: Item) {
     const flow = addFlowFor(item);
@@ -46,15 +46,13 @@ export function KioskMenuPage() {
     }
     if (flow === 'variant' || flow === 'combo') return setDialog(item);
 
-    setResolving(true);
+    if (!mayHaveModifiers) return add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
     try {
-      const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 60_000 });
+      const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 5 * 60_000 });
       if (groups.length > 0) setDialog(item);
       else add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
     } catch (error) {
       toast.error(userMessage(error));
-    } finally {
-      setResolving(false);
     }
   }
 
@@ -98,7 +96,7 @@ export function KioskMenuPage() {
               <li key={item.id}>
                 <button
                   type="button"
-                  disabled={busy || item.isOutOfStock}
+                  disabled={item.isOutOfStock}
                   onClick={() => void pick(item)}
                   className="flex h-full min-h-44 w-full flex-col overflow-hidden rounded-panel border border-line bg-surface text-left active:translate-y-px disabled:opacity-50"
                 >
@@ -123,7 +121,7 @@ export function KioskMenuPage() {
         </Link>
       </div>
 
-      {dialog && <OptionsDialog item={dialog} items={items.data ?? []} busy={addLine.isPending} onAdd={(request) => add(request, dialog)} onClose={() => setDialog(null)} />}
+      {dialog && <OptionsDialog item={dialog} items={items.data ?? []} busy={false} onAdd={(request) => add(request, dialog)} onClose={() => setDialog(null)} />}
     </div>
   );
 }

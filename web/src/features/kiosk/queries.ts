@@ -1,4 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../lib/authStore';
+import { createAddQueue } from '../pos/addQueue';
+import { useCartAdds, type CartAdds } from '../pos/useCartAdds';
 import { displayApi, kioskApi } from './api';
 import type { AddLineRequest, KitchenStatus, Transaction } from '../pos/types';
 
@@ -56,3 +59,12 @@ export function useSetKitchenStatus(branchId: string | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: kioskKeys.display('KitchenDisplay', branchId ?? '') }),
   });
 }
+
+/** Adds to the kiosk's own cart, queued so a customer tapping quickly is never held up. */
+export const kioskAddQueue = createAddQueue();
+
+useAuthStore.subscribe((state, previous) => {
+  if (previous.accessToken && !state.accessToken) kioskAddQueue.reset();
+});
+
+export const useKioskAdds = (): CartAdds => useCartAdds(kioskAddQueue, kioskApi.addLine, kioskKeys.cart);

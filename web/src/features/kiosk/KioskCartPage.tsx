@@ -4,7 +4,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { userMessage } from '../../lib/apiError';
 import { formatPeso } from '../dashboard/format';
 import { lineDetails } from './tickets';
-import { useKioskCart, useKioskRemoveLine, useKioskUpdateLine } from './queries';
+import { useKioskAdds, useKioskCart, useKioskRemoveLine, useKioskUpdateLine } from './queries';
 
 const stepper = 'grid size-14 place-items-center rounded-control border border-line text-2xl font-semibold disabled:opacity-40';
 
@@ -12,7 +12,9 @@ export function KioskCartPage() {
   const cart = useKioskCart();
   const update = useKioskUpdateLine();
   const remove = useKioskRemoveLine();
-  const busy = update.isPending || remove.isPending;
+  const adds = useKioskAdds();
+  const updating = adds.pending.length > 0;
+  const busy = update.isPending || remove.isPending || updating;
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
@@ -27,7 +29,13 @@ export function KioskCartPage() {
       {cart.isPending && <Skeleton className="h-64 w-full" />}
       {cart.isError && <ErrorState title="Your order could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />}
 
-      {cart.isSuccess && cart.data.lines.length === 0 && (
+      {updating && (
+        <p role="status" className="rounded-control border border-line bg-surface px-4 py-3 text-lg font-semibold">
+          Adding {adds.pending.map((row) => `${row.label} x ${row.quantity}`).join(", ")}...
+        </p>
+      )}
+
+      {cart.isSuccess && cart.data.lines.length === 0 && !updating && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <p className="text-2xl font-bold">Your order is empty</p>
           <Link to="/kiosk/menu" className="grid h-16 place-items-center rounded-control bg-brand px-8 text-xl font-bold text-on-brand">
@@ -77,7 +85,7 @@ export function KioskCartPage() {
               <span>Total</span>
               <span className="tabular-nums">{formatPeso(cart.data.totalAmount)}</span>
             </p>
-            <Link to="/kiosk/order-type" className="grid h-20 place-items-center rounded-control bg-brand text-2xl font-bold text-on-brand">
+            <Link to="/kiosk/order-type" aria-disabled={updating} onClick={(e) => updating && e.preventDefault()} className={`grid h-20 place-items-center rounded-control bg-brand text-2xl font-bold text-on-brand ${updating ? "opacity-50" : ""}`}>
               Continue
             </Link>
           </div>

@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../lib/authStore';
+import { createAddQueue } from './addQueue';
 import { posApi } from './api';
+import { useCartAdds, type CartAdds } from './useCartAdds';
 import type { AddLineRequest, RecordPaymentRequest, Transaction } from './types';
 
 export const posKeys = { cart: ['pos', 'cart'] as const };
@@ -59,3 +62,13 @@ export function useClaimKioskOrder() {
     },
   });
 }
+
+/** Adds to the register's cart. One queue for the whole app, so an add started on one screen finishes on any. */
+export const posAddQueue = createAddQueue();
+
+// Adds waiting for one session must never be sent under the next one.
+useAuthStore.subscribe((state, previous) => {
+  if (previous.accessToken && !state.accessToken) posAddQueue.reset();
+});
+
+export const usePosAdds = (): CartAdds => useCartAdds(posAddQueue, posApi.addLine, posKeys.cart);

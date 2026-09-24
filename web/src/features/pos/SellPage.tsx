@@ -6,7 +6,7 @@ import { LinkButton } from '../../components/PageHeader';
 import { toast } from '../../components/feedback/toastStore';
 import { userMessage } from '../../lib/apiError';
 import { catalogApi } from '../catalog/api';
-import { catalogKeys, useCategories, useItems } from '../catalog/queries';
+import { catalogKeys, useCategories, useItems, useModifierGroups } from '../catalog/queries';
 import type { Item } from '../catalog/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/useSession';
@@ -18,12 +18,13 @@ import { DeviceRequired } from './components/DeviceRequired';
 import { ItemGrid } from './components/ItemGrid';
 import { OptionsDialog } from './components/OptionsDialog';
 import { WeightDialog } from './components/WeightDialog';
-import { useAddLine, useCart } from './queries';
+import { useCart, usePosAdds } from './queries';
 import { CUSTOMER_DISPLAY_PATH, customerDisplaySupported, stateForCart } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { CameraScanDialog } from '../../hardware/scanner/CameraScanDialog';
 import { cameraScanSupported } from '../../hardware/scanner/cameraSupport';
 import { useBarcodeWedge } from '../../hardware/scanner/useBarcodeWedge';
+import type { PendingRow } from './addQueue';
 import type { AddLineRequest } from './types';
 
 type Dialog = { kind: 'options'; item: Item } | { kind: 'weight'; item: Item } | null;
@@ -40,37 +41,42 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
   const items = useItems();
   const categories = useCategories();
   const cart = useCart(online);
-  const addLine = useAddLine();
+  const adds = usePosAdds();
+  const modifierGroups = useModifierGroups();
   const qc = useQueryClient();
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [resolving, setResolving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const visible = filterItems(items.data ?? [], { categoryId, query });
-  const lineCount = cart.data?.lines.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 1), 0) ?? 0;
+  const pendingCount = adds.pending.reduce((sum, row) => sum + (Number.isInteger(row.quantity) ? row.quantity : 1), 0);
+  const lineCount = (cart.data?.lines.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 1), 0) ?? 0) + pendingCount;
 
-  function add(request: AddLineRequest) {
-    addLine.mutate(request, { onSuccess: () => setDialog(null) });
+  /** Records the add and closes any dialog at once; the cart catches up as the server answers. */
+  function add(label: string, request: AddLineRequest) {
+    setDialog(null);
+    adds.add(label, request);
   }
+
+  // A business with no modifier groups at all cannot have any attached to an item, so the per-item check is skipped.
+  const mayHaveModifiers = modifierGroups.data === undefined || modifierGroups.data.length > 0;
 
   async function beginAdd(item: Item) {
     const flow = addFlowFor(item);
     if (flow === 'weight') return setDialog({ kind: 'weight', item });
     if (flow === 'variant' || flow === 'combo') return setDialog({ kind: 'options', item });
 
-    // A plain item goes straight in unless it has modifier groups to choose from.
-    setResolving(true);
+    // A plain item goes straight in, with no waiting, unless it has modifier groups to choose from.
+    const plainAdd = () => add(item.name, { itemId: item.id, itemVariantId: null, quantity: 1 });
+    if (!mayHaveModifiers) return plainAdd();
     try {
-      const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 60_000 });
+      const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 5 * 60_000 });
       if (groups.length > 0) setDialog({ kind: 'options', item });
-      else add({ itemId: item.id, itemVariantId: null, quantity: 1 });
+      else plainAdd();
     } catch (error) {
       toast.error(userMessage(error));
-    } finally {
-      setResolving(false);
     }
   }
 
@@ -103,8 +109,6 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
   if (!online) {
     return <ErrorState title="Selling needs a connection" message="Prices and stock are worked out by the server, so the till is paused while you are offline. It resumes when the connection returns." />;
   }
-
-  const busy = addLine.isPending || resolving;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
@@ -155,11 +159,11 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           </div>
         )}
         {items.isError && <ErrorState title="Items could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />}
-        {items.isSuccess && <ItemGrid items={visible} onPick={(item) => void beginAdd(item)} disabled={busy} />}
+        {items.isSuccess && <ItemGrid items={visible} onPick={(item) => void beginAdd(item)} />}
       </div>
 
       <aside className="hidden lg:sticky lg:top-4 lg:block lg:h-[calc(100dvh-6rem)]">
-        <CartArea cart={cart} isSupervisor={isSupervisor} onCheckout={() => navigate('/sell/payment')} />
+        <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
       </aside>
 
       <div className="fixed inset-x-4 bottom-24 z-30 lg:hidden">
@@ -179,7 +183,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
             Back to items
           </button>
           <div className="min-h-0 flex-1">
-            <CartArea cart={cart} isSupervisor={isSupervisor} onCheckout={() => navigate('/sell/payment')} />
+            <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
           </div>
         </div>
       )}
@@ -193,18 +197,18 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           onClose={() => setCameraOpen(false)}
         />
       )}
-      {dialog?.kind === 'options' && <OptionsDialog item={dialog.item} items={items.data ?? []} busy={addLine.isPending} onAdd={add} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'options' && <OptionsDialog item={dialog.item} items={items.data ?? []} busy={false} onAdd={(request) => add(dialog.item.name, request)} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'weight' && (
-        <WeightDialog item={dialog.item} busy={addLine.isPending} onAdd={(quantity) => add({ itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />
+        <WeightDialog item={dialog.item} busy={false} onAdd={(quantity) => add(dialog.item.name, { itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />
       )}
     </div>
   );
 }
 
-function CartArea({ cart, isSupervisor, onCheckout }: { cart: ReturnType<typeof useCart>; isSupervisor: boolean; onCheckout: () => void }) {
+function CartArea({ cart, isSupervisor, pending, onCheckout }: { cart: ReturnType<typeof useCart>; isSupervisor: boolean; pending: PendingRow[]; onCheckout: () => void }) {
   if (cart.isPending) return <Skeleton className="h-full min-h-96 w-full" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
-  return <CartPanel cart={cart.data} isSupervisor={isSupervisor} onCheckout={onCheckout} />;
+  return <CartPanel cart={cart.data} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} />;
 }
 
 function CategoryChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

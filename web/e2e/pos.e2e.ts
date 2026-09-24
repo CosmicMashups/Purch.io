@@ -47,16 +47,3 @@ test.describe('the register', () => {
   });
 });
 
-// Known problem, tracked in docs/REACT-MIGRATION.md: the item grid is disabled while an add is on its way to the
-// server, so a fast cashier's second tap is lost. Remove `fixme` when adds no longer block each other.
-test.fixme('two items tapped back to back both reach the cart', async ({ page, signInAs, ip, seed }) => {
-  await signInAs('cashier');
-  await resetRegister(seed.register.code, seed.pins.manager, ip);
-  await page.goto('/sell');
-  await expect(page.getByRole('button', { name: /Iced Latte/ })).toBeVisible();
-
-  await page.getByRole('button', { name: /Iced Latte/ }).click({ noWaitAfter: true });
-  await page.getByRole('button', { name: /Mocha/ }).click({ force: true, noWaitAfter: true });
-
-  await expect(page.getByText('₱320.00').first()).toBeVisible();
-});

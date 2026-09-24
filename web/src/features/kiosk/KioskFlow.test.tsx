@@ -10,6 +10,7 @@ import { KioskCartPage } from './KioskCartPage';
 import { KioskMenuPage } from './KioskMenuPage';
 import { KioskOrderTypePage } from './KioskOrderTypePage';
 import { useKioskStore } from './kioskStore';
+import { kioskAddQueue } from './queries';
 
 vi.mock('./api', () => ({
   deviceApi: { pair: vi.fn() },
@@ -17,7 +18,7 @@ vi.mock('./api', () => ({
   displayApi: { pending: vi.fn(), setKitchenStatus: vi.fn() },
 }));
 vi.mock('../catalog/api', () => ({
-  catalogApi: { listItems: vi.fn(), listCategories: vi.fn(), listItemModifierGroups: vi.fn(), listVariants: vi.fn(), listComboComponents: vi.fn() },
+  catalogApi: { listItems: vi.fn(), listModifierGroups: vi.fn(), listCategories: vi.fn(), listItemModifierGroups: vi.fn(), listVariants: vi.fn(), listComboComponents: vi.fn() },
 }));
 
 const other = [
@@ -32,6 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useToastStore.setState({ toasts: [] });
   useKioskStore.setState({ submitted: null });
+  kioskAddQueue.reset();
   signInAs('Kiosk', { device_id: 'k1', branch_id: 'b1' });
   vi.mocked(catalogApi.listItems).mockResolvedValue([
     makeItem({ id: 'latte', name: 'Iced Latte', basePrice: 150 }),
@@ -65,6 +67,36 @@ describe('KioskMenuPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Fish By Weight/ }));
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toMatch(/order at the counter/i));
     expect(kioskApi.addLine).not.toHaveBeenCalled();
+  });
+});
+
+describe('KioskMenuPage quick taps', () => {
+  it('lets a customer keep tapping while the first item is still being added', async () => {
+    let finish!: (c: ReturnType<typeof makeCart>) => void;
+    vi.mocked(kioskApi.addLine)
+      .mockReturnValueOnce(new Promise((r) => (finish = r)))
+      .mockResolvedValue(makeCart());
+    vi.mocked(catalogApi.listItems).mockResolvedValue([makeItem({ id: 'latte', name: 'Iced Latte', basePrice: 150 }), makeItem({ id: 'mocha', name: 'Mocha', basePrice: 170 })]);
+    renderPage(<KioskMenuPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
+    const mocha = screen.getByRole('button', { name: /Mocha/ });
+    expect(mocha).toBeEnabled();
+    fireEvent.click(mocha);
+
+    expect(await screen.findByText(/View your order \(2\)/)).toBeInTheDocument();
+    finish(makeCart({ lines: [makeLine({ id: 'a', itemName: 'Iced Latte' })] }));
+    await waitFor(() => expect(kioskApi.addLine).toHaveBeenCalledTimes(2));
+  });
+
+  it('will not continue to the next step while an item is still being added', async () => {
+    vi.mocked(kioskApi.getCart).mockResolvedValue(makeCart({ lines: [makeLine({ id: 'a', itemName: 'Iced Latte' })], totalAmount: 150 }));
+    vi.mocked(kioskApi.addLine).mockReturnValue(new Promise(() => undefined));
+    const { kioskAddQueue: q } = await import('./queries');
+    renderPage(<KioskCartPage />, { otherRoutes: other });
+    await screen.findAllByText('Iced Latte');
+    q.add({ send: kioskApi.addLine, onCart: () => undefined, onError: () => undefined }, 'Mocha', { itemId: 'mocha', itemVariantId: null, quantity: 1 });
+    expect(await screen.findByRole('status')).toHaveTextContent(/Adding Mocha/);
+    expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

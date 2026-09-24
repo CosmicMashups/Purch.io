@@ -3,6 +3,7 @@ import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { formatPeso } from '../../dashboard/format';
 import { useApplyPromoCode, useApplySeniorPwd, useRemoveLine, useSetOrderType, useUpdateLine, useVoidCart } from '../queries';
+import type { PendingRow } from '../addQueue';
 import type { Transaction, TransactionLine } from '../types';
 
 const ORDER_TYPES = ['Dine In', 'Take Out'] as const;
@@ -12,6 +13,8 @@ interface CartPanelProps {
   /** Admin or Manager. The API restricts Senior/PWD and voiding to them; this only hides what would be refused. */
   isSupervisor: boolean;
   onCheckout: () => void;
+  /** Adds still on their way to the server. Shown as rows without a price, and the cart cannot be changed or charged until they land. */
+  pending?: PendingRow[];
 }
 
 const stepper = 'grid size-12 place-items-center rounded-control border border-line text-xl font-semibold hover:border-brand disabled:opacity-40';
@@ -24,7 +27,7 @@ function lineDetails(line: TransactionLine): string[] {
   ];
 }
 
-export function CartPanel({ cart, isSupervisor, onCheckout }: CartPanelProps) {
+export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: CartPanelProps) {
   const update = useUpdateLine();
   const remove = useRemoveLine();
   const promo = useApplyPromoCode();
@@ -34,7 +37,8 @@ export function CartPanel({ cart, isSupervisor, onCheckout }: CartPanelProps) {
   const [code, setCode] = useState('');
   const [confirmVoid, setConfirmVoid] = useState(false);
 
-  const busy = update.isPending || remove.isPending || promo.isPending || senior.isPending || orderType.isPending || voidCart.isPending;
+  const updating = pending.length > 0;
+  const busy = updating || update.isPending || remove.isPending || promo.isPending || senior.isPending || orderType.isPending || voidCart.isPending;
   const empty = cart.lines.length === 0;
 
   function applyCode(event: React.FormEvent) {
@@ -61,7 +65,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout }: CartPanelProps) {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5">
-        {empty ? (
+        {empty && !updating ? (
           <p className="py-10 text-center text-base text-ink-soft">The cart is empty. Tap an item to add it.</p>
         ) : (
           <ul className="divide-y divide-line">
@@ -107,6 +111,14 @@ export function CartPanel({ cart, isSupervisor, onCheckout }: CartPanelProps) {
                 </li>
               );
             })}
+            {pending.map((row) => (
+              <li key={row.key} aria-label={`Adding ${row.label}`} className="flex items-center justify-between gap-3 py-4 text-ink-soft">
+                <p className="text-base font-semibold">
+                  {row.label} x {row.quantity}
+                </p>
+                <p className="text-sm">Adding...</p>
+              </li>
+            ))}
           </ul>
         )}
       </div>
@@ -188,7 +200,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout }: CartPanelProps) {
           onClick={onCheckout}
           className="h-16 rounded-control bg-brand text-xl font-bold text-on-brand hover:bg-brand-strong active:translate-y-px disabled:opacity-50"
         >
-          Charge {formatPeso(cart.totalAmount)}
+          {updating ? 'Updating...' : `Charge ${formatPeso(cart.totalAmount)}`}
         </button>
       </div>
 

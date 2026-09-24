@@ -5,7 +5,6 @@ import { addFlowFor, stockBadge } from '../catalogView';
 interface ItemGridProps {
   items: Item[];
   onPick: (item: Item) => void;
-  disabled: boolean;
 }
 
 function priceLabel(item: Item): string {
@@ -13,7 +12,7 @@ function priceLabel(item: Item): string {
   return formatPeso(item.basePrice);
 }
 
-export function ItemGrid({ items, onPick, disabled }: ItemGridProps) {
+export function ItemGrid({ items, onPick }: ItemGridProps) {
   if (items.length === 0) {
     return <p className="rounded-panel border border-dashed border-ink-soft/40 p-8 text-center text-base text-ink-soft">No items match. Try another category or search.</p>;
   }
@@ -27,9 +26,8 @@ export function ItemGrid({ items, onPick, disabled }: ItemGridProps) {
           <li key={item.id}>
             <button
               type="button"
-              disabled={disabled}
               onClick={() => onPick(item)}
-              className="flex min-h-32 w-full flex-col justify-between overflow-hidden rounded-panel border border-line bg-surface p-4 text-left hover:border-brand active:translate-y-px disabled:opacity-60"
+              className="flex min-h-32 w-full flex-col justify-between overflow-hidden rounded-panel border border-line bg-surface p-4 text-left hover:border-brand active:translate-y-px"
             >
               <span className="flex flex-col items-start gap-1">
                 {badge && (
