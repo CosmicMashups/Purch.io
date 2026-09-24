@@ -9,6 +9,7 @@ import { pricingTypeLabels } from '../labels';
 import { catalogApi } from '../api';
 import { useCategories, useCreateItem } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
+import { ImageUploadField } from '../../../components/forms/ImageUploadField';
 import { ApiError } from '../../../lib/apiError';
 
 type FormValues = z.infer<typeof createItemSchema>;
@@ -22,6 +23,7 @@ export function AddItemPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(createItemSchema),
@@ -29,6 +31,7 @@ export function AddItemPage() {
   });
 
   const pricingType = Number(watch('pricingType'));
+  const imageUrl = watch('imageUrl');
 
   // Sub-module fields — best-effort, mirroring add_item_screen.dart: if these don't parse to
   // a valid value, the item is still created and the matching secondary call is silently skipped.
@@ -151,9 +154,8 @@ export function AddItemPage() {
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
       </Field>
 
-      <Field label="Image URL">
-        <input {...register('imageUrl')} className={inputClass} />
-      </Field>
+      <input type="hidden" {...register('imageUrl')} />
+      <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <Field label="Pricing Type">
         <select {...register('pricingType', { valueAsNumber: true })} className={inputClass}>

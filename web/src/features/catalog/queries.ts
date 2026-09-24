@@ -11,6 +11,7 @@ import type {
   CreateItemRequest,
   CreateItemVariantRequest,
   CreateModifierGroupRequest,
+  ReplaceItemRecipeRequest,
   UpdateCategoryRequest,
   UpdateItemDepartmentRequest,
   UpdateItemRequest,
@@ -28,6 +29,7 @@ export const catalogKeys = {
   variants: (itemId: string) => ['items', itemId, 'variants'] as const,
   itemModifierGroups: (itemId: string) => ['items', itemId, 'modifierGroups'] as const,
   comboComponents: (itemId: string) => ['items', itemId, 'comboComponents'] as const,
+  recipe: (itemId: string) => ['items', itemId, 'recipe'] as const,
   departments: ['departments'] as const,
 };
 
@@ -215,4 +217,21 @@ export function useUpdateLowStockThreshold(itemId: string) {
 
 export function useDepartments() {
   return useQuery({ queryKey: catalogKeys.departments, queryFn: departmentsApi.listAllDepartments });
+}
+
+export function useRecipe(itemId: string) {
+  return useQuery({ queryKey: catalogKeys.recipe(itemId), queryFn: () => catalogApi.getRecipe(itemId), enabled: !!itemId });
+}
+
+export function useReplaceRecipe(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReplaceItemRecipeRequest) => catalogApi.replaceRecipe(itemId, body),
+    // Saving a recipe can retire or recreate the item's own stock record, so stock views are stale too.
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: catalogKeys.recipe(itemId) });
+      await qc.invalidateQueries({ queryKey: ['inventory-items'] });
+      await qc.invalidateQueries({ queryKey: catalogKeys.items });
+    },
+  });
 }

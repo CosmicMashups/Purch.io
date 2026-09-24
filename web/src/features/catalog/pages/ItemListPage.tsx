@@ -6,12 +6,15 @@ import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonRows } from '../../../components/Skeleton';
 import { StatusBadge } from '../../../components/StatusBadge';
+import { useTenantSettings } from '../../tenant/queries';
 import { PricingType } from '../types';
 import { pricingTypeLabels } from '../labels';
 
 export function ItemListPage() {
   const { data: items, isLoading, isError, error, refetch } = useItems();
   const { data: categories } = useCategories();
+  // Unknown (a non-Admin, or still loading) reads as off, exactly like the Flutter client.
+  const showRecipe = useTenantSettings().data?.useSeparateInventoryTracking === true;
   const [search, setSearch] = useState('');
 
   const categoryNameById = useMemo(() => {
@@ -95,7 +98,7 @@ export function ItemListPage() {
                     {!item.isActive && <StatusBadge label="Inactive" tone="neutral" />}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <ItemRowActions itemId={item.id} pricingType={item.pricingType} />
+                    <ItemRowActions itemId={item.id} pricingType={item.pricingType} showRecipe={showRecipe} />
                   </td>
                 </tr>
               ))}
@@ -107,7 +110,7 @@ export function ItemListPage() {
   );
 }
 
-function ItemRowActions({ itemId, pricingType }: { itemId: string; pricingType: PricingType }) {
+function ItemRowActions({ itemId, pricingType, showRecipe }: { itemId: string; pricingType: PricingType; showRecipe: boolean }) {
   const links: { to: string; label: string }[] = [{ to: `/catalog/items/${itemId}/edit`, label: 'Edit' }];
 
   if (pricingType === PricingType.WeightVolume) {
@@ -134,6 +137,7 @@ function ItemRowActions({ itemId, pricingType }: { itemId: string; pricingType: 
     { to: `/catalog/items/${itemId}/department`, label: 'Assign Department' },
     { to: `/catalog/items/${itemId}/low-stock-threshold`, label: 'Low-Stock Threshold' },
   );
+  if (showRecipe) links.push({ to: `/catalog/items/${itemId}/recipe`, label: 'Recipe' });
 
   return (
     <div className="flex flex-wrap justify-end gap-x-2 gap-y-1 text-xs">

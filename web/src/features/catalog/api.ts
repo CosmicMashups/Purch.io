@@ -13,6 +13,8 @@ import type {
   CreateModifierGroupRequest,
   Item,
   ItemBatch,
+  ItemRecipeLine,
+  ReplaceItemRecipeRequest,
   ItemComboComponent,
   ItemVariant,
   ModifierGroup,
@@ -74,4 +76,8 @@ export const catalogApi = {
     apiClient.put<Item>(`/items/${itemId}/department`, body).then((r) => r.data),
   updateLowStockThreshold: (itemId: string, body: UpdateLowStockThresholdRequest) =>
     apiClient.put<Item>(`/items/${itemId}/low-stock-threshold`, body).then((r) => r.data),
+
+  getRecipe: (itemId: string) => apiClient.get<ItemRecipeLine[]>(`/items/${itemId}/recipe`).then((r) => r.data),
+  replaceRecipe: (itemId: string, body: ReplaceItemRecipeRequest) =>
+    apiClient.put<ItemRecipeLine[]>(`/items/${itemId}/recipe`, body).then((r) => r.data),
 };

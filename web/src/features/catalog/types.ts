@@ -188,3 +188,19 @@ export interface UpdateItemDepartmentRequest {
 export interface UpdateLowStockThresholdRequest {
   threshold: number | null;
 }
+
+/** Mirrors Purch.Application.Inventory.ItemRecipeLineDto. A null quantity means "only check availability". */
+export interface ItemRecipeLine {
+  inventoryItemId: string;
+  inventoryItemName: string;
+  quantityPerOrder: number | null;
+}
+
+export interface ReplaceItemRecipeLine {
+  inventoryItemId: string;
+  quantityPerOrder: number | null;
+}
+
+export interface ReplaceItemRecipeRequest {
+  lines: ReplaceItemRecipeLine[];
+}

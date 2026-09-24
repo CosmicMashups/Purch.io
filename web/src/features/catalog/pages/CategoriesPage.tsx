@@ -1,9 +1,10 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { categorySchema } from '../schemas';
 import { useCategories, useCreateCategory, useUpdateCategory } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
+import { ImageUploadField } from '../../../components/forms/ImageUploadField';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
@@ -22,11 +23,14 @@ export function CategoriesPage() {
     register,
     handleSubmit,
     reset,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: { name: '', sortOrder: 0, imageUrl: null },
   });
+  const imageUrl = useWatch({ control, name: 'imageUrl' });
 
   function startEdit(category: Category) {
     setEditing(category);
@@ -57,9 +61,8 @@ export function CategoriesPage() {
         <Field label="Sort order" error={errors.sortOrder?.message}>
           <input type="number" {...register('sortOrder')} className={inputClass} />
         </Field>
-        <Field label="Image URL">
-          <input {...register('imageUrl')} className={inputClass} />
-        </Field>
+        <input type="hidden" {...register('imageUrl')} />
+        <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
         <div className="flex gap-2">
           <button
             type="submit"

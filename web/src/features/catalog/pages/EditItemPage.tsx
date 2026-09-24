@@ -1,10 +1,11 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { z } from 'zod';
 import { updateItemSchema } from '../schemas';
 import { useCategories, useItems, useUpdateItem } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
+import { ImageUploadField } from '../../../components/forms/ImageUploadField';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { pricingTypeLabels } from '../labels';
 import { ApiError } from '../../../lib/apiError';
@@ -25,6 +26,8 @@ export function EditItemPage() {
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(updateItemSchema),
@@ -41,6 +44,8 @@ export function EditItemPage() {
         }
       : undefined,
   });
+
+  const imageUrl = useWatch({ control, name: 'imageUrl' });
 
   if (!item || !itemId) {
     return <p className="text-sm text-gray-500">Loading…</p>;
@@ -103,9 +108,8 @@ export function EditItemPage() {
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
       </Field>
 
-      <Field label="Image URL">
-        <input {...register('imageUrl')} className={inputClass} />
-      </Field>
+      <input type="hidden" {...register('imageUrl')} />
+      <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         <input type="checkbox" {...register('isActive')} />
