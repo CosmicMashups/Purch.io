@@ -132,12 +132,12 @@ This is a **parity gap versus Flutter**, chosen deliberately to avoid duplicatin
 
 | Device | Class | Web approach | Status |
 |---|---|---|---|
-| Barcode scanner | A / B | USB/Bluetooth HID scanners act as keyboards; camera scan via `BarcodeDetector` or a ZXing library | TODO |
-| Receipt printer | B / C | Browser print with 80mm CSS now; raw ESC/POS needs WebUSB/Web Serial (Chromium) or a local bridge | TODO |
-| Cash drawer | C | Opened by printer pulse; needs the same bridge. Not faked. | TODO |
-| Scale | B | Web Serial (Chromium only) | TODO |
-| Customer-facing display | B | Second window/route via BroadcastChannel (Flutter used a local HTTP server) | TODO |
-| Kiosk OS lock | E | Only the Fullscreen API. OS pinning is not possible in a browser. | BROWSER LIMITATION |
+| Barcode scanner | A / B | USB/Bluetooth keyboard-mode scanners: a fast run of keys ending in Enter is read as a scan anywhere on Sell (`hardware/scanner/wedge.ts`), and the search box still works. Camera scan uses the browser's `BarcodeDetector` (Chrome and Edge, secure page). | DONE. Camera scanning needs a real device to try; only the unsupported and mocked paths are tested. |
+| Receipt printer | B / C | Browser print. The receipt is a named 80 mm or 58 mm page (`@page`), chosen in Hardware settings. Raw ESC/POS was not built (see G25). | DONE for browser print. Direct ESC/POS: NOT BUILT. |
+| Cash drawer | C | It opens from a pulse sent through the receipt printer, so it needs the same raw printer link. Not faked. | NOT BUILT (G25) |
+| Scale | B | Web Serial (`hardware/scale`): CAS and Mettler-Toledo lines parsed by a port of the Flutter parsers, zero and tare, and a live panel. A weight is only accepted when settled, recent, above zero, not overloaded and in a known unit (kg, g, lb; converted to kg). | DONE. Not tried on a physical scale (G26). |
+| Customer-facing display | B | A second window at `/customer-display` fed by `BroadcastChannel`; shows welcome, the order, amount to pay, and thank you with change. Shows only server figures. | DONE. Same browser only (G27). |
+| Kiosk OS lock | E | Full screen button on the kiosk, kitchen display, order board and customer display. Hides the browser bars only. | BROWSER LIMITATION |
 
 ## G. Discrepancy and gap log
 
@@ -179,7 +179,10 @@ This is a **parity gap versus Flutter**, chosen deliberately to avoid duplicatin
 | G4 | BACKEND GAP | `/sync` records metadata only; payloads are applied via `/transactions/checkout`. Unverified. |
 | G22 | BACKEND GAP | The kiosk has no way to empty its cart (there is no void route for the Kiosk role), and a customer who walks away leaves their lines in it. The next customer sees them, exactly as in Flutter. The web does not hide or delete them silently. Needs a kiosk void or an idle-expiry on the server. |
 | G23 | DESIGN | A browser stores one session per site, so a browser paired as a kiosk or display cannot also be used for staff. It shows a plain screen saying so, with Sign out. Use a separate browser profile per device. A staff token is likewise kept out of device screens and a device token out of the staff shell (`RequireAuth`, `RequireDevice`). |
-| G24 | DESIGN | Resetting a public device (ending its session) is behind a 3 second hold on the heading for the kiosk and order board, so a customer cannot strand it, and a visible Unpair button on the kitchen display. Re-pairing needs the device PIN. Fullscreen and screen lock are Phase 11. |
+| G24 | DESIGN | Resetting a public device (ending its session) is behind a 3 second hold on the heading for the kiosk and order board, so a customer cannot strand it, and a visible Unpair button on the kitchen display. Re-pairing needs the device PIN. A full screen button is provided on each device screen (F). |
+| G25 | BROWSER LIMIT | Direct receipt printing (ESC/POS) and the cash drawer were not built. Browsers cannot send raw commands to a printer driver. It would need Web Serial or WebUSB against a printer that shows up as a port, which cannot be verified without that hardware, or a small local bridge program. Browser print covers receipts. The drawer has to be opened by hand, and the Flutter option to open it on cash sales has no web equivalent. |
+| G26 | RISK | The scale code follows the Flutter parsers and was tested against a mocked serial port. It has not been tried on a physical CAS or Mettler-Toledo scale. Flutter only read from network (TCP) scales; the web reads USB or serial ones, so the first real test may need a different baud rate or line format. Weighed quantities are kilograms only, as in Flutter (a litre-priced item would be wrong). |
+| G27 | BROWSER LIMIT | The customer display works only in the same browser as the till (a second window on a second monitor). Flutter served it over a local HTTP server so a separate tablet could show it. That is not possible from a browser without a relay. It shows only the order and total. |
 | G5 | RISK | `/order-board/session` and `/kitchen-display/session` are anonymous and not rate limited. |
 | G6 | RISK | Scope enforcement for catalog/promo writes is unverified. |
 | G7 | RISK | PIN login checks every active user's BCrypt hash in the tenant (latency). |
@@ -198,7 +201,15 @@ This is a **parity gap versus Flutter**, chosen deliberately to avoid duplicatin
 8. Business / settings
 9. Offline read cache and conflict screen (DONE)
 10. Kiosk and displays (DONE)
-11. Hardware
+11. Hardware (DONE, except direct printing and the cash drawer)
 12. Regression (Playwright E2E)
+
+## I. Follow-ups queued by the product owner
+
+To be done after the remaining delivery steps.
+
+1. **Name the app "Purch.io".** `npm run dev` still prints `web@0.0.0 dev` and the browser tab title is "web". Set the package name and the page title.
+2. **Vary the Home charts.** Use different chart types on Home instead of only bars and raw numbers. The figures must still come from the server.
+3. **Faster add to cart (web and Flutter).** Adding an item makes the register wait for the server, and the next item cannot be added until it finishes. In the web the item grid is disabled while an add is pending (`SellPage` `busy`) and every add is a round trip. Cashier speed is the top priority, so adds must not block each other. Prices stay the server's; there is no client pricing.
 
 Per phase: `npm --prefix web run lint`, `tsc -b`, `npm --prefix web test`, `npm --prefix web run build`.
