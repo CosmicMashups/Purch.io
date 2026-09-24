@@ -18,8 +18,9 @@ mkdirSync(logDir, { recursive: true });
 const DB_CONTAINER = 'purch-e2e-db';
 const DB_PORT = process.env.E2E_DB_PORT ?? '55432';
 const API_PORT = process.env.E2E_API_PORT ?? '5099';
+const DB_NAME = process.env.E2E_DB_NAME ?? 'purch';
 const DB_PASSWORD = 'purch_e2e_password';
-const CONNECTION = `Host=127.0.0.1;Port=${DB_PORT};Database=purch;Username=purch;Password=${DB_PASSWORD}`;
+const CONNECTION = `Host=127.0.0.1;Port=${DB_PORT};Database=${DB_NAME};Username=purch;Password=${DB_PASSWORD}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const docker = (...args) => spawnSync('docker', args, { encoding: 'utf8' });
@@ -30,7 +31,7 @@ function startDockerDatabase() {
   if (state.status === 0) {
     if (state.stdout.trim() !== 'true' && docker('start', DB_CONTAINER).status !== 0) return false;
   } else {
-    const run = docker('run', '-d', '--name', DB_CONTAINER, '-e', 'POSTGRES_DB=purch', '-e', 'POSTGRES_USER=purch', '-e', `POSTGRES_PASSWORD=${DB_PASSWORD}`, '-p', `${DB_PORT}:5432`, 'postgres:16');
+    const run = docker('run', '-d', '--name', DB_CONTAINER, '-e', `POSTGRES_DB=${DB_NAME}`, '-e', 'POSTGRES_USER=purch', '-e', `POSTGRES_PASSWORD=${DB_PASSWORD}`, '-p', `${DB_PORT}:5432`, 'postgres:16');
     if (run.status !== 0) {
       console.error(`Docker could not start Postgres:\n${run.stderr}`);
       return false;
@@ -41,7 +42,7 @@ function startDockerDatabase() {
 
 async function waitForDockerDatabase() {
   for (let i = 0; i < 60; i++) {
-    if (docker('exec', DB_CONTAINER, 'pg_isready', '-U', 'purch', '-d', 'purch').status === 0) return true;
+    if (docker('exec', DB_CONTAINER, 'pg_isready', '-U', 'purch', '-d', DB_NAME).status === 0) return true;
     await sleep(1000);
   }
   return false;
@@ -86,7 +87,7 @@ async function startLocalDatabase() {
       return false;
     }
   }
-  const create = run('createdb', '-h', '127.0.0.1', '-p', DB_PORT, '-U', 'purch', 'purch');
+  const create = run('createdb', '-h', '127.0.0.1', '-p', DB_PORT, '-U', 'purch', DB_NAME);
   // "already exists" is fine on a reused data folder.
   return create.status === 0 || /already exists/.test(create.stderr);
 }
@@ -107,7 +108,7 @@ async function startDatabase() {
 
 await startDatabase();
 
-const log = createWriteStream(path.join(logDir, 'backend.log'));
+const log = createWriteStream(path.join(logDir, `backend-${API_PORT}.log`));
 
 // Cloud mode is used because it honours X-Forwarded-For, which lets each test present its own client
 // address and never share the 10-per-15-minutes sign-in limit. The storage settings are unused here.
