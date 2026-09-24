@@ -1,4 +1,5 @@
 import { useForm, useWatch } from 'react-hook-form';
+import { ITEM_SAMPLES } from '../../../lib/images';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { categorySchema } from '../schemas';
@@ -62,7 +63,7 @@ export function CategoriesPage() {
           <input type="number" {...register('sortOrder')} className={inputClass} />
         </Field>
         <input type="hidden" {...register('imageUrl')} />
-        <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+        <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
         <div className="flex gap-2">
           <button
             type="submit"

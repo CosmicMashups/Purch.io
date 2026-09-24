@@ -1,9 +1,7 @@
 import axios, { isAxiosError, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { API_BASE_URL as baseURL } from './apiBase';
 import { useAuthStore } from './authStore';
 import { ApiError, type ApiErrorKind } from './apiError';
-
-// In dev, /api is proxied by Vite (vite.config.ts) so the browser never makes a cross-origin call.
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/api' : 'https://purch-io-backend.vercel.app');
 
 export const apiClient = axios.create({
   baseURL,

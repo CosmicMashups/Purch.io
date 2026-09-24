@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrandMark, Wordmark } from '../../components/brand/Brand';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -100,7 +101,10 @@ export function LoginPage() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)]">
       <aside className="hidden flex-col justify-between bg-brand p-12 text-on-brand lg:flex">
-        <span className="text-2xl font-bold tracking-tight">Purch.io</span>
+        <div className="flex items-center gap-4">
+          <BrandMark size={64} className="border-white/30" />
+          <Wordmark height={36} onBrand />
+        </div>
         <p className="max-w-md text-4xl font-bold leading-tight tracking-tight">One till for everything you sell.</p>
       </aside>
 

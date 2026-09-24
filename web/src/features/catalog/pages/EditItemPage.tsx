@@ -1,4 +1,5 @@
 import { useForm, useWatch } from 'react-hook-form';
+import { ITEM_SAMPLES } from '../../../lib/images';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { z } from 'zod';
@@ -109,7 +110,7 @@ export function EditItemPage() {
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />
-      <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+      <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         <input type="checkbox" {...register('isActive')} />

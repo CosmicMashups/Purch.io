@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PurchImage } from '../../components/brand/PurchImage';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState } from '../../components/ErrorState';
@@ -100,7 +101,7 @@ export function KioskMenuPage() {
                   onClick={() => void pick(item)}
                   className="flex h-full min-h-44 w-full flex-col overflow-hidden rounded-panel border border-line bg-surface text-left active:translate-y-px disabled:opacity-50"
                 >
-                  {item.imageUrl && <img src={item.imageUrl} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />}
+                  {item.imageUrl && <PurchImage src={item.imageUrl} alt="" className="aspect-[4/3] w-full object-cover" />}
                   <span className="flex flex-1 flex-col justify-between gap-2 p-4">
                     <span className="line-clamp-2 text-lg font-semibold leading-snug">{item.name}</span>
                     <span className="text-lg font-bold tabular-nums text-brand-strong">

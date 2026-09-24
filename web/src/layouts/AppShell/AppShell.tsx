@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Cube, House, CashRegister, SignOut, Storefront, WifiSlash } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
+import { BrandMark } from '../../components/brand/Brand';
 import { signOut } from '../../features/auth/signOut';
 import { useSession } from '../../features/auth/useSession';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
@@ -36,7 +37,9 @@ export function AppShell() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 print:hidden flex items-stretch gap-1 border-t border-line bg-surface p-2 md:inset-y-0 md:right-auto md:w-28 md:flex-col md:justify-start md:border-t-0 md:border-r"
       >
-        <div className="hidden px-1 pb-3 pt-2 text-center text-lg font-bold tracking-tight text-brand md:block">Purch.io</div>
+        <div className="hidden justify-center pb-3 pt-2 md:flex">
+          <BrandMark size={56} />
+        </div>
         {tabs.map((tab) => {
           const { label, icon: TabIcon, matches } = TAB_META[tab];
           const active = matches(pathname);

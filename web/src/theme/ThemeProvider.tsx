@@ -3,26 +3,7 @@ import { useSession } from '../features/auth/useSession';
 import { useTenantSettings } from '../features/tenant/queries';
 import type { TenantSettings } from '../features/tenant/types';
 import { brandingToCssVars, type TenantBranding } from './branding';
-
-const CACHE_KEY = 'purch.branding';
-
-function readCache(): Partial<TenantBranding> | null {
-  try {
-    const raw = window.localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as Partial<TenantBranding>) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(branding: TenantBranding | null): void {
-  try {
-    if (branding) window.localStorage.setItem(CACHE_KEY, JSON.stringify(branding));
-    else window.localStorage.removeItem(CACHE_KEY);
-  } catch {
-    // Storage unavailable: the theme just falls back to defaults next load.
-  }
-}
+import { writeBrandCache, readBrandCache } from './brandCache';
 
 function applyVars(vars: Record<string, string>): void {
   const root = document.documentElement.style;
@@ -55,17 +36,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const branding = useMemo(() => (data ? toBranding(data) : null), [data]);
 
   useEffect(() => {
-    if (branding) writeCache(branding);
+    if (branding) writeBrandCache(branding);
   }, [branding]);
 
   useEffect(() => {
     if (!signedIn) {
       // The previous tenant's look must not linger on the sign-in screen for the next one.
-      writeCache(null);
+      writeBrandCache(null);
       applyVars({});
       return;
     }
-    applyVars(brandingToCssVars(branding ?? readCache()));
+    applyVars(brandingToCssVars(branding ?? readBrandCache()));
   }, [signedIn, branding]);
 
   return <>{children}</>;

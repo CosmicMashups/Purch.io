@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { PurchImage } from '../../../components/brand/PurchImage';
 import { Link } from 'react-router-dom';
 import { useCategories, useItems } from '../queries';
 import { StaleDataNotice } from '../../../components/feedback/StaleDataNotice';
@@ -78,7 +79,7 @@ export function ItemListPage() {
                 <tr key={item.id}>
                   <td className="flex items-center gap-2 px-4 py-2">
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" className="h-8 w-8 rounded object-cover" />
+                      <PurchImage src={item.imageUrl} alt="" className="h-8 w-8 rounded object-cover" errorNode={<div className="h-8 w-8 rounded bg-gray-100" />} />
                     ) : (
                       <div className="h-8 w-8 rounded bg-gray-100" />
                     )}

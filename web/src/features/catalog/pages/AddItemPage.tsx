@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ITEM_SAMPLES } from '../../../lib/images';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
@@ -155,7 +156,7 @@ export function AddItemPage() {
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />
-      <ImageUploadField label="Image" value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+      <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <Field label="Pricing Type">
         <select {...register('pricingType', { valueAsNumber: true })} className={inputClass}>

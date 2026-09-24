@@ -1,4 +1,5 @@
 import { useForm, useWatch } from 'react-hook-form';
+import { SAMPLE_IMAGE } from '../../../lib/images';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
 import { ColorField } from '../../../components/forms/ColorField';
@@ -88,7 +89,7 @@ export function BrandingSection({ settings }: { settings: TenantSettings }) {
         <ImageUploadField label="Logo" value={values.logoUrl || null} onChange={(url) => setValue('logoUrl', url ?? '', { shouldDirty: true })} />
 
         <input type="hidden" {...register('kioskPosterImageUrl')} />
-        <ImageUploadField label="Kiosk poster" value={values.kioskPosterImageUrl || null} onChange={(url) => setValue('kioskPosterImageUrl', url ?? '', { shouldDirty: true })} />
+        <ImageUploadField label="Kiosk poster" samples={[{ label: 'Use default', value: SAMPLE_IMAGE.kioskPoster }]} value={values.kioskPosterImageUrl || null} onChange={(url) => setValue('kioskPosterImageUrl', url ?? '', { shouldDirty: true })} />
 
         <div>
           <PrimaryButton type="submit" busy={save.isPending}>

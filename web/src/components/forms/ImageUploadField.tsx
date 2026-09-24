@@ -2,16 +2,19 @@ import { useId, useRef, useState } from 'react';
 import { userMessage } from '../../lib/apiError';
 import { uploadsApi } from '../../features/uploads/api';
 import { ACCEPTED_IMAGE_EXTENSIONS, validateImageFile } from '../../features/uploads/imageRules';
+import { PurchImage } from '../brand/PurchImage';
 import { SecondaryButton } from './FormField';
 
 interface ImageUploadFieldProps {
   label: string;
   value: string | null;
   onChange: (url: string | null) => void;
+  /** Bundled pictures the user can pick instead of uploading, e.g. Rice Bowl. The stored value is the assets/ path. */
+  samples?: { label: string; value: string }[];
 }
 
 /** Uploads through the API and hands back the hosted URL. Never stores the file itself. */
-export function ImageUploadField({ label, value, onChange }: ImageUploadFieldProps) {
+export function ImageUploadField({ label, value, onChange, samples = [] }: ImageUploadFieldProps) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -46,12 +49,18 @@ export function ImageUploadField({ label, value, onChange }: ImageUploadFieldPro
       </p>
       <div className="flex items-center gap-4">
         <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-control border border-line bg-canvas text-sm text-ink-soft">
-          {value ? <img src={value} alt="" className="size-full object-cover" /> : 'No image'}
+          {value ? <PurchImage src={value} alt="" className="size-full object-cover" errorNode={'Not found'} /> : 'No image'}
         </div>
         <div className="flex flex-wrap gap-2">
           <SecondaryButton type="button" disabled={busy} onClick={() => input.current?.click()} aria-describedby={`${id}-label`}>
             {busy ? 'Uploading...' : value ? 'Change image' : 'Upload image'}
           </SecondaryButton>
+          {!busy &&
+            samples.map((sample) => (
+              <SecondaryButton key={sample.value} type="button" onClick={() => onChange(sample.value)} aria-pressed={value === sample.value}>
+                {sample.label}
+              </SecondaryButton>
+            ))}
           {value && !busy && (
             <SecondaryButton type="button" onClick={() => onChange(null)}>
               Remove

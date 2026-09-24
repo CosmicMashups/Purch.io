@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SAMPLE_IMAGE } from '../../lib/images';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from '../../components/feedback/toastStore';
 import { EditorCard } from '../../components/forms/EditorCard';
@@ -174,7 +175,7 @@ function GcashForm({ branch }: { branch: Branch }) {
       <h3 className="text-lg font-semibold">Manual GCash QR</h3>
       <p className="text-sm text-ink-soft">Cashiers show this QR to customers who pay by GCash. Confirm each payment by hand.</p>
       <input type="hidden" {...register('qrImageUrl')} />
-      <ImageUploadField label="QR image" value={qr || null} onChange={(url) => setValue('qrImageUrl', url ?? '', { shouldDirty: true })} />
+      <ImageUploadField label="QR image" samples={[{ label: 'Use sample', value: SAMPLE_IMAGE.gcashQr }]} value={qr || null} onChange={(url) => setValue('qrImageUrl', url ?? '', { shouldDirty: true })} />
       <FormField label="Account name">
         <input {...register('accountName')} className={controlClass} />
       </FormField>
