@@ -75,6 +75,17 @@ html {
   }
 }
 
+/* Prevent browser autofill from painting harsh default yellow/blue backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #f8fafc inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: var(--ink);
+}
+
 /* Receipts print on narrow thermal paper. Each width is its own named page so the browser sizes the sheet. */
 @page receipt-mm80 {
   size: 80mm auto;
