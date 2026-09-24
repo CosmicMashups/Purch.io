@@ -1,6 +1,6 @@
 /// Mirrors Purch.Domain.Enums.DeviceType exactly, in declared order (sent/
 /// received as a plain integer, same as onboarding_enums.dart's enums).
-enum DeviceType { register, kiosk, orderBoard, kitchenDisplay }
+enum DeviceType { register, kiosk, orderBoard, kitchenDisplay, warehouseOfficer }
 
 /// Mirrors Purch.Application.Onboarding.DeviceDto.
 class Device {

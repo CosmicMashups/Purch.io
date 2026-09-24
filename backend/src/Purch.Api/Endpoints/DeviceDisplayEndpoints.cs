@@ -60,6 +60,15 @@ public static class DeviceDisplayEndpoints
             Results.Ok(await transactionService.UpdateKitchenStatusAsync(transactionId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(kitchenDisplayOnly));
 
+        _ = app.MapPost("/warehouse-officer/session", async (
+            UnattendedSessionRequest request,
+            IUnattendedSessionService sessionService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await sessionService.PairAsync(request, DeviceType.WarehouseOfficer, Role.Warehouse, cancellationToken);
+            return MapSessionResult(result);
+        }).AllowAnonymous();
+
         return app;
     }
 

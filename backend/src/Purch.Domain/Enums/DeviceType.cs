@@ -20,4 +20,9 @@ public enum DeviceType
     /// <summary>An unattended display showing pending orders with line items,
     /// for kitchen staff preparing food.</summary>
     KitchenDisplay,
+
+    /// <summary>An unattended device for a warehouse officer, paired with a
+    /// pairing PIN. Its session carries the Warehouse role, so it only ever
+    /// sees Home and Inventory.</summary>
+    WarehouseOfficer,
 }

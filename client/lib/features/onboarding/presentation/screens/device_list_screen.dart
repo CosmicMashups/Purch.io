@@ -13,6 +13,7 @@ import 'add_device_screen.dart';
   DeviceType.kiosk => (Icons.storefront_rounded, 'Self-Order Kiosk'),
   DeviceType.orderBoard => (Icons.confirmation_number_rounded, 'Order Number Board'),
   DeviceType.kitchenDisplay => (Icons.soup_kitchen_rounded, 'Kitchen Display'),
+  DeviceType.warehouseOfficer => (Icons.warehouse_rounded, 'Warehouse Officer'),
 };
 
 /// A3's device list. Each device's pairing code is shown plainly — the admin

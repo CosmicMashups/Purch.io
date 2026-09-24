@@ -218,6 +218,10 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                             value: DeviceType.kitchenDisplay,
                             child: Text('Kitchen Display'),
                           ),
+                          DropdownMenuItem(
+                            value: DeviceType.warehouseOfficer,
+                            child: Text('Warehouse Officer (Home + Inventory)'),
+                          ),
                         ],
                         onChanged:
                             isLoading

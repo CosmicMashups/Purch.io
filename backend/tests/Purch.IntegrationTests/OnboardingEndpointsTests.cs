@@ -237,6 +237,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     [InlineData(DeviceType.OrderBoard, "/order-board/session", nameof(Role.OrderBoard))]
     [InlineData(DeviceType.KitchenDisplay, "/kitchen-display/session", nameof(Role.KitchenDisplay))]
     [InlineData(DeviceType.Kiosk, "/kiosk/session", nameof(Role.Kiosk))]
+    [InlineData(DeviceType.WarehouseOfficer, "/warehouse-officer/session", nameof(Role.Warehouse))]
     public async Task An_unattended_device_pairs_and_keeps_its_own_role_when_its_token_is_refreshed(DeviceType deviceType, string sessionPath, string expectedRole)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
