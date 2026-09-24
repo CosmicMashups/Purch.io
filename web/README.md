@@ -33,13 +33,13 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 
 ## Deployment
 
-The web client is configured for deployment to **Cloudflare Pages**.
-- Direct navigation and SPA routing fallback are handled via `public/_redirects`.
+The web client is configured for deployment to **Cloudflare** (Workers Static Assets).
+- Direct navigation and SPA routing fallback are handled natively via `"not_found_handling": "single-page-application"` in `wrangler.jsonc`.
 - Caching policies and security headers are specified via `public/_headers`.
-- Cloudflare Pages settings are defined in `wrangler.jsonc` and `package.json`.
+- Cloudflare configuration is defined in `wrangler.jsonc` and `package.json`.
 
 Commands:
-- `npm run preview:cf`: Test the Cloudflare Pages edge build locally with Wrangler.
-- `npm run deploy:cf`: Build and deploy to Cloudflare Pages.
+- `npm run preview:cf`: Test the Cloudflare edge build locally with Wrangler.
+- `npm run deploy:cf`: Build and deploy to Cloudflare.
 
 For detailed setup instructions, CI/CD, and backend CORS configuration, see [docs/CLOUDFLARE-DEPLOYMENT.md](../docs/CLOUDFLARE-DEPLOYMENT.md).

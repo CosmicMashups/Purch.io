@@ -1,3 +1,0 @@
-# Cloudflare Pages SPA client-side routing fallback
-# Ensures direct navigation and reloads to React Router routes (/sell, /kiosk, /business, etc.) serve index.html with a 200 OK.
-/*    /index.html   200
