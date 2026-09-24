@@ -3,6 +3,7 @@ import { AppShell } from './layouts/AppShell/AppShell';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { RequireTab } from './features/auth/RequireTab';
 import { LoginPage } from './features/auth/LoginPage';
+import { HomePage } from './features/dashboard/HomePage';
 import { InventoryHomePage } from './features/inventory/pages/InventoryHomePage';
 import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
 import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
@@ -10,6 +11,7 @@ import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPag
 import { RecordMovementPage } from './features/inventory/pages/RecordMovementPage';
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
+import { ReportsPage } from './features/reports/ReportsPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { CustomersPage } from './features/credit/CustomersPage';
 import { KioskOrdersPage } from './features/pos/KioskOrdersPage';
@@ -40,6 +42,7 @@ export function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
+          <Route path="/" element={<HomePage />} />
 
           <Route element={<RequireTab tab="sell" />}>
             <Route path="/sell" element={<SellPage />} />
@@ -63,6 +66,7 @@ export function App() {
 
           <Route element={<RequireTab tab="business" />}>
             <Route path="/business/promotions" element={<PromotionsPage />} />
+            <Route path="/business/reports" element={<ReportsPage />} />
             <Route path="/business/customers" element={<CustomersPage />} />
             <Route path="/catalog/items" element={<ItemListPage />} />
             <Route path="/catalog/items/new" element={<AddItemPage />} />
