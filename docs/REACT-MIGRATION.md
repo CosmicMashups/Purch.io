@@ -214,7 +214,7 @@ Running it locally needs .NET 9 and either Docker or a local PostgreSQL install:
 - `PW_CHANNEL=chrome` (or `msedge`) uses an installed browser instead of Playwright's own download.
 - Ports: API 5099, web 5180, database 55432 (`E2E_API_PORT`, `E2E_WEB_PORT`, `E2E_DB_PORT`).
 
-What is covered (36 tests, 35 running and 1 known-problem test marked `fixme`):
+What is covered (44 tests, 43 running and 1 known-problem test marked `fixme`):
 - **Sign-in:** register code and PIN, wrong PIN message, owner email and password, redirect when signed out, sign out clearing the session.
 - **Roles:** the tabs each role sees, pages each role is turned away from, Manager without Devices and Settings, admin-only pages by address.
 - **Device sessions:** a kiosk token cannot enter the staff shell, a staff token cannot use a device screen, unpaired kiosk goes to pairing.
@@ -224,6 +224,7 @@ What is covered (36 tests, 35 running and 1 known-problem test marked `fixme`):
 - **Customer display:** a second window follows the sale, including one opened after the order started.
 - **Offline:** the saved catalog is shown with no connection and says how old it is, selling is paused, sign-out wipes the saved data, and another business never sees it.
 - **Quick adds:** two items tapped back to back both reach the cart; five taps against a server made 1.5 seconds slow are all accepted at once, shown as "adding" rows, merged into fewer requests, and end at the right total; a burst of seven taps on one item comes out as seven.
+- **Dashboards:** Home shows revenue, the busiest-days calendar, top sellers and stock health with no error; each chart has a table view and can be read with the arrow keys; a manager and a warehouse officer see only what their role allows. The Business page leads with what needs attention, then money owed, the team and (for admins) devices, with live figures beside each link.
 - **Admin:** add an item, add a staff member who can then sign in, a reused PIN is refused, a manager only sees the staff list.
 
 Each test uses its own client address (`X-Forwarded-For`) so the 10-per-15-minutes sign-in limit is never shared. Tests run one at a time because every device owns one open cart on the server.
@@ -236,14 +237,17 @@ Each test uses its own client address (`X-Forwarded-For`) so the 10-per-15-minut
 | G31 | UNVERIFIED | The CI job (`e2e` in `web-ci.yml`) has not run yet. It follows the same steps used locally, with Docker for Postgres and Playwright's Chromium. Its first run may need small fixes. |
 | D21 | IMPLEMENTATION | **Register adds are queued, not awaited** (`features/pos/addQueue.ts`, `useCartAdds.ts`). Every tap is recorded at once and sent in order, one request at a time, because the server keeps one cart per device and merges lines, so two at once could race. Taps on the same plain item that are waiting are merged into one request with the summed quantity. The screen shows waiting adds as "Adding..." rows with no price (the web still has no pricing of its own), and editing, promo codes and Charge stay disabled until the queue is empty, so nothing can be charged before the server has priced it. A failed add is named in a message and the rest carry on. The queue is emptied when the session ends. Adding no longer blocks the item grid, and dialogs close the moment they are confirmed. When a business has no modifier groups at all, the per-item modifier lookup is skipped. The kiosk menu uses the same queue. |
 | D22 | IMPLEMENTATION | **Flutter register**: pricing was already local, but every tap first awaited a fresh network lookup of that item's modifier groups (the provider was dropped as soon as the tap finished) and the first add of each item then fetched them a second time for pricing. The lookup is now one shared provider kept for five minutes (a failure is never kept), the pricing code reads through it, and the "Added" confirmation replaces the previous one instead of queueing a four-second snackbar per tap. Not changed: the kiosk cart notifier still shows a loading state on every add. |
+| D23 | DESIGN DECISION | **Charts are hand-built SVG and HTML** (`components/charts`), not a chart library, so text stays crisp, colours follow the tenant theme, and the bundle stays small. The form follows the data's job: a line and area for revenue over time with a crosshair and arrow-key reading, a calendar heat map for the busiest days, horizontal bars for top sellers, a ring for departments (six at most, the rest folded into a muted Other), a single stacked strip for branches, a lollipop list for people, meters for a count against its whole, bullet charts for stock against its alert level and credit against its limit, a dot plot for stock movement, a waffle of squares for the team, and a seven day timeline for devices. Rules kept everywhere: one accent (the tenant colour, darkened if too pale to read as a line, `--viz-accent`), a fixed eight colour order for identity that follows the entity and never its rank (validated for colour-blind separation; three of its colours fall under 3:1 on white, so every such chart has visible labels and values), thin marks, hairline grid, values in words as well as colour (status colours always come with an icon and text), a "Show as table" view on the line chart and the calendar, and rows that stack when their container is narrow. Nothing is recomputed: bars, arcs and shares only scale the server's numbers. |
+| G32 | DESIGN | The browser tab icon is still the Vite default, because the only Purch.io logo files (`web/src/assets/logo.*`) are not in version control and the SVG is 74 KB, too heavy for a favicon. Needs a small square logo. |
+| G33 | BACKEND GAP | `/reports/sales-dashboard` returns a 14 day daily trend, although it also reports 7 and 30 day totals. The Home line chart and calendar therefore show two weeks. A full month of daily figures needs the API to return them. |
 | D20 | KNOWN PROBLEM | A test marked `fixme` reproduces G15: a cashier who has merely opened Sell has an empty open cart, and the server then refuses to hand them a kiosk order (400). Only a manager can clear that cart. |
 
 ## I. Follow-ups queued by the product owner
 
 To be done after the remaining delivery steps.
 
-1. **Name the app "Purch.io".** `npm run dev` still prints `web@0.0.0 dev` and the browser tab title is "web". Set the package name and the page title.
-2. **Vary the Home charts.** Use different chart types on Home instead of only bars and raw numbers. The figures must still come from the server.
+1. **Name the app "Purch.io". DONE.** The package is `purch.io` (`npm run dev` prints `purch.io@0.0.0 dev`) and the page title and description say Purch.io. The tab icon is still the Vite default, see G32.
+2. **Vary the Home charts. DONE for Home, Reports and Business, see D23.** Each kind of data now has the chart that suits its job. The figures still come from the server.
 3. **Faster add to cart (web and Flutter). DONE, see D21 and D22.** Adding an item made the register wait for the server, and the next item could not be added until it finished. Cashier speed is the top priority, so adds no longer block each other. Prices stay the server's; there is no client pricing.
 
 Per phase: `npm --prefix web run lint`, `tsc -b`, `npm --prefix web test`, `npm --prefix web run build`.
