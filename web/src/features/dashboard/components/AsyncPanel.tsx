@@ -39,7 +39,9 @@ export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, m
         {title}
       </h2>
       {subtitle && <p className="text-sm text-ink-soft">{subtitle}</p>}
-      <div className="mt-4">{body}</div>
+      <div className={`mt-4 transition-opacity ${query.isFetching && !query.isPending ? "opacity-60" : ""}`} aria-busy={query.isFetching}>
+        {body}
+      </div>
     </section>
   );
 }

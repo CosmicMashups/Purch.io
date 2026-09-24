@@ -15,6 +15,23 @@
   --ink: #0f172a;
   --ink-soft: #475569;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /*
+   * Chart tokens. The tenant's colour is the single-series accent (--viz-accent is darkened by ThemeProvider if
+   * the brand is too pale to read as a line). Identity between entities uses the fixed categorical order below,
+   * validated for colour-blind separation on a white surface; it never follows the tenant's colour.
+   */
+  --viz-accent: var(--brand);
+  --viz-muted: color-mix(in srgb, var(--ink-soft) 30%, var(--surface));
+  --viz-grid: var(--line);
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-8: #e34948;
 }
 
 @theme inline {
@@ -27,6 +44,8 @@
   --color-line: var(--line);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
+  --color-viz-muted: var(--viz-muted);
+  --color-viz-grid: var(--viz-grid);
   --color-ok: #059669;
   --color-warn: #b45309;
   --color-danger: #dc2626;

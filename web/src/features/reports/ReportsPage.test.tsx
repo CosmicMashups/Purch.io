@@ -73,16 +73,20 @@ beforeEach(() => {
 describe('range reports', () => {
   it('shows staff sales ranked, with the server figures and pluralised sale counts', async () => {
     renderPage(<ReportsPage />);
-    expect(await screen.findByText('₱9,000.00, 30 sales')).toBeInTheDocument();
-    expect(screen.getByText('₱4,500.00, 1 sale')).toBeInTheDocument();
+    expect(await screen.findByText('₱9,000.00')).toBeInTheDocument();
+    expect(screen.getByText('30 sales')).toBeInTheDocument();
+    expect(screen.getByText('₱4,500.00')).toBeInTheDocument();
+    expect(screen.getByText('1 sale')).toBeInTheDocument();
     const names = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
     expect(names.findIndex((t) => t.includes('Ana Reyes'))).toBeLessThan(names.findIndex((t) => t.includes('Ben Cruz')));
-    expect(await screen.findByText('5 opened, 2 with variance')).toBeInTheDocument();
+    expect(await screen.findByText('2 shifts closed with a cash difference')).toBeInTheDocument();
+    expect(screen.getByRole('meter', { name: 'Ana Reyes' })).toHaveAttribute('aria-valuenow', '2');
+    expect(screen.getByRole('meter', { name: 'Ana Reyes' })).toHaveAttribute('aria-valuemax', '5');
   });
 
   it('asks the API for the last 30 days in Manila time by default', async () => {
     renderPage(<ReportsPage />);
-    await screen.findByText('₱9,000.00, 30 sales');
+    await screen.findByText('30 sales');
     const params = vi.mocked(reportsApi.staffPerformance).mock.calls[0][0];
     expect(params).not.toHaveProperty('branchId');
     expect(new Date(params.from).toISOString().endsWith('T16:00:00.000Z')).toBe(true);
@@ -91,7 +95,7 @@ describe('range reports', () => {
 
   it('re-queries when a preset or a branch is chosen', async () => {
     renderPage(<ReportsPage />);
-    await screen.findByText('₱9,000.00, 30 sales');
+    await screen.findByText('30 sales');
     fireEvent.click(screen.getByRole('button', { name: 'Today' }));
     await waitFor(() => {
       const last = vi.mocked(reportsApi.staffPerformance).mock.calls.at(-1)![0];
@@ -103,7 +107,7 @@ describe('range reports', () => {
 
   it('does not fetch while a custom range is reversed, and says why', async () => {
     renderPage(<ReportsPage />);
-    await screen.findByText('₱9,000.00, 30 sales');
+    await screen.findByText('30 sales');
     fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
     fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-09-10' } });
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-09-20' } });
@@ -125,7 +129,8 @@ describe('range reports', () => {
   it('labels stock movements by reason', async () => {
     renderPage(<ReportsPage />, { route: '/?tab=stock' });
     expect(await screen.findByText('Spoiled')).toBeInTheDocument();
-    expect(screen.getByText('12 across 1 record')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('1 record')).toBeInTheDocument();
   });
 
   it('shows a retryable error rather than an empty report when loading fails', async () => {

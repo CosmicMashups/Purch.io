@@ -3,7 +3,7 @@ import { deviceApi, type CreateDeviceBody } from './deviceApi';
 
 export const deviceKeys = { all: ['devices'] as const };
 
-export const useDevices = () => useQuery({ queryKey: deviceKeys.all, queryFn: () => deviceApi.list() });
+export const useDevices = (enabled = true) => useQuery({ queryKey: deviceKeys.all, queryFn: () => deviceApi.list(), enabled });
 
 export function useCreateDevice() {
   const qc = useQueryClient();

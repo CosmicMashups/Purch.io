@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brandingToCssVars, contrastRatio, readableOn, validHex } from './branding';
+import { brandingToCssVars, chartAccent, contrastRatio, readableOn, validHex } from './branding';
 
 describe('validHex', () => {
   it('accepts 6-digit hex and normalises case', () => {
@@ -31,6 +31,17 @@ describe('brandingToCssVars', () => {
     expect(vars['--brand']).toBe('#b91c1c');
     expect(vars['--on-brand']).toBe('#ffffff');
     expect(contrastRatio(vars['--brand-strong'], '#ffffff')).toBeGreaterThan(contrastRatio('#b91c1c', '#ffffff'));
+  });
+
+  it('gives charts an accent that stays visible on white', () => {
+    expect(brandingToCssVars({ accentColorHex: '#b91c1c' })['--viz-accent']).toBe('#b91c1c');
+    const pale = brandingToCssVars({ accentColorHex: '#ffd54a' })['--viz-accent'];
+    expect(pale).not.toBe('#ffd54a');
+    expect(contrastRatio(pale, '#ffffff')).toBeGreaterThanOrEqual(3);
+  });
+
+  it('leaves an already legible accent alone', () => {
+    expect(chartAccent('#0f766e')).toBe('#0f766e');
   });
 
   it('ignores a background/text pair that fails contrast', () => {

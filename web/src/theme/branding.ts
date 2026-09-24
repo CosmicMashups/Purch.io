@@ -46,6 +46,13 @@ function mix(hex: string, toward: string, amount: number): string {
   return `#${((part(16) << 16) | (part(8) << 8) | part(0)).toString(16).padStart(6, '0')}`;
 }
 
+/** A pale tenant colour would vanish as a chart line on white, so it is darkened until a mark stays visible (3:1). */
+export function chartAccent(accent: string, surface = '#ffffff'): string {
+  let color = accent;
+  for (let step = 1; step <= 10 && contrastRatio(color, surface) < 3; step += 1) color = mix(accent, '#000000', step * 0.1);
+  return color;
+}
+
 /**
  * Maps tenant branding to CSS variables. Anything malformed is dropped so a bad value from the
  * server can never break the page or inject CSS. Hover colour is derived so it stays readable.
@@ -60,6 +67,7 @@ export function brandingToCssVars(branding: Partial<TenantBranding> | null): Rec
     vars['--brand-strong'] = mix(accent, '#000000', 0.2);
     vars['--on-brand'] = readableOn(accent);
     vars['--brand-tint'] = mix(accent, '#ffffff', 0.92);
+    vars['--viz-accent'] = chartAccent(accent);
   }
 
   const canvas = validHex(branding.backgroundColorHex);
