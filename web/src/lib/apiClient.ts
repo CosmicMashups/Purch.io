@@ -2,7 +2,8 @@ import axios, { isAxiosError, type AxiosError, type InternalAxiosRequestConfig }
 import { useAuthStore } from './authStore';
 import { ApiError, type ApiErrorKind } from './apiError';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:5001';
+// In dev, /api is proxied by Vite (vite.config.ts) so the browser never makes a cross-origin call.
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/api' : 'https://purch-io-backend.vercel.app');
 
 export const apiClient = axios.create({
   baseURL,
@@ -12,7 +13,7 @@ export const apiClient = axios.create({
 // Separate instance for refresh calls so the 401 interceptor below never recurses on itself.
 const refreshClient = axios.create({ baseURL, timeout: 15000 });
 
-const NO_AUTH_REFRESH_PATHS = ['/auth/login', '/auth/admin-login', '/auth/refresh', '/kiosk/session'];
+const NO_AUTH_REFRESH_PATHS = ['/auth/login', '/auth/admin-login', '/auth/refresh', '/kiosk/session', '/kitchen-display/session', '/order-board/session'];
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
@@ -87,7 +88,7 @@ function mapError(error: AxiosError): ApiError {
     403: 'forbidden',
     404: 'notFound',
     409: 'conflict',
-    429: 'serviceUnavailable', // rate limited: wait and retry
+    429: 'rateLimited',
     503: 'serviceUnavailable',
   };
 
