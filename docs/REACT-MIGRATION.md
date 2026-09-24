@@ -202,7 +202,39 @@ This is a **parity gap versus Flutter**, chosen deliberately to avoid duplicatin
 9. Offline read cache and conflict screen (DONE)
 10. Kiosk and displays (DONE)
 11. Hardware (DONE, except direct printing and the cash drawer)
-12. Regression (Playwright E2E)
+12. Regression (Playwright end-to-end, DONE; see section J)
+
+## J. End-to-end tests
+
+Playwright drives a real browser against the **real backend and a real Postgres**. Nothing is mocked. `npm run e2e` (from `web/`) does everything: `e2e/stack/run-backend.mjs` starts the database and the API, the web dev server proxies `/api` to it, and `e2e/global-setup.ts` creates a brand new business through the API (categories, three items with stock, a manager, a cashier, a warehouse officer, and a kiosk, order board and kitchen display device). Each test then signs in through the API and only uses the screens for what it is testing.
+
+Running it locally needs .NET 9 and either Docker or a local PostgreSQL install:
+- Set `DOTNET` to the dotnet executable if it is not on the PATH.
+- The database comes from Docker (`postgres:16`). If Docker is not usable, a private Postgres is started from installed binaries (`PG_BIN`, or the standard install folder) in `web/e2e/.pgdata` on port 55432. `E2E_DB=docker` or `E2E_DB=local` forces one.
+- `PW_CHANNEL=chrome` (or `msedge`) uses an installed browser instead of Playwright's own download.
+- Ports: API 5099, web 5180, database 55432 (`E2E_API_PORT`, `E2E_WEB_PORT`, `E2E_DB_PORT`).
+
+What is covered (34 tests, 32 running and 2 known-problem tests marked `fixme`):
+- **Sign-in:** register code and PIN, wrong PIN message, owner email and password, redirect when signed out, sign out clearing the session.
+- **Roles:** the tabs each role sees, pages each role is turned away from, Manager without Devices and Settings, admin-only pages by address.
+- **Device sessions:** a kiosk token cannot enter the staff shell, a staff token cannot use a device screen, unpaired kiosk goes to pairing.
+- **Register:** two items and a cash sale with change computed by the server, barcode scanner typing, admin email sign-in told to use a device.
+- **Kiosk to kitchen to board:** the customer orders, the kitchen ticket shows the lines, the status moves through preparing, ready and picked up, and the order board follows across three separate browsers.
+- **Counter:** a cashier takes a kiosk order and is paid, a shift is opened and closed with a matching count, Home loads for an admin.
+- **Customer display:** a second window follows the sale, including one opened after the order started.
+- **Offline:** the saved catalog is shown with no connection and says how old it is, selling is paused, sign-out wipes the saved data, and another business never sees it.
+- **Admin:** add an item, add a staff member who can then sign in, a reused PIN is refused, a manager only sees the staff list.
+
+Each test uses its own client address (`X-Forwarded-For`) so the 10-per-15-minutes sign-in limit is never shared. Tests run one at a time because every device owns one open cart on the server.
+
+| # | Type | Note |
+|---|------|------|
+| G28 | TEST LIMIT | The backend runs in **Cloud** mode against the local database, because only that mode honours `X-Forwarded-For`. Local (on-premises) mode is not covered. File storage and uploads point at a dummy address and are not tested. |
+| G29 | TEST LIMIT | The hardware (scale over serial, camera scan, printing, full screen, second monitor) cannot be driven by the test browser and is covered by unit tests only. |
+| G30 | NOT COVERED | Direct comparison with the Flutter client's behaviour is not automated. Flutter has no test hook for it, so parity was checked by reading its code (sections B and C). |
+| G31 | UNVERIFIED | The CI job (`e2e` in `web-ci.yml`) has not run yet. It follows the same steps used locally, with Docker for Postgres and Playwright's Chromium. Its first run may need small fixes. |
+| D19 | KNOWN PROBLEM | A test marked `fixme` reproduces the slow register: the item grid is disabled while an add is on its way, so the second of two quick taps is lost (see section I). |
+| D20 | KNOWN PROBLEM | A test marked `fixme` reproduces G15: a cashier who has merely opened Sell has an empty open cart, and the server then refuses to hand them a kiosk order (400). Only a manager can clear that cart. |
 
 ## I. Follow-ups queued by the product owner
 
