@@ -26,6 +26,8 @@ import { StaffPage } from './features/business/StaffPage';
 import { RequireRole } from './features/auth/RequireRole';
 import { KioskOrdersPage } from './features/pos/KioskOrdersPage';
 import { ShiftPage } from './features/shifts/ShiftPage';
+import { CustomerDisplayPage } from './hardware/display/CustomerDisplayPage';
+import { HardwarePage } from './hardware/HardwarePage';
 import { PaymentPage } from './features/pos/PaymentPage';
 import { ReceiptPage } from './features/pos/ReceiptPage';
 import { SellPage } from './features/pos/SellPage';
@@ -62,6 +64,7 @@ export function App() {
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/legal/:document" element={<LegalPage />} />
 
+      <Route path="/customer-display" element={<CustomerDisplayPage />} />
       <Route path="/kiosk/pair" element={<DevicePairPage role="Kiosk" />} />
       <Route path="/kitchen/pair" element={<DevicePairPage role="KitchenDisplay" />} />
       <Route path="/order-board/pair" element={<DevicePairPage role="OrderBoard" />} />
@@ -91,6 +94,7 @@ export function App() {
             <Route path="/sell" element={<SellPage />} />
             <Route path="/sell/shift" element={<ShiftPage />} />
             <Route path="/sell/kiosk-orders" element={<KioskOrdersPage />} />
+            <Route path="/sell/hardware" element={<HardwarePage />} />
             <Route path="/sell/payment" element={<PaymentPage />} />
             <Route path="/sell/receipt" element={<ReceiptPage />} />
             <Route path="/sell/*" element={<Navigate to="/sell" replace />} />

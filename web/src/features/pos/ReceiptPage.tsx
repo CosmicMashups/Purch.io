@@ -1,5 +1,8 @@
 import { Navigate, useNavigate } from 'react-router-dom';
 import { formatPeso } from '../dashboard/format';
+import { useHardwareConfig } from '../../hardware/config';
+import { IDLE_STATE, stateForReceipt } from '../../hardware/display/channel';
+import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { usePosStore } from './posStore';
 import { PaymentMethod, type TransactionLine } from './types';
 
@@ -25,6 +28,8 @@ export function ReceiptPage() {
   const navigate = useNavigate();
   const receipt = usePosStore((s) => s.receipt);
   const clearReceipt = usePosStore((s) => s.clearReceipt);
+  const paperWidth = useHardwareConfig((s) => s.paperWidth);
+  usePublishCustomerDisplay(receipt ? stateForReceipt(receipt) : IDLE_STATE);
 
   if (!receipt) return <Navigate to="/sell" replace />;
 
@@ -42,7 +47,7 @@ export function ReceiptPage() {
         <p className="text-base text-ink-soft">The payment is recorded. Hand over the receipt.</p>
       </div>
 
-      <article aria-label="Receipt" className="rounded-panel border border-line bg-surface p-6 print:border-0 print:p-0">
+      <article aria-label="Receipt" className={`receipt-paper receipt-${paperWidth} rounded-panel border border-line bg-surface p-6 print:border-0 print:p-0`}>
         <header className="border-b border-dashed border-line pb-4">
           <p className="text-lg font-bold">Receipt No. {receipt.receiptNumber ?? 'pending'}</p>
           {receipt.orderType && <p className="text-base text-ink-soft">{receipt.orderType}</p>}

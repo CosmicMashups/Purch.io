@@ -9,6 +9,8 @@ import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
 import { useCreditLedgers } from '../credit/queries';
 import { formatPeso } from '../dashboard/format';
+import { stateForPayment } from '../../hardware/display/channel';
+import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { tenderCoversTotal } from './catalogView';
 import { CashKeypad } from './components/CashKeypad';
 import { usePosStore } from './posStore';
@@ -41,6 +43,7 @@ export function PaymentPage() {
   const [tendered, setTendered] = useState('');
   const [ledgerId, setLedgerId] = useState('');
   const ledgers = useCreditLedgers(choice === 'utang');
+  usePublishCustomerDisplay(stateForPayment(cart.data));
 
   if (!claims?.deviceId) return <Navigate to="/sell" replace />;
   if (cart.isPending) return <Skeleton className="h-96 w-full max-w-3xl" />;

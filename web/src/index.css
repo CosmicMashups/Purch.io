@@ -55,3 +55,25 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Receipts print on narrow thermal paper. Each width is its own named page so the browser sizes the sheet. */
+@page receipt-mm80 {
+  size: 80mm auto;
+  margin: 3mm;
+}
+@page receipt-mm58 {
+  size: 58mm auto;
+  margin: 2mm;
+}
+@media print {
+  .receipt-mm80 {
+    page: receipt-mm80;
+    width: 74mm;
+    font-size: 12px;
+  }
+  .receipt-mm58 {
+    page: receipt-mm58;
+    width: 54mm;
+    font-size: 11px;
+  }
+}

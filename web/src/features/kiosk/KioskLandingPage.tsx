@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FullscreenButton } from '../../hardware/fullscreen';
 import { useKioskBranding } from './queries';
 import { ResetDeviceDialog } from './ResetDeviceDialog';
 import { useLongPress } from './useLongPress';
@@ -16,6 +17,10 @@ export function KioskLandingPage() {
       <p {...hold} className="select-none self-center rounded-full border border-brand/30 bg-brand-tint px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-strong">
         Self-service order kiosk
       </p>
+
+      <div className="flex justify-end">
+        <FullscreenButton />
+      </div>
 
       <div className="flex flex-col items-center gap-8 text-center">
         {poster && !posterFailed && <img src={poster} alt="" onError={() => setPosterFailed(true)} className="aspect-video w-full rounded-panel object-cover" />}

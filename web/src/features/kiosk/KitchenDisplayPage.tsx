@@ -3,6 +3,7 @@ import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
+import { FullscreenButton } from '../../hardware/fullscreen';
 import { KitchenStatus, type Transaction } from '../pos/types';
 import { useDisplayOrders, useSetKitchenStatus } from './queries';
 import { ResetDeviceDialog } from './ResetDeviceDialog';
@@ -27,9 +28,12 @@ export function KitchenDisplayPage() {
     <div className="mx-auto flex min-h-dvh max-w-7xl flex-col gap-4 bg-canvas p-4 text-ink">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Kitchen tickets</h1>
-        <button type="button" onClick={() => setResetting(true)} className="h-12 rounded-control border border-line px-4 text-base font-semibold">
-          Unpair this screen
-        </button>
+        <div className="flex gap-2">
+          <FullscreenButton />
+          <button type="button" onClick={() => setResetting(true)} className="h-12 rounded-control border border-line px-4 text-base font-semibold">
+            Unpair this screen
+          </button>
+        </div>
       </header>
 
       {!branchId && <ErrorState title="This screen has no branch" message="Pair it again with a kitchen display device that belongs to a branch." />}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
 import type { Item } from '../../catalog/types';
+import { ScalePanel } from '../../../hardware/scale/ScalePanel';
+import { useScale } from '../../../hardware/scale/scaleStore';
 
 interface WeightDialogProps {
   item: Item;
@@ -10,9 +12,10 @@ interface WeightDialogProps {
   onClose: () => void;
 }
 
-/** Manual weight or volume entry. A hardware scale can fill this in later. */
+/** Weight or volume entry. A connected scale fills it in once its reading has settled; typing stays available. */
 export function WeightDialog({ item, busy, onAdd, onClose }: WeightDialogProps) {
   const [text, setText] = useState('');
+  const scaleConnected = useScale((s) => s.status === 'connected');
   const quantity = Number(text);
   const valid = text.trim() !== '' && Number.isFinite(quantity) && quantity > 0;
 
@@ -27,6 +30,11 @@ export function WeightDialog({ item, busy, onAdd, onClose }: WeightDialogProps) 
         </PrimaryButton>
       }
     >
+      {scaleConnected && (
+        <div className="mb-4">
+          <ScalePanel onUse={(kilograms) => setText(String(kilograms))} />
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();

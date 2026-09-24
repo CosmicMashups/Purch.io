@@ -19,6 +19,11 @@ import { ItemGrid } from './components/ItemGrid';
 import { OptionsDialog } from './components/OptionsDialog';
 import { WeightDialog } from './components/WeightDialog';
 import { useAddLine, useCart } from './queries';
+import { CUSTOMER_DISPLAY_PATH, customerDisplaySupported, stateForCart } from '../../hardware/display/channel';
+import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
+import { CameraScanDialog } from '../../hardware/scanner/CameraScanDialog';
+import { cameraScanSupported } from '../../hardware/scanner/cameraSupport';
+import { useBarcodeWedge } from '../../hardware/scanner/useBarcodeWedge';
 import type { AddLineRequest } from './types';
 
 type Dialog = { kind: 'options'; item: Item } | { kind: 'weight'; item: Item } | null;
@@ -42,6 +47,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const visible = filterItems(items.data ?? [], { categoryId, query });
   const lineCount = cart.data?.lines.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 1), 0) ?? 0;
@@ -67,6 +73,18 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
       setResolving(false);
     }
   }
+
+  function scanCode(code: string) {
+    const match = findByCode(items.data ?? [], code);
+    if (!match) {
+      toast.info('No item with that barcode or SKU');
+      return;
+    }
+    void beginAdd(match);
+  }
+
+  usePublishCustomerDisplay(stateForCart(cart.data));
+  useBarcodeWedge(scanCode, online && dialog === null && !cameraOpen);
 
   function onSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter') return;
@@ -94,6 +112,17 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
         <div className="flex flex-wrap gap-2">
           <LinkButton to="/sell/kiosk-orders">Kiosk orders</LinkButton>
           <LinkButton to="/sell/shift">Shift and drawer</LinkButton>
+          <LinkButton to="/sell/hardware">Hardware</LinkButton>
+          {cameraScanSupported() && (
+            <button type="button" onClick={() => setCameraOpen(true)} className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand">
+              Scan with camera
+            </button>
+          )}
+          {customerDisplaySupported() && (
+            <button type="button" onClick={() => window.open(CUSTOMER_DISPLAY_PATH, 'purch-customer-display')} className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand">
+              Customer display
+            </button>
+          )}
         </div>
         <input
           type="search"
@@ -155,6 +184,15 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
         </div>
       )}
 
+      {cameraOpen && (
+        <CameraScanDialog
+          onDetect={(code) => {
+            setCameraOpen(false);
+            scanCode(code);
+          }}
+          onClose={() => setCameraOpen(false)}
+        />
+      )}
       {dialog?.kind === 'options' && <OptionsDialog item={dialog.item} items={items.data ?? []} busy={addLine.isPending} onAdd={add} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'weight' && (
         <WeightDialog item={dialog.item} busy={addLine.isPending} onAdd={(quantity) => add({ itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />

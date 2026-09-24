@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ErrorState } from '../../components/ErrorState';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
+import { FullscreenButton } from '../../hardware/fullscreen';
 import type { Transaction } from '../pos/types';
 import { useDisplayOrders } from './queries';
 import { ResetDeviceDialog } from './ResetDeviceDialog';
@@ -19,9 +20,12 @@ export function OrderBoardPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-7xl flex-col gap-6 bg-canvas p-6 text-ink">
-      <h1 {...hold} className="select-none text-4xl font-extrabold tracking-tight">
-        Order status
-      </h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 {...hold} className="select-none text-4xl font-extrabold tracking-tight">
+          Order status
+        </h1>
+        <FullscreenButton />
+      </div>
 
       {!branchId && <ErrorState title="This screen has no branch" message="Pair it again with an order board device that belongs to a branch." />}
       {orders.isError && !orders.data && <ErrorState title="Orders could not be loaded" message={userMessage(orders.error)} onRetry={() => void orders.refetch()} />}

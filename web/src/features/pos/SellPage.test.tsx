@@ -306,3 +306,54 @@ describe('cart actions', () => {
     expect(await screen.findByText('The cart could not be loaded')).toBeInTheDocument();
   });
 });
+
+describe('SellPage hardware', () => {
+  const scan = (code: string) => {
+    for (const key of code) fireEvent.keyDown(document.body, { key });
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+  };
+
+  it('adds the item when a keyboard scanner reads its barcode, without clicking anywhere', async () => {
+    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    renderPage(<SellPage />);
+    await screen.findByRole('button', { name: /Iced Latte/ });
+    scan('4800001');
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 }));
+  });
+
+  it('says so when a scanned code matches nothing', async () => {
+    renderPage(<SellPage />);
+    await screen.findByRole('button', { name: /Iced Latte/ });
+    scan('9999999');
+    await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toBe('No item with that barcode or SKU'));
+    expect(posApi.addLine).not.toHaveBeenCalled();
+  });
+
+  it('ignores scans while an options dialog is open', async () => {
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Logo Tee/ }));
+    await screen.findByRole('dialog');
+    scan('4800001');
+    expect(posApi.addLine).not.toHaveBeenCalled();
+  });
+
+  it('links to the hardware settings', async () => {
+    renderPage(<SellPage />);
+    expect(await screen.findByRole('link', { name: 'Hardware' })).toHaveAttribute('href', '/sell/hardware');
+  });
+
+  it('fills the weight from a connected scale once it has settled', async () => {
+    const { useScale } = await import('../../hardware/scale/scaleStore');
+    const { parseCas } = await import('../../hardware/scale/parser');
+    vi.mocked(catalogApi.listItems).mockResolvedValue([makeItem({ id: 'rice', name: 'Rice', pricingType: PricingType.WeightVolume, basePrice: 55 })]);
+    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    useScale.setState({ status: 'connected', reading: parseCas('ST,GS,  0.350kg') });
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Rice/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Rice' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Use 0.350 kg' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add to cart' }));
+    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'rice', itemVariantId: null, quantity: 0.35 }));
+    useScale.setState({ status: 'disconnected', reading: null });
+  });
+});
