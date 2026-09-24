@@ -84,6 +84,7 @@ PosRepository posRepository(Ref ref) {
     drainQueue: () => ref.read(saleSyncCoordinatorProvider).drain(),
     catalog: ref.watch(catalogRepositoryProvider),
     loadItems: () => ref.read(itemListProvider.future),
+    modifierGroupsFor: (itemId) => ref.read(itemModifierGroupListProvider(itemId).future),
     currentStaffId: () async {
       final token = await ref.read(secureTokenStorageProvider).readAccessToken();
       return token == null ? null : staffIdFromJwt(token);

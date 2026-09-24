@@ -307,6 +307,28 @@ void main() {
     expect(remote.calls, isEmpty);
   });
 
+  test('modifier groups come from the shared lookup once per item, not once per add', () async {
+    final asked = <String>[];
+    final repo = LocalFirstPosRepository(
+      lastIssuedReceiptNumber: lastIssued,
+      recordReceiptNumber: record,
+      remote: remote,
+      catalog: catalog,
+      loadItems: () async => items,
+      loadRules: () async => rules,
+      store: store,
+      identity: () async => null,
+      modifierGroupsFor: (itemId) async {
+        asked.add(itemId);
+        return const [];
+      },
+    );
+    await repo.addLine(add('coffee'));
+    await repo.addLine(add('coffee'));
+    await repo.addLine(add('coffee'));
+    expect(asked, ['coffee']);
+  });
+
   test('overlapping adds (a double scan) are all kept, none overwrites another', () async {
     final repo = build();
 

@@ -75,6 +75,7 @@ class LocalFirstPosRepository implements PosRepository {
     Future<bool> Function()? isConnected,
     Future<void> Function()? drainQueue,
     Future<void> Function()? refreshCatalog,
+    Future<List<ModifierGroup>> Function(String itemId)? modifierGroupsFor,
     Future<String?> Function()? currentStaffId,
     DateTime Function()? clock,
   }) : _remote = remote,
@@ -90,6 +91,7 @@ class LocalFirstPosRepository implements PosRepository {
        _isConnected = isConnected,
        _drainQueue = drainQueue,
        _refreshCatalog = refreshCatalog,
+       _modifierGroupsLoader = modifierGroupsFor,
        _currentStaffId = currentStaffId,
        _clock = clock ?? DateTime.now;
 
@@ -99,6 +101,10 @@ class LocalFirstPosRepository implements PosRepository {
 
   /// Drops the cached item list so the next [_loadItems] reads current prices.
   final Future<void> Function()? _refreshCatalog;
+
+  /// Where an item's modifier groups come from. The app passes its shared cache, so an add does not fetch what
+  /// the screen just fetched; without it the catalog repository is asked directly.
+  final Future<List<ModifierGroup>> Function(String itemId)? _modifierGroupsLoader;
 
   /// Who is signed in right now, stamped on offline sales so the server can credit and authorise
   /// them correctly when they sync later under a different login.
@@ -832,7 +838,7 @@ class LocalFirstPosRepository implements PosRepository {
   Future<List<ModifierGroup>> _modifierGroupsFor(String itemId) => _memo(
     _modifierGroups,
     itemId,
-    () => _catalog.listModifierGroupsForItem(itemId),
+    () => (_modifierGroupsLoader ?? _catalog.listModifierGroupsForItem)(itemId),
   );
 
   Future<List<ItemComboComponent>> _comboSlotsFor(String itemId) =>

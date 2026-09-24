@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../../core/data/data_refresh.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -237,6 +238,9 @@ class AddModifierController extends _$AddModifierController {
   }
 }
 
+/// How long a fetched set of modifier groups is reused before the next tap asks the server again.
+const _modifierGroupsKeepFor = Duration(minutes: 5);
+
 /// One list per item (Riverpod family, inferred from the `itemId` parameter).
 @riverpod
 class ItemBatchList extends _$ItemBatchList {
@@ -366,9 +370,22 @@ class CreateVariantController extends _$CreateVariantController {
 class ItemModifierGroupList extends _$ItemModifierGroupList {
   @override
   Future<List<ModifierGroup>> build(String itemId) {
+    // The cashier asks this on every tap, and it used to be forgotten the moment the tap finished, so every
+    // tap waited on a network round trip. Keep the answer for a few minutes, but never keep a failure: a
+    // dropped connection must not stop the next tap from asking again.
+    final link = ref.keepAlive();
+    final expiry = Timer(_modifierGroupsKeepFor, link.close);
+    ref.onDispose(expiry.cancel);
     return ref
         .watch(catalogRepositoryProvider)
-        .listModifierGroupsForItem(itemId);
+        .listModifierGroupsForItem(itemId)
+        .then<List<ModifierGroup>>(
+          (groups) => groups,
+          onError: (Object error, StackTrace stack) {
+            link.close();
+            Error.throwWithStackTrace(error, stack);
+          },
+        );
   }
 
   Future<void> refresh() async {

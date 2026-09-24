@@ -972,9 +972,7 @@ class _ItemTile extends ConsumerWidget {
                 builder: (_) => ItemModifierCustomizationDialog(item: item),
               );
               if (added == true && context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Added ${item.name}')));
+                _showAdded(context, item.name);
               }
               return;
             }
@@ -984,9 +982,7 @@ class _ItemTile extends ConsumerWidget {
               AddTransactionLineRequest(itemId: item.id, quantity: 1),
             );
             if (succeeded && context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Added ${item.name}')));
+              _showAdded(context, item.name);
             }
           },
           child: Column(
@@ -2072,4 +2068,17 @@ String _discountLabel(Transaction cart) {
 bool _canApplySeniorPwd(WidgetRef ref) {
   final role = ref.watch(currentStaffRoleProvider).valueOrNull;
   return role == StaffRole.admin || role == StaffRole.manager;
+}
+
+/// Confirms an add without queueing. Tapping quickly used to stack one four-second snackbar per tap, so the
+/// confirmations kept appearing long after the cashier had moved on.
+void _showAdded(BuildContext context, String name) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text('Added $name'),
+        duration: const Duration(milliseconds: 900),
+      ),
+    );
 }
