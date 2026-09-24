@@ -1,5 +1,6 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query';
 import { toast } from '../components/feedback/toastStore';
+import { CACHE_MAX_AGE_MS } from '../offline/db/cachePolicy';
 import { ApiError, userMessage } from './apiError';
 
 declare module '@tanstack/react-query' {
@@ -24,6 +25,13 @@ export const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 10_000,
+      // Kept in memory as long as it may be saved offline, or a restored copy would be discarded early.
+      gcTime: CACHE_MAX_AGE_MS,
+    },
+    mutations: {
+      // The default would pause a save while offline and replay it on reconnect, possibly long after the
+      // person has moved on. There is no offline write queue, so a save must fail now and say so.
+      networkMode: 'always',
     },
   },
 });

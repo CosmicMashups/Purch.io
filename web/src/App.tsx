@@ -17,6 +17,7 @@ import { ReportsPage } from './features/reports/ReportsPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { BusinessPage } from './features/business/BusinessPage';
 import { CustomersPage } from './features/credit/CustomersPage';
+import { SyncConflictsPage } from './features/sync/SyncConflictsPage';
 import { AuditLogPage } from './features/business/AuditLogPage';
 import { BranchesPage } from './features/business/BranchesPage';
 import { DevicesPage } from './features/business/DevicesPage';
@@ -80,6 +81,7 @@ export function App() {
             <Route path="/business/promotions" element={<PromotionsPage />} />
             <Route path="/business/reports" element={<ReportsPage />} />
             <Route path="/business/customers" element={<CustomersPage />} />
+            <Route path="/business/sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="/business/staff" element={<StaffPage />} />
             <Route path="/business/branches" element={<BranchesPage />} />
             <Route path="/business/audit-log" element={<AuditLogPage />} />

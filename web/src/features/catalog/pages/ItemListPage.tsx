@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCategories, useItems } from '../queries';
+import { StaleDataNotice } from '../../../components/feedback/StaleDataNotice';
 import { SearchBar } from '../../../components/SearchBar';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
@@ -11,7 +12,7 @@ import { PricingType } from '../types';
 import { pricingTypeLabels } from '../labels';
 
 export function ItemListPage() {
-  const { data: items, isLoading, isError, error, refetch } = useItems();
+  const { data: items, isLoading, isError, error, refetch, dataUpdatedAt } = useItems();
   const { data: categories } = useCategories();
   // Unknown (a non-Admin, or still loading) reads as off, exactly like the Flutter client.
   const showRecipe = useTenantSettings().data?.useSeparateInventoryTracking === true;
@@ -45,6 +46,8 @@ export function ItemListPage() {
           Add Item
         </Link>
       </div>
+
+      <StaleDataNotice updatedAt={dataUpdatedAt} what="items" />
 
       {isLoading && <SkeletonRows columns={5} />}
 

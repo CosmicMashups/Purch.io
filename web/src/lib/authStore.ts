@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { clearOfflineCache } from '../offline/db/persister';
 import { queryClient } from './queryClient';
 
 const ACCESS_TOKEN_KEY = 'purch.accessToken';
@@ -71,6 +72,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ accessToken: null, refreshToken: null });
     // The cache is not keyed by tenant, so whoever signs in next must never see this session's data.
     queryClient.clear();
+    // Saved offline data belongs to the business that just signed out; it must not outlive the session.
+    void clearOfflineCache();
   },
   syncFromStorage: () => {
     const accessToken = safeGetStorage(ACCESS_TOKEN_KEY);

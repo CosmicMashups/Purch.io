@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useToastStore } from '../components/feedback/toastStore';
 import { ApiError } from './apiError';
-import { notifyMutationError } from './queryClient';
+import { notifyMutationError, queryClient } from './queryClient';
 
 describe('notifyMutationError', () => {
   beforeEach(() => useToastStore.setState({ toasts: [] }));
@@ -20,5 +20,15 @@ describe('notifyMutationError', () => {
     notifyMutationError(new ApiError('validation', 'x'), true);
     notifyMutationError(new ApiError('unauthorized', 'x'), undefined);
     expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+});
+
+describe('queryClient defaults', () => {
+  it('never queues a save while offline: it must fail now instead of replaying later', () => {
+    expect(queryClient.getDefaultOptions().mutations?.networkMode).toBe('always');
+  });
+
+  it('keeps data in memory at least as long as it may be saved for offline use', () => {
+    expect(queryClient.getDefaultOptions().queries?.gcTime).toBe(24 * 60 * 60 * 1000);
   });
 });
