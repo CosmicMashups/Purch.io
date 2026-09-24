@@ -3,6 +3,8 @@ import { AppShell } from './layouts/AppShell/AppShell';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { RequireTab } from './features/auth/RequireTab';
 import { LoginPage } from './features/auth/LoginPage';
+import { LegalPage } from './features/onboarding/LegalPage';
+import { OnboardingPage } from './features/onboarding/OnboardingPage';
 import { HomePage } from './features/dashboard/HomePage';
 import { InventoryHomePage } from './features/inventory/pages/InventoryHomePage';
 import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
@@ -13,7 +15,14 @@ import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
+import { BusinessPage } from './features/business/BusinessPage';
 import { CustomersPage } from './features/credit/CustomersPage';
+import { AuditLogPage } from './features/business/AuditLogPage';
+import { BranchesPage } from './features/business/BranchesPage';
+import { DevicesPage } from './features/business/DevicesPage';
+import { SettingsPage } from './features/business/SettingsPage';
+import { StaffPage } from './features/business/StaffPage';
+import { RequireRole } from './features/auth/RequireRole';
 import { KioskOrdersPage } from './features/pos/KioskOrdersPage';
 import { ShiftPage } from './features/shifts/ShiftPage';
 import { PaymentPage } from './features/pos/PaymentPage';
@@ -39,6 +48,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/legal/:document" element={<LegalPage />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
@@ -65,9 +76,17 @@ export function App() {
           </Route>
 
           <Route element={<RequireTab tab="business" />}>
+            <Route path="/business" element={<BusinessPage />} />
             <Route path="/business/promotions" element={<PromotionsPage />} />
             <Route path="/business/reports" element={<ReportsPage />} />
             <Route path="/business/customers" element={<CustomersPage />} />
+            <Route path="/business/staff" element={<StaffPage />} />
+            <Route path="/business/branches" element={<BranchesPage />} />
+            <Route path="/business/audit-log" element={<AuditLogPage />} />
+            <Route element={<RequireRole allow={['Admin']} />}>
+              <Route path="/business/devices" element={<DevicesPage />} />
+              <Route path="/business/settings" element={<SettingsPage />} />
+            </Route>
             <Route path="/catalog/items" element={<ItemListPage />} />
             <Route path="/catalog/items/new" element={<AddItemPage />} />
             <Route path="/catalog/items/:itemId/edit" element={<EditItemPage />} />
