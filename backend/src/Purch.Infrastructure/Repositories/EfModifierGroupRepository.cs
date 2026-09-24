@@ -17,6 +17,31 @@ public sealed class EfModifierGroupRepository(PurchDbContext dbContext) : IModif
         return dbContext.ItemModifiers.FirstOrDefaultAsync(modifier => modifier.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<(ItemModifier Modifier, ModifierGroup? Group)>> ListModifiersWithGroupsByIdsAsync(
+        IReadOnlyCollection<Guid> modifierIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (modifierIds.Count == 0)
+        {
+            return [];
+        }
+
+        var modifiers = await dbContext.ItemModifiers
+            .AsNoTracking()
+            .Where(modifier => modifierIds.Contains(modifier.Id))
+            .ToListAsync(cancellationToken);
+
+        var groupIds = modifiers.Select(modifier => modifier.ModifierGroupId).Distinct().ToList();
+        var groups = await dbContext.ModifierGroups
+            .AsNoTracking()
+            .Where(group => groupIds.Contains(group.Id))
+            .ToDictionaryAsync(group => group.Id, cancellationToken);
+
+        return modifiers
+            .Select(modifier => (modifier, groups.GetValueOrDefault(modifier.ModifierGroupId)))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<(ModifierGroup Group, IReadOnlyList<ItemModifier> Modifiers)>> ListByTenantWithModifiersAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default)

@@ -23,6 +23,10 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsByLinesAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsByLinesAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken = default);
+
     /// <summary>Every completed sale on this device that no Z-reading has reported yet, ordered by receipt number —
     /// what an X/Z-reading covers. Tracked, so a Z-reading can stamp them as reported in the same save as its counters.</summary>
     Task<IReadOnlyList<Transaction>> ListUnreportedCompletedByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);

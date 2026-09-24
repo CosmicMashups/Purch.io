@@ -104,7 +104,7 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
     // retrying execution strategy is safe (SaveChanges is already atomic per call).
     _ = options.UseNpgsql(
         deploymentContext.DatabaseConnectionString,
-        npgsql => npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(2), errorCodesToAdd: null));
+        npgsql => npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(4), errorCodesToAdd: null));
 });
 
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();

@@ -12,6 +12,13 @@ public sealed class EfItemVariantRepository(PurchDbContext dbContext) : IItemVar
         return dbContext.ItemVariants.FirstOrDefaultAsync(variant => variant.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ItemVariant>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        return ids.Count == 0
+            ? []
+            : await dbContext.ItemVariants.AsNoTracking().Where(variant => ids.Contains(variant.Id)).ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ItemVariant>> ListByItemAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         return await dbContext.ItemVariants

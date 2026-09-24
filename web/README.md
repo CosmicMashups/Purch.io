@@ -30,3 +30,16 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Deployment
+
+The web client is configured for deployment to **Cloudflare Pages**.
+- Direct navigation and SPA routing fallback are handled via `public/_redirects`.
+- Caching policies and security headers are specified via `public/_headers`.
+- Cloudflare Pages settings are defined in `wrangler.jsonc` and `package.json`.
+
+Commands:
+- `npm run preview:cf`: Test the Cloudflare Pages edge build locally with Wrangler.
+- `npm run deploy:cf`: Build and deploy to Cloudflare Pages.
+
+For detailed setup instructions, CI/CD, and backend CORS configuration, see [docs/CLOUDFLARE-DEPLOYMENT.md](../docs/CLOUDFLARE-DEPLOYMENT.md).

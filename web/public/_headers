@@ -1,0 +1,14 @@
+# Global security and privacy headers
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), serial=(self), usb=(self)
+
+# Never cache index.html so updates and asset hashes update immediately on deploy
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Hashed assets in /assets/ can be safely cached immutably for 1 year
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

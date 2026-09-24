@@ -12,6 +12,13 @@ public sealed class EfItemRepository(PurchDbContext dbContext) : IItemRepository
         return dbContext.Items.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Item>> ListByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        return ids.Count == 0
+            ? []
+            : await dbContext.Items.AsNoTracking().Where(item => ids.Contains(item.Id)).ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Item>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Items

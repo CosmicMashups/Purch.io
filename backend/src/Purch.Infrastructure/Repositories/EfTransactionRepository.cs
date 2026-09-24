@@ -57,6 +57,26 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsByLinesAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken = default)
+    {
+        return lineIds.Count == 0
+            ? []
+            : await dbContext.TransactionLineComboSelections
+                .AsNoTracking()
+                .Where(selection => lineIds.Contains(selection.TransactionLineId))
+                .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TransactionLineModifierSelection>> ListModifierSelectionsByLinesAsync(IReadOnlyCollection<Guid> lineIds, CancellationToken cancellationToken = default)
+    {
+        return lineIds.Count == 0
+            ? []
+            : await dbContext.TransactionLineModifierSelections
+                .AsNoTracking()
+                .Where(selection => lineIds.Contains(selection.TransactionLineId))
+                .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Transaction>> ListUnreportedCompletedByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions

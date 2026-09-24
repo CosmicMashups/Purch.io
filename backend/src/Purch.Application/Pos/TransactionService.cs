@@ -177,6 +177,20 @@ public sealed class TransactionService(
         resolvedUnitPrice += modifierPriceDelta;
 
         var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        var pricedLines = lines.ToList();
+
+        // Which candidate lines already carry modifiers — one query, not one per candidate.
+        var linesWithModifiers = new HashSet<Guid>();
+        if (modifierIds.Count == 0)
+        {
+            var candidateIds = lines
+                .Where(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId)
+                .Select(line => line.Id)
+                .ToList();
+            linesWithModifiers = (await transactionRepository.ListModifierSelectionsByLinesAsync(candidateIds, cancellationToken))
+                .Select(selection => selection.TransactionLineId)
+                .ToHashSet();
+        }
 
         // Two lines for the same item/variant only merge into one when neither
         // carries a modifier selection — a "No Ice" latte and a regular one are
@@ -187,14 +201,10 @@ public sealed class TransactionService(
         TransactionLine? existingLine = null;
         if (modifierIds.Count == 0)
         {
-            foreach (var candidate in lines.Where(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId))
-            {
-                if ((await transactionRepository.ListModifierSelectionsAsync(candidate.Id, cancellationToken)).Count == 0)
-                {
-                    existingLine = candidate;
-                    break;
-                }
-            }
+            existingLine = lines.FirstOrDefault(line =>
+                line.ItemId == request.ItemId
+                && line.ItemVariantId == request.ItemVariantId
+                && !linesWithModifiers.Contains(line.Id));
         }
         if (existingLine is not null)
         {
@@ -214,6 +224,7 @@ public sealed class TransactionService(
                 LineTotal = resolvedUnitPrice * request.Quantity,
             };
             transactionRepository.AddLine(line);
+            pricedLines.Add(line);
 
             foreach (var modifierId in modifierIds)
             {
@@ -226,10 +237,9 @@ public sealed class TransactionService(
             }
         }
 
-        // Same flush-before-recalculate ordering as the combo branch above —
-        // RecalculateTotalAsync's line query otherwise misses this add/update.
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        await RecalculateTotalAsync(cart, cancellationToken);
+        // Recalculate from the lines already in memory (existing plus the one just added) and save
+        // once, instead of flushing, re-querying the lines and saving a second time.
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: pricedLines);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return cart;
@@ -1115,9 +1125,9 @@ public sealed class TransactionService(
     /// scratch on every call, never patched incrementally. Mirrored by the Flutter PricingEngine — keep the
     /// two in step.
     /// </summary>
-    private async Task RecalculateTotalAsync(Transaction transaction, CancellationToken cancellationToken, Guid? excludingLineId = null)
+    private async Task RecalculateTotalAsync(Transaction transaction, CancellationToken cancellationToken, Guid? excludingLineId = null, IReadOnlyList<TransactionLine>? knownLines = null)
     {
-        var lines = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
+        var lines = knownLines ?? await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
         var pricedLines = lines.Where(line => line.Id != excludingLineId).ToList();
 
         var grossSubtotal = pricedLines.Sum(line => line.LineTotal);
@@ -1222,22 +1232,53 @@ public sealed class TransactionService(
     private async Task<TransactionDto> ToDtoAsync(Transaction transaction, CancellationToken cancellationToken)
     {
         var lines = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
+        var lineIds = lines.Select(line => line.Id).ToList();
+
+        // Each lookup below is one batched query for the whole cart, not one per line: on a remote
+        // database every query is a network round trip, so a per-line loop made each add slower the
+        // fuller the cart got.
+        var comboSelections = await transactionRepository.ListComboSelectionsByLinesAsync(lineIds, cancellationToken);
+        var modifierSelections = await transactionRepository.ListModifierSelectionsByLinesAsync(lineIds, cancellationToken);
+
+        var itemIds = lines.Select(line => line.ItemId)
+            .Concat(comboSelections.Select(selection => selection.SelectedItemId))
+            .Distinct()
+            .ToList();
+        var itemsById = (await itemRepository.ListByIdsAsync(itemIds, cancellationToken)).ToDictionary(item => item.Id);
+
+        var variantIds = lines.Where(line => line.ItemVariantId is not null).Select(line => line.ItemVariantId!.Value).Distinct().ToList();
+        var variantsById = (await itemVariantRepository.ListByIdsAsync(variantIds, cancellationToken)).ToDictionary(variant => variant.Id);
+
+        var modifiersById = (await modifierGroupRepository.ListModifiersWithGroupsByIdsAsync(
+                modifierSelections.Select(selection => selection.ItemModifierId).Distinct().ToList(), cancellationToken))
+            .ToDictionary(entry => entry.Modifier.Id);
+
+        var slotsByItem = new Dictionary<Guid, IReadOnlyList<ItemComboComponent>>();
+        foreach (var comboItemId in lines
+            .Where(line => itemsById.TryGetValue(line.ItemId, out var comboItem) && comboItem.PricingType == PricingType.Combo)
+            .Select(line => line.ItemId)
+            .Distinct())
+        {
+            slotsByItem[comboItemId] = await comboComponentRepository.ListByItemAsync(comboItemId, cancellationToken);
+        }
+
+        var comboSelectionsByLine = comboSelections.ToLookup(selection => selection.TransactionLineId);
+        var modifierSelectionsByLine = modifierSelections.ToLookup(selection => selection.TransactionLineId);
         var lineDtos = new List<TransactionLineDto>();
 
         foreach (var line in lines)
         {
-            var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken);
+            _ = itemsById.TryGetValue(line.ItemId, out var item);
 
             var comboSelectionDtos = new List<ComboSelectionDto>();
             if (item?.PricingType == PricingType.Combo)
             {
-                var slots = await comboComponentRepository.ListByItemAsync(line.ItemId, cancellationToken);
-                var selections = await transactionRepository.ListComboSelectionsAsync(line.Id, cancellationToken);
+                var slots = slotsByItem[line.ItemId];
 
-                foreach (var selection in selections)
+                foreach (var selection in comboSelectionsByLine[line.Id])
                 {
                     var slot = slots.FirstOrDefault(s => s.Id == selection.ItemComboComponentId);
-                    var selectedItem = await itemRepository.GetByIdAsync(selection.SelectedItemId, cancellationToken);
+                    _ = itemsById.TryGetValue(selection.SelectedItemId, out var selectedItem);
                     comboSelectionDtos.Add(new ComboSelectionDto(
                         selection.ItemComboComponentId,
                         slot?.SlotLabel ?? "(removed slot)",
@@ -1247,27 +1288,21 @@ public sealed class TransactionService(
             }
 
             var itemVariantAttributes = new Dictionary<string, string>();
-            if (line.ItemVariantId is { } variantIdForDto)
+            if (line.ItemVariantId is { } variantIdForDto && variantsById.TryGetValue(variantIdForDto, out var variant))
             {
-                var variant = await itemVariantRepository.GetByIdAsync(variantIdForDto, cancellationToken);
-                if (variant is not null)
-                {
-                    itemVariantAttributes = JsonSerializer.Deserialize<Dictionary<string, string>>(variant.VariantAttributesJson)
-                        ?? [];
-                }
+                itemVariantAttributes = JsonSerializer.Deserialize<Dictionary<string, string>>(variant.VariantAttributesJson)
+                    ?? [];
             }
 
-            var modifierSelections = await transactionRepository.ListModifierSelectionsAsync(line.Id, cancellationToken);
             var modifierSelectionDtos = new List<ModifierSelectionDto>();
-            foreach (var selection in modifierSelections)
+            foreach (var selection in modifierSelectionsByLine[line.Id])
             {
-                var modifier = await modifierGroupRepository.GetModifierByIdAsync(selection.ItemModifierId, cancellationToken);
-                var group = modifier is null ? null : await modifierGroupRepository.GetByIdAsync(modifier.ModifierGroupId, cancellationToken);
+                var found = modifiersById.TryGetValue(selection.ItemModifierId, out var entry);
                 modifierSelectionDtos.Add(new ModifierSelectionDto(
                     selection.ItemModifierId,
-                    modifier?.Name ?? "(removed modifier)",
-                    group?.Name ?? "(removed group)",
-                    modifier?.PriceDelta ?? 0m));
+                    found ? entry.Modifier.Name : "(removed modifier)",
+                    found && entry.Group is not null ? entry.Group.Name : "(removed group)",
+                    found ? entry.Modifier.PriceDelta : 0m));
             }
 
             lineDtos.Add(new TransactionLineDto(
