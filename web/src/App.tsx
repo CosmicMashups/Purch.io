@@ -43,6 +43,16 @@ import { AssignDepartmentPage } from './features/catalog/pages/AssignDepartmentP
 import { LowStockThresholdPage } from './features/catalog/pages/LowStockThresholdPage';
 import { RecipePage } from './features/catalog/pages/RecipePage';
 import { CategoriesPage } from './features/catalog/pages/CategoriesPage';
+import { DevicePairPage } from './features/kiosk/DevicePairPage';
+import { KioskCartPage } from './features/kiosk/KioskCartPage';
+import { KioskDonePage } from './features/kiosk/KioskDonePage';
+import { KioskLandingPage } from './features/kiosk/KioskLandingPage';
+import { KioskLayout } from './features/kiosk/KioskLayout';
+import { KioskMenuPage } from './features/kiosk/KioskMenuPage';
+import { KioskOrderTypePage } from './features/kiosk/KioskOrderTypePage';
+import { KitchenDisplayPage } from './features/kiosk/KitchenDisplayPage';
+import { OrderBoardPage } from './features/kiosk/OrderBoardPage';
+import { RequireDevice } from './features/kiosk/RequireDevice';
 import { ModifierGroupsPage } from './features/catalog/pages/ModifierGroupsPage';
 
 export function App() {
@@ -51,6 +61,27 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/legal/:document" element={<LegalPage />} />
+
+      <Route path="/kiosk/pair" element={<DevicePairPage role="Kiosk" />} />
+      <Route path="/kitchen/pair" element={<DevicePairPage role="KitchenDisplay" />} />
+      <Route path="/order-board/pair" element={<DevicePairPage role="OrderBoard" />} />
+
+      <Route element={<RequireDevice role="Kiosk" />}>
+        <Route element={<KioskLayout />}>
+          <Route path="/kiosk" element={<KioskLandingPage />} />
+          <Route path="/kiosk/menu" element={<KioskMenuPage />} />
+          <Route path="/kiosk/cart" element={<KioskCartPage />} />
+          <Route path="/kiosk/order-type" element={<KioskOrderTypePage />} />
+          <Route path="/kiosk/done" element={<KioskDonePage />} />
+          <Route path="/kiosk/*" element={<Navigate to="/kiosk" replace />} />
+        </Route>
+      </Route>
+      <Route element={<RequireDevice role="KitchenDisplay" />}>
+        <Route path="/kitchen" element={<KitchenDisplayPage />} />
+      </Route>
+      <Route element={<RequireDevice role="OrderBoard" />}>
+        <Route path="/order-board" element={<OrderBoardPage />} />
+      </Route>
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
