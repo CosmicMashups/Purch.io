@@ -214,7 +214,7 @@ Running it locally needs .NET 9 and either Docker or a local PostgreSQL install:
 - `PW_CHANNEL=chrome` (or `msedge`) uses an installed browser instead of Playwright's own download.
 - Ports: API 5099, web 5180, database 55432 (`E2E_API_PORT`, `E2E_WEB_PORT`, `E2E_DB_PORT`).
 
-What is covered (34 tests, 32 running and 2 known-problem tests marked `fixme`):
+What is covered (36 tests, 35 running and 1 known-problem test marked `fixme`):
 - **Sign-in:** register code and PIN, wrong PIN message, owner email and password, redirect when signed out, sign out clearing the session.
 - **Roles:** the tabs each role sees, pages each role is turned away from, Manager without Devices and Settings, admin-only pages by address.
 - **Device sessions:** a kiosk token cannot enter the staff shell, a staff token cannot use a device screen, unpaired kiosk goes to pairing.
@@ -223,6 +223,7 @@ What is covered (34 tests, 32 running and 2 known-problem tests marked `fixme`):
 - **Counter:** a cashier takes a kiosk order and is paid, a shift is opened and closed with a matching count, Home loads for an admin.
 - **Customer display:** a second window follows the sale, including one opened after the order started.
 - **Offline:** the saved catalog is shown with no connection and says how old it is, selling is paused, sign-out wipes the saved data, and another business never sees it.
+- **Quick adds:** two items tapped back to back both reach the cart; five taps against a server made 1.5 seconds slow are all accepted at once, shown as "adding" rows, merged into fewer requests, and end at the right total; a burst of seven taps on one item comes out as seven.
 - **Admin:** add an item, add a staff member who can then sign in, a reused PIN is refused, a manager only sees the staff list.
 
 Each test uses its own client address (`X-Forwarded-For`) so the 10-per-15-minutes sign-in limit is never shared. Tests run one at a time because every device owns one open cart on the server.
@@ -233,7 +234,8 @@ Each test uses its own client address (`X-Forwarded-For`) so the 10-per-15-minut
 | G29 | TEST LIMIT | The hardware (scale over serial, camera scan, printing, full screen, second monitor) cannot be driven by the test browser and is covered by unit tests only. |
 | G30 | NOT COVERED | Direct comparison with the Flutter client's behaviour is not automated. Flutter has no test hook for it, so parity was checked by reading its code (sections B and C). |
 | G31 | UNVERIFIED | The CI job (`e2e` in `web-ci.yml`) has not run yet. It follows the same steps used locally, with Docker for Postgres and Playwright's Chromium. Its first run may need small fixes. |
-| D19 | KNOWN PROBLEM | A test marked `fixme` reproduces the slow register: the item grid is disabled while an add is on its way, so the second of two quick taps is lost (see section I). |
+| D21 | IMPLEMENTATION | **Register adds are queued, not awaited** (`features/pos/addQueue.ts`, `useCartAdds.ts`). Every tap is recorded at once and sent in order, one request at a time, because the server keeps one cart per device and merges lines, so two at once could race. Taps on the same plain item that are waiting are merged into one request with the summed quantity. The screen shows waiting adds as "Adding..." rows with no price (the web still has no pricing of its own), and editing, promo codes and Charge stay disabled until the queue is empty, so nothing can be charged before the server has priced it. A failed add is named in a message and the rest carry on. The queue is emptied when the session ends. Adding no longer blocks the item grid, and dialogs close the moment they are confirmed. When a business has no modifier groups at all, the per-item modifier lookup is skipped. The kiosk menu uses the same queue. |
+| D22 | IMPLEMENTATION | **Flutter register**: pricing was already local, but every tap first awaited a fresh network lookup of that item's modifier groups (the provider was dropped as soon as the tap finished) and the first add of each item then fetched them a second time for pricing. The lookup is now one shared provider kept for five minutes (a failure is never kept), the pricing code reads through it, and the "Added" confirmation replaces the previous one instead of queueing a four-second snackbar per tap. Not changed: the kiosk cart notifier still shows a loading state on every add. |
 | D20 | KNOWN PROBLEM | A test marked `fixme` reproduces G15: a cashier who has merely opened Sell has an empty open cart, and the server then refuses to hand them a kiosk order (400). Only a manager can clear that cart. |
 
 ## I. Follow-ups queued by the product owner
@@ -242,6 +244,6 @@ To be done after the remaining delivery steps.
 
 1. **Name the app "Purch.io".** `npm run dev` still prints `web@0.0.0 dev` and the browser tab title is "web". Set the package name and the page title.
 2. **Vary the Home charts.** Use different chart types on Home instead of only bars and raw numbers. The figures must still come from the server.
-3. **Faster add to cart (web and Flutter).** Adding an item makes the register wait for the server, and the next item cannot be added until it finishes. In the web the item grid is disabled while an add is pending (`SellPage` `busy`) and every add is a round trip. Cashier speed is the top priority, so adds must not block each other. Prices stay the server's; there is no client pricing.
+3. **Faster add to cart (web and Flutter). DONE, see D21 and D22.** Adding an item made the register wait for the server, and the next item could not be added until it finished. Cashier speed is the top priority, so adds no longer block each other. Prices stay the server's; there is no client pricing.
 
 Per phase: `npm --prefix web run lint`, `tsc -b`, `npm --prefix web test`, `npm --prefix web run build`.
