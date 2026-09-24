@@ -53,6 +53,6 @@ describe('InventoryHomePage', () => {
     signInAs('Manager');
     vi.mocked(dashboardApi.inventory).mockRejectedValue(new Error('boom'));
     renderPage(<InventoryHomePage />);
-    expect(await screen.findByText('Stock totals are unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Stock health is unavailable')).toBeInTheDocument();
   });
 });

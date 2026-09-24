@@ -132,7 +132,7 @@ describe('PaymentPage', () => {
     await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 5, amountTendered: null, customerCreditLedgerId: 'c1' }));
   });
 
-  it('goes back to Sell when the cart is empty', async () => {
+  it('goes back to Cashier when the cart is empty', async () => {
     vi.mocked(posApi.getCart).mockResolvedValue(makeCart());
     renderPayment();
     expect(await screen.findByText('Sell home')).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe('PaymentPage', () => {
 });
 
 describe('ReceiptPage', () => {
-  it('sends you back to Sell if there is no completed sale to show', async () => {
+  it('sends you back to Cashier if there is no completed sale to show', async () => {
     renderPage(<ReceiptPage />, { route: '/sell/receipt', path: '/sell/receipt', otherRoutes: [{ path: '/sell', element: <p>Sell home</p> }] });
     expect(await screen.findByText('Sell home')).toBeInTheDocument();
   });

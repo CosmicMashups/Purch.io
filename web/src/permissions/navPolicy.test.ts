@@ -8,7 +8,7 @@ describe('tabsForRole', () => {
     expect(tabsForRole('Manager')).toEqual(all);
   });
 
-  it('confines Cashier to Home and Sell', () => {
+  it('confines Cashier to Home and Cashier', () => {
     expect(tabsForRole('Cashier')).toEqual(['home', 'sell']);
   });
 

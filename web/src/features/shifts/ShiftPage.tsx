@@ -27,7 +27,7 @@ function ShiftScreen() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageHeader title="Shift and cash drawer" backTo={{ to: '/sell', label: 'Sell' }} />
+      <PageHeader title="Shift and cash drawer" backTo={{ to: '/sell', label: 'Cashier' }} />
       {closed ? (
         <ClosedSummary shift={closed} />
       ) : shift.isPending ? (

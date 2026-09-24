@@ -40,7 +40,7 @@ function PendingOrders({ branchId }: { branchId: string }) {
       <PageHeader
         title="Kiosk orders"
         subtitle="Orders customers placed at the kiosk, waiting for payment"
-        backTo={{ to: '/sell', label: 'Sell' }}
+        backTo={{ to: '/sell', label: 'Cashier' }}
         action={
           <SecondaryButton type="button" disabled={orders.isFetching} onClick={() => void orders.refetch()}>
             {orders.isFetching ? 'Refreshing...' : 'Refresh'}
@@ -76,7 +76,7 @@ function PendingOrders({ branchId }: { branchId: string }) {
       )}
 
       <p className="text-sm text-ink-soft">
-        Taking an order makes it your cart so you can add the payment. If you already have items in your cart, finish that sale first. A manager can clear the cart from the Sell screen.
+        Taking an order makes it your cart so you can add the payment. If you already have items in your cart, finish that sale first. A manager can clear the cart from the Cashier screen.
       </p>
     </div>
   );

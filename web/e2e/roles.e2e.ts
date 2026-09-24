@@ -7,32 +7,32 @@ test.describe('what each role can reach', () => {
   test('an admin sees every tab', async ({ page, signInAs }) => {
     await signInAs('admin');
     await page.goto('/');
-    for (const tab of ['Home', 'Sell', 'Inventory', 'Business']) await expect(nav(page).getByRole('link', { name: tab })).toBeVisible();
+    for (const tab of ['Home', 'Cashier', 'Inventory', 'Business']) await expect(nav(page).getByRole('link', { name: tab })).toBeVisible();
   });
 
   test('a manager sees every tab but not Devices or Settings', async ({ page, signInAs }) => {
     await signInAs('manager');
     await page.goto('/business');
-    for (const tab of ['Home', 'Sell', 'Inventory', 'Business']) await expect(nav(page).getByRole('link', { name: tab })).toBeVisible();
+    for (const tab of ['Home', 'Cashier', 'Inventory', 'Business']) await expect(nav(page).getByRole('link', { name: tab })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Devices/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /^Settings/ })).toHaveCount(0);
   });
 
-  test('a cashier sees Home and Sell only, and is turned away from Business', async ({ page, signInAs }) => {
+  test('a cashier sees Home and Cashier only, and is turned away from Business', async ({ page, signInAs }) => {
     await signInAs('cashier');
     await page.goto('/');
-    await expect(nav(page).getByRole('link', { name: 'Sell' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Cashier' })).toBeVisible();
     await expect(nav(page).getByRole('link', { name: 'Business' })).toHaveCount(0);
     await expect(nav(page).getByRole('link', { name: 'Inventory' })).toHaveCount(0);
     await page.goto('/business');
     await expect(page).not.toHaveURL(/\/business/);
   });
 
-  test('a warehouse officer sees Home and Inventory only, and is turned away from Sell', async ({ page, signInAs }) => {
+  test('a warehouse officer sees Home and Inventory only, and is turned away from Cashier', async ({ page, signInAs }) => {
     await signInAs('warehouse');
     await page.goto('/');
     await expect(nav(page).getByRole('link', { name: 'Inventory' })).toBeVisible();
-    await expect(nav(page).getByRole('link', { name: 'Sell' })).toHaveCount(0);
+    await expect(nav(page).getByRole('link', { name: 'Cashier' })).toHaveCount(0);
     await page.goto('/sell');
     await expect(page).not.toHaveURL(/\/sell/);
   });

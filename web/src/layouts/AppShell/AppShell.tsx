@@ -9,7 +9,7 @@ import { tabPath, tabsForRole, type AppTab } from '../../permissions/navPolicy';
 
 const TAB_META: Record<AppTab, { label: string; icon: Icon; matches: (path: string) => boolean }> = {
   home: { label: 'Home', icon: House, matches: (p) => p === '/' },
-  sell: { label: 'Sell', icon: CashRegister, matches: (p) => p.startsWith('/sell') },
+  sell: { label: 'Cashier', icon: CashRegister, matches: (p) => p.startsWith('/sell') },
   inventory: { label: 'Inventory', icon: Cube, matches: (p) => p.startsWith('/inventory') },
   business: {
     label: 'Business',

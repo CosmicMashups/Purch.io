@@ -61,7 +61,7 @@ test.describe('at the counter', () => {
 });
 
 // Known problem (G15 in docs/REACT-MIGRATION.md): the server refuses to hand a kiosk order to a till that already
-// has an open cart, and merely opening Sell creates one. Only a manager can clear it. Remove `fixme` once fixed.
+// has an open cart, and merely opening Cashier creates one. Only a manager can clear it. Remove `fixme` once fixed.
 test.fixme('a cashier who has looked at an empty register can still take a kiosk order', async ({ page, actor, signInAs, ip, seed }) => {
   const kiosk = await actor('kiosk');
   await kiosk.goto('/kiosk');

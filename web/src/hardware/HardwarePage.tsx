@@ -35,7 +35,7 @@ export function HardwarePage() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-5">
-      <PageHeader title="Hardware" subtitle="These settings belong to this browser on this computer. They are not shared with other devices." backTo={{ to: '/sell', label: 'Sell' }} />
+      <PageHeader title="Hardware" subtitle="These settings belong to this browser on this computer. They are not shared with other devices." backTo={{ to: '/sell', label: 'Cashier' }} />
 
       <Section title="Scale">
         {!canSerial && <p className="text-base text-ink-soft">Connecting a scale needs Chrome or Edge on a secure page. Weights can still be typed in.</p>}
@@ -79,7 +79,7 @@ export function HardwarePage() {
       </Section>
 
       <Section title="Barcode scanner">
-        <p className="text-base">A USB or Bluetooth scanner in keyboard mode works anywhere on the Sell screen: scan and the item is added. Nothing needs to be connected here.</p>
+        <p className="text-base">A USB or Bluetooth scanner in keyboard mode works anywhere on the Cashier screen: scan and the item is added. Nothing needs to be connected here.</p>
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className={button} disabled={!cameraScanSupported()} onClick={() => setCameraOpen(true)}>
             Test camera scan

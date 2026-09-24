@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CategoryStrip } from './components/CategoryStrip';
 import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
@@ -138,23 +139,12 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           className="h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-lg"
         />
 
-        <div role="group" aria-label="Categories" className="flex flex-wrap gap-2">
-          <CategoryChip active={categoryId === null} onClick={() => setCategoryId(null)}>
-            All
-          </CategoryChip>
-          {[...(categories.data ?? [])]
-            .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((category) => (
-              <CategoryChip key={category.id} active={categoryId === category.id} onClick={() => setCategoryId(category.id)}>
-                {category.name}
-              </CategoryChip>
-            ))}
-        </div>
+        <CategoryStrip categories={categories.data ?? []} selectedId={categoryId} onSelect={setCategoryId} />
 
         {items.isPending && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" aria-busy="true">
             {Array.from({ length: 8 }, (_, i) => (
-              <Skeleton key={i} className="h-32 w-full" />
+              <Skeleton key={i} className="h-52 w-full" />
             ))}
           </div>
         )}
@@ -209,17 +199,4 @@ function CartArea({ cart, isSupervisor, pending, onCheckout }: { cart: ReturnTyp
   if (cart.isPending) return <Skeleton className="h-full min-h-96 w-full" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
   return <CartPanel cart={cart.data} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} />;
-}
-
-function CategoryChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`h-12 rounded-control px-5 text-base font-semibold ${active ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
-    >
-      {children}
-    </button>
-  );
 }

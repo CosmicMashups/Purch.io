@@ -7,7 +7,7 @@ import type { AddLineRequest, RecordPaymentRequest, Transaction } from './types'
 
 export const posKeys = { cart: ['pos', 'cart'] as const };
 
-/** The device's open cart. Fetching creates one if none exists, so this is safe to call on entering Sell. */
+/** The device's open cart. Fetching creates one if none exists, so this is safe to call on entering Cashier. */
 export const useCart = (enabled: boolean) => useQuery({ queryKey: posKeys.cart, queryFn: posApi.getCart, enabled, staleTime: 0, refetchOnWindowFocus: true });
 
 /** Each cart call returns the freshly priced cart, so the cache is set from the response instead of refetching. */
@@ -30,7 +30,7 @@ export const useVoidCart = () => useCartMutation(() => posApi.voidCart());
 
 /**
  * Paying completes the sale, so the returned transaction is the receipt. The old cart is dropped
- * from the cache so the next visit to Sell fetches (and creates) a fresh open cart.
+ * from the cache so the next visit to Cashier fetches (and creates) a fresh open cart.
  */
 export function usePay() {
   const qc = useQueryClient();
