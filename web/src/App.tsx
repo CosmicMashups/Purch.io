@@ -3,6 +3,13 @@ import { AppShell } from './layouts/AppShell/AppShell';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { RequireTab } from './features/auth/RequireTab';
 import { LoginPage } from './features/auth/LoginPage';
+import { InventoryHomePage } from './features/inventory/pages/InventoryHomePage';
+import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
+import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
+import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPage';
+import { RecordMovementPage } from './features/inventory/pages/RecordMovementPage';
+import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
+import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { ItemListPage } from './features/catalog/pages/ItemListPage';
 import { AddItemPage } from './features/catalog/pages/AddItemPage';
@@ -16,6 +23,7 @@ import { ComboComponentsPage } from './features/catalog/pages/ComboComponentsPag
 import { ItemModifierGroupsPage } from './features/catalog/pages/ItemModifierGroupsPage';
 import { AssignDepartmentPage } from './features/catalog/pages/AssignDepartmentPage';
 import { LowStockThresholdPage } from './features/catalog/pages/LowStockThresholdPage';
+import { RecipePage } from './features/catalog/pages/RecipePage';
 import { CategoriesPage } from './features/catalog/pages/CategoriesPage';
 import { ModifierGroupsPage } from './features/catalog/pages/ModifierGroupsPage';
 
@@ -32,6 +40,13 @@ export function App() {
           </Route>
 
           <Route element={<RequireTab tab="inventory" />}>
+            <Route path="/inventory" element={<InventoryHomePage />} />
+            <Route path="/inventory/movements" element={<MovementLogPage />} />
+            <Route path="/inventory/movements/new" element={<RecordMovementPage />} />
+            <Route path="/inventory/ingredients" element={<IngredientsPage />} />
+            <Route path="/inventory/suppliers" element={<SuppliersPage />} />
+            <Route path="/inventory/purchase-orders" element={<PurchaseOrdersPage />} />
+            <Route path="/inventory/transfers" element={<TransfersPage />} />
             <Route path="/inventory/*" element={<Navigate to="/inventory" replace />} />
           </Route>
 
@@ -49,6 +64,7 @@ export function App() {
             <Route path="/catalog/items/:itemId/modifier-groups" element={<ItemModifierGroupsPage />} />
             <Route path="/catalog/items/:itemId/department" element={<AssignDepartmentPage />} />
             <Route path="/catalog/items/:itemId/low-stock-threshold" element={<LowStockThresholdPage />} />
+            <Route path="/catalog/items/:itemId/recipe" element={<RecipePage />} />
             <Route path="/catalog/categories" element={<CategoriesPage />} />
             <Route path="/catalog/modifier-groups" element={<ModifierGroupsPage />} />
           </Route>
