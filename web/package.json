@@ -12,8 +12,8 @@
     "e2e": "playwright test",
     "e2e:types": "tsc -p e2e",
     "preview": "vite preview",
-    "preview:cf": "wrangler pages dev dist",
-    "deploy:cf": "npm run build && wrangler pages deploy dist"
+    "preview:cf": "wrangler dev",
+    "deploy:cf": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
