@@ -6,8 +6,9 @@ public sealed record RetentionSweepResult(
     int SyncedRecordsPurged,
     int AuditLogsPurged,
     int InventoryMovementsPurged,
-    int OrphanedUploadsPurged = 0)
+    int OrphanedUploadsPurged = 0,
+    int CartBatchReceiptsPurged = 0)
 {
     public int Total => RefreshTokensPurged + PasswordResetTokensPurged + SyncedRecordsPurged
-        + AuditLogsPurged + InventoryMovementsPurged + OrphanedUploadsPurged;
+        + AuditLogsPurged + InventoryMovementsPurged + OrphanedUploadsPurged + CartBatchReceiptsPurged;
 }

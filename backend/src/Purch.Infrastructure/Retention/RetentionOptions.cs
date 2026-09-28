@@ -24,6 +24,11 @@ public sealed class RetentionOptions
     /// still dedupes correctly; short enough not to grow forever.</summary>
     public int SyncedRecordRetentionDays { get; set; } = 30;
 
+    /// <summary>A cart-batch-add idempotency row (see CartBatchReceipt) is purged this many days after it was
+    /// created. A retry only ever resends a batch within the same checkout session, so this only needs to
+    /// outlive any realistic retry window, not the sale itself.</summary>
+    public int CartBatchReceiptRetentionDays { get; set; } = 7;
+
     /// <summary>Null (the default) keeps every audit log row forever. Set a value to purge rows older
     /// than that many days.</summary>
     public int? AuditLogRetentionDays { get; set; }

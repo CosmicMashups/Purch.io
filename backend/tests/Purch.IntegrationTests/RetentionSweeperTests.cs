@@ -129,6 +129,24 @@ public sealed class RetentionSweeperTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task An_old_cart_batch_receipt_is_purged_once_its_retention_window_has_passed()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await using var dbContext = OpenDbContext();
+
+        var old = new CartBatchReceipt { TenantId = Guid.NewGuid(), TransactionId = Guid.NewGuid(), CreatedAt = now.AddDays(-10) };
+        var recent = new CartBatchReceipt { TenantId = Guid.NewGuid(), TransactionId = Guid.NewGuid(), CreatedAt = now.AddDays(-1) };
+        dbContext.AddRange(old, recent);
+        _ = await dbContext.SaveChangesAsync();
+
+        var result = await Sweeper(dbContext, new RetentionOptions { CartBatchReceiptRetentionDays = 7 }).RunAsync();
+
+        Assert.True(result.CartBatchReceiptsPurged >= 1);
+        Assert.False(await dbContext.CartBatchReceipts.IgnoreQueryFilters().AnyAsync(r => r.Id == old.Id));
+        Assert.True(await dbContext.CartBatchReceipts.IgnoreQueryFilters().AnyAsync(r => r.Id == recent.Id));
+    }
+
+    [Fact]
     public async Task Audit_logs_and_inventory_movements_are_left_untouched_when_no_retention_period_is_configured()
     {
         var now = DateTimeOffset.UtcNow;

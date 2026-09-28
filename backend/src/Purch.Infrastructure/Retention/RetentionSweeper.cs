@@ -58,6 +58,12 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
                 .ExecuteDeleteAsync(cancellationToken);
         }
 
+        var cartBatchReceiptCutoff = now.AddDays(-settings.CartBatchReceiptRetentionDays);
+        var cartBatchReceiptsPurged = await dbContext.CartBatchReceipts
+            .IgnoreQueryFilters()
+            .Where(receipt => receipt.CreatedAt < cartBatchReceiptCutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+
         var inventoryMovementsPurged = 0;
         if (settings.InventoryMovementRetentionDays is { } movementDays)
         {
@@ -86,7 +92,8 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
             syncedRecordsPurged,
             auditLogsPurged,
             inventoryMovementsPurged,
-            orphanedUploadsPurged);
+            orphanedUploadsPurged,
+            cartBatchReceiptsPurged);
     }
 
     private async Task ArchiveAuditLogsAsync(string archiveDirectory, DateTimeOffset cutoff, CancellationToken cancellationToken)
