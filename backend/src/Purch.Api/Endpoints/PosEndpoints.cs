@@ -43,9 +43,10 @@ public static class PosEndpoints
 
         _ = app.MapDelete("/transactions/cart/lines/{lineId:guid}", async (
             Guid lineId,
+            string? approverPin,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await transactionService.RemoveLineAsync(lineId, cancellationToken)))
+            Results.Ok(await transactionService.RemoveLineAsync(lineId, approverPin, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         // Void and refund are reachable by any POS role (a cashier must be able to ask), but always need a

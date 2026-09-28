@@ -66,7 +66,7 @@ public static class KioskEndpoints
             Guid lineId,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await transactionService.RemoveLineAsync(lineId, cancellationToken)))
+            Results.Ok(await transactionService.RemoveLineAsync(lineId, approverPin: null, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
 
         _ = app.MapPut("/kiosk/cart/order-type", async (

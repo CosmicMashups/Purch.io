@@ -13,7 +13,7 @@ public interface ITransactionService
 
     Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default);
 
-    Task<TransactionDto> RemoveLineAsync(Guid lineId, CancellationToken cancellationToken = default);
+    Task<TransactionDto> RemoveLineAsync(Guid lineId, string? approverPin, CancellationToken cancellationToken = default);
 
     Task<TransactionDto> VoidCartAsync(VoidCartRequest request, CancellationToken cancellationToken = default);
 

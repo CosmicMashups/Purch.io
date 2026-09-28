@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
+using Purch.Application.Devices;
 using Purch.Application.Kiosk;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
@@ -133,6 +134,130 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         Assert.DoesNotContain(stillPending!, order => order.Id == submitted.Id);
     }
 
+    /// <summary>Builds, submits and claims a one-line kiosk order, leaving it Open with KitchenStatus.Queued
+    /// under whichever client claims it — the shared setup for the kitchen-edit gate tests below.</summary>
+    private static async Task<(TransactionDto Claimed, ItemDto Item)> ClaimedKioskOrderAsync(PurchApiFactory factory, HttpClient adminClient, HttpClient claimingClient)
+    {
+        var (kioskClient, _, _) = await PairedKioskClientAsync(factory, adminClient);
+        var itemResponse = await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Ramen", null, null, null, 150m, null, PricingType.Unit));
+        var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        _ = await kioskClient.PostAsJsonAsync("/kiosk/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        var submitResponse = await kioskClient.PostAsync("/kiosk/cart/submit", null);
+        var submitted = (await submitResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        var claimResponse = await claimingClient.PostAsync($"/transactions/kiosk-pending/{submitted.Id}/claim", null);
+        var claimed = (await claimResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        return (claimed, item);
+    }
+
+    [Fact]
+    public async Task A_cashier_editing_a_not_yet_prepared_kitchen_order_needs_a_managers_pin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        var (claimed, item) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
+        var lineId = claimed.Lines.Single().Id;
+
+        var noPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m));
+        Assert.Equal(HttpStatusCode.BadRequest, noPin.StatusCode);
+        Assert.Equal(1m, (await cashierClient.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!.Lines.Single().Quantity);
+
+        var wrongPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m, "0000"));
+        Assert.Equal(HttpStatusCode.BadRequest, wrongPin.StatusCode);
+
+        var withManagerPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m, "5678"));
+        Assert.Equal(HttpStatusCode.OK, withManagerPin.StatusCode);
+        var updated = await withManagerPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(2m, updated!.Lines.Single().Quantity);
+        _ = item;
+    }
+
+    [Fact]
+    public async Task An_admin_editing_a_not_yet_prepared_kitchen_order_needs_no_pin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, adminClient);
+        var lineId = claimed.Lines.Single().Id;
+
+        var response = await adminClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(3m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(3m, (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines.Single().Quantity);
+    }
+
+    [Fact]
+    public async Task Removing_a_line_from_a_not_yet_prepared_kitchen_order_follows_the_same_pin_rule()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
+        var lineId = claimed.Lines.Single().Id;
+
+        var noPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}");
+        Assert.Equal(HttpStatusCode.BadRequest, noPin.StatusCode);
+
+        var withPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}?approverPin=5678");
+        Assert.Equal(HttpStatusCode.OK, withPin.StatusCode);
+        Assert.Empty((await withPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines);
+    }
+
+    [Fact]
+    public async Task Once_the_kitchen_has_started_preparing_it_no_pin_can_change_the_order()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, adminClient);
+        var lineId = claimed.Lines.Single().Id;
+
+        var (kitchenClient, _, _) = await PairedKitchenDisplayClientAsync(factory, adminClient);
+        var statusResponse = await kitchenClient.PutAsJsonAsync($"/kitchen-display/orders/{claimed.Id}/status", new UpdateKitchenStatusRequest(KitchenStatus.Preparing));
+        Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
+
+        // Even the admin who needed no PIN a moment ago cannot edit it now — a PIN is not the point once
+        // the kitchen has actually started.
+        var response = await adminClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(5m));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(1m, (await adminClient.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!.Lines.Single().Quantity);
+    }
+
+    [Fact]
+    public async Task Editing_an_ordinary_non_kiosk_cart_never_needs_a_pin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Soda", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var addResponse = await cashierClient.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        var lineId = (await addResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines.Single().Id;
+
+        var response = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(4m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(4m, (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines.Single().Quantity);
+    }
+
+    private static async Task<(HttpClient Client, Guid BranchId, Guid DeviceId)> PairedKitchenDisplayClientAsync(PurchApiFactory factory, HttpClient adminClient)
+    {
+        var branches = await adminClient.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+        var deviceResponse = await adminClient.PostAsJsonAsync("/devices", new CreateDeviceRequest(branchId, DeviceIdentifier: null, DeviceType.KitchenDisplay, PairingPin: "9999"));
+        var device = (await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions))!;
+
+        var client = factory.CreateClient();
+        var session = await client.PostAsJsonAsync("/kitchen-display/session", new UnattendedSessionRequest(device.PairingCode, "9999"));
+        var token = (await session.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions))!.AccessToken;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return (client, branchId, device.Id);
+    }
+
     [Fact]
     public async Task Claiming_a_kiosk_order_is_rejected_if_the_cashier_already_has_an_open_cart()
     {
@@ -238,6 +363,21 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
 
         kioskClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session!.AccessToken);
         return (kioskClient, branchId, device.Id);
+    }
+
+    /// <summary>A cashier signed in on the same tenant/device as an already-paired admin — for the
+    /// kitchen-edit gate, where who is asking (not just who is signed in on the same terminal) matters.</summary>
+    private static async Task<HttpClient> CashierClientAsync(HttpClient adminClient, PurchApiFactory factory, string pin = "6789")
+    {
+        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, pin));
+        var devices = await adminClient.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
+
+        var cashier = factory.CreateClient();
+        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, pin));
+        var token = (await login.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions))!.AccessToken;
+        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return cashier;
     }
 
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)

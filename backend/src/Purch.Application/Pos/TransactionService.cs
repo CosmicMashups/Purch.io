@@ -571,12 +571,13 @@ public sealed class TransactionService(
         }
 
         var line = await RequireOwnLineAsync(lineId, cancellationToken);
+        var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
+            ?? throw new NotFoundException("Transaction", line.TransactionId);
+
+        await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
 
         line.Quantity = request.Quantity;
         line.LineTotal = line.Quantity * line.UnitPrice;
-
-        var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
-            ?? throw new NotFoundException("Transaction", line.TransactionId);
 
         // Flush the quantity/LineTotal change above before recalculating — its
         // line query would otherwise still see the old quantity.
@@ -587,11 +588,13 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
-    public async Task<TransactionDto> RemoveLineAsync(Guid lineId, CancellationToken cancellationToken = default)
+    public async Task<TransactionDto> RemoveLineAsync(Guid lineId, string? approverPin, CancellationToken cancellationToken = default)
     {
         var line = await RequireOwnLineAsync(lineId, cancellationToken);
         var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
             ?? throw new NotFoundException("Transaction", line.TransactionId);
+
+        await RequireKitchenEditAllowedAsync(cart, approverPin, cancellationToken);
 
         transactionRepository.RemoveLine(line);
 
@@ -1200,6 +1203,38 @@ public sealed class TransactionService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(order, cancellationToken);
+    }
+
+    /// <summary>
+    /// A line on an ordinary cart may be changed or removed freely. A cart that has been sent to the kitchen
+    /// (a claimed kiosk order — <see cref="Transaction.OriginatedFromKiosk"/>) is different: the kitchen's own
+    /// status says whether it is still safe to touch.
+    ///  - Queued (the kitchen hasn't started it): the edit is allowed, but a Cashier or Warehouse staff
+    ///    member needs an Admin or Manager's PIN first — an Admin/Manager themselves doesn't, since they are
+    ///    already that approver.
+    ///  - Preparing, Ready or PickedUp: refused outright, no PIN changes that — the item is already being
+    ///    made or is done, so the fix is a refund or exchange, not editing the order kitchen already has.
+    /// </summary>
+    private async Task RequireKitchenEditAllowedAsync(Transaction cart, string? approverPin, CancellationToken cancellationToken)
+    {
+        if (!cart.OriginatedFromKiosk)
+        {
+            return;
+        }
+
+        if (cart.KitchenStatus != KitchenStatus.Queued)
+        {
+            throw new ConflictException(
+                "The kitchen has already started or finished this order, so it can no longer be changed here. Refund or exchange the item instead.");
+        }
+
+        var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+        if (caller is not null && ApproverRoles.Contains(caller.Role))
+        {
+            return;
+        }
+
+        _ = await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
     }
 
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
