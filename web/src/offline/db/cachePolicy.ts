@@ -1,9 +1,11 @@
 /**
- * What may be kept for offline browsing: the catalog and the branch structure only. Nothing personal or
- * sensitive is ever stored: no staff, customers, credit, audit, reports, settings, carts or sales.
- * A key is allowed by its first part, so a new feature stays out of the cache until it is added here.
+ * What may be kept across a reload: the catalog and branch structure for offline browsing, plus the Home
+ * dashboard's own aggregate figures (revenue totals, top sellers, stock counts) so it shows something at
+ * once instead of a blank loading screen. Nothing keyed by a customer, a staff member or a single sale is
+ * ever stored: no per-staff reports, credit, audit, settings, carts or sale records. A key is allowed by
+ * its first part, so a new feature stays out of the cache until it is added here.
  */
-const CACHEABLE_ROOTS: ReadonlySet<string> = new Set(['items', 'categories', 'modifierGroups', 'branches', 'departments']);
+const CACHEABLE_ROOTS: ReadonlySet<string> = new Set(['items', 'categories', 'modifierGroups', 'branches', 'departments', 'dashboard']);
 
 export function isCacheableKey(queryKey: readonly unknown[]): boolean {
   return typeof queryKey[0] === 'string' && CACHEABLE_ROOTS.has(queryKey[0]);

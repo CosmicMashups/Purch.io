@@ -36,7 +36,11 @@ export function usePay() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: RecordPaymentRequest) => posApi.pay(body),
-    onSuccess: () => qc.removeQueries({ queryKey: posKeys.cart }),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: posKeys.cart });
+      // Today's revenue figures are stale the instant a sale completes.
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
     // A refused sale (prices or promos moved, or the cart changed) leaves the cart open: read it again so the screen shows the server's current total.
     onError: () => qc.invalidateQueries({ queryKey: posKeys.cart }),
   });

@@ -8,7 +8,7 @@ import { AsyncPanel } from './components/AsyncPanel';
 import { RevenueOverview } from './components/RevenueOverview';
 import { StockHealth } from './components/StockHealth';
 import { formatDay, formatPeso, greetingFor } from './format';
-import { useFlaggedSync, useSalesDashboard } from './queries';
+import { useFlaggedSync, useRefreshDashboards, useSalesDashboard } from './queries';
 import { tabsForRole } from '../../permissions/navPolicy';
 import { DepartmentPanel, MovementPanel, StaffPanels } from '../reports/components/RangePanels';
 import { choiceToParams, defaultChoice } from '../reports/params';
@@ -24,10 +24,22 @@ export function HomePage() {
   const flagged = useFlaggedSync(canReport);
   const monthParams = canReport ? choiceToParams(defaultChoice('30d')) : null;
   const openConflicts = flagged.data?.filter((r) => r.reviewedAt === null).length ?? 0;
+  const refreshDashboards = useRefreshDashboards();
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">{greetingFor(new Date().getHours())}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold tracking-tight">{greetingFor(new Date().getHours())}</h1>
+        {canReport && (
+          <button
+            type="button"
+            onClick={() => void refreshDashboards()}
+            className="inline-flex h-10 items-center rounded-control border border-line bg-surface px-4 text-sm font-semibold hover:border-brand"
+          >
+            Refresh
+          </button>
+        )}
+      </div>
 
       {openConflicts > 0 && (
         <div role="status" className="rounded-panel border border-warn bg-surface p-5">

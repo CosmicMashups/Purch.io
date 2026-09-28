@@ -8,6 +8,12 @@ describe('isCacheableKey', () => {
     }
   });
 
+  it('allows the Home dashboard: aggregate revenue and stock figures, not per-record data', () => {
+    for (const key of [['dashboard', 'sales'], ['dashboard', 'inventory'], ['dashboard', 'flaggedSync']]) {
+      expect(isCacheableKey(key)).toBe(true);
+    }
+  });
+
   it('keeps everything personal or sensitive out', () => {
     for (const key of [
       ['staff'],
@@ -20,7 +26,6 @@ describe('isCacheableKey', () => {
       ['reports', 'staff', {}],
       ['devices'],
       ['shifts', 'current'],
-      ['dashboard', 'sales'],
       ['inventory-items'],
       ['inventory', 'movements'],
       ['promos', 'codes'],
@@ -42,6 +47,7 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery({ queryKey: ['items'], state: { status: 'error' } })).toBe(false);
     expect(shouldPersistQuery({ queryKey: ['items'], state: { status: 'pending' } })).toBe(false);
     expect(shouldPersistQuery({ queryKey: ['staff'], state: { status: 'success' } })).toBe(false);
+    expect(shouldPersistQuery({ queryKey: ['dashboard', 'sales'], state: { status: 'success' } })).toBe(true);
   });
 });
 

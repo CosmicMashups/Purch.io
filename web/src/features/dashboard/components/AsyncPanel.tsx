@@ -33,11 +33,22 @@ export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, m
     body = children(query.data);
   }
 
+  // A cached figure shown while a background refetch is on its way is still worth a timestamp, so nobody
+  // reads it as this second's number. Nothing to show before the first answer ever arrives.
+  const asOf = query.dataUpdatedAt > 0 ? new Date(query.dataUpdatedAt) : null;
+
   return (
     <section aria-labelledby={`panel-${title}`} className="rounded-panel border border-line bg-surface p-5">
-      <h2 id={`panel-${title}`} className="text-lg font-semibold">
-        {title}
-      </h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id={`panel-${title}`} className="text-lg font-semibold">
+          {title}
+        </h2>
+        {asOf && (
+          <p className="text-xs text-ink-soft">
+            {query.isFetching ? 'Updating…' : `As of ${asOf.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+          </p>
+        )}
+      </div>
       {subtitle && <p className="text-sm text-ink-soft">{subtitle}</p>}
       <div className={`mt-4 transition-opacity ${query.isFetching && !query.isPending ? "opacity-60" : ""}`} aria-busy={query.isFetching}>
         {body}

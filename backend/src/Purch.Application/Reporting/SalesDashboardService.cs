@@ -43,7 +43,9 @@ public sealed class SalesDashboardService(
 
         var topItems = await reportingRepository.GetTopItemsByRevenueAsync(
             resolvedBranchId, last30Start, to, 10, cancellationToken);
-        var items = await itemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+        // Only the top 10 items' names are needed — loading the whole catalog here cost one query per
+        // dashboard view that grew with the tenant's item count instead of staying fixed at 10.
+        var items = await itemRepository.ListByIdsAsync(topItems.Select(top => top.ItemId).ToList(), cancellationToken);
         var itemNamesById = items.ToDictionary(item => item.Id, item => item.Name);
 
         var topSellingItems = topItems
