@@ -42,6 +42,7 @@ public sealed class TransactionService(
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IPosSettings posSettings,
+    IApproverAuthorizationService approverAuthorizationService,
     IUnitOfWork unitOfWork) : ITransactionService
 {
     private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
@@ -466,7 +467,9 @@ public sealed class TransactionService(
             // around it.
             if (open.TotalAmount > 0)
             {
-                AuditVoid(open, "Discarded when a new sale was checked out");
+                // Automatic, not a staff-initiated void: starting a new sale must never itself be blocked
+                // waiting on an approver PIN, so this path carries none.
+                AuditVoid(open, "Discarded when a new sale was checked out", approver: null);
             }
 
             open.Status = TransactionStatus.Voided;
@@ -598,13 +601,21 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
-    public async Task<TransactionDto> VoidCartAsync(CancellationToken cancellationToken = default)
+    public async Task<TransactionDto> VoidCartAsync(VoidCartRequest request, CancellationToken cancellationToken = default)
     {
         var deviceId = CurrentDeviceId;
         var cart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
             ?? throw new NotFoundException("Open cart", deviceId);
 
-        AuditVoid(cart, "Voided by staff");
+        // An empty cart has nothing to lose, so it voids freely — the same as starting a new sale over it
+        // elsewhere in this file. A cart with items always needs approval, matching decision G in the plan.
+        User? approver = null;
+        if (cart.TotalAmount > 0)
+        {
+            approver = await approverAuthorizationService.AuthorizeAsync(request.ApproverPin, cancellationToken);
+        }
+
+        AuditVoid(cart, request.Reason ?? "Voided by staff", approver);
         cart.Status = TransactionStatus.Voided;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -612,8 +623,10 @@ public sealed class TransactionService(
     }
 
     /// <summary>Records that a cart with content was voided and by whom, staged so it commits in the same
-    /// save as the void. Call before changing the cart's status, which the entry captures.</summary>
-    private void AuditVoid(Transaction cart, string reason)
+    /// save as the void. Call before changing the cart's status, which the entry captures. The approver's
+    /// id and role — not just their name in a UI somewhere — go in the entry itself, so an audit review
+    /// never depends on a still-existing account to say who signed off.</summary>
+    private void AuditVoid(Transaction cart, string reason, User? approver)
     {
         auditLogRepository.Add(new AuditLog
         {
@@ -623,7 +636,13 @@ public sealed class TransactionService(
             TargetEntityType = nameof(Transaction),
             TargetEntityId = cart.Id,
             BeforeStateJson = JsonSerializer.Serialize(new { status = cart.Status.ToString(), total = cart.TotalAmount }),
-            AfterStateJson = JsonSerializer.Serialize(new { status = nameof(TransactionStatus.Voided), reason }),
+            AfterStateJson = JsonSerializer.Serialize(new
+            {
+                status = nameof(TransactionStatus.Voided),
+                reason,
+                approvedByUserId = approver?.Id,
+                approvedByRole = approver?.Role.ToString(),
+            }),
         });
     }
 
@@ -647,6 +666,8 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(transaction.Status), "Only completed transactions can be refunded.");
         }
 
+        var approver = await approverAuthorizationService.AuthorizeAsync(request.ApproverPin, cancellationToken);
+
         var beforeState = new { status = transaction.Status.ToString(), total = transaction.TotalAmount };
         transaction.Status = TransactionStatus.Refunded;
 
@@ -658,7 +679,14 @@ public sealed class TransactionService(
             TargetEntityType = nameof(Transaction),
             TargetEntityId = transaction.Id,
             BeforeStateJson = JsonSerializer.Serialize(beforeState),
-            AfterStateJson = JsonSerializer.Serialize(new { status = nameof(TransactionStatus.Refunded), reason = request.Reason, total = transaction.TotalAmount }),
+            AfterStateJson = JsonSerializer.Serialize(new
+            {
+                status = nameof(TransactionStatus.Refunded),
+                reason = request.Reason,
+                total = transaction.TotalAmount,
+                approvedByUserId = approver.Id,
+                approvedByRole = approver.Role.ToString(),
+            }),
         });
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

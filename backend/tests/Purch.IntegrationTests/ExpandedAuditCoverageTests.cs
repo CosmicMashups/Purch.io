@@ -125,9 +125,10 @@ public sealed class ExpandedAuditCoverageTests(PostgresContainerFixture postgres
                 new RecordPaymentRequest(PaymentMethod.Cash, 120m)));
         var sale = (await checkoutResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
 
+        // This tenant has only one Admin account, so it may approve its own refund.
         var refundResponse = await admin.PostAsJsonAsync(
             $"/transactions/{sale.Id}/refund",
-            new RefundTransactionRequest("Wrong order prepared"));
+            new RefundTransactionRequest("Wrong order prepared", "1234"));
         Assert.True(refundResponse.IsSuccessStatusCode);
 
         var logs = await admin.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);

@@ -213,7 +213,8 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         _ = await client.PostAsJsonAsync(
             "/transactions/cart/lines",
             new AddTransactionLineRequest(item!.Id, null, 1m));
-        _ = await client.PostAsync("/transactions/cart/void", null);
+        // This tenant has only one Admin account, so it may approve its own void.
+        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
 
         var response = await client.PostAsync("/reports/x-reading", null);
         var reading = await response.Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
@@ -386,7 +387,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
 
         var voidedItem = await CreateItemAsync(client, "Voided Item", 40m);
         _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(voidedItem.Id, null, 1m));
-        _ = await client.PostAsync("/transactions/cart/void", null);
+        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
 
         var from = DateTimeOffset.UtcNow.AddDays(-1);
         var to = DateTimeOffset.UtcNow.AddDays(1);

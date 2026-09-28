@@ -33,4 +33,13 @@ public class Device : TenantScopedEntity
 
     /// <summary>BIR accreditation's Machine Identification Number for this terminal — admin-entered once the unit is accredited; falls back to a device-ID-derived placeholder until then (see BirReadingService).</summary>
     public string? MachineIdentificationNumber { get; set; }
+
+    /// <summary>Wrong approver PINs typed at this terminal since the last correct one or the last lockout —
+    /// see ApproverAuthorizationService. Never reset by anything except a correct PIN or the lockout window
+    /// elapsing, so a cashier can't out-wait a lock by retrying from a different login.</summary>
+    public int ApproverPinFailedAttempts { get; set; }
+
+    /// <summary>Set once ApproverPinFailedAttempts reaches the limit; every approval attempt at this
+    /// terminal is refused until this passes, even with the correct PIN.</summary>
+    public DateTimeOffset? ApproverPinLockedUntil { get; set; }
 }

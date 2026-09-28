@@ -156,6 +156,7 @@ builder.Services.AddScoped<IPaymentRepository, EfPaymentRepository>();
 builder.Services.AddScoped<IReceiptSequenceRepository, EfReceiptSequenceRepository>();
 builder.Services.AddScoped<IKioskPrepSequenceRepository, EfKioskPrepSequenceRepository>();
 builder.Services.AddSingleton<IPosSettings, PosSettings>();
+builder.Services.AddScoped<IApproverAuthorizationService, ApproverAuthorizationService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IKioskSessionService, KioskSessionService>();
 builder.Services.AddScoped<IUnattendedSessionService, UnattendedSessionService>();

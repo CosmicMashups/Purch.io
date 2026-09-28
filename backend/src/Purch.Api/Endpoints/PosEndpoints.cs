@@ -48,11 +48,14 @@ public static class PosEndpoints
             Results.Ok(await transactionService.RemoveLineAsync(lineId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        // Void and refund are reachable by any POS role (a cashier must be able to ask), but always need a
+        // different Admin/Manager's PIN inside the service itself — see ApproverAuthorizationService.
         _ = app.MapPost("/transactions/cart/void", async (
+            VoidCartRequest? request,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await transactionService.VoidCartAsync(cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
+            Results.Ok(await transactionService.VoidCartAsync(request ?? new VoidCartRequest(null), cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         _ = app.MapPost("/transactions/{transactionId:guid}/refund", async (
             Guid transactionId,
@@ -60,7 +63,7 @@ public static class PosEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.RefundTransactionAsync(transactionId, request, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,

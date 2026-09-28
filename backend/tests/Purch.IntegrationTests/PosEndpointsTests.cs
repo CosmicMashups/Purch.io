@@ -567,9 +567,39 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         var cart = (await (await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 2m))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
 
-        _ = await client.PostAsync("/transactions/cart/void", null);
+        // This tenant has only one Admin account, so it may approve its own void — see
+        // ApproverAuthorizationServiceTests for the case where a second approver exists.
+        var voided = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
+        Assert.Equal(HttpStatusCode.OK, voided.StatusCode);
 
         Assert.Contains(await VoidAuditEntriesAsync(client), entry => entry.TargetEntityId == cart.Id && entry.TargetEntityType == "Transaction");
+    }
+
+    [Fact]
+    public async Task Voiding_a_cart_with_items_and_no_approver_pin_is_refused_and_leaves_the_cart_open()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 2m));
+
+        var response = await client.PostAsync("/transactions/cart/void", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var cart = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+        Assert.Equal(TransactionStatus.Open, cart!.Status);
+    }
+
+    [Fact]
+    public async Task Voiding_an_empty_cart_needs_no_approval()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        _ = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+
+        var response = await client.PostAsync("/transactions/cart/void", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

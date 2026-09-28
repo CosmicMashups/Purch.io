@@ -15,7 +15,7 @@ public interface ITransactionService
 
     Task<TransactionDto> RemoveLineAsync(Guid lineId, CancellationToken cancellationToken = default);
 
-    Task<TransactionDto> VoidCartAsync(CancellationToken cancellationToken = default);
+    Task<TransactionDto> VoidCartAsync(VoidCartRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Refunds a completed transaction, marking it Refunded and auditing the action.</summary>
     Task<TransactionDto> RefundTransactionAsync(Guid transactionId, RefundTransactionRequest request, CancellationToken cancellationToken = default);
