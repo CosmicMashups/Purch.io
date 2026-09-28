@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { formatPeso } from '../../dashboard/format';
-import { useApplyPromoCode, useApplySeniorPwd, useRemoveLine, useSetOrderType, useUpdateLine, useVoidCart } from '../queries';
+import { posApi } from '../api';
+import { useApplyPromoCode, useApplySeniorPwd, useSetOrderType } from '../queries';
+import { useApproverGatedAction } from '../useApproverGatedAction';
 import type { PendingRow } from '../addQueue';
 import type { Transaction, TransactionLine } from '../types';
 
@@ -28,17 +31,16 @@ function lineDetails(line: TransactionLine): string[] {
 }
 
 export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: CartPanelProps) {
-  const update = useUpdateLine();
-  const remove = useRemoveLine();
   const promo = useApplyPromoCode();
   const senior = useApplySeniorPwd();
   const orderType = useSetOrderType();
-  const voidCart = useVoidCart();
+  const gated = useApproverGatedAction();
   const [code, setCode] = useState('');
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const [gatedActionBusy, setGatedActionBusy] = useState(false);
 
   const updating = pending.length > 0;
-  const busy = updating || update.isPending || remove.isPending || promo.isPending || senior.isPending || orderType.isPending || voidCart.isPending;
+  const busy = updating || gatedActionBusy || promo.isPending || senior.isPending || orderType.isPending;
   const empty = cart.lines.length === 0;
 
   function applyCode(event: React.FormEvent) {
@@ -48,16 +50,26 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
     promo.mutate(trimmed.toUpperCase(), { onSuccess: () => setCode('') });
   }
 
+  /** Every gated action runs through here so `busy` covers it even before a PIN dialog (if any) opens. */
+  async function runGated(title: string, send: (approverPin?: string) => Promise<Transaction>, onLanded?: (cart: Transaction) => void) {
+    setGatedActionBusy(true);
+    try {
+      await gated.run(title, send, onLanded);
+    } finally {
+      setGatedActionBusy(false);
+    }
+  }
+
   function onVoid() {
     setConfirmVoid(false);
-    voidCart.mutate(undefined, { onSuccess: () => toast.info('Cart cleared') });
+    void runGated('Clear the cart', (approverPin) => posApi.voidCart(approverPin), () => toast.info('Cart cleared'));
   }
 
   return (
     <section aria-label="Cart" className="flex h-full min-h-0 flex-col rounded-panel border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line px-5 py-4">
         <h2 className="text-xl font-bold">Cart</h2>
-        {isSupervisor && !empty && (
+        {!empty && (
           <button type="button" disabled={busy} onClick={() => setConfirmVoid(true)} className="h-12 px-3 text-base font-semibold text-danger underline disabled:opacity-40">
             Clear cart
           </button>
@@ -89,7 +101,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
                         aria-label={`Decrease ${line.itemName}`}
                         className={stepper}
                         disabled={busy || !whole || line.quantity <= 1}
-                        onClick={() => update.mutate({ lineId: line.id, quantity: line.quantity - 1 })}
+                        onClick={() => void runGated(`Change the quantity of ${line.itemName}`, (approverPin) => posApi.updateLine(line.id, line.quantity - 1, approverPin))}
                       >
                         -
                       </button>
@@ -99,12 +111,17 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
                         aria-label={`Increase ${line.itemName}`}
                         className={stepper}
                         disabled={busy || !whole}
-                        onClick={() => update.mutate({ lineId: line.id, quantity: line.quantity + 1 })}
+                        onClick={() => void runGated(`Change the quantity of ${line.itemName}`, (approverPin) => posApi.updateLine(line.id, line.quantity + 1, approverPin))}
                       >
                         +
                       </button>
                     </div>
-                    <button type="button" disabled={busy} onClick={() => remove.mutate(line.id)} className="h-12 px-2 text-base font-semibold text-danger underline disabled:opacity-40">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runGated(`Remove ${line.itemName}`, (approverPin) => posApi.removeLine(line.id, approverPin))}
+                      className="h-12 px-2 text-base font-semibold text-danger underline disabled:opacity-40"
+                    >
                       Remove
                     </button>
                   </div>
@@ -216,6 +233,8 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
         onConfirm={onVoid}
         onCancel={() => setConfirmVoid(false)}
       />
+
+      {gated.dialogProps && <ApproverPinDialog open {...gated.dialogProps} />}
     </section>
   );
 }

@@ -8,10 +8,13 @@ export const posApi = {
   /** Several adds in one call, all or nothing. The batch id makes a retry safe: the server applies each id once. It carries no prices. */
   addLines: (batchId: string, lines: AddLineRequest[]) =>
     apiClient.post<Transaction>('/transactions/cart/lines/batch', { batchId, lines }).then((r) => r.data),
-  updateLine: (lineId: string, quantity: number) =>
-    apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}`, { quantity }).then((r) => r.data),
-  removeLine: (lineId: string) => apiClient.delete<Transaction>(`/transactions/cart/lines/${lineId}`).then((r) => r.data),
-  voidCart: () => apiClient.post<Transaction>('/transactions/cart/void').then((r) => r.data),
+  /** approverPin is only ever required on a claimed kiosk order the kitchen hasn't started yet — see ApproverPinDialog. */
+  updateLine: (lineId: string, quantity: number, approverPin?: string) =>
+    apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}`, { quantity, approverPin }).then((r) => r.data),
+  removeLine: (lineId: string, approverPin?: string) =>
+    apiClient.delete<Transaction>(`/transactions/cart/lines/${lineId}`, { params: approverPin ? { approverPin } : undefined }).then((r) => r.data),
+  /** approverPin is required whenever the cart holds anything — a different Admin/Manager, unless the tenant has only one. */
+  voidCart: (approverPin?: string) => apiClient.post<Transaction>('/transactions/cart/void', { approverPin }).then((r) => r.data),
   applyPromoCode: (code: string | null) => apiClient.put<Transaction>('/transactions/cart/promo-code', { code }).then((r) => r.data),
   applySeniorPwd: (apply: boolean) => apiClient.put<Transaction>('/transactions/cart/senior-pwd-discount', { apply }).then((r) => r.data),
   setOrderType: (orderType: string) => apiClient.put<Transaction>('/transactions/cart/order-type', { orderType }).then((r) => r.data),

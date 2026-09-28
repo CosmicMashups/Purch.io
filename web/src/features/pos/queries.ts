@@ -20,13 +20,12 @@ function useCartMutation<TVars>(fn: (vars: TVars) => Promise<Transaction>) {
 }
 
 export const useAddLine = () => useCartMutation((body: AddLineRequest) => posApi.addLine(body));
-export const useUpdateLine = () =>
-  useCartMutation(({ lineId, quantity }: { lineId: string; quantity: number }) => posApi.updateLine(lineId, quantity));
-export const useRemoveLine = () => useCartMutation((lineId: string) => posApi.removeLine(lineId));
 export const useApplyPromoCode = () => useCartMutation((code: string | null) => posApi.applyPromoCode(code));
 export const useApplySeniorPwd = () => useCartMutation((apply: boolean) => posApi.applySeniorPwd(apply));
 export const useSetOrderType = () => useCartMutation((orderType: string) => posApi.setOrderType(orderType));
-export const useVoidCart = () => useCartMutation(() => posApi.voidCart());
+// Voiding, changing a line's quantity and removing a line all go through useApproverGatedAction instead of a
+// plain mutation now: any of them may come back needing a manager/admin PIN, which a mutation's onSuccess/
+// onError alone can't pause for and retry.
 
 /**
  * Paying completes the sale, so the returned transaction is the receipt. The old cart is dropped

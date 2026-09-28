@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useToastStore } from '../../components/feedback/toastStore';
+import { ApiError } from '../../lib/apiError';
 import { makeCart, makeItem, makeLine } from '../../test/pos';
 import { renderPage, signInAs } from '../../test/render';
 import { catalogApi } from '../catalog/api';
@@ -251,10 +252,51 @@ describe('cart actions', () => {
     vi.mocked(posApi.removeLine).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Increase Iced Latte' }));
-    await waitFor(() => expect(posApi.updateLine).toHaveBeenCalledWith('l1', 3));
+    await waitFor(() => expect(posApi.updateLine).toHaveBeenCalledWith('l1', 3, undefined));
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
-    await waitFor(() => expect(posApi.removeLine).toHaveBeenCalledWith('l2'));
+    await waitFor(() => expect(posApi.removeLine).toHaveBeenCalledWith('l2', undefined));
+  });
+
+  it('opens the approver PIN dialog when a kitchen order edit is refused, and retries with what was typed', async () => {
+    vi.mocked(posApi.getCart).mockResolvedValue(twoLines());
+    vi.mocked(posApi.updateLine).mockImplementation((_lineId, _quantity, approverPin) =>
+      approverPin === '5678'
+        ? Promise.resolve(twoLines())
+        : Promise.reject(
+            new ApiError('validation', 'An Admin or Manager PIN is required to approve this.', { approverPin: ['An Admin or Manager PIN is required to approve this.'] }),
+          ),
+    );
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Increase Iced Latte' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Change the quantity of Iced Latte' });
+    expect(within(dialog).getByText('An Admin or Manager PIN is required to approve this.')).toBeInTheDocument();
+    // A blank PIN cannot be submitted.
+    expect(within(dialog).getByRole('button', { name: 'Approve' })).toBeDisabled();
+
+    fireEvent.change(within(dialog).getByLabelText('Manager or admin PIN'), { target: { value: '5678' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => expect(posApi.updateLine).toHaveBeenCalledWith('l1', 3, '5678'));
+    expect(screen.queryByRole('dialog', { name: 'Change the quantity of Iced Latte' })).not.toBeInTheDocument();
+  });
+
+  it('reopens the PIN dialog with the servers reason after a wrong PIN, without losing the cart', async () => {
+    vi.mocked(posApi.getCart).mockResolvedValue(twoLines());
+    vi.mocked(posApi.removeLine).mockRejectedValue(
+      new ApiError('validation', "That PIN doesn't match a different active manager or admin.", { approverPin: ["That PIN doesn't match a different active manager or admin."] }),
+    );
+    renderPage(<SellPage />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove' }))[0]);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Iced Latte' });
+    fireEvent.change(within(dialog).getByLabelText('Manager or admin PIN'), { target: { value: '0000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent("That PIN doesn't match a different active manager or admin.");
+    // Still both lines: the refused removal never touched the cart.
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
   });
 
   it('does not offer plus and minus on a fractional weight line', async () => {
@@ -276,12 +318,24 @@ describe('cart actions', () => {
     await waitFor(() => expect(posApi.setOrderType).toHaveBeenCalledWith('Take Out'));
   });
 
-  it('lets a cashier see but not use Senior/PWD, and gives no clear-cart button', async () => {
+  it('lets a cashier see but not use Senior/PWD, and asks a manager to approve clearing the cart', async () => {
     vi.mocked(posApi.getCart).mockResolvedValue(twoLines());
+    vi.mocked(posApi.voidCart).mockImplementation((approverPin) =>
+      approverPin === '5678' ? Promise.resolve(makeCart()) : Promise.reject(new ApiError('validation', "That PIN doesn't match a different active manager or admin.", { approverPin: ["That PIN doesn't match a different active manager or admin."] })),
+    );
     renderPage(<SellPage />);
     expect(await screen.findByRole('switch')).toBeDisabled();
     expect(screen.getByText('A manager applies this')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Clear cart' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear cart' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Clear the cart?' })).getByRole('button', { name: 'Clear cart' }));
+
+    const pinDialog = await screen.findByRole('dialog', { name: 'Clear the cart' });
+    fireEvent.change(within(pinDialog).getByLabelText('Manager or admin PIN'), { target: { value: '5678' } });
+    fireEvent.click(within(pinDialog).getByRole('button', { name: 'Approve' }));
+
+    await waitFor(() => expect(posApi.voidCart).toHaveBeenCalledWith('5678'));
+    expect(screen.queryByRole('dialog', { name: 'Clear the cart' })).not.toBeInTheDocument();
   });
 
   it('lets a manager apply Senior/PWD and clear the cart after confirming', async () => {
