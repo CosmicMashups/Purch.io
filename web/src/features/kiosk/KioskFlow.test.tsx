@@ -94,7 +94,7 @@ describe('KioskMenuPage quick taps', () => {
     const { kioskAddQueue: q } = await import('./queries');
     renderPage(<KioskCartPage />, { otherRoutes: other });
     await screen.findAllByText('Iced Latte');
-    q.add({ send: kioskApi.addLine, onCart: () => undefined, onError: () => undefined }, 'Mocha', { itemId: 'mocha', itemVariantId: null, quantity: 1 });
+    q.add({ send: (_id, requests) => kioskApi.addLine(requests[0]), onCart: () => undefined, onError: () => undefined }, 'Mocha', { itemId: 'mocha', itemVariantId: null, quantity: 1 });
     expect(await screen.findByRole('status')).toHaveTextContent(/Adding Mocha/);
     expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute('aria-disabled', 'true');
   });

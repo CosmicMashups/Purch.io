@@ -7,6 +7,10 @@ public interface ITransactionService
 
     Task<TransactionDto> AddLineAsync(AddTransactionLineRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>Applies several adds together, all or nothing, and answers with the priced cart. Idempotent on
+    /// <see cref="AddLinesBatchRequest.BatchId"/>: a retry adds nothing a second time.</summary>
+    Task<TransactionDto> AddLinesBatchAsync(AddLinesBatchRequest request, CancellationToken cancellationToken = default);
+
     Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default);
 
     Task<TransactionDto> RemoveLineAsync(Guid lineId, CancellationToken cancellationToken = default);

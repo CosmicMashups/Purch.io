@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The pricing cases every client's engine also runs (web TypeScript, Flutter Dart). -->
+    <None Include="..\..\..\shared\pricing-scenarios.json" Link="shared\pricing-scenarios.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Purch.Domain\Purch.Domain.csproj" />
     <ProjectReference Include="..\..\src\Purch.Application\Purch.Application.csproj" />
     <ProjectReference Include="..\Purch.Common.TestUtilities\Purch.Common.TestUtilities.csproj" />

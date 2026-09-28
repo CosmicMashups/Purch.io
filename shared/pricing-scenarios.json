@@ -1,0 +1,215 @@
+{
+  "_readme": "Shared pricing scenarios. Every pricing engine (web TypeScript, Flutter Dart, and the backend's item-promo calculator) must produce these results, so the copies cannot drift apart. Only the fields listed under 'expect' are asserted. Money figures are compared to within 0.02. Add a scenario here whenever a pricing rule changes.",
+  "now": "2026-01-15T12:00:00Z",
+  "scenarios": [
+    {
+      "name": "no active rules yields no discounts",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 4, "unitPrice": 25 }],
+      "expect": { "itemPromoDiscountAmount": 0, "totalAmount": 100, "lineDiscounts": { "1": { "discount": 0, "label": null } } }
+    },
+    {
+      "name": "same-item BOGO spans multiple lines, earliest first",
+      "lines": [
+        { "lineId": "1", "itemId": "item-a", "quantity": 3, "unitPrice": 10 },
+        { "lineId": "2", "itemId": "item-a", "quantity": 2, "unitPrice": 10 }
+      ],
+      "rules": { "bogo": [{ "name": "B1T1", "triggerItemId": "item-a", "triggerQuantity": 1, "freeItemId": "item-a", "freeQuantity": 1 }] },
+      "expect": {
+        "itemPromoDiscountAmount": 20,
+        "lineDiscounts": { "1": { "discount": 20, "label": "B1T1" }, "2": { "discount": 0 } }
+      }
+    },
+    {
+      "name": "different-item BOGO is capped by the free item quantity",
+      "lines": [
+        { "lineId": "1", "itemId": "item-a", "quantity": 10, "unitPrice": 5 },
+        { "lineId": "2", "itemId": "item-b", "quantity": 3, "unitPrice": 8 }
+      ],
+      "rules": { "bogo": [{ "name": "A2 get B1", "triggerItemId": "item-a", "triggerQuantity": 2, "freeItemId": "item-b", "freeQuantity": 1 }] },
+      "expect": { "lineDiscounts": { "1": { "discount": 0 }, "2": { "discount": 24 } } }
+    },
+    {
+      "name": "combo pairs only matched units, splitting the discount proportionally",
+      "lines": [
+        { "lineId": "1", "itemId": "item-a", "quantity": 3, "unitPrice": 50 },
+        { "lineId": "2", "itemId": "item-b", "quantity": 5, "unitPrice": 40 }
+      ],
+      "rules": { "combo": [{ "name": "Combo", "itemAId": "item-a", "itemBId": "item-b", "comboPrice": 85 }] },
+      "expect": {
+        "itemPromoDiscountAmount": 15,
+        "lineDiscounts": { "1": { "discount": 8.33, "label": "COMBO ₱85.00" }, "2": { "discount": 6.67 } }
+      }
+    },
+    {
+      "name": "a unit claimed by BOGO is not discounted again by an item discount",
+      "lines": [
+        { "lineId": "t", "itemId": "trigger", "quantity": 1, "unitPrice": 20 },
+        { "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 30 }
+      ],
+      "rules": {
+        "bogo": [{ "name": "B1T1", "triggerItemId": "trigger", "triggerQuantity": 1, "freeItemId": "item-a", "freeQuantity": 1 }],
+        "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 20 }]
+      },
+      "expect": { "lineDiscounts": { "1": { "discount": 30, "label": "B1T1" } } }
+    },
+    {
+      "name": "item discount, percentage",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 20 }] },
+      "expect": { "itemPromoDiscountAmount": 20, "lineDiscounts": { "1": { "label": "20% OFF" } } }
+    },
+    {
+      "name": "item discount, fixed amount",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "fixedAmount", "discountValue": 15 }] },
+      "expect": { "itemPromoDiscountAmount": 15, "lineDiscounts": { "1": { "label": "₱15.00 OFF" } } }
+    },
+    {
+      "name": "item discount, fixed price",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "fixedPrice", "discountValue": 70 }] },
+      "expect": { "itemPromoDiscountAmount": 30, "lineDiscounts": { "1": { "label": "SALE PRICE" } } }
+    },
+    {
+      "name": "inactive or out-of-window rules are ignored",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 2, "unitPrice": 10 }],
+      "rules": {
+        "bogo": [
+          { "name": "old", "triggerItemId": "item-a", "triggerQuantity": 1, "freeItemId": "item-a", "freeQuantity": 1, "startsAt": "2026-01-10T00:00:00Z", "endsAt": "2026-01-11T00:00:00Z" },
+          { "name": "off", "triggerItemId": "item-a", "triggerQuantity": 1, "freeItemId": "item-a", "freeQuantity": 1, "isActive": false }
+        ]
+      },
+      "expect": { "itemPromoDiscountAmount": 0 }
+    },
+    {
+      "name": "Senior/PWD takes 20% of the regular price",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 2, "unitPrice": 50 }],
+      "seniorPwdApplied": true,
+      "expect": { "seniorPwdDiscountAmount": 20, "discountAmount": 20, "totalAmount": 80 }
+    },
+    {
+      "name": "item promo alone, Senior/PWD off",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 50 }] },
+      "expect": { "itemPromoDiscountAmount": 50, "totalAmount": 50, "appliedPromoSide": "itemPromos", "seniorPwdSavings": 20, "promoSavings": 50 }
+    },
+    {
+      "name": "Senior/PWD is taken on the regular price and suppresses item promos",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 50 }] },
+      "seniorPwdApplied": true,
+      "expect": {
+        "seniorPwdDiscountAmount": 20,
+        "itemPromoDiscountAmount": 0,
+        "totalAmount": 80,
+        "seniorPwdSavings": 20,
+        "promoSavings": 50,
+        "lineDiscounts": { "1": { "discount": 0, "label": null } }
+      }
+    },
+    {
+      "name": "a promo code does not stack with Senior/PWD but stays on the cart",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "promoCodes": [{ "code": "SAVE10", "discountType": "percentage", "discountValue": 10 }] },
+      "seniorPwdApplied": true,
+      "promoCode": "save10",
+      "expect": {
+        "seniorPwdDiscountAmount": 20,
+        "promoDiscountAmount": 0,
+        "appliedPromoCode": null,
+        "retainedPromoCode": "SAVE10",
+        "promoCodeNotApplied": "suppressedBySeniorPwd",
+        "totalAmount": 80
+      }
+    },
+    {
+      "name": "switching Senior/PWD off restores the promo code",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "promoCodes": [{ "code": "SAVE10", "discountType": "percentage", "discountValue": 10 }] },
+      "promoCode": "save10",
+      "expect": { "promoDiscountAmount": 10, "appliedPromoCode": "SAVE10", "promoCodeNotApplied": "none", "totalAmount": 90 }
+    },
+    {
+      "name": "a promo code is capped by the regular subtotal",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": { "promoCodes": [{ "code": "SAVE500", "discountType": "fixedAmount", "discountValue": 500 }] },
+      "promoCode": "SAVE500",
+      "expect": { "promoDiscountAmount": 100, "totalAmount": 0 }
+    },
+    {
+      "name": "a percentage promo code is computed on the regular subtotal",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 200 }],
+      "rules": { "promoCodes": [{ "code": "TEN", "discountType": "percentage", "discountValue": 10 }] },
+      "promoCode": "TEN",
+      "expect": { "promoDiscountAmount": 20, "totalAmount": 180 }
+    },
+    {
+      "name": "promo code larger than the item promos wins",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": {
+        "itemDiscount": [{ "itemId": "item-a", "discountType": "fixedAmount", "discountValue": 10 }],
+        "promoCodes": [{ "code": "CODE30", "discountType": "fixedAmount", "discountValue": 30 }]
+      },
+      "promoCode": "CODE30",
+      "expect": {
+        "promoDiscountAmount": 30,
+        "itemPromoDiscountAmount": 0,
+        "appliedPromoSide": "promoCode",
+        "totalAmount": 70,
+        "lineDiscounts": { "1": { "discount": 0 } }
+      }
+    },
+    {
+      "name": "item promos larger than the promo code win",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": {
+        "itemDiscount": [{ "itemId": "item-a", "discountType": "fixedAmount", "discountValue": 10 }],
+        "promoCodes": [{ "code": "CODE5", "discountType": "fixedAmount", "discountValue": 5 }]
+      },
+      "promoCode": "CODE5",
+      "expect": {
+        "itemPromoDiscountAmount": 10,
+        "promoDiscountAmount": 0,
+        "appliedPromoSide": "itemPromos",
+        "retainedPromoCode": "CODE5",
+        "promoCodeNotApplied": "supersededByItemPromos",
+        "totalAmount": 90
+      }
+    },
+    {
+      "name": "a tie between the code and the item promos goes to the item promos",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
+      "rules": {
+        "itemDiscount": [{ "itemId": "item-a", "discountType": "fixedAmount", "discountValue": 10 }],
+        "promoCodes": [{ "code": "CODE10", "discountType": "fixedAmount", "discountValue": 10 }]
+      },
+      "promoCode": "CODE10",
+      "expect": { "itemPromoDiscountAmount": 10, "promoDiscountAmount": 0, "totalAmount": 90 }
+    },
+    {
+      "name": "a lone BOGO behaves as before when Senior/PWD is off",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 2, "unitPrice": 50 }],
+      "rules": { "bogo": [{ "name": "B1T1", "triggerItemId": "item-a", "triggerQuantity": 1, "freeItemId": "item-a", "freeQuantity": 1 }] },
+      "expect": { "itemPromoDiscountAmount": 50, "appliedPromoSide": "itemPromos", "totalAmount": 50 }
+    },
+    {
+      "name": "an expired promo code is dropped, not an error",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 50 }],
+      "rules": { "promoCodes": [{ "code": "OLD", "discountType": "fixedAmount", "discountValue": 10, "expiresAt": "2026-01-15T11:00:00Z" }] },
+      "promoCode": "OLD",
+      "expect": { "promoDiscountAmount": 0, "appliedPromoCode": null, "retainedPromoCode": null, "totalAmount": 50 }
+    },
+    {
+      "name": "an unknown promo code is dropped, not an error",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 50 }],
+      "promoCode": "NOPE",
+      "expect": { "totalAmount": 50, "retainedPromoCode": null }
+    },
+    {
+      "name": "rounding halves to even like the server",
+      "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 0.625 }],
+      "seniorPwdApplied": true,
+      "expect": { "seniorPwdDiscountAmount": 0.12 }
+    }
+  ]
+}

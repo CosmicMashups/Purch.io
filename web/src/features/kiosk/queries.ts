@@ -67,4 +67,14 @@ useAuthStore.subscribe((state, previous) => {
   if (previous.accessToken && !state.accessToken) kioskAddQueue.reset();
 });
 
-export const useKioskAdds = (): CartAdds => useCartAdds(kioskAddQueue, kioskApi.addLine, kioskKeys.cart);
+/**
+ * The kiosk's server takes one line at a time, so a batch goes line by line, and a failed batch is not retried (a retry
+ * would add the lines that already landed a second time). The POS register uses a batch endpoint that is safe to retry.
+ */
+const sendKioskBatch = async (_batchId: string, requests: AddLineRequest[]): Promise<Transaction> => {
+  let cart!: Transaction;
+  for (const request of requests) cart = await kioskApi.addLine(request);
+  return cart;
+};
+
+export const useKioskAdds = (): CartAdds => useCartAdds(kioskAddQueue, sendKioskBatch, kioskKeys.cart, { retry: false });

@@ -39,6 +39,11 @@ public interface ITransactionRepository
     /// <summary>Kiosk orders submitted at this branch, awaiting pickup by a cashier — see TransactionService.SubmitKioskOrderAsync/ClaimKioskOrderAsync.</summary>
     Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
 
+    /// <summary>Whether a batch of cart adds with this id was already applied.</summary>
+    Task<bool> BatchReceiptExistsAsync(Guid batchId, CancellationToken cancellationToken = default);
+
+    void AddBatchReceipt(CartBatchReceipt receipt);
+
     void Add(Transaction transaction);
 
     void AddLine(TransactionLine line);

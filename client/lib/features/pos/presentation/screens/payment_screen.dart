@@ -108,6 +108,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         amountTendered: method == PaymentMethod.cash ? _tendered : null,
         customerCreditLedgerId:
             method == PaymentMethod.utangCredit ? _selectedLedgerId : null,
+        // Exactly the total on this screen; the server refuses the sale if its own total has moved.
+        expectedTotal: widget.total,
       ),
     );
 

@@ -41,6 +41,7 @@ public sealed class TransactionService(
     IInventoryMovementRepository inventoryMovementRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
+    IPosSettings posSettings,
     IUnitOfWork unitOfWork) : ITransactionService
 {
     private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
@@ -87,7 +88,91 @@ public sealed class TransactionService(
         return await ToDtoAsync(await AddLineCoreAsync(request, cancellationToken), cancellationToken);
     }
 
+    /// <summary>The most lines one batch may carry: enough for a cashier tapping fast, small enough that one
+    /// request cannot hold a database connection for long.</summary>
+    private const int MaxBatchLines = 50;
+
+    public async Task<TransactionDto> AddLinesBatchAsync(AddLinesBatchRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.BatchId == Guid.Empty)
+        {
+            throw new ValidationException(nameof(request.BatchId), "A batch needs its own id, so a retry can never add its lines twice.");
+        }
+
+        if (request.Lines.Count is 0 or > MaxBatchLines)
+        {
+            throw new ValidationException(nameof(request.Lines), $"A batch must carry between 1 and {MaxBatchLines} lines.");
+        }
+
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+
+        // A retry after a lost response: the lines are already in the cart, so add nothing and answer with it.
+        if (await transactionRepository.BatchReceiptExistsAsync(request.BatchId, cancellationToken))
+        {
+            return await ToDtoAsync(cart, cancellationToken);
+        }
+
+        var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
+        foreach (var line in request.Lines)
+        {
+            await StageLineAsync(stage, line, cancellationToken);
+        }
+
+        // One recalculation and one save for the whole batch, receipt included, so the batch is all-or-nothing:
+        // a request that dies part-way leaves neither lines nor a receipt, and the retry starts clean. Two
+        // requests racing with the same id collide on the receipt key and one gets a 409.
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        transactionRepository.AddBatchReceipt(new CartBatchReceipt { Id = request.BatchId, TenantId = CurrentTenantId, TransactionId = cart.Id });
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
     private async Task<Transaction> AddLineCoreAsync(AddTransactionLineRequest request, CancellationToken cancellationToken)
+    {
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
+        await StageLineAsync(stage, request, cancellationToken);
+
+        // Recalculate from the lines already in memory (existing plus the one just staged) and save once,
+        // instead of flushing, re-querying the lines and saving a second time.
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return cart;
+    }
+
+    /// <summary>A cart's lines held in memory while one or more adds are staged against it, so the adds see each
+    /// other (a second plain add of the same item merges into the first) without saving in between.</summary>
+    private sealed class CartStage
+    {
+        private CartStage(Transaction cart, List<TransactionLine> lines, HashSet<Guid> linesWithModifiers)
+        {
+            Cart = cart;
+            Lines = lines;
+            LinesWithModifiers = linesWithModifiers;
+        }
+
+        public Transaction Cart { get; }
+
+        public List<TransactionLine> Lines { get; }
+
+        /// <summary>Lines that carry at least one modifier selection, including ones staged in this same request.</summary>
+        public HashSet<Guid> LinesWithModifiers { get; }
+
+        public static async Task<CartStage> LoadAsync(Transaction cart, ITransactionRepository transactionRepository, CancellationToken cancellationToken)
+        {
+            var lines = (await transactionRepository.ListLinesAsync(cart.Id, cancellationToken)).ToList();
+            var withModifiers = (await transactionRepository.ListModifierSelectionsByLinesAsync(lines.Select(l => l.Id).ToList(), cancellationToken))
+                .Select(selection => selection.TransactionLineId)
+                .ToHashSet();
+            return new CartStage(cart, lines, withModifiers);
+        }
+    }
+
+    /// <summary>Validates one add and applies it to the staged cart (a new line or a merge into an existing one)
+    /// WITHOUT saving or recalculating; the caller does both once for everything it staged.</summary>
+    private async Task StageLineAsync(CartStage stage, AddTransactionLineRequest request, CancellationToken cancellationToken)
     {
         if (request.Quantity <= 0)
         {
@@ -107,7 +192,7 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(request.ItemVariantId), "This item requires choosing a variant.");
         }
 
-        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        var cart = stage.Cart;
 
         if (item.PricingType == PricingType.Combo)
         {
@@ -115,7 +200,7 @@ public sealed class TransactionService(
             var (comboModifierPriceDelta, comboModifierIds) = await ResolveModifierSelectionsAsync(item, request.SelectedModifierIds, cancellationToken);
             var unitPrice = comboUnitPrice + comboModifierPriceDelta;
 
-            var line = new TransactionLine
+            var comboLine = new TransactionLine
             {
                 TenantId = CurrentTenantId,
                 TransactionId = cart.Id,
@@ -125,14 +210,15 @@ public sealed class TransactionService(
                 UnitPrice = unitPrice,
                 LineTotal = unitPrice * request.Quantity,
             };
-            transactionRepository.AddLine(line);
+            transactionRepository.AddLine(comboLine);
+            stage.Lines.Add(comboLine);
 
             foreach (var selection in selections)
             {
                 transactionRepository.AddComboSelection(new TransactionLineComboSelection
                 {
                     TenantId = CurrentTenantId,
-                    TransactionLineId = line.Id,
+                    TransactionLineId = comboLine.Id,
                     ItemComboComponentId = selection.SlotId,
                     SelectedItemId = selection.SelectedItemId,
                 });
@@ -143,19 +229,13 @@ public sealed class TransactionService(
                 transactionRepository.AddModifierSelection(new TransactionLineModifierSelection
                 {
                     TenantId = CurrentTenantId,
-                    TransactionLineId = line.Id,
+                    TransactionLineId = comboLine.Id,
                     ItemModifierId = modifierId,
                 });
+                _ = stage.LinesWithModifiers.Add(comboLine.Id);
             }
 
-            // RecalculateTotalAsync re-queries lines from the database, which
-            // wouldn't see the line just added above until it's flushed — save
-            // first so the total isn't computed one line behind.
-            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-            await RecalculateTotalAsync(cart, cancellationToken);
-            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            return cart;
+            return;
         }
 
         var resolvedUnitPrice = item.BasePrice;
@@ -176,22 +256,6 @@ public sealed class TransactionService(
         var (modifierPriceDelta, modifierIds) = await ResolveModifierSelectionsAsync(item, request.SelectedModifierIds, cancellationToken);
         resolvedUnitPrice += modifierPriceDelta;
 
-        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
-        var pricedLines = lines.ToList();
-
-        // Which candidate lines already carry modifiers — one query, not one per candidate.
-        var linesWithModifiers = new HashSet<Guid>();
-        if (modifierIds.Count == 0)
-        {
-            var candidateIds = lines
-                .Where(line => line.ItemId == request.ItemId && line.ItemVariantId == request.ItemVariantId)
-                .Select(line => line.Id)
-                .ToList();
-            linesWithModifiers = (await transactionRepository.ListModifierSelectionsByLinesAsync(candidateIds, cancellationToken))
-                .Select(selection => selection.TransactionLineId)
-                .ToHashSet();
-        }
-
         // Two lines for the same item/variant only merge into one when neither
         // carries a modifier selection — a "No Ice" latte and a regular one are
         // meaningfully different lines, so merging them would silently drop
@@ -201,48 +265,42 @@ public sealed class TransactionService(
         TransactionLine? existingLine = null;
         if (modifierIds.Count == 0)
         {
-            existingLine = lines.FirstOrDefault(line =>
+            existingLine = stage.Lines.FirstOrDefault(line =>
                 line.ItemId == request.ItemId
                 && line.ItemVariantId == request.ItemVariantId
-                && !linesWithModifiers.Contains(line.Id));
+                && !stage.LinesWithModifiers.Contains(line.Id));
         }
+
         if (existingLine is not null)
         {
             existingLine.Quantity += request.Quantity;
             existingLine.LineTotal = existingLine.Quantity * existingLine.UnitPrice;
+            return;
         }
-        else
+
+        var line = new TransactionLine
         {
-            var line = new TransactionLine
+            TenantId = CurrentTenantId,
+            TransactionId = cart.Id,
+            ItemId = request.ItemId,
+            ItemVariantId = request.ItemVariantId,
+            Quantity = request.Quantity,
+            UnitPrice = resolvedUnitPrice,
+            LineTotal = resolvedUnitPrice * request.Quantity,
+        };
+        transactionRepository.AddLine(line);
+        stage.Lines.Add(line);
+
+        foreach (var modifierId in modifierIds)
+        {
+            transactionRepository.AddModifierSelection(new TransactionLineModifierSelection
             {
                 TenantId = CurrentTenantId,
-                TransactionId = cart.Id,
-                ItemId = request.ItemId,
-                ItemVariantId = request.ItemVariantId,
-                Quantity = request.Quantity,
-                UnitPrice = resolvedUnitPrice,
-                LineTotal = resolvedUnitPrice * request.Quantity,
-            };
-            transactionRepository.AddLine(line);
-            pricedLines.Add(line);
-
-            foreach (var modifierId in modifierIds)
-            {
-                transactionRepository.AddModifierSelection(new TransactionLineModifierSelection
-                {
-                    TenantId = CurrentTenantId,
-                    TransactionLineId = line.Id,
-                    ItemModifierId = modifierId,
-                });
-            }
+                TransactionLineId = line.Id,
+                ItemModifierId = modifierId,
+            });
+            _ = stage.LinesWithModifiers.Add(line.Id);
         }
-
-        // Recalculate from the lines already in memory (existing plus the one just added) and save
-        // once, instead of flushing, re-querying the lines and saving a second time.
-        await RecalculateTotalAsync(cart, cancellationToken, knownLines: pricedLines);
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return cart;
     }
 
     /// <summary>Validates that every combo slot got exactly its required number of
@@ -443,10 +501,15 @@ public sealed class TransactionService(
         // (still holding the SaleId) and the next checkout attempt discards it above, from a
         // fresh unit of work. Cleaning up here would re-save whatever half-applied changes
         // (e.g. a credit-ledger balance) the failed step left in the change tracker.
+        // Every line is staged in memory and priced and saved once, not one save and one recalculation per line.
+        var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
         foreach (var line in request.Lines)
         {
-            _ = await AddLineCoreAsync(line, cancellationToken);
+            await StageLineAsync(stage, line, cancellationToken);
         }
+
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (request.SeniorPwdDiscountApplied)
         {
@@ -465,10 +528,36 @@ public sealed class TransactionService(
 
         // An offline sale is already paid for at the device's price — refusing it now would leave the
         // customer with a receipt for a sale the books never see. It is recorded at the server's price.
-        return !request.OfflineSale && request.ExpectedTotal is { } expectedTotal && Math.Abs(cart.TotalAmount - expectedTotal) > 0.005m
-            ? throw new ConflictException(
-                $"Prices or promos changed: the total is now {cart.TotalAmount:F2} (the device showed {expectedTotal:F2}). Review the cart and try again.")
-            : await RecordPaymentCoreAsync(request.Payment, request.ReceiptNumber, cancellationToken);
+        if (!request.OfflineSale)
+        {
+            EnforceExpectedTotal(cart.TotalAmount, request.ExpectedTotal);
+        }
+
+        return await RecordPaymentCoreAsync(request.Payment, request.ReceiptNumber, expectedTotal: null, enforceExpectedTotal: false, cancellationToken);
+    }
+
+    /// <summary>
+    /// The server's own total is the one charged, so what the customer was shown must be that same amount. The client says
+    /// what it showed; a missing figure is refused (unless the grace switch is on) and a different one stops the sale with a
+    /// 409 before anything is charged, so nobody pays a total they were never shown.
+    /// </summary>
+    private void EnforceExpectedTotal(decimal serverTotal, decimal? expectedTotal)
+    {
+        if (expectedTotal is not { } expected)
+        {
+            if (posSettings.RequireExpectedTotal)
+            {
+                throw new ValidationException("ExpectedTotal", "Send the total the customer was shown (ExpectedTotal), so it can be checked against the server's total before anything is charged.");
+            }
+
+            return;
+        }
+
+        if (Math.Abs(serverTotal - expected) > 0.005m)
+        {
+            throw new ConflictException(
+                $"Prices or promos changed: the total is now {serverTotal:F2} (the device showed {expected:F2}). Review the cart and try again.");
+        }
     }
 
     public async Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default)
@@ -584,10 +673,15 @@ public sealed class TransactionService(
 
     public Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
     {
-        return RecordPaymentCoreAsync(request, deviceIssuedReceiptNumber: null, cancellationToken);
+        return RecordPaymentCoreAsync(request, deviceIssuedReceiptNumber: null, request.ExpectedTotal, enforceExpectedTotal: true, cancellationToken);
     }
 
-    private async Task<TransactionDto> RecordPaymentCoreAsync(RecordPaymentRequest request, long? deviceIssuedReceiptNumber, CancellationToken cancellationToken)
+    private async Task<TransactionDto> RecordPaymentCoreAsync(
+        RecordPaymentRequest request,
+        long? deviceIssuedReceiptNumber,
+        decimal? expectedTotal,
+        bool enforceExpectedTotal,
+        CancellationToken cancellationToken)
     {
         if (!SupportedPaymentMethods.Contains(request.Method))
         {
@@ -603,6 +697,11 @@ public sealed class TransactionService(
         if (cart.TotalAmount <= 0)
         {
             throw new ValidationException(nameof(request.Method), "The cart is empty — add an item before recording a payment.");
+        }
+
+        if (enforceExpectedTotal)
+        {
+            EnforceExpectedTotal(cart.TotalAmount, expectedTotal);
         }
 
         decimal? changeGiven = null;

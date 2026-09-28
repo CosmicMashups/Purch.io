@@ -37,6 +37,8 @@ export function usePay() {
   return useMutation({
     mutationFn: (body: RecordPaymentRequest) => posApi.pay(body),
     onSuccess: () => qc.removeQueries({ queryKey: posKeys.cart }),
+    // A refused sale (prices or promos moved, or the cart changed) leaves the cart open: read it again so the screen shows the server's current total.
+    onError: () => qc.invalidateQueries({ queryKey: posKeys.cart }),
   });
 }
 
@@ -71,4 +73,4 @@ useAuthStore.subscribe((state, previous) => {
   if (previous.accessToken && !state.accessToken) posAddQueue.reset();
 });
 
-export const usePosAdds = (): CartAdds => useCartAdds(posAddQueue, posApi.addLine, posKeys.cart);
+export const usePosAdds = (): CartAdds => useCartAdds(posAddQueue, posApi.addLines, posKeys.cart);

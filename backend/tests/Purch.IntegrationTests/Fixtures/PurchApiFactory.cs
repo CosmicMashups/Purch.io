@@ -40,6 +40,9 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
                 ["SUPABASE_STORAGE_KEY"] = "integration-test-storage-key",
                 ["JWT_SIGNING_KEY"] = TestJwtSigningKey,
                 ["JWT_ISSUER"] = TestJwtIssuer,
+                // The suite's many payment calls predate the field; tests of the rule itself switch it on
+                // through ExtraSettings (see the ExpectedTotal tests in PosEndpointsTests).
+                ["POS_REQUIRE_EXPECTED_TOTAL"] = "false",
             });
             _ = configBuilder.AddInMemoryCollection(ExtraSettings);
         });

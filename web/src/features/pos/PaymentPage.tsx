@@ -64,6 +64,8 @@ export function PaymentPage() {
       method,
       amountTendered: choice === 'cash' ? tenderNumber : null,
       customerCreditLedgerId: choice === 'utang' ? ledgerId : null,
+      // Exactly the total on this screen, which is the server's last answer: the server refuses the sale if its own total has moved.
+      expectedTotal: total,
     };
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
     pay.mutate(body, {

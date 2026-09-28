@@ -1135,6 +1135,171 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(11, sale.ReceiptNumber);
     }
 
+    [Fact]
+    public async Task A_batch_adds_every_line_in_one_call_and_merges_repeats_of_the_same_plain_item()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        var shake = await CreateItemAsync(client, "Yellow Mango Shake", 80m);
+
+        var response = await client.PostAsJsonAsync(
+            "/transactions/cart/lines/batch",
+            new AddLinesBatchRequest(
+                Guid.NewGuid(),
+                [
+                    new AddTransactionLineRequest(ramen.Id, null, 1m),
+                    new AddTransactionLineRequest(shake.Id, null, 1m),
+                    new AddTransactionLineRequest(ramen.Id, null, 1m),
+                ]));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cart = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(2, cart!.Lines.Count);
+        Assert.Equal(2m, cart.Lines.Single(l => l.ItemId == ramen.Id).Quantity);
+        Assert.Equal(280m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task Retrying_a_batch_with_the_same_id_adds_nothing_a_second_time()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        var batch = new AddLinesBatchRequest(Guid.NewGuid(), [new AddTransactionLineRequest(ramen.Id, null, 2m)]);
+
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines/batch", batch);
+        var retry = await client.PostAsJsonAsync("/transactions/cart/lines/batch", batch);
+
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var cart = await retry.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        var line = Assert.Single(cart!.Lines);
+        Assert.Equal(2m, line.Quantity);
+        Assert.Equal(200m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task A_batch_with_one_bad_line_adds_none_of_its_lines_and_can_be_sent_again_once_fixed()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        var batchId = Guid.NewGuid();
+
+        var bad = await client.PostAsJsonAsync(
+            "/transactions/cart/lines/batch",
+            new AddLinesBatchRequest(batchId, [new AddTransactionLineRequest(ramen.Id, null, 1m), new AddTransactionLineRequest(Guid.NewGuid(), null, 1m)]));
+        Assert.Equal(HttpStatusCode.NotFound, bad.StatusCode);
+
+        var untouched = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+        Assert.Empty(untouched!.Lines);
+
+        // No receipt was left behind, so the same id still works with corrected lines.
+        var fixedBatch = await client.PostAsJsonAsync(
+            "/transactions/cart/lines/batch",
+            new AddLinesBatchRequest(batchId, [new AddTransactionLineRequest(ramen.Id, null, 1m)]));
+        var cart = await fixedBatch.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Single(cart!.Lines);
+        Assert.Equal(100m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task A_batch_must_have_an_id_and_between_one_and_fifty_lines()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        var line = new AddTransactionLineRequest(ramen.Id, null, 1m);
+
+        var noId = await client.PostAsJsonAsync("/transactions/cart/lines/batch", new AddLinesBatchRequest(Guid.Empty, [line]));
+        var empty = await client.PostAsJsonAsync("/transactions/cart/lines/batch", new AddLinesBatchRequest(Guid.NewGuid(), []));
+        var tooMany = await client.PostAsJsonAsync("/transactions/cart/lines/batch", new AddLinesBatchRequest(Guid.NewGuid(), Enumerable.Repeat(line, 51).ToList()));
+
+        Assert.Equal(HttpStatusCode.BadRequest, noId.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+    }
+
+    private static PurchApiFactory FactoryRequiringExpectedTotal(string connectionString) =>
+        new(connectionString) { ExtraSettings = { ["POS_REQUIRE_EXPECTED_TOTAL"] = "true" } };
+
+    [Fact]
+    public async Task Paying_a_cart_without_the_total_the_customer_was_shown_is_refused_and_charges_nothing()
+    {
+        await using var factory = FactoryRequiringExpectedTotal(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(ramen.Id, null, 1m));
+
+        var response = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 100m));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var cart = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+        Assert.Equal(TransactionStatus.Open, cart!.Status);
+        Assert.Empty(cart.Payments);
+    }
+
+    [Fact]
+    public async Task Paying_a_cart_when_the_shown_total_differs_from_the_servers_stops_with_a_conflict_and_charges_nothing()
+    {
+        await using var factory = FactoryRequiringExpectedTotal(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(ramen.Id, null, 1m));
+
+        var response = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 100m, ExpectedTotal: 1m));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var cart = await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions);
+        Assert.Equal(TransactionStatus.Open, cart!.Status);
+        Assert.Empty(cart.Payments);
+    }
+
+    [Fact]
+    public async Task Paying_a_cart_with_the_matching_total_charges_exactly_the_servers_total()
+    {
+        await using var factory = FactoryRequiringExpectedTotal(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(ramen.Id, null, 2m));
+
+        var response = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 500m, ExpectedTotal: 200m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sale = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(TransactionStatus.Completed, sale!.Status);
+        Assert.Equal(200m, sale.TotalAmount);
+        Assert.Equal(200m, Assert.Single(sale.Payments).Amount);
+        Assert.Equal(300m, sale.Payments[0].ChangeGiven);
+    }
+
+    [Fact]
+    public async Task An_online_checkout_needs_the_shown_total_and_it_must_match_but_an_offline_sale_is_exempt()
+    {
+        await using var factory = FactoryRequiringExpectedTotal(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(client, "Ramen", 100m);
+        CheckoutRequest Sale(decimal? expected, bool offline = false) => new(
+            Guid.NewGuid(),
+            [new AddTransactionLineRequest(ramen.Id, null, 1m)],
+            false,
+            null,
+            null,
+            new RecordPaymentRequest(PaymentMethod.Cash, 100m),
+            ExpectedTotal: expected,
+            OfflineSale: offline);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/transactions/checkout", Sale(null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/transactions/checkout", Sale(99m))).StatusCode);
+
+        var matching = await client.PostAsJsonAsync("/transactions/checkout", Sale(100m));
+        Assert.Equal(HttpStatusCode.OK, matching.StatusCode);
+        Assert.Equal(100m, (await matching.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.TotalAmount);
+
+        // Already paid at the counter: recorded at the server's price even with no shown total, never refused.
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/transactions/checkout", Sale(null, offline: true))).StatusCode);
+    }
+
     private static async Task<ItemDto> CreateItemAsync(HttpClient client, string name, decimal price)
     {
         var response = await client.PostAsJsonAsync(

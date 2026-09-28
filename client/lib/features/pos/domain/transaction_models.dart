@@ -143,6 +143,7 @@ class RecordPaymentRequest {
     required this.method,
     this.amountTendered,
     this.customerCreditLedgerId,
+    this.expectedTotal,
   });
 
   factory RecordPaymentRequest.fromJson(Map<String, dynamic> json) {
@@ -150,6 +151,7 @@ class RecordPaymentRequest {
       method: PaymentMethod.values[json['method'] as int],
       amountTendered: (json['amountTendered'] as num?)?.toDouble(),
       customerCreditLedgerId: json['customerCreditLedgerId'] as String?,
+      expectedTotal: (json['expectedTotal'] as num?)?.toDouble(),
     );
   }
 
@@ -157,10 +159,16 @@ class RecordPaymentRequest {
   final double? amountTendered;
   final String? customerCreditLedgerId;
 
+  /// The total the customer was shown. The server charges its own total and
+  /// refuses the sale (409) when this differs, so nobody pays an amount they
+  /// were not shown. Required by the server for online payments.
+  final double? expectedTotal;
+
   Map<String, dynamic> toJson() => {
     'method': method.index,
     'amountTendered': amountTendered,
     'customerCreditLedgerId': customerCreditLedgerId,
+    'expectedTotal': expectedTotal,
   };
 }
 

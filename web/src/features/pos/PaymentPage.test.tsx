@@ -86,7 +86,7 @@ describe('PaymentPage', () => {
     fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
 
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 0, amountTendered: 200, customerCreditLedgerId: null }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 0, amountTendered: 200, customerCreditLedgerId: null, expectedTotal: 137.5 }));
     expect(await screen.findByText('Sale complete')).toBeInTheDocument();
     expect(screen.getByText('Receipt No. 41')).toBeInTheDocument();
     expect(screen.getByText('Change')).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('PaymentPage', () => {
     renderPayment();
     fireEvent.click(await screen.findByRole('radio', { name: 'Bank transfer' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 2, amountTendered: null, customerCreditLedgerId: null }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 2, amountTendered: null, customerCreditLedgerId: null, expectedTotal: 137.5 }));
   });
 
   it("shows the branch's GCash QR and account", async () => {
@@ -129,7 +129,7 @@ describe('PaymentPage', () => {
 
     fireEvent.change(select, { target: { value: 'c1' } });
     fireEvent.click(confirm);
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 5, amountTendered: null, customerCreditLedgerId: 'c1' }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 5, amountTendered: null, customerCreditLedgerId: 'c1', expectedTotal: 137.5 }));
   });
 
   it('goes back to Cashier when the cart is empty', async () => {
@@ -148,6 +148,24 @@ describe('PaymentPage', () => {
     expect(screen.queryByText('Sale complete')).not.toBeInTheDocument();
     expect(usePosStore.getState().receipt).toBeNull();
     expect(screen.getByRole('button', { name: 'Confirm ₱137.50' })).toBeEnabled();
+  });
+});
+
+describe('PaymentPage when the total on the server has moved', () => {
+  it('shows the server total again and charges nothing when the sale is refused for a changed price', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00 (the device showed 137.50). Review the cart and try again.'));
+    renderPayment();
+    fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '500' } });
+
+    // The next read of the cart comes back at the new price.
+    vi.mocked(posApi.getCart).mockResolvedValue(cartWithTotal(150));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
+
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith(expect.objectContaining({ expectedTotal: 137.5 })));
+    expect(await screen.findByTestId('amount-due')).toHaveTextContent('₱150.00');
+    expect(screen.queryByText('Sale complete')).not.toBeInTheDocument();
+    expect(usePosStore.getState().receipt).toBeNull();
   });
 });
 

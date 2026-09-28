@@ -26,6 +26,13 @@ public static class PosEndpoints
             Results.Ok(await transactionService.AddLineAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapPost("/transactions/cart/lines/batch", async (
+            AddLinesBatchRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.AddLinesBatchAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPut("/transactions/cart/lines/{lineId:guid}", async (
             Guid lineId,
             UpdateTransactionLineRequest request,

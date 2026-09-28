@@ -8,18 +8,20 @@ import { toast } from '../../components/feedback/toastStore';
 import { userMessage } from '../../lib/apiError';
 import { catalogApi } from '../catalog/api';
 import { catalogKeys, useCategories, useItems, useModifierGroups } from '../catalog/queries';
-import type { Item } from '../catalog/types';
+import type { Item, ItemVariant } from '../catalog/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/useSession';
 import { formatPeso } from '../dashboard/format';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { addFlowFor, filterItems, findByCode } from './catalogView';
+import { previewFor, withPending } from './optimisticCart';
 import { CartPanel } from './components/CartPanel';
 import { DeviceRequired } from './components/DeviceRequired';
 import { ItemGrid } from './components/ItemGrid';
 import { OptionsDialog } from './components/OptionsDialog';
 import { WeightDialog } from './components/WeightDialog';
 import { useCart, usePosAdds } from './queries';
+import { useCatalogSync } from './useCatalogSync';
 import { CUSTOMER_DISPLAY_PATH, customerDisplaySupported, stateForCart } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { CameraScanDialog } from '../../hardware/scanner/CameraScanDialog';
@@ -45,6 +47,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
   const adds = usePosAdds();
   const modifierGroups = useModifierGroups();
   const qc = useQueryClient();
+  const catalogSync = useCatalogSync(online);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -55,10 +58,14 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
   const pendingCount = adds.pending.reduce((sum, row) => sum + (Number.isInteger(row.quantity) ? row.quantity : 1), 0);
   const lineCount = (cart.data?.lines.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 1), 0) ?? 0) + pendingCount;
 
-  /** Records the add and closes any dialog at once; the cart catches up as the server answers. */
-  function add(label: string, request: AddLineRequest) {
+  /**
+   * Records the add and closes any dialog at once. The cart shows the device's own price for it straight away
+   * (from the catalog already on the device) and catches up as the server answers.
+   */
+  function add(item: Item, request: AddLineRequest) {
     setDialog(null);
-    adds.add(label, request);
+    const variants = qc.getQueryData<ItemVariant[]>(catalogKeys.variants(item.id));
+    adds.add(item.name, request, previewFor(item, request, { variants, modifierGroups: modifierGroups.data }));
   }
 
   // A business with no modifier groups at all cannot have any attached to an item, so the per-item check is skipped.
@@ -70,7 +77,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
     if (flow === 'variant' || flow === 'combo') return setDialog({ kind: 'options', item });
 
     // A plain item goes straight in, with no waiting, unless it has modifier groups to choose from.
-    const plainAdd = () => add(item.name, { itemId: item.id, itemVariantId: null, quantity: 1 });
+    const plainAdd = () => add(item, { itemId: item.id, itemVariantId: null, quantity: 1 });
     if (!mayHaveModifiers) return plainAdd();
     try {
       const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 5 * 60_000 });
@@ -118,6 +125,13 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           <LinkButton to="/sell/kiosk-orders">Kiosk orders</LinkButton>
           <LinkButton to="/sell/shift">Shift and drawer</LinkButton>
           <LinkButton to="/sell/hardware">Hardware</LinkButton>
+          <button
+            type="button"
+            onClick={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))}
+            className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand"
+          >
+            Refresh prices
+          </button>
           {cameraScanSupported() && (
             <button type="button" onClick={() => setCameraOpen(true)} className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand">
               Scan with camera
@@ -163,7 +177,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           className="flex h-16 w-full items-center justify-between rounded-control bg-brand px-5 text-lg font-bold text-on-brand shadow-lg"
         >
           <span>Review cart ({lineCount})</span>
-          <span className="tabular-nums">{cart.data ? formatPeso(cart.data.totalAmount) : ''}</span>
+          <span className="tabular-nums">{cart.data ? formatPeso(withPending(cart.data, adds.pending).totalAmount) : ''}</span>
         </button>
       </div>
 
@@ -187,9 +201,9 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           onClose={() => setCameraOpen(false)}
         />
       )}
-      {dialog?.kind === 'options' && <OptionsDialog item={dialog.item} items={items.data ?? []} busy={false} onAdd={(request) => add(dialog.item.name, request)} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'options' && <OptionsDialog item={dialog.item} items={items.data ?? []} busy={false} onAdd={(request) => add(dialog.item, request)} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'weight' && (
-        <WeightDialog item={dialog.item} busy={false} onAdd={(quantity) => add(dialog.item.name, { itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />
+        <WeightDialog item={dialog.item} busy={false} onAdd={(quantity) => add(dialog.item, { itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />
       )}
     </div>
   );
@@ -198,5 +212,5 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
 function CartArea({ cart, isSupervisor, pending, onCheckout }: { cart: ReturnType<typeof useCart>; isSupervisor: boolean; pending: PendingRow[]; onCheckout: () => void }) {
   if (cart.isPending) return <Skeleton className="h-full min-h-96 w-full" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
-  return <CartPanel cart={cart.data} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} />;
+  return <CartPanel cart={withPending(cart.data, pending)} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} />;
 }

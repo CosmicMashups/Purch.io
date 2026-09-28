@@ -130,6 +130,16 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public Task<bool> BatchReceiptExistsAsync(Guid batchId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.CartBatchReceipts.AsNoTracking().AnyAsync(receipt => receipt.Id == batchId, cancellationToken);
+    }
+
+    public void AddBatchReceipt(CartBatchReceipt receipt)
+    {
+        _ = dbContext.CartBatchReceipts.Add(receipt);
+    }
+
     public void Add(Transaction transaction)
     {
         _ = dbContext.Transactions.Add(transaction);

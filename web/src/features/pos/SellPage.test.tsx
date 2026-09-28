@@ -12,7 +12,7 @@ import { posAddQueue } from './queries';
 vi.mock('./api', () => ({
   posApi: {
     getCart: vi.fn(),
-    addLine: vi.fn(),
+    addLines: vi.fn(),
     updateLine: vi.fn(),
     removeLine: vi.fn(),
     voidCart: vi.fn(),
@@ -91,13 +91,13 @@ describe('SellPage catalog', () => {
 
 describe('adding to the cart', () => {
   it('adds a plain item at quantity 1 and shows the server-priced cart', async () => {
-    vi.mocked(posApi.addLine).mockResolvedValue(
+    vi.mocked(posApi.addLines).mockResolvedValue(
       makeCart({ lines: [makeLine({ id: 'l1', itemName: 'Iced Latte', unitPrice: 150, lineTotal: 150 })], subtotal: 150, totalAmount: 150 }),
     );
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
 
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1 }]));
     const cart = await screen.findByRole('region', { name: 'Cart' });
     expect(within(cart).getByText('Iced Latte')).toBeInTheDocument();
     expect(within(cart).getByTestId('cart-total')).toHaveTextContent('₱150.00');
@@ -132,7 +132,7 @@ describe('adding to the cart', () => {
         ],
       },
     ]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
 
@@ -144,8 +144,8 @@ describe('adding to the cart', () => {
     fireEvent.click(within(dialog).getByLabelText(/Extra shot/));
     expect(add).toBeEnabled();
     fireEvent.click(add);
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1, selectedModifierIds: ['extra'] }));
-    expect(posApi.addLine).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1, selectedModifierIds: ['extra'] }]));
+    expect(posApi.addLines).toHaveBeenCalledTimes(1);
   });
 
   it('requires a variant for a variant item', async () => {
@@ -153,7 +153,7 @@ describe('adding to the cart', () => {
       { id: 'v-m', itemId: 'tee', attributes: { Size: 'M' }, sku: null, priceOverride: 450, imageUrl: null },
       { id: 'v-l', itemId: 'tee', attributes: { Size: 'L' }, sku: null, priceOverride: null, imageUrl: null },
     ]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Logo Tee/ }));
 
@@ -161,7 +161,7 @@ describe('adding to the cart', () => {
     expect(await within(dialog).findByText('Choose a variant')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByLabelText(/^M/));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add to cart' }));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'tee', itemVariantId: 'v-m', quantity: 1 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'tee', itemVariantId: 'v-m', quantity: 1 }]));
   });
 
   it('collects one choice per combo slot unit and sends them', async () => {
@@ -173,7 +173,7 @@ describe('adding to the cart', () => {
     vi.mocked(catalogApi.listComboComponents).mockResolvedValue([
       { id: 'slot1', itemId: 'meal', componentCategoryId: 'drinks', slotLabel: 'Drink', quantity: 2, substitutionUpchargeAmount: 20 },
     ]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Meal Deal/ }));
 
@@ -189,26 +189,28 @@ describe('adding to the cart', () => {
     fireEvent.click(add);
 
     await waitFor(() =>
-      expect(posApi.addLine).toHaveBeenCalledWith({
-        itemId: 'meal',
-        itemVariantId: null,
-        quantity: 1,
-        comboSelections: [
-          { slotId: 'slot1', selectedItemId: 'latte' },
-          { slotId: 'slot1', selectedItemId: 'tea' },
-        ],
-      }),
+      expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [
+        {
+          itemId: 'meal',
+          itemVariantId: null,
+          quantity: 1,
+          comboSelections: [
+            { slotId: 'slot1', selectedItemId: 'latte' },
+            { slotId: 'slot1', selectedItemId: 'tea' },
+          ],
+        },
+      ]),
     );
   });
 
   it('adds an item when its barcode is scanned and Enter is pressed', async () => {
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     await screen.findByRole('button', { name: /Iced Latte/ });
     const search = screen.getByLabelText('Search items or scan a barcode');
     fireEvent.change(search, { target: { value: '4800001' } });
     fireEvent.keyDown(search, { key: 'Enter' });
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1 }]));
     expect(search).toHaveValue('');
   });
 
@@ -219,19 +221,19 @@ describe('adding to the cart', () => {
     fireEvent.change(search, { target: { value: '0000' } });
     fireEvent.keyDown(search, { key: 'Enter' });
     expect(useToastStore.getState().toasts[0].message).toBe('No item with that barcode or SKU');
-    expect(posApi.addLine).not.toHaveBeenCalled();
+    expect(posApi.addLines).not.toHaveBeenCalled();
   });
 
   it('sends a weight for a by-weight item', async () => {
     vi.mocked(catalogApi.listItems).mockResolvedValue([makeItem({ id: 'rice', name: 'Rice', pricingType: PricingType.WeightVolume, basePrice: 55 })]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Rice/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Rice' });
     expect(within(dialog).getByRole('button', { name: 'Add to cart' })).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText('Weight or amount'), { target: { value: '0.35' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add to cart' }));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'rice', itemVariantId: null, quantity: 0.35 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'rice', itemVariantId: null, quantity: 0.35 }]));
   });
 });
 
@@ -317,11 +319,11 @@ describe('SellPage hardware', () => {
   };
 
   it('adds the item when a keyboard scanner reads its barcode, without clicking anywhere', async () => {
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     await screen.findByRole('button', { name: /Iced Latte/ });
     scan('4800001');
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1 }]));
   });
 
   it('says so when a scanned code matches nothing', async () => {
@@ -329,7 +331,7 @@ describe('SellPage hardware', () => {
     await screen.findByRole('button', { name: /Iced Latte/ });
     scan('9999999');
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toBe('No item with that barcode or SKU'));
-    expect(posApi.addLine).not.toHaveBeenCalled();
+    expect(posApi.addLines).not.toHaveBeenCalled();
   });
 
   it('ignores scans while an options dialog is open', async () => {
@@ -337,7 +339,7 @@ describe('SellPage hardware', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Logo Tee/ }));
     await screen.findByRole('dialog');
     scan('4800001');
-    expect(posApi.addLine).not.toHaveBeenCalled();
+    expect(posApi.addLines).not.toHaveBeenCalled();
   });
 
   it('links to the hardware settings', async () => {
@@ -349,14 +351,14 @@ describe('SellPage hardware', () => {
     const { useScale } = await import('../../hardware/scale/scaleStore');
     const { parseCas } = await import('../../hardware/scale/parser');
     vi.mocked(catalogApi.listItems).mockResolvedValue([makeItem({ id: 'rice', name: 'Rice', pricingType: PricingType.WeightVolume, basePrice: 55 })]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     useScale.setState({ status: 'connected', reading: parseCas('ST,GS,  0.350kg') });
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Rice/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Rice' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Use 0.350 kg' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add to cart' }));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledWith({ itemId: 'rice', itemVariantId: null, quantity: 0.35 }));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledWith(expect.any(String), [{ itemId: 'rice', itemVariantId: null, quantity: 0.35 }]));
     useScale.setState({ status: 'disconnected', reading: null });
   });
 });
@@ -376,7 +378,7 @@ describe('SellPage adding items quickly', () => {
 
   it('never blocks a tap while an earlier add is still on its way', async () => {
     const first = deferred<ReturnType<typeof makeCart>>();
-    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 150 }, { id: 'b', name: 'Mocha', qty: 1, total: 170 }]));
+    vi.mocked(posApi.addLines).mockReturnValueOnce(first.promise).mockResolvedValue(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 150 }, { id: 'b', name: 'Mocha', qty: 1, total: 170 }]));
     renderPage(<SellPage />);
     const latte = await screen.findByRole('button', { name: /Iced Latte/ });
     fireEvent.click(latte);
@@ -389,27 +391,45 @@ describe('SellPage adding items quickly', () => {
     expect(screen.getByRole('button', { name: 'Updating...' })).toBeDisabled();
 
     first.resolve(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 150 }]));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByLabelText(/^Adding /)).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Charge ₱320\.00/ })).toBeEnabled();
   });
 
+  it('shows the device\'s own price for a tapped item before the server has answered, and never lets Charge run until it has', async () => {
+    const first = deferred<ReturnType<typeof makeCart>>();
+    vi.mocked(posApi.addLines).mockReturnValueOnce(first.promise);
+    renderPage(<SellPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
+
+    const row = await screen.findByLabelText('Adding Iced Latte');
+    expect(within(row).getByText('₱150.00')).toBeInTheDocument();
+    expect(screen.getByTestId('cart-total')).toHaveTextContent('₱150.00');
+    expect(screen.getByRole('button', { name: 'Updating...' })).toBeDisabled();
+
+    // The server's answer replaces the preview, and Charge then shows the server's total.
+    first.resolve(cartWith([{ id: 'a', name: 'Iced Latte', qty: 1, total: 152 }]));
+    await waitFor(() => expect(screen.queryByLabelText(/^Adding /)).not.toBeInTheDocument());
+    expect(screen.getByTestId('cart-total')).toHaveTextContent('₱152.00');
+    expect(screen.getByRole('button', { name: /Charge ₱152\.00/ })).toBeEnabled();
+  });
+
   it('sends items one at a time, in the order they were tapped', async () => {
     const first = deferred<ReturnType<typeof makeCart>>();
-    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
     fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(1));
-    expect(posApi.addLine).toHaveBeenLastCalledWith({ itemId: 'latte', itemVariantId: null, quantity: 1 });
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(1));
+    expect(posApi.addLines).toHaveBeenLastCalledWith(expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1 }]);
     first.resolve(makeCart());
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
-    expect(posApi.addLine).toHaveBeenLastCalledWith({ itemId: 'mocha', itemVariantId: null, quantity: 1 });
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(2));
+    expect(posApi.addLines).toHaveBeenLastCalledWith(expect.any(String), [{ itemId: 'mocha', itemVariantId: null, quantity: 1 }]);
   });
 
   it('turns repeated taps on one item into a single request for the total quantity', async () => {
     const first = deferred<ReturnType<typeof makeCart>>();
-    vi.mocked(posApi.addLine).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockReturnValueOnce(first.promise).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     const latte = await screen.findByRole('button', { name: /Iced Latte/ });
     fireEvent.click(latte);
@@ -419,24 +439,24 @@ describe('SellPage adding items quickly', () => {
     expect(await screen.findByLabelText('Adding Iced Latte')).toHaveTextContent('x 4');
 
     first.resolve(makeCart());
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
-    expect(posApi.addLine).toHaveBeenNthCalledWith(1, { itemId: 'latte', itemVariantId: null, quantity: 1 });
-    expect(posApi.addLine).toHaveBeenNthCalledWith(2, { itemId: 'latte', itemVariantId: null, quantity: 3 });
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(2));
+    expect(posApi.addLines).toHaveBeenNthCalledWith(1, expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 1 }]);
+    expect(posApi.addLines).toHaveBeenNthCalledWith(2, expect.any(String), [{ itemId: 'latte', itemVariantId: null, quantity: 3 }]);
   });
 
   it('names the item that could not be added and keeps the others', async () => {
-    vi.mocked(posApi.addLine).mockRejectedValueOnce(new Error('boom')).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockRejectedValueOnce(new Error('boom')).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
     fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toMatch(/Iced Latte could not be added/));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByLabelText(/^Adding /)).not.toBeInTheDocument());
   });
 
   it('closes the options dialog at once instead of waiting for the server', async () => {
     const never = deferred<ReturnType<typeof makeCart>>();
-    vi.mocked(posApi.addLine).mockReturnValue(never.promise);
+    vi.mocked(posApi.addLines).mockReturnValue(never.promise);
     vi.mocked(catalogApi.listVariants).mockResolvedValue([{ id: 'v1', itemId: 'tee', attributes: { Size: 'M' }, priceOverride: null, sku: null, barcode: null, isActive: true } as never]);
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Logo Tee/ }));
@@ -449,19 +469,19 @@ describe('SellPage adding items quickly', () => {
 
   it('skips the per-item modifier check when the business has no modifier groups', async () => {
     vi.mocked(catalogApi.listModifierGroups).mockResolvedValue([]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     await screen.findByRole('button', { name: /Iced Latte/ });
     await waitFor(() => expect(catalogApi.listModifierGroups).toHaveBeenCalled());
     await waitFor(() => new Promise((r) => setTimeout(r, 30)));
     fireEvent.click(screen.getByRole('button', { name: /Iced Latte/ }));
-    await waitFor(() => expect(posApi.addLine).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(posApi.addLines).toHaveBeenCalledTimes(1));
     expect(catalogApi.listItemModifierGroups).not.toHaveBeenCalled();
   });
 
   it('still checks an item for modifiers when the business has modifier groups', async () => {
     vi.mocked(catalogApi.listModifierGroups).mockResolvedValue([{ id: 'g1', name: 'Ice' } as never]);
-    vi.mocked(posApi.addLine).mockResolvedValue(makeCart());
+    vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);
     await screen.findByRole('button', { name: /Iced Latte/ });
     await waitFor(() => new Promise((r) => setTimeout(r, 30)));
@@ -474,7 +494,7 @@ describe('SellPage adds and the session', () => {
   it('drops adds that were still waiting when the session ends', async () => {
     const { useAuthStore } = await import('../../lib/authStore');
     const never = new Promise<ReturnType<typeof makeCart>>(() => undefined);
-    vi.mocked(posApi.addLine).mockReturnValue(never);
+    vi.mocked(posApi.addLines).mockReturnValue(never);
     renderPage(<SellPage />);
     fireEvent.click(await screen.findByRole('button', { name: /Iced Latte/ }));
     fireEvent.click(screen.getByRole('button', { name: /Mocha/ }));

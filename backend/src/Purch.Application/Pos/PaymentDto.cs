@@ -23,4 +23,5 @@ public sealed record RecordPaymentRequest(
     decimal? AmountTendered,
     Guid? CustomerCreditLedgerId = null,
     bool AllowCreditLimitOverride = false,
-    string? CreditLimitOverrideReason = null);
+    string? CreditLimitOverrideReason = null,
+    decimal? ExpectedTotal = null);

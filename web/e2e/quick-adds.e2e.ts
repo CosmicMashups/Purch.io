@@ -23,9 +23,9 @@ test.describe('adding items to the cart quickly', () => {
     await page.goto('/sell');
     await expect(page.getByRole('button', { name: /^Iced Latte/ })).toBeVisible();
 
-    // The server takes a full second and a half to answer each add.
+    // The server takes a full second and a half to answer each batch.
     let sent = 0;
-    await page.route('**/api/transactions/cart/lines', async (route) => {
+    await page.route('**/api/transactions/cart/lines/batch', async (route) => {
       if (route.request().method() === 'POST') {
         sent += 1;
         await new Promise((r) => setTimeout(r, 1500));
@@ -54,8 +54,8 @@ test.describe('adding items to the cart quickly', () => {
     // 3 lattes, a mocha and a cookie: 450 + 170 + 60.
     await expect(page.getByRole('button', { name: /Charge ₱680\.00/ })).toBeEnabled({ timeout: 15_000 });
     await expect(page.getByLabel(/^Adding /)).toHaveCount(0);
-    // Repeated taps on the latte went out together instead of one request each.
-    expect(sent).toBeLessThan(5);
+    // Everything tapped while the first batch was on its way went out together in one more request, not one each.
+    expect(sent).toBeLessThanOrEqual(3);
   });
 
   test('a rapid burst of taps on one item comes out as the right quantity', async ({ page, signInAs, ip, seed }) => {

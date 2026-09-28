@@ -5,6 +5,9 @@ import type { AddLineRequest, RecordPaymentRequest, Transaction } from './types'
 export const posApi = {
   getCart: () => apiClient.get<Transaction>('/transactions/cart').then((r) => r.data),
   addLine: (body: AddLineRequest) => apiClient.post<Transaction>('/transactions/cart/lines', body).then((r) => r.data),
+  /** Several adds in one call, all or nothing. The batch id makes a retry safe: the server applies each id once. It carries no prices. */
+  addLines: (batchId: string, lines: AddLineRequest[]) =>
+    apiClient.post<Transaction>('/transactions/cart/lines/batch', { batchId, lines }).then((r) => r.data),
   updateLine: (lineId: string, quantity: number) =>
     apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}`, { quantity }).then((r) => r.data),
   removeLine: (lineId: string) => apiClient.delete<Transaction>(`/transactions/cart/lines/${lineId}`).then((r) => r.data),

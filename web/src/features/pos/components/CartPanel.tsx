@@ -13,7 +13,7 @@ interface CartPanelProps {
   /** Admin or Manager. The API restricts Senior/PWD and voiding to them; this only hides what would be refused. */
   isSupervisor: boolean;
   onCheckout: () => void;
-  /** Adds still on their way to the server. Shown as rows without a price, and the cart cannot be changed or charged until they land. */
+  /** Adds still on their way to the server. Shown with the device's preview price when it has one, and the cart cannot be changed or charged until they land. */
   pending?: PendingRow[];
 }
 
@@ -113,10 +113,13 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
             })}
             {pending.map((row) => (
               <li key={row.key} aria-label={`Adding ${row.label}`} className="flex items-center justify-between gap-3 py-4 text-ink-soft">
-                <p className="text-base font-semibold">
-                  {row.label} x {row.quantity}
-                </p>
-                <p className="text-sm">Adding...</p>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold">
+                    {row.label} x {row.quantity}
+                  </p>
+                  {row.details && row.details.length > 0 && <p className="text-sm">{row.details.join(', ')}</p>}
+                </div>
+                <p className="shrink-0 text-sm tabular-nums">{row.unitPrice === undefined ? 'Adding...' : formatPeso(row.unitPrice * row.quantity)}</p>
               </li>
             ))}
           </ul>

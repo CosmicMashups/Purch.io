@@ -96,4 +96,6 @@ export interface RecordPaymentRequest {
   customerCreditLedgerId?: string | null;
   allowCreditLimitOverride?: boolean;
   creditLimitOverrideReason?: string | null;
+  /** The total the customer was shown. The server refuses the sale unless this equals its own total. */
+  expectedTotal?: number;
 }
