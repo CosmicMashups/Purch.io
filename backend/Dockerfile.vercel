@@ -12,10 +12,14 @@ COPY src/Purch.Domain/Purch.Domain.csproj src/Purch.Domain/
 COPY src/Purch.Application/Purch.Application.csproj src/Purch.Application/
 COPY src/Purch.Infrastructure/Purch.Infrastructure.csproj src/Purch.Infrastructure/
 COPY src/Purch.Api/Purch.Api.csproj src/Purch.Api/
-RUN dotnet restore src/Purch.Api/Purch.Api.csproj
+# linux-x64 + ReadyToRun: the assemblies ship precompiled, so a cold start skips most JIT compilation
+# (the biggest part of a .NET cold start). On a non-x64 host the precompiled code is ignored and the
+# runtime JITs as before, so this is safe either way. Framework-dependent, so the runtime image is unchanged.
+RUN dotnet restore src/Purch.Api/Purch.Api.csproj -r linux-x64
 
 COPY src/ src/
-RUN dotnet publish src/Purch.Api/Purch.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/Purch.Api/Purch.Api.csproj -c Release -o /app/publish --no-restore \
+    -r linux-x64 --self-contained false -p:PublishReadyToRun=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-noble-chiseled AS runtime
 WORKDIR /app
@@ -36,5 +40,8 @@ COPY --chown=$APP_UID:$APP_UID --from=build /app/publish .
 # explain why — exec form only from here on.
 ENV PORT=8080
 ENV DOTNET_EnableDiagnostics=0
+# Skip the profile-guided tier-0 instrumentation: it only pays off in long-running processes, and here
+# instances are short-lived, so it just adds start-up and early-request overhead.
+ENV DOTNET_TieredPGO=0
 
 ENTRYPOINT ["dotnet", "Purch.Api.dll"]

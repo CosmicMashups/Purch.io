@@ -314,6 +314,18 @@ if (args is ["migrate"])
 // Local-mode instance migrates its own database once at startup instead;
 // Cloud's migrations run via the "migrate" preDeployCommand above.
 DeploymentMode deploymentMode;
+
+// The role check below and the migration work need separate DbContexts, so they run side by side:
+// a cold start no longer waits for one database round trip after the other, and the overlap also
+// builds the EF model and opens the first pooled connection once instead of twice in sequence.
+var rlsCheck = Task.Run(async () =>
+{
+    using var rlsScope = app.Services.CreateScope();
+    return await rlsScope.ServiceProvider.GetRequiredService<PurchDbContext>().Database
+        .SqlQueryRaw<bool>("SELECT rolbypassrls AS \"Value\" FROM pg_roles WHERE rolname = current_user")
+        .SingleAsync();
+});
+
 using (var startupScope = app.Services.CreateScope())
 {
     var deploymentContext = startupScope.ServiceProvider.GetRequiredService<IDeploymentContext>();
@@ -362,9 +374,7 @@ using (var startupScope = app.Services.CreateScope())
     // an opaque RLS-violation error — while JWT auth kept working fine,
     // making it look like a data bug rather than a role misconfiguration.
     // Fail loudly at startup instead of letting that happen silently.
-    var bypassesRls = await dbContext.Database
-        .SqlQueryRaw<bool>("SELECT rolbypassrls AS \"Value\" FROM pg_roles WHERE rolname = current_user")
-        .SingleAsync();
+    var bypassesRls = await rlsCheck;
 
     if (!bypassesRls)
     {
