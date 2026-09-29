@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeCart, makeLine } from '../../test/pos';
 import { renderPage, signInAs } from '../../test/render';
@@ -9,7 +9,7 @@ import { PaymentPage } from './PaymentPage';
 import { usePosStore } from './posStore';
 import { ReceiptPage } from './ReceiptPage';
 
-vi.mock('./api', () => ({ posApi: { getCart: vi.fn(), pay: vi.fn() } }));
+vi.mock('./api', () => ({ posApi: { getCart: vi.fn(), pay: vi.fn(), refund: vi.fn() } }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
 vi.mock('../credit/api', () => ({ creditApi: { list: vi.fn() } }));
 
@@ -179,5 +179,41 @@ describe('ReceiptPage', () => {
     usePosStore.setState({ receipt: completed });
     renderPage(<ReceiptPage />);
     expect(screen.getByText(/BIR official receipt is not available from the web yet/)).toBeInTheDocument();
+  });
+
+  it('refunds the sale once a reason and an approver PIN are given, and shows it as refunded', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    usePosStore.setState({ receipt: completed });
+    vi.mocked(posApi.refund).mockImplementation((_id, body) =>
+      body.approverPin === '5678'
+        ? Promise.resolve({ ...completed, status: 4 })
+        : Promise.reject(new ApiError('validation', 'That PIN doesn\'t match a different active manager or admin.', { approverPin: ['That PIN doesn\'t match a different active manager or admin.'] })),
+    );
+    renderPage(<ReceiptPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    const dialog = await screen.findByRole('dialog', { name: /Refund/ });
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Customer changed their mind' } });
+    fireEvent.change(within(dialog).getByLabelText('Manager or admin PIN'), { target: { value: '0000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Refund' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent("That PIN doesn't match a different active manager or admin.");
+    fireEvent.change(within(dialog).getByLabelText('Manager or admin PIN'), { target: { value: '5678' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Refund' }));
+
+    await waitFor(() =>
+      expect(posApi.refund).toHaveBeenLastCalledWith('cart1', { reason: 'Customer changed their mind', approverPin: '5678' }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('REFUNDED')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
+  });
+
+  it('cannot submit the refund dialog until both a reason and a PIN are entered', async () => {
+    usePosStore.setState({ receipt: completed });
+    renderPage(<ReceiptPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+    const dialog = await screen.findByRole('dialog', { name: /Refund/ });
+    expect(within(dialog).getByRole('button', { name: 'Refund' })).toBeDisabled();
   });
 });

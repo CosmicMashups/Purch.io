@@ -6,13 +6,34 @@ import '../../../../core/hardware/hardware_providers.dart';
 import '../../../../core/formatting/money.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
+import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
+import '../widgets/refund_dialog.dart';
 import 'cashier_screen.dart';
 
 /// D6, minimal slice — shows the just-completed sale's sequential BIR
 /// receipt number and a summary.
 class ReceiptScreen extends ConsumerWidget {
   const ReceiptScreen({super.key});
+
+  Future<void> _refund(
+    BuildContext context,
+    WidgetRef ref,
+    Transaction cart,
+  ) async {
+    final notifier = ref.read(cartNotifierProvider.notifier);
+    await showRefundDialog(
+      context: context,
+      total: cart.totalAmount,
+      submit: (reason, approverPin) async {
+        final ok = await notifier.refundTransaction(
+          cart.id,
+          RefundTransactionRequest(reason: reason, approverPin: approverPin),
+        );
+        return ok ? null : notifier.currentFailure;
+      },
+    );
+  }
 
   Future<void> _startNewSale(BuildContext context, WidgetRef ref) async {
     await ref.read(cartNotifierProvider.notifier).startNewSale();
@@ -92,6 +113,20 @@ class ReceiptScreen extends ConsumerWidget {
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
+                                  if (cart.status ==
+                                      TransactionStatus.refunded) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'REFUNDED',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.error,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
                                   const SizedBox(height: 4),
                                   if (cart.savedOffline) ...[
                                     Container(
@@ -140,7 +175,8 @@ class ReceiptScreen extends ConsumerWidget {
                                         vertical: 5,
                                       ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             mainAxisAlignment:
@@ -149,66 +185,99 @@ class ReceiptScreen extends ConsumerWidget {
                                               Expanded(
                                                 child: Text(
                                                   '${line.itemName} ×${line.quantity.toStringAsFixed(line.quantity.truncateToDouble() == line.quantity ? 0 : 2)}',
-                                                  style: GoogleFonts.plusJakartaSans(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: AppColors.textPrimary,
-                                                  ),
+                                                  style:
+                                                      GoogleFonts.plusJakartaSans(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color:
+                                                            AppColors
+                                                                .textPrimary,
+                                                      ),
                                                 ),
                                               ),
                                               Text(
                                                 formatCurrency(line.lineTotal),
-                                                style: GoogleFonts.jetBrainsMono(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.textPrimary,
-                                                ),
+                                                style:
+                                                    GoogleFonts.jetBrainsMono(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          AppColors.textPrimary,
+                                                    ),
                                               ),
                                             ],
                                           ),
-                                          if (line.itemVariantAttributes.isNotEmpty)
+                                          if (line
+                                              .itemVariantAttributes
+                                              .isNotEmpty)
                                             Padding(
-                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              padding: const EdgeInsets.only(
+                                                left: 8,
+                                                top: 2,
+                                              ),
                                               child: Text(
                                                 '  ${line.variantAttributesLabel}',
-                                                style: GoogleFonts.plusJakartaSans(
-                                                  fontSize: 12,
-                                                  fontStyle: FontStyle.italic,
-                                                  color: AppColors.textSecondary,
-                                                ),
+                                                style:
+                                                    GoogleFonts.plusJakartaSans(
+                                                      fontSize: 12,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                      color:
+                                                          AppColors
+                                                              .textSecondary,
+                                                    ),
                                               ),
                                             ),
                                           if (line.comboSelections.isNotEmpty)
                                             Padding(
-                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              padding: const EdgeInsets.only(
+                                                left: 8,
+                                                top: 2,
+                                              ),
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  for (final selection in line.comboSelections)
+                                                  for (final selection
+                                                      in line.comboSelections)
                                                     Text(
                                                       '  ${selection.slotLabel}: ${selection.selectedItemName}',
                                                       style: GoogleFonts.plusJakartaSans(
                                                         fontSize: 12,
-                                                        color: AppColors.textSecondary,
+                                                        color:
+                                                            AppColors
+                                                                .textSecondary,
                                                       ),
                                                     ),
                                                 ],
                                               ),
                                             ),
-                                          if (line.modifierSelections.isNotEmpty)
+                                          if (line
+                                              .modifierSelections
+                                              .isNotEmpty)
                                             Padding(
-                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              padding: const EdgeInsets.only(
+                                                left: 8,
+                                                top: 2,
+                                              ),
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  for (final mod in line.modifierSelections)
+                                                  for (final mod
+                                                      in line
+                                                          .modifierSelections)
                                                     Text(
                                                       mod.priceDelta > 0
                                                           ? '  + ${mod.modifierName} (+${formatCurrency(mod.priceDelta)})'
                                                           : '  + ${mod.modifierName}',
                                                       style: GoogleFonts.plusJakartaSans(
                                                         fontSize: 12,
-                                                        color: AppColors.textSecondary,
+                                                        color:
+                                                            AppColors
+                                                                .textSecondary,
                                                       ),
                                                     ),
                                                 ],
@@ -216,14 +285,21 @@ class ReceiptScreen extends ConsumerWidget {
                                             ),
                                           if (line.appliedPromoLabel != null)
                                             Padding(
-                                              padding: const EdgeInsets.only(left: 8, top: 2),
+                                              padding: const EdgeInsets.only(
+                                                left: 8,
+                                                top: 2,
+                                              ),
                                               child: Text(
                                                 '  Promo: ${line.appliedPromoLabel}',
-                                                style: GoogleFonts.plusJakartaSans(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.accentEmerald,
-                                                ),
+                                                style:
+                                                    GoogleFonts.plusJakartaSans(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          AppColors
+                                                              .accentEmerald,
+                                                    ),
                                               ),
                                             ),
                                         ],
@@ -271,8 +347,7 @@ class ReceiptScreen extends ConsumerWidget {
                                           cart.seniorPwdDiscountApplied
                                               ? 'Senior/PWD (20%)'
                                               : (cart.promoCode != null &&
-                                                      cart.promoDiscountAmount >
-                                                          0)
+                                                  cart.promoDiscountAmount > 0)
                                               ? 'Promo code (${cart.promoCode})'
                                               : 'Discount',
                                           style: GoogleFonts.plusJakartaSans(
@@ -329,14 +404,18 @@ class ReceiptScreen extends ConsumerWidget {
                                           children: [
                                             Text(
                                               'Change',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.textSecondary,
-                                              ),
+                                              style:
+                                                  GoogleFonts.plusJakartaSans(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
                                             ),
                                             Text(
-                                              formatCurrency(payment.changeGiven!),
+                                              formatCurrency(
+                                                payment.changeGiven!,
+                                              ),
                                               style: GoogleFonts.jetBrainsMono(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w700,
@@ -357,14 +436,20 @@ class ReceiptScreen extends ConsumerWidget {
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
                                       shape: const RoundedRectangleBorder(
                                         borderRadius: AppRadius.mdBorder,
                                       ),
                                     ),
                                     onPressed: () async {
                                       final tenantSettings =
-                                          ref.read(tenantSettingsNotifierProvider).valueOrNull;
+                                          ref
+                                              .read(
+                                                tenantSettingsNotifierProvider,
+                                              )
+                                              .valueOrNull;
                                       final success = await ref
                                           .read(printerServiceProvider)
                                           .printReceipt(
@@ -374,7 +459,9 @@ class ReceiptScreen extends ConsumerWidget {
                                             cutPaper: true,
                                           );
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               success
@@ -385,7 +472,10 @@ class ReceiptScreen extends ConsumerWidget {
                                         );
                                       }
                                     },
-                                    icon: const Icon(Icons.print_rounded, size: 18),
+                                    icon: const Icon(
+                                      Icons.print_rounded,
+                                      size: 18,
+                                    ),
                                     label: const Text('Print Receipt'),
                                   ),
                                 ),
@@ -411,17 +501,46 @@ class ReceiptScreen extends ConsumerWidget {
                                           );
                                     } catch (e) {
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(content: Text('$e')),
                                         );
                                       }
                                     }
                                   },
-                                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.point_of_sale_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Drawer'),
                                 ),
                               ],
                             ),
+                            if (cart.status != TransactionStatus.refunded) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  key: const Key('open-refund-dialog'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                    side: const BorderSide(
+                                      color: AppColors.error,
+                                    ),
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                    ),
+                                  ),
+                                  onPressed: () => _refund(context, ref, cart),
+                                  icon: const Icon(
+                                    Icons.undo_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Refund'),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 14),
 
                             // New Sale CTA
@@ -455,4 +574,3 @@ class ReceiptScreen extends ConsumerWidget {
     );
   }
 }
-

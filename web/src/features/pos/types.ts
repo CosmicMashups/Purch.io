@@ -99,3 +99,9 @@ export interface RecordPaymentRequest {
   /** The total the customer was shown. The server refuses the sale unless this equals its own total. */
   expectedTotal?: number;
 }
+
+/** Refunding a completed sale always needs an Admin/Manager's approval — see ApproverPinDialog. */
+export interface RefundTransactionRequest {
+  reason: string;
+  approverPin?: string;
+}

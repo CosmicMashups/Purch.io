@@ -303,6 +303,36 @@ class FakePosRepository implements PosRepository {
     return cart;
   }
 
+  Object? refundFailure;
+  String? lastRefundApproverPin;
+
+  @override
+  Future<Transaction> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  ) async {
+    lastRefundApproverPin = request.approverPin;
+    if (refundFailure != null) {
+      throw refundFailure!;
+    }
+    cart = Transaction(
+      id: cart.id,
+      branchId: cart.branchId,
+      deviceId: cart.deviceId,
+      status: TransactionStatus.refunded,
+      lines: cart.lines,
+      subtotal: cart.subtotal,
+      discountAmount: cart.discountAmount,
+      seniorPwdDiscountApplied: cart.seniorPwdDiscountApplied,
+      promoCode: cart.promoCode,
+      promoDiscountAmount: cart.promoDiscountAmount,
+      totalAmount: cart.totalAmount,
+      receiptNumber: cart.receiptNumber,
+      payments: cart.payments,
+    );
+    return cart;
+  }
+
   Transaction _withLines(List<TransactionLine> lines) {
     final subtotal = lines.fold(0.0, (total, line) => total + line.lineTotal);
     final seniorAmount = cart.seniorPwdDiscountApplied ? subtotal * 0.2 : 0.0;

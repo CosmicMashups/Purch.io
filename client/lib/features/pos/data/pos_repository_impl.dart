@@ -92,6 +92,18 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<Transaction> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  ) {
+    return _post(
+      '/transactions/$transactionId/refund',
+      request.toJson(),
+      Transaction.fromJson,
+    );
+  }
+
+  @override
   Future<int> getLastIssuedReceiptNumber() async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(

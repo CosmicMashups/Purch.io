@@ -255,6 +255,16 @@ class CartNotifier extends _$CartNotifier {
     return succeeded;
   }
 
+  /// Refunds the completed sale currently shown (the receipt screen's own state), marking it Refunded.
+  /// Always needs a manager/admin's approval — see ApproverAuthorizationService and
+  /// runApproverGatedCartAction, which is what actually collects the PIN.
+  Future<bool> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  ) => _mutate(
+    (repository) => repository.refundTransaction(transactionId, request),
+  );
+
   /// Call once the completed sale's receipt has been shown/acknowledged.
   Future<void> startNewSale() async {
     ref.invalidateSelf();

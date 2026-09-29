@@ -367,6 +367,12 @@ class LocalFirstPosRepository implements PosRepository {
       _remote.listPendingKioskOrders(branchId);
 
   @override
+  Future<Transaction> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  ) => _remote.refundTransaction(transactionId, request);
+
+  @override
   Future<Transaction> claimKioskOrder(String transactionId) async {
     final cart = await _load();
     if (cart.lines.isNotEmpty) {

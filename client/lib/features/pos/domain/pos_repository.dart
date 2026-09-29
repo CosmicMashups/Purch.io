@@ -25,6 +25,13 @@ abstract class PosRepository {
 
   Future<Transaction> recordPayment(RecordPaymentRequest request);
 
+  /// Refunds a completed sale, marking it Refunded and auditing the action. Always needs a manager/
+  /// admin's approval — see RefundTransactionRequest.
+  Future<Transaction> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  );
+
   /// Sends a whole sale — cart lines, discounts and payment — in one call.
   /// Idempotent on [CheckoutRequest.saleId].
   Future<Transaction> checkout(CheckoutRequest request);

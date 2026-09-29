@@ -192,6 +192,12 @@ class _RecordingRemote implements PosRepository {
       throw UnimplementedError();
 
   @override
+  Future<Transaction> refundTransaction(
+    String transactionId,
+    RefundTransactionRequest request,
+  ) => throw UnimplementedError();
+
+  @override
   Future<List<Transaction>> listPendingKioskOrders(String branchId) async =>
       const [];
 

@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/apiClient';
-import type { AddLineRequest, RecordPaymentRequest, Transaction } from './types';
+import type { AddLineRequest, RecordPaymentRequest, RefundTransactionRequest, Transaction } from './types';
 
 /** The server owns the cart and prices it. Every call returns the whole priced cart to render as-is. */
 export const posApi = {
@@ -21,4 +21,5 @@ export const posApi = {
   listKioskPending: (branchId: string) => apiClient.get<Transaction[]>('/transactions/kiosk-pending', { params: { branchId } }).then((r) => r.data),
   claimKioskOrder: (transactionId: string) => apiClient.post<Transaction>(`/transactions/kiosk-pending/${transactionId}/claim`).then((r) => r.data),
   pay: (body: RecordPaymentRequest) => apiClient.post<Transaction>('/transactions/cart/payments', body).then((r) => r.data),
+  refund: (transactionId: string, body: RefundTransactionRequest) => apiClient.post<Transaction>(`/transactions/${transactionId}/refund`, body).then((r) => r.data),
 };

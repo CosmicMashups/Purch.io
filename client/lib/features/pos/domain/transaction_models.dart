@@ -503,3 +503,17 @@ class UpdateKitchenStatusRequest {
 
   Map<String, dynamic> toJson() => {'kitchenStatus': kitchenStatus.index};
 }
+
+/// Mirrors Purch.Application.Pos.RefundTransactionRequest. Refunding a completed sale always needs a
+/// manager/admin's approval — see ApproverAuthorizationService.
+class RefundTransactionRequest {
+  const RefundTransactionRequest({required this.reason, this.approverPin});
+
+  final String reason;
+  final String? approverPin;
+
+  Map<String, dynamic> toJson() => {
+    'reason': reason,
+    'approverPin': approverPin,
+  };
+}

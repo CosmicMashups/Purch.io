@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purch_client/core/errors/failure.dart';
 import 'package:purch_client/features/pos/domain/payment_method.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
@@ -88,4 +89,64 @@ void main() {
     // standalone item grid.
     expect(find.text('Cashier'), findsWidgets);
   });
+
+  testWidgets(
+    'refunding needs a reason and a manager PIN, and retries after a wrong one',
+    (tester) async {
+      final repository = FakePosRepository(initialCart: _completedCart);
+      repository.refundFailure = const ValidationFailure(
+        "That PIN doesn't match a different active manager or admin.",
+        {
+          'approverPin': [
+            "That PIN doesn't match a different active manager or admin.",
+          ],
+        },
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            posRepositoryProvider.overrideWithValue(repository),
+            catalogRepositoryProvider.overrideWithValue(
+              FakeCatalogRepository(),
+            ),
+          ],
+          child: const MaterialApp(home: ReceiptScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('open-refund-dialog')));
+      await tester.pumpAndSettle();
+
+      final approveButton = find.byKey(const Key('confirm-refund'));
+      expect(tester.widget<FilledButton>(approveButton).onPressed, isNull);
+
+      await tester.enterText(
+        find.byKey(const Key('refund-reason')),
+        'Customer changed their mind',
+      );
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('refund-pin')), '0000');
+      await tester.pump();
+      await tester.tap(approveButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          "That PIN doesn't match a different active manager or admin.",
+        ),
+        findsOneWidget,
+      );
+      expect(repository.cart.status, TransactionStatus.completed);
+
+      repository.refundFailure = null;
+      await tester.enterText(find.byKey(const Key('refund-pin')), '5678');
+      await tester.tap(approveButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.lastRefundApproverPin, '5678');
+      expect(find.text('REFUNDED'), findsOneWidget);
+      expect(find.byKey(const Key('open-refund-dialog')), findsNothing);
+    },
+  );
 }
