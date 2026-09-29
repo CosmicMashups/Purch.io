@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Purch.Application.Approvals;
 using Purch.Application.Reporting;
 using Purch.Domain.Enums;
 
@@ -81,6 +82,14 @@ public static class ReportingEndpoints
             IDepartmentSalesReportService departmentSalesReportService,
             CancellationToken cancellationToken) =>
             Results.Ok(await departmentSalesReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        // --- Daily review of void/refund/kitchen-order-edit approvals, grouped by who approved them ---
+        _ = app.MapGet("/reports/approvals-review", async (
+            DateOnly? date,
+            IApprovalsReviewService approvalsReviewService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await approvalsReviewService.GetDailyReviewAsync(date, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
         return app;

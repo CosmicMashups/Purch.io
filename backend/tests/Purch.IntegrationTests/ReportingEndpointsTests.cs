@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Purch.Application.Approvals;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Inventory;
@@ -438,6 +439,71 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         _ = await client.PostAsJsonAsync(
             "/transactions/cart/payments",
             new RecordPaymentRequest(PaymentMethod.Cash, price));
+    }
+
+    [Fact]
+    public async Task The_approvals_review_groups_a_cashiers_void_under_the_manager_who_approved_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await AuthenticatedAdminClientAsync(factory);
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
+
+        using var cashier = factory.CreateClient();
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
+        var cashierLogin = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, "6789"));
+        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await cashierLogin.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+
+        var itemResponse = await admin.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit));
+        var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var addResponse = await cashier.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        Assert.Equal(HttpStatusCode.OK, addResponse.StatusCode);
+
+        var voidResponse = await cashier.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("5678"));
+        Assert.Equal(HttpStatusCode.OK, voidResponse.StatusCode);
+
+        // No date given: the service's own default (today, in Philippine local time) is what should
+        // cover an approval that just happened.
+        var review = await admin.GetFromJsonAsync<ApprovalsReviewDto>("/reports/approvals-review", JsonOptions);
+
+        Assert.NotNull(review);
+        var approver = Assert.Single(review!.Approvers, a => a.ApproverName == "Mae Manager");
+        Assert.Equal(1, approver.TotalApprovals);
+        var entry = Assert.Single(approver.Entries);
+        Assert.Equal("Cal Cashier", entry.RequesterName);
+        Assert.Equal(AuditActionType.Void, entry.ActionType);
+    }
+
+    [Fact]
+    public async Task The_approvals_review_is_empty_when_nobody_has_approved_anything_yet()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await AuthenticatedAdminClientAsync(factory);
+
+        var review = await admin.GetFromJsonAsync<ApprovalsReviewDto>("/reports/approvals-review", JsonOptions);
+
+        Assert.NotNull(review);
+        Assert.Equal(0, review!.TotalApprovals);
+        Assert.Empty(review.Approvers);
+    }
+
+    [Fact]
+    public async Task A_cashier_cannot_see_the_approvals_review()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await AuthenticatedAdminClientAsync(factory);
+        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
+        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
+
+        using var cashier = factory.CreateClient();
+        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, "6789"));
+        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await login.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+
+        var response = await cashier.GetAsync("/reports/approvals-review");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)

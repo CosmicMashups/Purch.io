@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { useSession } from '../auth/useSession';
 import { useSelectableBranches } from '../branches/queries';
+import { ApprovalsPanel } from './components/ApprovalsPanel';
 import { BirPanel } from './components/BirPanel';
 import { ExportsPanel } from './components/ExportsPanel';
 import { DepartmentPanel, MovementPanel, StaffPanels } from './components/RangePanels';
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'departments', label: 'Departments', usesRange: true },
   { id: 'stock', label: 'Stock movement', usesRange: true },
   { id: 'bir', label: 'X and Z readings', usesRange: false },
+  { id: 'approvals', label: 'Approvals', usesRange: false },
   { id: 'exports', label: 'Exports', usesRange: true },
 ] as const;
 
@@ -65,6 +67,7 @@ export function ReportsPage() {
 
       <div role="tabpanel" id={`report-panel-${active}`} aria-labelledby={`report-tab-${active}`}>
         {active === 'bir' && <BirPanel />}
+        {active === 'approvals' && <ApprovalsPanel />}
         {active === 'exports' && <ExportsPanel params={params} isAdmin={role === 'Admin'} />}
         {(active === 'staff' || active === 'departments' || active === 'stock') &&
           (params ? (

@@ -8,4 +8,8 @@ public interface IAuditLogRepository
     void Add(AuditLog log);
 
     Task<IReadOnlyList<AuditLog>> QueryAsync(Guid tenantId, AuditLogQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>Every audit entry that named an approver in the given window — the source data for the
+    /// daily approvals review report.</summary>
+    Task<IReadOnlyList<AuditLog>> ListApprovalsAsync(Guid tenantId, DateTimeOffset fromUtc, DateTimeOffset toExclusiveUtc, CancellationToken cancellationToken = default);
 }

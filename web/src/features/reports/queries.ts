@@ -6,6 +6,7 @@ export const reportKeys = {
   staff: (p: RangeParams) => ['reports', 'staff', p] as const,
   departments: (p: RangeParams) => ['reports', 'departments', p] as const,
   movements: (p: RangeParams) => ['reports', 'movements', p] as const,
+  approvalsReview: (date: string | undefined) => ['reports', 'approvalsReview', date ?? 'today'] as const,
 };
 
 export const useStaffPerformance = (params: RangeParams, enabled = true) =>
@@ -20,3 +21,7 @@ export const useMovementSummary = (params: RangeParams, enabled = true) =>
 /** Readings are generated on demand, not cached: a Z-reading advances the day's counters on the server. */
 export const useXReading = () => useMutation({ mutationFn: () => reportsApi.xReading() });
 export const useZReading = () => useMutation({ mutationFn: () => reportsApi.zReading() });
+
+/** date is an ISO yyyy-MM-dd string, or undefined for today. */
+export const useApprovalsReview = (date: string | undefined, enabled = true) =>
+  useQuery({ queryKey: reportKeys.approvalsReview(date), queryFn: () => reportsApi.approvalsReview(date), enabled });

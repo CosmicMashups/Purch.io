@@ -12,6 +12,7 @@ using Purch.Api.ErrorHandling;
 using Purch.Api.Health;
 using Purch.Api.Middleware;
 using Purch.Api.RateLimiting;
+using Purch.Application.Approvals;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
@@ -133,6 +134,7 @@ builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IDeviceManagementService, DeviceManagementService>();
 builder.Services.AddScoped<ITenantSettingsService, TenantSettingsService>();
 builder.Services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+builder.Services.AddScoped<IApprovalsReviewService, ApprovalsReviewService>();
 
 builder.Services.AddScoped<ICategoryRepository, EfCategoryRepository>();
 builder.Services.AddScoped<IItemRepository, EfItemRepository>();

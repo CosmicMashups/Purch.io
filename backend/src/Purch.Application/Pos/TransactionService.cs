@@ -646,6 +646,7 @@ public sealed class TransactionService(
                 approvedByUserId = approver?.Id,
                 approvedByRole = approver?.Role.ToString(),
             }),
+            ApprovedByUserId = approver?.Id,
         });
     }
 
@@ -690,6 +691,7 @@ public sealed class TransactionService(
                 approvedByUserId = approver.Id,
                 approvedByRole = approver.Role.ToString(),
             }),
+            ApprovedByUserId = approver.Id,
         });
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

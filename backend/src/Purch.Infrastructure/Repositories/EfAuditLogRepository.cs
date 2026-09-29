@@ -55,4 +55,13 @@ public sealed class EfAuditLogRepository(PurchDbContext dbContext) : IAuditLogRe
             .Take(Paging.ClampLimit(query.Limit))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<AuditLog>> ListApprovalsAsync(Guid tenantId, DateTimeOffset fromUtc, DateTimeOffset toExclusiveUtc, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.AuditLogs
+            .AsNoTracking()
+            .Where(log => log.TenantId == tenantId && log.ApprovedByUserId != null && log.CreatedAt >= fromUtc && log.CreatedAt < toExclusiveUtc)
+            .OrderBy(log => log.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
 }

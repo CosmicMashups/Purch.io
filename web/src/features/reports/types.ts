@@ -72,3 +72,40 @@ export interface RangeParams {
   to: string;
   branchId?: string;
 }
+
+/** Mirrors Purch.Domain.Enums.AuditActionType — only the values this report ever shows. */
+export const AuditActionType = { Void: 0, Refund: 1 } as const;
+export type AuditActionType = (typeof AuditActionType)[keyof typeof AuditActionType];
+
+/** Mirrors Purch.Application.Approvals.ApprovalEntryDto. */
+export interface ApprovalEntry {
+  requesterId: string;
+  requesterName: string;
+  actionType: AuditActionType;
+  targetEntityId: string;
+  createdAt: string;
+  afterHours: boolean;
+}
+
+/** Mirrors Purch.Application.Approvals.ApprovalFlagDto. */
+export interface ApprovalFlag {
+  message: string;
+}
+
+/** Mirrors Purch.Application.Approvals.ApproverSummaryDto. */
+export interface ApproverSummary {
+  approverId: string;
+  approverName: string;
+  approverRole: number;
+  totalApprovals: number;
+  afterHoursApprovals: number;
+  flags: ApprovalFlag[];
+  entries: ApprovalEntry[];
+}
+
+/** Mirrors Purch.Application.Approvals.ApprovalsReviewDto. */
+export interface ApprovalsReview {
+  date: string;
+  totalApprovals: number;
+  approvers: ApproverSummary[];
+}

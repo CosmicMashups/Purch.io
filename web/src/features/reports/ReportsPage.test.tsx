@@ -18,6 +18,7 @@ vi.mock('./api', () => ({
     zReading: vi.fn(),
     lowStockCsv: vi.fn(),
     transactionsCsv: vi.fn(),
+    approvalsReview: vi.fn(),
   },
 }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
@@ -188,6 +189,61 @@ describe('X and Z readings', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Take X-reading' }));
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toBe('You do not have permission to do that.'));
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
+  });
+});
+
+describe('approvals review', () => {
+  it('says plainly that nothing needed approval, when nothing did', async () => {
+    vi.mocked(reportsApi.approvalsReview).mockResolvedValue({ date: '2026-09-29', totalApprovals: 0, approvers: [] });
+    renderPage(<ReportsPage />, { route: '/?tab=approvals' });
+    expect(await screen.findByText('No void, refund or kitchen-order edit needed approval on 2026-09-29.')).toBeInTheDocument();
+    expect(reportsApi.approvalsReview).toHaveBeenCalledWith(undefined);
+  });
+
+  it('groups approvals by approver and calls out a flagged pattern', async () => {
+    vi.mocked(reportsApi.approvalsReview).mockResolvedValue({
+      date: '2026-09-29',
+      totalApprovals: 2,
+      approvers: [
+        {
+          approverId: 'u1',
+          approverName: 'Mae Manager',
+          approverRole: 1,
+          totalApprovals: 2,
+          afterHoursApprovals: 1,
+          flags: [{ message: '1 of these were approved outside normal hours (10pm-6am).' }],
+          entries: [
+            { requesterId: 'c1', requesterName: 'Cal Cashier', actionType: 0, targetEntityId: 't1', createdAt: '2026-09-29T02:00:00Z', afterHours: true },
+            { requesterId: 'c1', requesterName: 'Cal Cashier', actionType: 1, targetEntityId: 't2', createdAt: '2026-09-29T10:00:00Z', afterHours: false },
+          ],
+        },
+      ],
+    });
+    renderPage(<ReportsPage />, { route: '/?tab=approvals' });
+
+    const card = await screen.findByRole('region', { name: 'Mae Manager' });
+    expect(within(card).getByText('Manager')).toBeInTheDocument();
+    expect(within(card).getByText('2 approvals')).toBeInTheDocument();
+    expect(within(card).getByText('1 of these were approved outside normal hours (10pm-6am).')).toBeInTheDocument();
+    expect(within(card).getByText('Void')).toBeInTheDocument();
+    expect(within(card).getByText('Refund')).toBeInTheDocument();
+    expect(within(card).getAllByText('Cal Cashier')).toHaveLength(2);
+  });
+
+  it('shows a retryable error when the review cannot be loaded', async () => {
+    vi.mocked(reportsApi.approvalsReview).mockRejectedValue(new ApiError('serviceUnavailable', 'busy'));
+    renderPage(<ReportsPage />, { route: '/?tab=approvals' });
+    expect(await screen.findByText('The approvals review could not be loaded')).toBeInTheDocument();
+  });
+
+  it('re-queries a chosen date instead of today', async () => {
+    vi.mocked(reportsApi.approvalsReview).mockResolvedValue({ date: '2026-09-20', totalApprovals: 0, approvers: [] });
+    renderPage(<ReportsPage />, { route: '/?tab=approvals' });
+    await screen.findByLabelText('Date');
+
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-09-20' } });
+
+    await waitFor(() => expect(reportsApi.approvalsReview).toHaveBeenCalledWith('2026-09-20'));
   });
 });
 
