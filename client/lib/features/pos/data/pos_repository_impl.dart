@@ -37,13 +37,20 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
-  Future<Transaction> removeLine(String lineId) {
-    return _delete('/transactions/cart/lines/$lineId', Transaction.fromJson);
+  Future<Transaction> removeLine(String lineId, {String? approverPin}) {
+    return _delete(
+      '/transactions/cart/lines/$lineId',
+      Transaction.fromJson,
+      queryParameters:
+          approverPin == null ? null : {'approverPin': approverPin},
+    );
   }
 
   @override
-  Future<Transaction> voidCart() {
-    return _post('/transactions/cart/void', const {}, Transaction.fromJson);
+  Future<Transaction> voidCart({String? approverPin}) {
+    return _post('/transactions/cart/void', {
+      'approverPin': approverPin,
+    }, Transaction.fromJson);
   }
 
   @override
@@ -176,10 +183,14 @@ class PosRepositoryImpl implements PosRepository {
 
   Future<T> _delete<T>(
     String path,
-    T Function(Map<String, dynamic>) fromJson,
-  ) async {
+    T Function(Map<String, dynamic>) fromJson, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await _apiClient.dio.delete<Map<String, dynamic>>(path);
+      final response = await _apiClient.dio.delete<Map<String, dynamic>>(
+        path,
+        queryParameters: queryParameters,
+      );
       return fromJson(response.data!);
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);

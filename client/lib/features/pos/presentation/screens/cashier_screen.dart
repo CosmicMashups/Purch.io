@@ -28,6 +28,7 @@ import 'payment_screen.dart';
 import 'tingi_weight_dialog.dart';
 import 'variant_picker_screen.dart';
 import '../../../catalog/presentation/widgets/stale_catalog_banner.dart';
+import '../widgets/approver_pin_dialog.dart';
 import '../widgets/offline_sales_banner.dart';
 
 /// The Cashier screen — D1's item grid and cart, merged.
@@ -109,7 +110,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     ref.listen(cartNotifierProvider, (_, next) {
       final cartValue = next.valueOrNull;
       if (cartValue != null) {
-        ref.read(cfdServiceProvider).updateFromTransaction(transaction: cartValue);
+        ref
+            .read(cfdServiceProvider)
+            .updateFromTransaction(transaction: cartValue);
       }
     });
 
@@ -136,7 +139,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           backgroundColor: AppColors.background,
           appBar: AppBar(
             centerTitle: false,
-            titleSpacing: showSidePanel ? NavigationToolbar.kMiddleSpacing : 12.0,
+            titleSpacing:
+                showSidePanel ? NavigationToolbar.kMiddleSpacing : 12.0,
             title: Row(
               children: [
                 Container(
@@ -197,9 +201,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: AppColors.brandPrimaryContainer,
-                                borderRadius: BorderRadius.circular(AppRadius.full),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.full,
+                                ),
                                 border: Border.all(
-                                  color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                                  color: AppColors.brandPrimary.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               child: const Text(
@@ -233,34 +241,60 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       constraints: const BoxConstraints(maxWidth: 380),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                        onChanged:
+                            (val) => setState(() => _searchQuery = val.trim()),
                         decoration: InputDecoration(
                           hintText: 'Scan barcode or search items... [F2]',
-                          hintStyle: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 16),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : const Icon(Icons.qr_code_scanner_rounded, size: 18, color: AppColors.textSecondary),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          hintStyle: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            size: 18,
+                            color: AppColors.textSecondary,
+                          ),
+                          suffixIcon:
+                              _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear_rounded,
+                                      size: 16,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                  : const Icon(
+                                    Icons.qr_code_scanner_rounded,
+                                    size: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 0,
+                          ),
                           fillColor: AppColors.card,
                           filled: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppRadius.full),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppRadius.full),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppRadius.full),
-                            borderSide: const BorderSide(color: AppColors.brandPrimary, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: AppColors.brandPrimary,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -278,23 +312,33 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   icon: const Icon(Icons.point_of_sale_rounded, size: 20),
                   onPressed: () async {
                     try {
-                      final success = await ref.read(cashDrawerServiceProvider).openManual(
-                        operatorName: 'Cashier',
-                        reason: 'Cashier Manual Open / No Sale',
-                        isManagerOverride: true,
-                      );
+                      final success = await ref
+                          .read(cashDrawerServiceProvider)
+                          .openManual(
+                            operatorName: 'Cashier',
+                            reason: 'Cashier Manual Open / No Sale',
+                            isManagerOverride: true,
+                          );
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(success ? 'Cash drawer opened.' : 'Failed to open drawer.'),
-                            backgroundColor: success ? AppColors.accentEmerald : Colors.red,
+                            content: Text(
+                              success
+                                  ? 'Cash drawer opened.'
+                                  : 'Failed to open drawer.',
+                            ),
+                            backgroundColor:
+                                success ? AppColors.accentEmerald : Colors.red,
                           ),
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+                          SnackBar(
+                            content: Text('$e'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
                     }
@@ -302,22 +346,34 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
                 IconButton(
                   tooltip: 'Hardware Settings',
-                  icon: const Icon(Icons.settings_input_component_rounded, size: 20),
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const HardwareSettingsScreen()),
+                  icon: const Icon(
+                    Icons.settings_input_component_rounded,
+                    size: 20,
                   ),
+                  onPressed:
+                      () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => const HardwareSettingsScreen(),
+                        ),
+                      ),
                 ),
                 for (final action in _secondaryActions)
-                  if (action.label != 'Kiosk Orders' || constraints.maxWidth >= 960)
+                  if (action.label != 'Kiosk Orders' ||
+                      constraints.maxWidth >= 960)
                     _SecondaryAction(spec: action),
                 if (constraints.maxWidth >= 1080) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.brandPrimaryContainer,
                       borderRadius: BorderRadius.circular(AppRadius.full),
-                      border: Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -327,7 +383,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           backgroundColor: AppColors.brandPrimary,
                           child: Text(
                             'MS',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         SizedBox(width: 6),
@@ -395,34 +455,30 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       },
     );
   }
+
   Widget _buildBody(
     bool showSidePanel,
     Widget categorySelector,
     Widget itemGrid,
   ) {
-    return
-              showSidePanel
-                  ? Row(
-                    children: [
-                      categorySelector,
-                      Expanded(child: itemGrid),
-                      const SizedBox(
-                        width: _cartPanelWidth,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            border: Border(
-                              left: BorderSide(color: AppColors.border),
-                            ),
-                          ),
-                          child: CartPanel(),
-                        ),
-                      ),
-                    ],
-                  )
-                  : Column(
-                    children: [categorySelector, Expanded(child: itemGrid)],
-                  );
+    return showSidePanel
+        ? Row(
+          children: [
+            categorySelector,
+            Expanded(child: itemGrid),
+            const SizedBox(
+              width: _cartPanelWidth,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(left: BorderSide(color: AppColors.border)),
+                ),
+                child: CartPanel(),
+              ),
+            ),
+          ],
+        )
+        : Column(children: [categorySelector, Expanded(child: itemGrid)]);
   }
 }
 
@@ -471,10 +527,7 @@ class _SecondaryActionsMenu extends StatelessWidget {
                   children: [
                     Icon(action.icon, size: 18, color: AppColors.textSecondary),
                     const SizedBox(width: AppSpacing.md),
-                    Text(
-                      action.label,
-                      style: AppTypography.labelMd,
-                    ),
+                    Text(action.label, style: AppTypography.labelMd),
                   ],
                 ),
               ),
@@ -574,7 +627,8 @@ class CategorySelector extends ConsumerWidget {
                   vertical: AppSpacing.xs,
                 ),
                 itemCount: entries.length,
-                separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                separatorBuilder:
+                    (_, _) => const SizedBox(height: AppSpacing.sm),
                 itemBuilder: (context, index) => entries[index],
               ),
             ),
@@ -667,8 +721,7 @@ class _CategoryTile extends StatelessWidget {
       selected: selected,
       button: true,
       child: Material(
-        color:
-            selected ? AppColors.brandPrimaryContainer : Colors.transparent,
+        color: selected ? AppColors.brandPrimaryContainer : Colors.transparent,
         borderRadius: AppRadius.mdBorder,
         child: InkWell(
           borderRadius: AppRadius.mdBorder,
@@ -964,8 +1017,9 @@ class _ItemTile extends ConsumerWidget {
             }
 
             // Check if item has attached modifier groups
-            final modifierGroups =
-                await ref.read(itemModifierGroupListProvider(item.id).future);
+            final modifierGroups = await ref.read(
+              itemModifierGroupListProvider(item.id).future,
+            );
             if (modifierGroups.isNotEmpty && context.mounted) {
               final added = await showDialog<bool>(
                 context: context,
@@ -995,32 +1049,45 @@ class _ItemTile extends ConsumerWidget {
                   children: [
                     Container(
                       color: AppColors.cardHover,
-                      child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                          ? PurchImage(
-                              imageUrlOrPath: item.imageUrl,
-                              fit: BoxFit.cover,
-                            )
-                          : Center(
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: isDirectlySellable || needsCustomization || isWeighed
-                                      ? AppColors.brandPrimaryContainer
-                                      : AppColors.background,
-                                  borderRadius: BorderRadius.circular(AppRadius.md),
-                                ),
-                                child: Icon(
-                                  isDirectlySellable || needsCustomization || isWeighed
-                                      ? (isWeighed ? Icons.scale_rounded : Icons.inventory_2_rounded)
-                                      : Icons.inventory_2_outlined,
-                                  size: 24,
-                                  color: isDirectlySellable || needsCustomization || isWeighed
-                                      ? AppColors.brandPrimary
-                                      : AppColors.textMuted,
+                      child:
+                          item.imageUrl != null && item.imageUrl!.isNotEmpty
+                              ? PurchImage(
+                                imageUrlOrPath: item.imageUrl,
+                                fit: BoxFit.cover,
+                              )
+                              : Center(
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        isDirectlySellable ||
+                                                needsCustomization ||
+                                                isWeighed
+                                            ? AppColors.brandPrimaryContainer
+                                            : AppColors.background,
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    isDirectlySellable ||
+                                            needsCustomization ||
+                                            isWeighed
+                                        ? (isWeighed
+                                            ? Icons.scale_rounded
+                                            : Icons.inventory_2_rounded)
+                                        : Icons.inventory_2_outlined,
+                                    size: 24,
+                                    color:
+                                        isDirectlySellable ||
+                                                needsCustomization ||
+                                                isWeighed
+                                            ? AppColors.brandPrimary
+                                            : AppColors.textMuted,
+                                  ),
                                 ),
                               ),
-                            ),
                     ),
                     if (badge != null && !isOutOfStock)
                       Positioned(
@@ -1040,7 +1107,9 @@ class _ItemTile extends ConsumerWidget {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.error,
-                              borderRadius: BorderRadius.circular(AppRadius.full),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.full,
+                              ),
                             ),
                             child: const Text(
                               'OUT OF STOCK',
@@ -1202,7 +1271,10 @@ class _ItemTypeBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: badge.background,
         borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(color: badge.color.withValues(alpha: 0.25), width: 0.8),
+        border: Border.all(
+          color: badge.color.withValues(alpha: 0.25),
+          width: 0.8,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -1277,9 +1349,15 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           ),
     );
 
-    if (confirmed == true) {
-      await ref.read(cartNotifierProvider.notifier).voidCart();
-    }
+    if (confirmed != true || !context.mounted) return;
+
+    final notifier = ref.read(cartNotifierProvider.notifier);
+    await runApproverGatedCartAction(
+      context: context,
+      title: 'Clear the cart',
+      action: (approverPin) => notifier.voidCart(approverPin: approverPin),
+      currentFailure: () => notifier.currentFailure,
+    );
   }
 
   @override
@@ -1379,58 +1457,62 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               // tall — the discount explanations add text — so cap it and let it
               // scroll, rather than overflowing a short window.
               return LayoutBuilder(
-                builder: (context, constraints) => Column(
-                children: [
-                  if (failure != null)
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withAlpha(20),
-                          borderRadius: AppRadius.smBorder,
-                          border: Border.all(color: AppColors.error.withAlpha(60)),
-                        ),
-                        child: Text(
-                          failure.message,
-                          style: const TextStyle(
-                            color: AppColors.error,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                builder:
+                    (context, constraints) => Column(
+                      children: [
+                        if (failure != null)
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withAlpha(20),
+                                borderRadius: AppRadius.smBorder,
+                                border: Border.all(
+                                  color: AppColors.error.withAlpha(60),
+                                ),
+                              ),
+                              child: Text(
+                                failure.message,
+                                style: const TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
-                          textAlign: TextAlign.center,
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.md,
+                            ),
+                            itemCount: cart.lines.length,
+                            separatorBuilder:
+                                (_, _) => const SizedBox(height: 8),
+                            itemBuilder:
+                                (context, index) =>
+                                    _CartLineTile(line: cart.lines[index]),
+                          ),
                         ),
-                      ),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                constraints.hasBoundedHeight
+                                    ? constraints.maxHeight * 0.6
+                                    : double.infinity,
+                          ),
+                          child: SingleChildScrollView(
+                            child: _CartFooter(
+                              cart: cart,
+                              promoCodeController: _promoCodeController,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.md,
-                      ),
-                      itemCount: cart.lines.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder:
-                          (context, index) =>
-                              _CartLineTile(line: cart.lines[index]),
-                    ),
-                  ),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight:
-                          constraints.hasBoundedHeight
-                              ? constraints.maxHeight * 0.6
-                              : double.infinity,
-                    ),
-                    child: SingleChildScrollView(
-                      child: _CartFooter(
-                        cart: cart,
-                        promoCodeController: _promoCodeController,
-                      ),
-                    ),
-                  ),
-                ],
-                ),
               );
             },
           ),
@@ -1592,14 +1674,24 @@ class _CartFooter extends ConsumerWidget {
               ),
               child: SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'Dine In', label: Text('Dine In'), icon: Icon(Icons.restaurant_rounded)),
-                  ButtonSegment(value: 'Take Out', label: Text('Take Out'), icon: Icon(Icons.takeout_dining_rounded)),
+                  ButtonSegment(
+                    value: 'Dine In',
+                    label: Text('Dine In'),
+                    icon: Icon(Icons.restaurant_rounded),
+                  ),
+                  ButtonSegment(
+                    value: 'Take Out',
+                    label: Text('Take Out'),
+                    icon: Icon(Icons.takeout_dining_rounded),
+                  ),
                 ],
                 selected: {if (cart.orderType != null) cart.orderType!},
                 emptySelectionAllowed: true,
                 onSelectionChanged: (selection) {
                   if (selection.isNotEmpty) {
-                    ref.read(cartNotifierProvider.notifier).setOrderType(selection.first);
+                    ref
+                        .read(cartNotifierProvider.notifier)
+                        .setOrderType(selection.first);
                   }
                 },
               ),
@@ -1720,7 +1812,9 @@ void _goToPayment(BuildContext context, WidgetRef ref, Transaction cart) {
   final requiresOrderType = ref.read(isDineInTakeOutVerticalProvider);
   if (requiresOrderType && cart.orderType == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Select Dine In or Take Out before checkout.')),
+      const SnackBar(
+        content: Text('Select Dine In or Take Out before checkout.'),
+      ),
     );
     return;
   }
@@ -1895,7 +1989,17 @@ class _CartLineTile extends ConsumerWidget {
           Row(
             children: [
               IconButton(
-                onPressed: () => controller.removeLine(line.id),
+                onPressed:
+                    () => runApproverGatedCartAction(
+                      context: context,
+                      title: 'Remove ${line.itemName}',
+                      action:
+                          (approverPin) => controller.removeLine(
+                            line.id,
+                            approverPin: approverPin,
+                          ),
+                      currentFailure: () => controller.currentFailure,
+                    ),
                 icon: const Icon(
                   Icons.delete_outline,
                   color: AppColors.error,
@@ -1909,11 +2013,18 @@ class _CartLineTile extends ConsumerWidget {
               IconButton(
                 onPressed:
                     line.quantity > 1
-                        ? () => controller.updateLine(
-                          line.id,
-                          UpdateTransactionLineRequest(
-                            quantity: line.quantity - 1,
-                          ),
+                        ? () => runApproverGatedCartAction(
+                          context: context,
+                          title: 'Change the quantity of ${line.itemName}',
+                          action:
+                              (approverPin) => controller.updateLine(
+                                line.id,
+                                UpdateTransactionLineRequest(
+                                  quantity: line.quantity - 1,
+                                  approverPin: approverPin,
+                                ),
+                              ),
+                          currentFailure: () => controller.currentFailure,
                         )
                         : null,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -1935,11 +2046,18 @@ class _CartLineTile extends ConsumerWidget {
               ),
               IconButton(
                 onPressed:
-                    () => controller.updateLine(
-                      line.id,
-                      UpdateTransactionLineRequest(
-                        quantity: line.quantity + 1,
-                      ),
+                    () => runApproverGatedCartAction(
+                      context: context,
+                      title: 'Change the quantity of ${line.itemName}',
+                      action:
+                          (approverPin) => controller.updateLine(
+                            line.id,
+                            UpdateTransactionLineRequest(
+                              quantity: line.quantity + 1,
+                              approverPin: approverPin,
+                            ),
+                          ),
+                      currentFailure: () => controller.currentFailure,
                     ),
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 visualDensity: VisualDensity.compact,
@@ -2005,10 +2123,7 @@ class _TotalsRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          formatCurrency(amount),
-          style: amountStyle,
-        ),
+        Text(formatCurrency(amount), style: amountStyle),
       ],
     );
   }

@@ -235,8 +235,9 @@ class TransactionLine {
 
   /// e.g. "Size: Large, Color: Red" — mirrors ItemVariant.attributesLabel's
   /// join format so a variant reads the same way everywhere it's shown.
-  String get variantAttributesLabel =>
-      itemVariantAttributes.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+  String get variantAttributesLabel => itemVariantAttributes.entries
+      .map((e) => '${e.key}: ${e.value}')
+      .join(', ');
 }
 
 /// Mirrors Purch.Application.Pos.ModifierSelectionDto — a resolved modifier
@@ -311,7 +312,9 @@ class AddTransactionLineRequest {
               .map(ComboSelectionRequest.fromJson)
               .toList(),
       selectedModifierIds:
-          (json['selectedModifierIds'] as List<dynamic>?)?.cast<String>().toList(),
+          (json['selectedModifierIds'] as List<dynamic>?)
+              ?.cast<String>()
+              .toList(),
     );
   }
 
@@ -366,7 +369,9 @@ class CheckoutRequest {
       receiptNumber: (json['receiptNumber'] as num?)?.toInt(),
       offlineSale: json['offlineSale'] as bool? ?? false,
       soldAt:
-          json['soldAt'] == null ? null : DateTime.parse(json['soldAt'] as String),
+          json['soldAt'] == null
+              ? null
+              : DateTime.parse(json['soldAt'] as String),
       rungByStaffId: json['rungByStaffId'] as String?,
     );
   }
@@ -441,11 +446,21 @@ class ComboSelectionRequest {
 
 /// Mirrors Purch.Application.Pos.UpdateTransactionLineRequest.
 class UpdateTransactionLineRequest {
-  const UpdateTransactionLineRequest({required this.quantity});
+  const UpdateTransactionLineRequest({
+    required this.quantity,
+    this.approverPin,
+  });
 
   final double quantity;
 
-  Map<String, dynamic> toJson() => {'quantity': quantity};
+  /// Required by the server only on a claimed kiosk order the kitchen hasn't started yet, and only when
+  /// the signed-in staff member isn't already an Admin/Manager — see ApproverAuthorizationService.
+  final String? approverPin;
+
+  Map<String, dynamic> toJson() => {
+    'quantity': quantity,
+    'approverPin': approverPin,
+  };
 }
 
 /// Mirrors Purch.Application.Pos.ApplySeniorPwdDiscountRequest. The cashier

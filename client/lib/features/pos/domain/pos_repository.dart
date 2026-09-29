@@ -11,9 +11,9 @@ abstract class PosRepository {
     UpdateTransactionLineRequest request,
   );
 
-  Future<Transaction> removeLine(String lineId);
+  Future<Transaction> removeLine(String lineId, {String? approverPin});
 
-  Future<Transaction> voidCart();
+  Future<Transaction> voidCart({String? approverPin});
 
   Future<Transaction> applySeniorPwdDiscount(
     ApplySeniorPwdDiscountRequest request,

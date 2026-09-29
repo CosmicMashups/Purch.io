@@ -110,7 +110,9 @@ class _RecordingRemote implements PosRepository {
     }
     final number = request.receiptNumber ?? 41 + recordedSales + 1;
     if (!usedReceiptNumbers.add(number)) {
-      throw ConflictFailure('Receipt number $number was already issued to this terminal.');
+      throw ConflictFailure(
+        'Receipt number $number was already issued to this terminal.',
+      );
     }
     serverLastReceipt = number > serverLastReceipt ? number : serverLastReceipt;
     recordedSales++;
@@ -135,7 +137,7 @@ class _RecordingRemote implements PosRepository {
   }
 
   @override
-  Future<Transaction> voidCart() async {
+  Future<Transaction> voidCart({String? approverPin}) async {
     calls.add('void');
     openCartLines = 0;
     openCartId = 'server-cart-${++_cartCounter}';
@@ -186,7 +188,8 @@ class _RecordingRemote implements PosRepository {
   ) => throw UnimplementedError();
 
   @override
-  Future<Transaction> removeLine(String lineId) => throw UnimplementedError();
+  Future<Transaction> removeLine(String lineId, {String? approverPin}) =>
+      throw UnimplementedError();
 
   @override
   Future<List<Transaction>> listPendingKioskOrders(String branchId) async =>
@@ -232,11 +235,8 @@ void main() {
     loadRules: () async => rules,
     store: store,
     identity:
-        () async => const CartIdentity(
-          tenantId: 't',
-          deviceId: 'd',
-          branchId: 'b',
-        ),
+        () async =>
+            const CartIdentity(tenantId: 't', deviceId: 'd', branchId: 'b'),
   );
 
   AddTransactionLineRequest add(String id, [double qty = 1, String? variant]) =>
@@ -287,63 +287,79 @@ void main() {
     );
   });
 
-  test('cart edits are local: no server calls, totals update instantly', () async {
-    final repo = build();
-    var cart = await repo.getOrCreateOpenCart();
-    expect(cart.lines, isEmpty);
+  test(
+    'cart edits are local: no server calls, totals update instantly',
+    () async {
+      final repo = build();
+      var cart = await repo.getOrCreateOpenCart();
+      expect(cart.lines, isEmpty);
 
-    cart = await repo.addLine(add('coffee', 2));
-    expect(cart.totalAmount, 200);
-    cart = await repo.addLine(add('coffee'));
-    expect(cart.lines, hasLength(1), reason: 'same item merges into one line');
-    expect(cart.lines.single.quantity, 3);
-    expect(cart.totalAmount, 300);
+      cart = await repo.addLine(add('coffee', 2));
+      expect(cart.totalAmount, 200);
+      cart = await repo.addLine(add('coffee'));
+      expect(
+        cart.lines,
+        hasLength(1),
+        reason: 'same item merges into one line',
+      );
+      expect(cart.lines.single.quantity, 3);
+      expect(cart.totalAmount, 300);
 
-    cart = await repo.updateLine(cart.lines.single.id, const UpdateTransactionLineRequest(quantity: 1));
-    expect(cart.totalAmount, 100);
-    cart = await repo.removeLine(cart.lines.single.id);
-    expect(cart.lines, isEmpty);
+      cart = await repo.updateLine(
+        cart.lines.single.id,
+        const UpdateTransactionLineRequest(quantity: 1),
+      );
+      expect(cart.totalAmount, 100);
+      cart = await repo.removeLine(cart.lines.single.id);
+      expect(cart.lines, isEmpty);
 
-    expect(remote.calls, isEmpty);
-  });
+      expect(remote.calls, isEmpty);
+    },
+  );
 
-  test('modifier groups come from the shared lookup once per item, not once per add', () async {
-    final asked = <String>[];
-    final repo = LocalFirstPosRepository(
-      lastIssuedReceiptNumber: lastIssued,
-      recordReceiptNumber: record,
-      remote: remote,
-      catalog: catalog,
-      loadItems: () async => items,
-      loadRules: () async => rules,
-      store: store,
-      identity: () async => null,
-      modifierGroupsFor: (itemId) async {
-        asked.add(itemId);
-        return const [];
-      },
-    );
-    await repo.addLine(add('coffee'));
-    await repo.addLine(add('coffee'));
-    await repo.addLine(add('coffee'));
-    expect(asked, ['coffee']);
-  });
+  test(
+    'modifier groups come from the shared lookup once per item, not once per add',
+    () async {
+      final asked = <String>[];
+      final repo = LocalFirstPosRepository(
+        lastIssuedReceiptNumber: lastIssued,
+        recordReceiptNumber: record,
+        remote: remote,
+        catalog: catalog,
+        loadItems: () async => items,
+        loadRules: () async => rules,
+        store: store,
+        identity: () async => null,
+        modifierGroupsFor: (itemId) async {
+          asked.add(itemId);
+          return const [];
+        },
+      );
+      await repo.addLine(add('coffee'));
+      await repo.addLine(add('coffee'));
+      await repo.addLine(add('coffee'));
+      expect(asked, ['coffee']);
+    },
+  );
 
-  test('overlapping adds (a double scan) are all kept, none overwrites another', () async {
-    final repo = build();
+  test(
+    'overlapping adds (a double scan) are all kept, none overwrites another',
+    () async {
+      final repo = build();
 
-    // Fired without awaiting in between, like a scanner or a double tap.
-    final results = await Future.wait([
-      repo.addLine(add('coffee')),
-      repo.addLine(add('coffee')),
-      repo.addLine(add('coffee', 2)),
-    ]);
+      // Fired without awaiting in between, like a scanner or a double tap.
+      final results = await Future.wait([
+        repo.addLine(add('coffee')),
+        repo.addLine(add('coffee')),
+        repo.addLine(add('coffee', 2)),
+      ]);
 
-    expect(results.last.lines.single.quantity, 4);
-    final cart = await repo.getOrCreateOpenCart();
-    expect(cart.lines.single.quantity, 4);
-    expect(cart.totalAmount, 400);
-  });
+      expect(results.last.lines.single.quantity, 4);
+      final cart = await repo.getOrCreateOpenCart();
+      expect(cart.lines.single.quantity, 4);
+      expect(cart.totalAmount, 400);
+    },
+  );
 
   test('the draft survives an app restart', () async {
     await build().addLine(add('coffee', 2));
@@ -353,45 +369,66 @@ void main() {
     expect(restarted.totalAmount, 200);
   });
 
-  test('a corrupt saved draft starts a fresh cart instead of crashing', () async {
-    await store.write('{not json');
-    final cart = await build().getOrCreateOpenCart();
-    expect(cart.lines, isEmpty);
-  });
+  test(
+    'a corrupt saved draft starts a fresh cart instead of crashing',
+    () async {
+      await store.write('{not json');
+      final cart = await build().getOrCreateOpenCart();
+      expect(cart.lines, isEmpty);
+    },
+  );
 
-  test('variant price overrides the base price and lines stay separate from plain ones', () async {
-    final repo = build();
-    final cart = await repo.addLine(add('shirt', 1, 'v-l'));
-    expect(cart.lines.single.unitPrice, 250);
-    expect(cart.lines.single.itemVariantId, 'v-l');
-    expect(cart.lines.single.variantAttributesLabel, 'Size: L');
-  });
+  test(
+    'variant price overrides the base price and lines stay separate from plain ones',
+    () async {
+      final repo = build();
+      final cart = await repo.addLine(add('shirt', 1, 'v-l'));
+      expect(cart.lines.single.unitPrice, 250);
+      expect(cart.lines.single.itemVariantId, 'v-l');
+      expect(cart.lines.single.variantAttributesLabel, 'Size: L');
+    },
+  );
 
-  test('a variant item without a variant, or an inactive item, is rejected', () async {
-    final repo = build();
-    await expectLater(repo.addLine(add('shirt')), throwsA(isA<ValidationFailure>()));
-    await expectLater(repo.addLine(add('off')), throwsA(isA<ValidationFailure>()));
-    await expectLater(repo.addLine(add('coffee', 0)), throwsA(isA<ValidationFailure>()));
-  });
+  test(
+    'a variant item without a variant, or an inactive item, is rejected',
+    () async {
+      final repo = build();
+      await expectLater(
+        repo.addLine(add('shirt')),
+        throwsA(isA<ValidationFailure>()),
+      );
+      await expectLater(
+        repo.addLine(add('off')),
+        throwsA(isA<ValidationFailure>()),
+      );
+      await expectLater(
+        repo.addLine(add('coffee', 0)),
+        throwsA(isA<ValidationFailure>()),
+      );
+    },
+  );
 
-  test('required modifier groups are enforced and priced into the unit price', () async {
-    final repo = build();
-    await expectLater(
-      repo.addLine(add('latte')),
-      throwsA(isA<ValidationFailure>()),
-    );
+  test(
+    'required modifier groups are enforced and priced into the unit price',
+    () async {
+      final repo = build();
+      await expectLater(
+        repo.addLine(add('latte')),
+        throwsA(isA<ValidationFailure>()),
+      );
 
-    final cart = await repo.addLine(
-      const AddTransactionLineRequest(
-        itemId: 'latte',
-        quantity: 2,
-        selectedModifierIds: ['m-oat'],
-      ),
-    );
-    expect(cart.lines.single.unitPrice, 135);
-    expect(cart.totalAmount, 270);
-    expect(cart.lines.single.modifierSelections.single.modifierName, 'Oat');
-  });
+      final cart = await repo.addLine(
+        const AddTransactionLineRequest(
+          itemId: 'latte',
+          quantity: 2,
+          selectedModifierIds: ['m-oat'],
+        ),
+      );
+      expect(cart.lines.single.unitPrice, 135);
+      expect(cart.totalAmount, 270);
+      expect(cart.lines.single.modifierSelections.single.modifierName, 'Oat');
+    },
+  );
 
   test('lines with different modifiers do not merge', () async {
     final repo = build();
@@ -412,74 +449,85 @@ void main() {
     expect(cart.lines, hasLength(2));
   });
 
-  test('Senior/PWD, promo codes and item promos never stack, and are priced locally', () async {
-    rules = PricingRules(
-      bogo: [
-        BogoPromoRule(
-          id: 'r',
-          name: 'B1T1',
-          triggerItemId: 'coffee',
-          triggerQuantity: 1,
-          freeItemId: 'coffee',
-          freeQuantity: 1,
-          startsAt: null,
-          endsAt: null,
-          isActive: true,
-        ),
-      ],
-      promoCodes: [
-        PromoCode(
-          id: 'p',
-          code: 'TEN',
-          discountType: PromoDiscountType.percentage,
-          discountValue: 10,
-          isActive: true,
-          expiresAt: null,
-        ),
-      ],
-    );
-    final repo = build();
-    var cart = await repo.addLine(add('coffee', 2));
-    expect(cart.itemPromoDiscountAmount, 100);
-    expect(cart.lines.single.appliedPromoLabel, 'B1T1');
-    expect(cart.totalAmount, 100);
-    // Both options are visible to the cashier: Senior/PWD would save 40, promos 100.
-    expect(cart.seniorPwdSavings, 40);
-    expect(cart.promoSavings, 100);
+  test(
+    'Senior/PWD, promo codes and item promos never stack, and are priced locally',
+    () async {
+      rules = PricingRules(
+        bogo: [
+          BogoPromoRule(
+            id: 'r',
+            name: 'B1T1',
+            triggerItemId: 'coffee',
+            triggerQuantity: 1,
+            freeItemId: 'coffee',
+            freeQuantity: 1,
+            startsAt: null,
+            endsAt: null,
+            isActive: true,
+          ),
+        ],
+        promoCodes: [
+          PromoCode(
+            id: 'p',
+            code: 'TEN',
+            discountType: PromoDiscountType.percentage,
+            discountValue: 10,
+            isActive: true,
+            expiresAt: null,
+          ),
+        ],
+      );
+      final repo = build();
+      var cart = await repo.addLine(add('coffee', 2));
+      expect(cart.itemPromoDiscountAmount, 100);
+      expect(cart.lines.single.appliedPromoLabel, 'B1T1');
+      expect(cart.totalAmount, 100);
+      // Both options are visible to the cashier: Senior/PWD would save 40, promos 100.
+      expect(cart.seniorPwdSavings, 40);
+      expect(cart.promoSavings, 100);
 
-    // Senior/PWD is chosen INSTEAD of the promos (they never combine), on the regular price.
-    cart = await repo.applySeniorPwdDiscount(
-      const ApplySeniorPwdDiscountRequest(apply: true),
-    );
-    expect(cart.itemPromoDiscountAmount, 0);
-    expect(cart.lines.single.appliedPromoLabel, isNull);
-    expect(cart.discountAmount, 40);
-    expect(cart.totalAmount, 160);
+      // Senior/PWD is chosen INSTEAD of the promos (they never combine), on the regular price.
+      cart = await repo.applySeniorPwdDiscount(
+        const ApplySeniorPwdDiscountRequest(apply: true),
+      );
+      expect(cart.itemPromoDiscountAmount, 0);
+      expect(cart.lines.single.appliedPromoLabel, isNull);
+      expect(cart.discountAmount, 40);
+      expect(cart.totalAmount, 160);
 
-    // A promo code can be entered while Senior/PWD is on, but gives nothing.
-    cart = await repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'ten'));
-    expect(cart.promoCode, 'TEN');
-    expect(cart.promoCodeNotApplied, PromoCodeNotApplied.suppressedBySeniorPwd);
-    expect(cart.promoDiscountAmount, 0);
-    expect(cart.totalAmount, 160);
+      // A promo code can be entered while Senior/PWD is on, but gives nothing.
+      cart = await repo.applyPromoCode(
+        const ApplyPromoCodeRequest(code: 'ten'),
+      );
+      expect(cart.promoCode, 'TEN');
+      expect(
+        cart.promoCodeNotApplied,
+        PromoCodeNotApplied.suppressedBySeniorPwd,
+      );
+      expect(cart.promoDiscountAmount, 0);
+      expect(cart.totalAmount, 160);
 
-    // Switching Senior/PWD off returns to promotions - and only ONE applies: the
-    // item promos (100) beat the code (10% of 200 = 20).
-    cart = await repo.applySeniorPwdDiscount(
-      const ApplySeniorPwdDiscountRequest(apply: false),
-    );
-    expect(cart.itemPromoDiscountAmount, 100);
-    expect(cart.promoDiscountAmount, 0);
-    expect(cart.promoCode, 'TEN');
-    expect(cart.promoCodeNotApplied, PromoCodeNotApplied.supersededByItemPromos);
-    expect(cart.totalAmount, 100);
+      // Switching Senior/PWD off returns to promotions - and only ONE applies: the
+      // item promos (100) beat the code (10% of 200 = 20).
+      cart = await repo.applySeniorPwdDiscount(
+        const ApplySeniorPwdDiscountRequest(apply: false),
+      );
+      expect(cart.itemPromoDiscountAmount, 100);
+      expect(cart.promoDiscountAmount, 0);
+      expect(cart.promoCode, 'TEN');
+      expect(
+        cart.promoCodeNotApplied,
+        PromoCodeNotApplied.supersededByItemPromos,
+      );
+      expect(cart.totalAmount, 100);
 
-    await expectLater(
-      repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'NOPE')),
-      throwsA(isA<ValidationFailure>()),
-    );
-    expect(remote.calls, isEmpty);
-  });
+      await expectLater(
+        repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'NOPE')),
+        throwsA(isA<ValidationFailure>()),
+      );
+      expect(remote.calls, isEmpty);
+    },
+  );
 
   test('promo rules failing to load never breaks the cart', () async {
     final repo = LocalFirstPosRepository(
@@ -496,131 +544,175 @@ void main() {
     expect(cart.totalAmount, 200);
   });
 
-  test('paying sends the whole sale in one checkout call and clears the draft', () async {
-    rules = PricingRules(
-      promoCodes: [
-        PromoCode(
-          id: 'p',
-          code: 'TEN',
-          discountType: PromoDiscountType.percentage,
-          discountValue: 10,
-          isActive: true,
-          expiresAt: null,
-        ),
-      ],
-    );
-    final repo = build();
-    await repo.addLine(add('coffee', 2));
-    await repo.addLine(add('latte', 1).copyWithModifiers(['m-soy']));
-    await repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'ten'));
-    await repo.setOrderType(const SetOrderTypeRequest(orderType: 'Dine In'));
-    expect(remote.calls, isEmpty);
+  test(
+    'paying sends the whole sale in one checkout call and clears the draft',
+    () async {
+      rules = PricingRules(
+        promoCodes: [
+          PromoCode(
+            id: 'p',
+            code: 'TEN',
+            discountType: PromoDiscountType.percentage,
+            discountValue: 10,
+            isActive: true,
+            expiresAt: null,
+          ),
+        ],
+      );
+      final repo = build();
+      await repo.addLine(add('coffee', 2));
+      await repo.addLine(add('latte', 1).copyWithModifiers(['m-soy']));
+      await repo.applyPromoCode(const ApplyPromoCodeRequest(code: 'ten'));
+      await repo.setOrderType(const SetOrderTypeRequest(orderType: 'Dine In'));
+      expect(remote.calls, isEmpty);
 
-    final paid = await repo.recordPayment(
-      const RecordPaymentRequest(
+      final paid = await repo.recordPayment(
+        const RecordPaymentRequest(
+          method: PaymentMethod.cash,
+          amountTendered: 500,
+        ),
+      );
+
+      expect(paid.receiptNumber, 1);
+      expect(remote.calls, [
+        'checkout:2',
+      ], reason: 'one call, not one per line');
+
+      final sent = remote.checkoutRequests.single;
+      expect(sent.lines.map((l) => l.itemId), ['coffee', 'latte']);
+      expect(sent.lines.last.selectedModifierIds, ['m-soy']);
+      expect(sent.promoCode, 'TEN');
+      expect(sent.orderType, 'Dine In');
+      expect(sent.payment.amountTendered, 500);
+      // coffee 200 + latte 130 = 330, less 10% promo = 297.
+      expect(sent.expectedTotal, closeTo(297, 0.001));
+      expect(sent.toJson()['saleId'], sent.saleId);
+      expect(
+        sent.saleId,
+        matches(
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        ),
+      );
+
+      // Next sale starts empty.
+      expect((await repo.getOrCreateOpenCart()).lines, isEmpty);
+      expect(await store.read(), isNull);
+    },
+  );
+
+  test(
+    'a price change reported by the server surfaces, keeps the cart, and reloads promo rules',
+    () async {
+      var ruleLoads = 0;
+      final repo = LocalFirstPosRepository(
+        lastIssuedReceiptNumber: lastIssued,
+        recordReceiptNumber: record,
+        remote: remote,
+        catalog: catalog,
+        loadItems: () async => items,
+        loadRules: () async {
+          ruleLoads++;
+          return rules;
+        },
+        store: store,
+        identity: () async => null,
+      );
+      remote.checkoutFailure = const ConflictFailure(
+        'Prices or promos changed: the total is now 180.00',
+      );
+      await repo.addLine(add('coffee', 2));
+      final loadsBeforePay = ruleLoads;
+
+      await expectLater(
+        repo.recordPayment(
+          const RecordPaymentRequest(
+            method: PaymentMethod.cash,
+            amountTendered: 200,
+          ),
+        ),
+        throwsA(isA<ConflictFailure>()),
+      );
+
+      expect((await repo.getOrCreateOpenCart()).lines, hasLength(1));
+      expect(
+        ruleLoads,
+        greaterThan(loadsBeforePay),
+        reason: 'rules refetched for the retry',
+      );
+    },
+  );
+
+  test(
+    'after a price change the lines are re-priced from the catalog, so the retry can succeed',
+    () async {
+      final repo = build();
+      final added = await repo.addLine(add('coffee', 2));
+      final lineId = added.lines.single.id;
+      expect(added.totalAmount, 200);
+
+      // The price is changed while the cart is open; the server refuses the stale total.
+      items = [
+        _item('coffee', 'Coffee', 80),
+        ...items.where((i) => i.id != 'coffee'),
+      ];
+      remote.checkoutFailure = const ConflictFailure(
+        'Prices or promos changed: the total is now 160.00',
+      );
+      const payment = RecordPaymentRequest(
         method: PaymentMethod.cash,
         amountTendered: 500,
-      ),
-    );
+      );
+      await expectLater(
+        repo.recordPayment(payment),
+        throwsA(isA<ConflictFailure>()),
+      );
 
-    expect(paid.receiptNumber, 1);
-    expect(remote.calls, ['checkout:2'], reason: 'one call, not one per line');
+      final cart = await repo.getOrCreateOpenCart();
+      expect(
+        cart.lines.single.id,
+        lineId,
+        reason: 'same line, not removed and re-added',
+      );
+      expect(cart.lines.single.quantity, 2);
+      expect(cart.totalAmount, 160);
 
-    final sent = remote.checkoutRequests.single;
-    expect(sent.lines.map((l) => l.itemId), ['coffee', 'latte']);
-    expect(sent.lines.last.selectedModifierIds, ['m-soy']);
-    expect(sent.promoCode, 'TEN');
-    expect(sent.orderType, 'Dine In');
-    expect(sent.payment.amountTendered, 500);
-    // coffee 200 + latte 130 = 330, less 10% promo = 297.
-    expect(sent.expectedTotal, closeTo(297, 0.001));
-    expect(sent.toJson()['saleId'], sent.saleId);
-    expect(sent.saleId, matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
+      // Retrying now sends the new total and goes through.
+      remote.checkoutFailure = null;
+      await repo.recordPayment(payment);
+      expect(remote.checkoutRequests.last.expectedTotal, closeTo(160, 0.001));
+    },
+  );
 
-    // Next sale starts empty.
-    expect((await repo.getOrCreateOpenCart()).lines, isEmpty);
-    expect(await store.read(), isNull);
-  });
+  test(
+    'retrying after a lost response reuses the sale id, so the customer is charged once',
+    () async {
+      final repo = build();
+      await repo.addLine(add('coffee', 2));
+      const payment = RecordPaymentRequest(
+        method: PaymentMethod.cash,
+        amountTendered: 200,
+      );
 
-  test('a price change reported by the server surfaces, keeps the cart, and reloads promo rules', () async {
-    var ruleLoads = 0;
-    final repo = LocalFirstPosRepository(
-      lastIssuedReceiptNumber: lastIssued,
-      recordReceiptNumber: record,
-      remote: remote,
-      catalog: catalog,
-      loadItems: () async => items,
-      loadRules: () async {
-        ruleLoads++;
-        return rules;
-      },
-      store: store,
-      identity: () async => null,
-    );
-    remote.checkoutFailure = const ConflictFailure(
-      'Prices or promos changed: the total is now 180.00',
-    );
-    await repo.addLine(add('coffee', 2));
-    final loadsBeforePay = ruleLoads;
+      remote.checkoutFailure = const NetworkFailure('response lost');
+      await expectLater(
+        repo.recordPayment(payment),
+        throwsA(isA<NetworkFailure>()),
+      );
 
-    await expectLater(
-      repo.recordPayment(
-        const RecordPaymentRequest(method: PaymentMethod.cash, amountTendered: 200),
-      ),
-      throwsA(isA<ConflictFailure>()),
-    );
+      // The request actually reached the server and was recorded before the
+      // connection dropped — model that, then retry.
+      remote.checkoutFailure = null;
+      final sale = await repo.recordPayment(payment);
+      final again = remote.checkoutRequests;
 
-    expect((await repo.getOrCreateOpenCart()).lines, hasLength(1));
-    expect(ruleLoads, greaterThan(loadsBeforePay), reason: 'rules refetched for the retry');
-  });
-
-  test('after a price change the lines are re-priced from the catalog, so the retry can succeed', () async {
-    final repo = build();
-    final added = await repo.addLine(add('coffee', 2));
-    final lineId = added.lines.single.id;
-    expect(added.totalAmount, 200);
-
-    // The price is changed while the cart is open; the server refuses the stale total.
-    items = [_item('coffee', 'Coffee', 80), ...items.where((i) => i.id != 'coffee')];
-    remote.checkoutFailure = const ConflictFailure(
-      'Prices or promos changed: the total is now 160.00',
-    );
-    const payment = RecordPaymentRequest(method: PaymentMethod.cash, amountTendered: 500);
-    await expectLater(repo.recordPayment(payment), throwsA(isA<ConflictFailure>()));
-
-    final cart = await repo.getOrCreateOpenCart();
-    expect(cart.lines.single.id, lineId, reason: 'same line, not removed and re-added');
-    expect(cart.lines.single.quantity, 2);
-    expect(cart.totalAmount, 160);
-
-    // Retrying now sends the new total and goes through.
-    remote.checkoutFailure = null;
-    await repo.recordPayment(payment);
-    expect(remote.checkoutRequests.last.expectedTotal, closeTo(160, 0.001));
-  });
-
-  test('retrying after a lost response reuses the sale id, so the customer is charged once', () async {
-    final repo = build();
-    await repo.addLine(add('coffee', 2));
-    const payment = RecordPaymentRequest(
-      method: PaymentMethod.cash,
-      amountTendered: 200,
-    );
-
-    remote.checkoutFailure = const NetworkFailure('response lost');
-    await expectLater(repo.recordPayment(payment), throwsA(isA<NetworkFailure>()));
-
-    // The request actually reached the server and was recorded before the
-    // connection dropped — model that, then retry.
-    remote.checkoutFailure = null;
-    final sale = await repo.recordPayment(payment);
-    final again = remote.checkoutRequests;
-
-    expect(again, hasLength(2));
-    expect(again.first.saleId, again.last.saleId);
-    expect(sale.receiptNumber, 1);
-    expect(remote.recordedSales, 1);
-  });
+      expect(again, hasLength(2));
+      expect(again.first.saleId, again.last.saleId);
+      expect(sale.receiptNumber, 1);
+      expect(remote.recordedSales, 1);
+    },
+  );
 
   test('the sale id survives an app restart mid-payment', () async {
     await build().addLine(add('coffee'));
@@ -629,12 +721,18 @@ void main() {
       method: PaymentMethod.cash,
       amountTendered: 100,
     );
-    await expectLater(build().recordPayment(payment), throwsA(isA<NetworkFailure>()));
+    await expectLater(
+      build().recordPayment(payment),
+      throwsA(isA<NetworkFailure>()),
+    );
 
     remote.checkoutFailure = null;
     await build().recordPayment(payment);
 
-    expect(remote.checkoutRequests.first.saleId, remote.checkoutRequests.last.saleId);
+    expect(
+      remote.checkoutRequests.first.saleId,
+      remote.checkoutRequests.last.saleId,
+    );
     expect(remote.recordedSales, 1);
   });
 
@@ -660,39 +758,52 @@ void main() {
       amountTendered: 100,
     );
 
-    test('each sale is numbered by the device, in sequence, after the highest known number', () async {
-      floorFromServer = 41; // the server already recorded 41 sales for this terminal
-      final repo = build();
+    test(
+      'each sale is numbered by the device, in sequence, after the highest known number',
+      () async {
+        floorFromServer =
+            41; // the server already recorded 41 sales for this terminal
+        final repo = build();
 
-      await repo.addLine(add('coffee'));
-      final first = await repo.recordPayment(payment);
-      await repo.addLine(add('coffee'));
-      final second = await repo.recordPayment(payment);
+        await repo.addLine(add('coffee'));
+        final first = await repo.recordPayment(payment);
+        await repo.addLine(add('coffee'));
+        final second = await repo.recordPayment(payment);
 
-      expect(first.receiptNumber, 42);
-      expect(second.receiptNumber, 43);
-      expect(remote.checkoutRequests.map((r) => r.receiptNumber), [42, 43]);
-      expect(localCounter, 43);
-    });
+        expect(first.receiptNumber, 42);
+        expect(second.receiptNumber, 43);
+        expect(remote.checkoutRequests.map((r) => r.receiptNumber), [42, 43]);
+        expect(localCounter, 43);
+      },
+    );
 
-    test('a retry after a lost response sends the SAME number, and it is used once', () async {
-      final repo = build();
-      await repo.addLine(add('coffee'));
+    test(
+      'a retry after a lost response sends the SAME number, and it is used once',
+      () async {
+        final repo = build();
+        await repo.addLine(add('coffee'));
 
-      remote.checkoutFailure = const NetworkFailure('response lost');
-      await expectLater(repo.recordPayment(payment), throwsA(isA<NetworkFailure>()));
-      remote.checkoutFailure = null;
-      final sale = await repo.recordPayment(payment);
+        remote.checkoutFailure = const NetworkFailure('response lost');
+        await expectLater(
+          repo.recordPayment(payment),
+          throwsA(isA<NetworkFailure>()),
+        );
+        remote.checkoutFailure = null;
+        final sale = await repo.recordPayment(payment);
 
-      expect(remote.checkoutRequests.map((r) => r.receiptNumber), [1, 1]);
-      expect(sale.receiptNumber, 1);
-      expect(remote.usedReceiptNumbers, {1});
-    });
+        expect(remote.checkoutRequests.map((r) => r.receiptNumber), [1, 1]);
+        expect(sale.receiptNumber, 1);
+        expect(remote.usedReceiptNumbers, {1});
+      },
+    );
 
     test('the reserved number survives an app restart mid-payment', () async {
       await build().addLine(add('coffee'));
       remote.checkoutFailure = const NetworkFailure('offline');
-      await expectLater(build().recordPayment(payment), throwsA(isA<NetworkFailure>()));
+      await expectLater(
+        build().recordPayment(payment),
+        throwsA(isA<NetworkFailure>()),
+      );
 
       remote.checkoutFailure = null;
       final sale = await build().recordPayment(payment);
@@ -702,8 +813,13 @@ void main() {
     test('a definitive rejection does not use up the number', () async {
       final repo = build();
       await repo.addLine(add('coffee'));
-      remote.checkoutFailure = const ConflictFailure('Prices or promos changed: 5.00');
-      await expectLater(repo.recordPayment(payment), throwsA(isA<ConflictFailure>()));
+      remote.checkoutFailure = const ConflictFailure(
+        'Prices or promos changed: 5.00',
+      );
+      await expectLater(
+        repo.recordPayment(payment),
+        throwsA(isA<ConflictFailure>()),
+      );
       expect(retiredNumbers, isEmpty);
 
       remote.checkoutFailure = null;
@@ -711,67 +827,91 @@ void main() {
       expect(sale.receiptNumber, 1, reason: 'still the first number, no gap');
     });
 
-    test('voiding after an unanswered payment attempt retires the number instead of reusing it', () async {
-      final repo = build();
-      await repo.addLine(add('coffee'));
-      remote.checkoutFailure = const NetworkFailure('no answer');
-      await expectLater(repo.recordPayment(payment), throwsA(isA<NetworkFailure>()));
+    test(
+      'voiding after an unanswered payment attempt retires the number instead of reusing it',
+      () async {
+        final repo = build();
+        await repo.addLine(add('coffee'));
+        remote.checkoutFailure = const NetworkFailure('no answer');
+        await expectLater(
+          repo.recordPayment(payment),
+          throwsA(isA<NetworkFailure>()),
+        );
 
-      await repo.voidCart();
-      expect(retiredNumbers, [1], reason: 'the server may have recorded number 1');
+        await repo.voidCart();
+        expect(retiredNumbers, [
+          1,
+        ], reason: 'the server may have recorded number 1');
 
-      remote.checkoutFailure = null;
-      await repo.addLine(add('coffee'));
-      final next = await repo.recordPayment(payment);
-      expect(next.receiptNumber, 2);
-    });
+        remote.checkoutFailure = null;
+        await repo.addLine(add('coffee'));
+        final next = await repo.recordPayment(payment);
+        expect(next.receiptNumber, 2);
+      },
+    );
 
-    test('voiding a cart that never attempted payment leaves the number available', () async {
-      final repo = build();
-      await repo.addLine(add('coffee'));
-      await repo.voidCart();
-      expect(retiredNumbers, isEmpty);
+    test(
+      'voiding a cart that never attempted payment leaves the number available',
+      () async {
+        final repo = build();
+        await repo.addLine(add('coffee'));
+        await repo.voidCart();
+        expect(retiredNumbers, isEmpty);
 
-      await repo.addLine(add('coffee'));
-      final sale = await repo.recordPayment(payment);
-      expect(sale.receiptNumber, 1);
-    });
+        await repo.addLine(add('coffee'));
+        final sale = await repo.recordPayment(payment);
+        expect(sale.receiptNumber, 1);
+      },
+    );
 
-    test('a number the server says is already taken is replaced from the server floor', () async {
-      // Another install of this terminal already used 1-5, which this device never saw.
-      remote.usedReceiptNumbers.addAll([1, 2, 3, 4, 5]);
-      remote.serverLastReceipt = 5;
-      final repo = build();
-      await repo.addLine(add('coffee'));
+    test(
+      'a number the server says is already taken is replaced from the server floor',
+      () async {
+        // Another install of this terminal already used 1-5, which this device never saw.
+        remote.usedReceiptNumbers.addAll([1, 2, 3, 4, 5]);
+        remote.serverLastReceipt = 5;
+        final repo = build();
+        await repo.addLine(add('coffee'));
 
-      await expectLater(repo.recordPayment(payment), throwsA(isA<ConflictFailure>()));
+        await expectLater(
+          repo.recordPayment(payment),
+          throwsA(isA<ConflictFailure>()),
+        );
 
-      final sale = await repo.recordPayment(payment);
-      expect(sale.receiptNumber, 6);
-    });
+        final sale = await repo.recordPayment(payment);
+        expect(sale.receiptNumber, 6);
+      },
+    );
 
-    test('numbering falls back to the local counter when the server floor is unreachable', () async {
-      localCounter = 9;
-      final repo = LocalFirstPosRepository(
-        remote: remote,
-        catalog: catalog,
-        loadItems: () async => items,
-        loadRules: () async => rules,
-        store: store,
-        identity: () async => null,
-        lastIssuedReceiptNumber: ({bool refresh = false}) async => localCounter,
-        recordReceiptNumber: record,
-      );
-      await repo.addLine(add('coffee'));
-      final sale = await repo.recordPayment(payment);
-      expect(sale.receiptNumber, 10);
-    });
+    test(
+      'numbering falls back to the local counter when the server floor is unreachable',
+      () async {
+        localCounter = 9;
+        final repo = LocalFirstPosRepository(
+          remote: remote,
+          catalog: catalog,
+          loadItems: () async => items,
+          loadRules: () async => rules,
+          store: store,
+          identity: () async => null,
+          lastIssuedReceiptNumber:
+              ({bool refresh = false}) async => localCounter,
+          recordReceiptNumber: record,
+        );
+        await repo.addLine(add('coffee'));
+        final sale = await repo.recordPayment(payment);
+        expect(sale.receiptNumber, 10);
+      },
+    );
   });
 
   test('an empty cart cannot be paid', () async {
     await expectLater(
       build().recordPayment(
-        const RecordPaymentRequest(method: PaymentMethod.cash, amountTendered: 1),
+        const RecordPaymentRequest(
+          method: PaymentMethod.cash,
+          amountTendered: 1,
+        ),
       ),
       throwsA(isA<ValidationFailure>()),
     );
@@ -787,20 +927,23 @@ void main() {
     expect(remote.calls, isEmpty);
   });
 
-  test('a claimed kiosk order is served from the server, not the local draft', () async {
-    final repo = build();
-    await repo.claimKioskOrder('kiosk-1');
-    expect(remote.calls, ['claim']);
+  test(
+    'a claimed kiosk order is served from the server, not the local draft',
+    () async {
+      final repo = build();
+      await repo.claimKioskOrder('kiosk-1');
+      expect(remote.calls, ['claim']);
 
-    remote.calls.clear();
-    await repo.getOrCreateOpenCart();
-    expect(remote.calls, ['getCart']);
+      remote.calls.clear();
+      await repo.getOrCreateOpenCart();
+      expect(remote.calls, ['getCart']);
 
-    // ...and it survives a restart, since the flag is persisted.
-    remote.calls.clear();
-    await build().getOrCreateOpenCart();
-    expect(remote.calls, ['getCart']);
-  });
+      // ...and it survives a restart, since the flag is persisted.
+      remote.calls.clear();
+      await build().getOrCreateOpenCart();
+      expect(remote.calls, ['getCart']);
+    },
+  );
 }
 
 extension on AddTransactionLineRequest {

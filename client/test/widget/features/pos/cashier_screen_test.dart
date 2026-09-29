@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:purch_client/core/errors/failure.dart';
 import 'package:purch_client/features/catalog/domain/category_models.dart';
 import 'package:purch_client/features/catalog/domain/item_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
@@ -9,7 +10,8 @@ import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 import 'package:purch_client/features/catalog/presentation/providers/catalog_providers.dart';
 import 'package:purch_client/core/routing/auth_gate.dart';
 import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
-import 'package:purch_client/features/pos/domain/pricing_engine.dart' show PromoCodeNotApplied;
+import 'package:purch_client/features/pos/domain/pricing_engine.dart'
+    show PromoCodeNotApplied;
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 import 'package:purch_client/features/pos/presentation/providers/pos_providers.dart';
 import 'package:purch_client/features/pos/presentation/screens/cashier_screen.dart';
@@ -412,6 +414,80 @@ void main() {
       expect(repository.cart.lines, isEmpty);
     });
 
+    testWidgets(
+      'removing a line that needs a manager PIN opens the dialog and retries with it',
+      (tester) async {
+        final repository = FakePosRepository(
+          initialCart: _cartWithOneLine,
+          removeLineFailure: const ValidationFailure(
+            'An Admin or Manager PIN is required to approve this.',
+            {
+              'approverPin': [
+                'An Admin or Manager PIN is required to approve this.',
+              ],
+            },
+          ),
+        );
+        await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.delete_outline));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Remove Bottled Water'), findsOneWidget);
+        expect(
+          find.text('An Admin or Manager PIN is required to approve this.'),
+          findsOneWidget,
+        );
+        final approveButton = find.widgetWithText(FilledButton, 'Approve');
+        expect(tester.widget<FilledButton>(approveButton).onPressed, isNull);
+
+        repository.removeLineFailure = null;
+        await tester.enterText(find.byType(TextField), '5678');
+        await tester.pumpAndSettle();
+        await tester.tap(approveButton);
+        await tester.pumpAndSettle();
+
+        expect(repository.lastApproverPin, '5678');
+        expect(find.text('Remove Bottled Water'), findsNothing);
+        expect(repository.cart.lines, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'a wrong PIN reopens the dialog with the servers reason, keeping the line',
+      (tester) async {
+        final repository = FakePosRepository(
+          initialCart: _cartWithOneLine,
+          removeLineFailure: const ValidationFailure(
+            "That PIN doesn't match a different active manager or admin.",
+            {
+              'approverPin': [
+                "That PIN doesn't match a different active manager or admin.",
+              ],
+            },
+          ),
+        );
+        await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.delete_outline));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), '0000');
+        await tester.tap(find.widgetWithText(FilledButton, 'Approve'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            "That PIN doesn't match a different active manager or admin.",
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Remove Bottled Water'), findsOneWidget);
+        expect(repository.cart.lines, isNotEmpty);
+      },
+    );
+
     testWidgets('voiding the cart after confirming starts a fresh one', (
       tester,
     ) async {
@@ -431,16 +507,17 @@ void main() {
       );
     });
 
-    testWidgets('a cashier cannot toggle the senior/PWD switch (manager/admin only)', (
-      tester,
-    ) async {
-      final repository = FakePosRepository(initialCart: _cartWithOneLine);
-      await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'a cashier cannot toggle the senior/PWD switch (manager/admin only)',
+      (tester) async {
+        final repository = FakePosRepository(initialCart: _cartWithOneLine);
+        await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+        await tester.pumpAndSettle();
 
-      final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
-      expect(tile.onChanged, isNull);
-    });
+        final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+        expect(tile.onChanged, isNull);
+      },
+    );
 
     testWidgets('toggling the senior/PWD switch applies the 20% discount', (
       tester,
@@ -461,63 +538,75 @@ void main() {
       expect(find.text('₱24.00'), findsOneWidget);
     });
 
-    testWidgets('shows what Senior/PWD and the promotions would each save, since they never combine', (
-      tester,
-    ) async {
-      final repository = FakePosRepository(
-        initialCart: _cartLike(seniorPwdSavings: 6, promoSavings: 3),
-      );
-      await tester.pumpWidget(
-        _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'shows what Senior/PWD and the promotions would each save, since they never combine',
+      (tester) async {
+        final repository = FakePosRepository(
+          initialCart: _cartLike(seniorPwdSavings: 6, promoSavings: 3),
+        );
+        await tester.pumpWidget(
+          _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.textContaining('Would save ₱6.00'), findsOneWidget);
-      expect(find.textContaining('promotions save ₱3.00'), findsOneWidget);
-      expect(find.textContaining('can\'t be combined'), findsOneWidget);
-    });
+        expect(find.textContaining('Would save ₱6.00'), findsOneWidget);
+        expect(find.textContaining('promotions save ₱3.00'), findsOneWidget);
+        expect(find.textContaining('can\'t be combined'), findsOneWidget);
+      },
+    );
 
-    testWidgets('with Senior/PWD on, a promo code is shown as not applied and why', (
-      tester,
-    ) async {
-      final repository = FakePosRepository(
-        initialCart: _cartLike(
-          seniorPwdApplied: true,
-          promoCode: 'SAVE10',
-          promoCodeNotApplied: PromoCodeNotApplied.suppressedBySeniorPwd,
-          discountAmount: 6,
-          totalAmount: 24,
-          seniorPwdSavings: 6,
-          promoSavings: 3,
-        ),
-      );
-      await tester.pumpWidget(
-        _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
-      );
-      await tester.pumpAndSettle();
+    testWidgets(
+      'with Senior/PWD on, a promo code is shown as not applied and why',
+      (tester) async {
+        final repository = FakePosRepository(
+          initialCart: _cartLike(
+            seniorPwdApplied: true,
+            promoCode: 'SAVE10',
+            promoCodeNotApplied: PromoCodeNotApplied.suppressedBySeniorPwd,
+            discountAmount: 6,
+            totalAmount: 24,
+            seniorPwdSavings: 6,
+            promoSavings: 3,
+          ),
+        );
+        await tester.pumpWidget(
+          _wrap(FakeCatalogRepository(), repository, role: StaffRole.manager),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.textContaining('Promo code "SAVE10" not applied'), findsOneWidget);
-      expect(find.textContaining('Senior/PWD discount'), findsWidgets);
-      expect(find.text('Senior/PWD (20%)'), findsOneWidget);
-      expect(find.textContaining('Applied instead of promotions'), findsOneWidget);
-    });
+        expect(
+          find.textContaining('Promo code "SAVE10" not applied'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Senior/PWD discount'), findsWidgets);
+        expect(find.text('Senior/PWD (20%)'), findsOneWidget);
+        expect(
+          find.textContaining('Applied instead of promotions'),
+          findsOneWidget,
+        );
+      },
+    );
 
-    testWidgets('an item promo that beats the promo code is named as the reason', (
-      tester,
-    ) async {
-      final repository = FakePosRepository(
-        initialCart: _cartLike(
-          promoCode: 'SAVE1',
-          promoCodeNotApplied: PromoCodeNotApplied.supersededByItemPromos,
-          promoSavings: 5,
-          seniorPwdSavings: 6,
-        ),
-      );
-      await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'an item promo that beats the promo code is named as the reason',
+      (tester) async {
+        final repository = FakePosRepository(
+          initialCart: _cartLike(
+            promoCode: 'SAVE1',
+            promoCodeNotApplied: PromoCodeNotApplied.supersededByItemPromos,
+            promoSavings: 5,
+            seniorPwdSavings: 6,
+          ),
+        );
+        await tester.pumpWidget(_wrap(FakeCatalogRepository(), repository));
+        await tester.pumpAndSettle();
 
-      expect(find.textContaining('item promotions save more'), findsOneWidget);
-    });
+        expect(
+          find.textContaining('item promotions save more'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('applying a promo code shows it as applied with a Remove '
         'action', (tester) async {

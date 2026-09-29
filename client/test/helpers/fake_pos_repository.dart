@@ -32,14 +32,18 @@ class FakePosRepository implements PosRepository {
 
   final Object? addLineFailure;
   final Object? updateLineFailure;
-  final Object? removeLineFailure;
-  final Object? voidCartFailure;
+  // Mutable so a test can clear it mid-flow to simulate a retry succeeding after a manager PIN.
+  Object? removeLineFailure;
+  Object? voidCartFailure;
   final Object? applySeniorPwdDiscountFailure;
   final Object? applyPromoCodeFailure;
   final Object? recordPaymentFailure;
 
   Transaction cart;
   int voidCallCount = 0;
+
+  /// The approverPin the last void/remove/update call was made with, for tests of the PIN retry flow.
+  String? lastApproverPin;
   int nextReceiptNumber = 1;
   RecordPaymentRequest? lastRecordPaymentRequest;
   AddTransactionLineRequest? lastAddLineRequest;
@@ -50,7 +54,9 @@ class FakePosRepository implements PosRepository {
 
   @override
   Future<Transaction> checkout(CheckoutRequest request) =>
-      throw UnimplementedError('FakePosRepository does not model one-call checkout');
+      throw UnimplementedError(
+        'FakePosRepository does not model one-call checkout',
+      );
 
   @override
   Future<Transaction> getOrCreateOpenCart() async => cart;
@@ -143,7 +149,8 @@ class FakePosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> removeLine(String lineId) async {
+  Future<Transaction> removeLine(String lineId, {String? approverPin}) async {
+    lastApproverPin = approverPin;
     if (removeLineFailure != null) {
       throw removeLineFailure!;
     }
@@ -153,8 +160,9 @@ class FakePosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> voidCart() async {
+  Future<Transaction> voidCart({String? approverPin}) async {
     voidCallCount++;
+    lastApproverPin = approverPin;
     if (voidCartFailure != null) {
       throw voidCartFailure!;
     }
@@ -250,8 +258,11 @@ class FakePosRepository implements PosRepository {
   @override
   Future<Transaction> claimKioskOrder(String transactionId) async {
     lastClaimedKioskOrderId = transactionId;
-    final claimed = pendingKioskOrders.firstWhere((order) => order.id == transactionId);
-    pendingKioskOrders = pendingKioskOrders.where((order) => order.id != transactionId).toList();
+    final claimed = pendingKioskOrders.firstWhere(
+      (order) => order.id == transactionId,
+    );
+    pendingKioskOrders =
+        pendingKioskOrders.where((order) => order.id != transactionId).toList();
     cart = claimed;
     return cart;
   }

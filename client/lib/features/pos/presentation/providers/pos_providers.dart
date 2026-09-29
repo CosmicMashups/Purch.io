@@ -84,9 +84,11 @@ PosRepository posRepository(Ref ref) {
     drainQueue: () => ref.read(saleSyncCoordinatorProvider).drain(),
     catalog: ref.watch(catalogRepositoryProvider),
     loadItems: () => ref.read(itemListProvider.future),
-    modifierGroupsFor: (itemId) => ref.read(itemModifierGroupListProvider(itemId).future),
+    modifierGroupsFor:
+        (itemId) => ref.read(itemModifierGroupListProvider(itemId).future),
     currentStaffId: () async {
-      final token = await ref.read(secureTokenStorageProvider).readAccessToken();
+      final token =
+          await ref.read(secureTokenStorageProvider).readAccessToken();
       return token == null ? null : staffIdFromJwt(token);
     },
     refreshCatalog: () async {
@@ -123,7 +125,8 @@ PosRepository posRepository(Ref ref) {
           serverFloor ??= 0;
         }
       }
-      final local = (await identityDao.getIdentity())?.lastKnownReceiptNumber ?? 0;
+      final local =
+          (await identityDao.getIdentity())?.lastKnownReceiptNumber ?? 0;
       return local > serverFloor! ? local : serverFloor!;
     },
     recordReceiptNumber: (number) async {
@@ -163,16 +166,21 @@ class CartNotifier extends _$CartNotifier {
     UpdateTransactionLineRequest request,
   ) => _mutate((repository) => repository.updateLine(lineId, request));
 
-  Future<bool> removeLine(String lineId) =>
-      _mutate((repository) => repository.removeLine(lineId));
+  Future<bool> removeLine(String lineId, {String? approverPin}) => _mutate(
+    (repository) => repository.removeLine(lineId, approverPin: approverPin),
+  );
 
   /// Voids the current cart, then starts a fresh one — the caller never sees
   /// the voided transaction itself, only the empty cart that replaces it.
-  Future<bool> voidCart() async {
+  /// [approverPin] is only ever required when the cart holds something — see
+  /// ApproverAuthorizationService.
+  Future<bool> voidCart({String? approverPin}) async {
     final repository = ref.read(posRepositoryProvider);
 
     state = const AsyncLoading();
-    final voided = await AsyncValue.guard(() => repository.voidCart());
+    final voided = await AsyncValue.guard(
+      () => repository.voidCart(approverPin: approverPin),
+    );
     if (voided.hasError) {
       state = voided;
       return false;
@@ -200,7 +208,8 @@ class CartNotifier extends _$CartNotifier {
   /// Sets the cart's fulfillment choice (e.g. "Dine In"/"Take Out") — shown
   /// to restaurant/cafe tenants only, but the underlying field is generic.
   Future<bool> setOrderType(String orderType) => _mutate(
-    (repository) => repository.setOrderType(SetOrderTypeRequest(orderType: orderType)),
+    (repository) =>
+        repository.setOrderType(SetOrderTypeRequest(orderType: orderType)),
   );
 
   /// Replaces the current cart with a pending kiosk order the cashier just

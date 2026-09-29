@@ -104,7 +104,8 @@ class LocalFirstPosRepository implements PosRepository {
 
   /// Where an item's modifier groups come from. The app passes its shared cache, so an add does not fetch what
   /// the screen just fetched; without it the catalog repository is asked directly.
-  final Future<List<ModifierGroup>> Function(String itemId)? _modifierGroupsLoader;
+  final Future<List<ModifierGroup>> Function(String itemId)?
+  _modifierGroupsLoader;
 
   /// Who is signed in right now, stamped on offline sales so the server can credit and authorise
   /// them correctly when they sync later under a different login.
@@ -248,13 +249,13 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> removeLine(String lineId) =>
-      _serial(() => _removeLine(lineId));
+  Future<Transaction> removeLine(String lineId, {String? approverPin}) =>
+      _serial(() => _removeLine(lineId, approverPin: approverPin));
 
-  Future<Transaction> _removeLine(String lineId) async {
+  Future<Transaction> _removeLine(String lineId, {String? approverPin}) async {
     final cart = await _load();
     if (cart.serverBacked) {
-      return _remote.removeLine(lineId);
+      return _remote.removeLine(lineId, approverPin: approverPin);
     }
     return _save(
       cart.copyWith(lines: cart.lines.where((l) => l.id != lineId).toList()),
@@ -262,12 +263,13 @@ class LocalFirstPosRepository implements PosRepository {
   }
 
   @override
-  Future<Transaction> voidCart() => _serial(_voidCart);
+  Future<Transaction> voidCart({String? approverPin}) =>
+      _serial(() => _voidCart(approverPin: approverPin));
 
-  Future<Transaction> _voidCart() async {
+  Future<Transaction> _voidCart({String? approverPin}) async {
     final cart = await _load();
     if (cart.serverBacked) {
-      final voided = await _remote.voidCart();
+      final voided = await _remote.voidCart(approverPin: approverPin);
       await _reset();
       return voided;
     }
@@ -685,7 +687,10 @@ class LocalFirstPosRepository implements PosRepository {
       variantAttributes = variant.attributes;
     }
 
-    final modifiers = await _resolveModifiers(item, request.selectedModifierIds);
+    final modifiers = await _resolveModifiers(
+      item,
+      request.selectedModifierIds,
+    );
     unitPrice += modifiers.fold<double>(0, (sum, m) => sum + m.priceDelta);
 
     return LocalCartLine(
@@ -736,7 +741,8 @@ class LocalFirstPosRepository implements PosRepository {
         if (selected == null) {
           throw NotFoundFailure('Item ${pick.selectedItemId} was not found.');
         }
-        if (!selected.isActive || selected.categoryId != slot.componentCategoryId) {
+        if (!selected.isActive ||
+            selected.categoryId != slot.componentCategoryId) {
           throw _invalid(
             '"${selected.name}" isn\'t a valid choice for "${slot.slotLabel}".',
           );
@@ -752,10 +758,16 @@ class LocalFirstPosRepository implements PosRepository {
       }
     }
 
-    final modifiers = await _resolveModifiers(item, request.selectedModifierIds);
+    final modifiers = await _resolveModifiers(
+      item,
+      request.selectedModifierIds,
+    );
     final unitPrice =
         item.basePrice +
-        slots.fold<double>(0, (sum, s) => sum + (s.substitutionUpchargeAmount ?? 0)) +
+        slots.fold<double>(
+          0,
+          (sum, s) => sum + (s.substitutionUpchargeAmount ?? 0),
+        ) +
         modifiers.fold<double>(0, (sum, m) => sum + m.priceDelta);
 
     return LocalCartLine(
@@ -794,7 +806,8 @@ class LocalFirstPosRepository implements PosRepository {
     }
 
     final recognized = {
-      for (final group in groups) for (final m in group.modifiers) m.id,
+      for (final group in groups)
+        for (final m in group.modifiers) m.id,
     };
     if (selected.any((id) => !recognized.contains(id))) {
       throw _invalid(
@@ -805,7 +818,8 @@ class LocalFirstPosRepository implements PosRepository {
 
     final result = <TransactionLineModifierSelection>[];
     for (final group in groups) {
-      final picked = group.modifiers.where((m) => selected.contains(m.id)).toList();
+      final picked =
+          group.modifiers.where((m) => selected.contains(m.id)).toList();
       if (group.isRequired && picked.isEmpty) {
         throw _invalid(
           'Choose an option for "${group.name}".',
@@ -926,9 +940,10 @@ class LocalFirstPosRepository implements PosRepository {
     TransactionStatus status = TransactionStatus.open,
   }) async {
     final identity = await _identity();
-    final rules = cart.lines.isEmpty && cart.promoCode == null
-        ? PricingRules.empty
-        : await _currentRules();
+    final rules =
+        cart.lines.isEmpty && cart.promoCode == null
+            ? PricingRules.empty
+            : await _currentRules();
     final priced = PricingEngine.price(
       lines: [
         for (final line in cart.lines)
@@ -995,7 +1010,8 @@ class LocalFirstPosRepository implements PosRepository {
     final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = [for (final b in bytes) b.toRadixString(16).padLeft(2, '0')].join();
+    final hex =
+        [for (final b in bytes) b.toRadixString(16).padLeft(2, '0')].join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
