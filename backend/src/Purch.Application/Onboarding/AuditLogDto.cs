@@ -8,4 +8,5 @@ public sealed record AuditLogDto(
     AuditActionType ActionType,
     string TargetEntityType,
     Guid TargetEntityId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? ApprovedByUserId);

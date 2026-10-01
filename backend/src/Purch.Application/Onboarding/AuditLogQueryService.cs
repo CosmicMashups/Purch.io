@@ -18,6 +18,6 @@ public sealed class AuditLogQueryService(
 
     private static AuditLogDto ToDto(AuditLog log)
     {
-        return new(log.Id, log.ActorUserId, log.ActionType, log.TargetEntityType, log.TargetEntityId, log.CreatedAt);
+        return new(log.Id, log.ActorUserId, log.ActionType, log.TargetEntityType, log.TargetEntityId, log.CreatedAt, log.ApprovedByUserId);
     }
 }

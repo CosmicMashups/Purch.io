@@ -173,6 +173,11 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var updated = await withManagerPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
         Assert.Equal(2m, updated!.Lines.Single().Quantity);
         _ = item;
+
+        var manager = (await adminClient.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions))!.Single(s => s.Name == "Mae Manager");
+        var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
+        var entry = Assert.Single(auditLogs!, log => log.TargetEntityId == lineId);
+        Assert.Equal(manager.Id, entry.ApprovedByUserId);
     }
 
     [Fact]
@@ -187,6 +192,10 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(3m, (await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines.Single().Quantity);
+
+        // The admin edited their own kiosk order — no approval happened, so nothing unusual to log.
+        var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
+        Assert.Empty(auditLogs!);
     }
 
     [Fact]
@@ -205,6 +214,11 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var withPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}?approverPin=5678");
         Assert.Equal(HttpStatusCode.OK, withPin.StatusCode);
         Assert.Empty((await withPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines);
+
+        var manager = (await adminClient.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions))!.Single(s => s.Name == "Mae Manager");
+        var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
+        var entry = Assert.Single(auditLogs!, log => log.TargetEntityId == lineId);
+        Assert.Equal(manager.Id, entry.ApprovedByUserId);
     }
 
     [Fact]

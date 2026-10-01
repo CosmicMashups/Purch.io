@@ -21,4 +21,14 @@ public enum AuditActionType
 
     /// <summary>A customer's personal data was anonymized/erased under the Data Privacy Act (RA 10173) / GDPR.</summary>
     CustomerAnonymized,
+
+    /// <summary>An exchange (return plus replacement) was recorded against a completed sale — see
+    /// AdjustmentService. The original sale's own audit trail is untouched; this is the adjustment's own entry.</summary>
+    Exchange,
+
+    /// <summary>A line was changed or removed on a claimed kiosk order the kitchen hadn't started yet, by a
+    /// Cashier or Warehouse staff member who needed a different Admin/Manager's PIN to do it — see
+    /// TransactionService.RequireKitchenEditAllowedAsync. Not recorded for the free-edit case (an
+    /// Admin/Manager editing it themselves needs no approval, so there's nothing unusual to log).</summary>
+    KitchenOrderLineEdited,
 }

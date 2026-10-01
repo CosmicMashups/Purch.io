@@ -574,10 +574,21 @@ public sealed class TransactionService(
         var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
             ?? throw new NotFoundException("Transaction", line.TransactionId);
 
-        await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
+        var approver = await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
 
+        var oldQuantity = line.Quantity;
         line.Quantity = request.Quantity;
         line.LineTotal = line.Quantity * line.UnitPrice;
+
+        if (approver is not null)
+        {
+            AuditKitchenOrderLineEdit(
+                cart,
+                line,
+                before: new { itemId = line.ItemId, quantity = oldQuantity },
+                after: new { itemId = line.ItemId, quantity = request.Quantity, kind = "quantity changed" },
+                approver);
+        }
 
         // Flush the quantity/LineTotal change above before recalculating — its
         // line query would otherwise still see the old quantity.
@@ -594,7 +605,17 @@ public sealed class TransactionService(
         var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
             ?? throw new NotFoundException("Transaction", line.TransactionId);
 
-        await RequireKitchenEditAllowedAsync(cart, approverPin, cancellationToken);
+        var approver = await RequireKitchenEditAllowedAsync(cart, approverPin, cancellationToken);
+
+        if (approver is not null)
+        {
+            AuditKitchenOrderLineEdit(
+                cart,
+                line,
+                before: new { itemId = line.ItemId, quantity = line.Quantity },
+                after: new { itemId = line.ItemId, quantity = line.Quantity, kind = "line removed" },
+                approver);
+        }
 
         transactionRepository.RemoveLine(line);
 
@@ -1216,12 +1237,16 @@ public sealed class TransactionService(
     ///    already that approver.
     ///  - Preparing, Ready or PickedUp: refused outright, no PIN changes that — the item is already being
     ///    made or is done, so the fix is a refund or exchange, not editing the order kitchen already has.
+    ///
+    /// Returns the approver who signed off, so the caller can audit-log the edit — or null when no
+    /// approval was needed at all (an ordinary cart, or an Admin/Manager editing their own kitchen order),
+    /// in which case there's nothing unusual to log.
     /// </summary>
-    private async Task RequireKitchenEditAllowedAsync(Transaction cart, string? approverPin, CancellationToken cancellationToken)
+    private async Task<User?> RequireKitchenEditAllowedAsync(Transaction cart, string? approverPin, CancellationToken cancellationToken)
     {
         if (!cart.OriginatedFromKiosk)
         {
-            return;
+            return null;
         }
 
         if (cart.KitchenStatus != KitchenStatus.Queued)
@@ -1233,10 +1258,35 @@ public sealed class TransactionService(
         var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
         if (caller is not null && ApproverRoles.Contains(caller.Role))
         {
-            return;
+            return null;
         }
 
-        _ = await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
+        return await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
+    }
+
+    /// <summary>Records a kitchen-order line edit that needed a different Admin/Manager's approval — see
+    /// RequireKitchenEditAllowedAsync. Call before applying the change, which the entry's "before" state
+    /// captures; "what" changed is the caller's own description of the line and the edit.</summary>
+    private void AuditKitchenOrderLineEdit(Transaction cart, TransactionLine line, object before, object after, User approver)
+    {
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.KitchenOrderLineEdited,
+            TargetEntityType = nameof(TransactionLine),
+            TargetEntityId = line.Id,
+            BeforeStateJson = JsonSerializer.Serialize(before),
+            AfterStateJson = JsonSerializer.Serialize(new
+            {
+                transactionId = cart.Id,
+                kioskPrepNumber = cart.KioskPrepNumber,
+                change = after,
+                approvedByUserId = approver.Id,
+                approvedByRole = approver.Role.ToString(),
+            }),
+            ApprovedByUserId = approver.Id,
+        });
     }
 
     private async Task<TransactionLine> RequireOwnLineAsync(Guid lineId, CancellationToken cancellationToken)
