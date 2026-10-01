@@ -66,6 +66,16 @@ public static class PosEndpoints
             Results.Ok(await transactionService.RefundTransactionAsync(transactionId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        // Exchange: reachable by any POS role (a cashier must be able to ask), always needs a manager/
+        // admin's PIN inside the service itself — see ApproverAuthorizationService.
+        _ = app.MapPost("/transactions/{transactionId:guid}/exchange", async (
+            Guid transactionId,
+            CreateExchangeRequest request,
+            IAdjustmentService adjustmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await adjustmentService.CreateExchangeAsync(transactionId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,
             ITransactionService transactionService,

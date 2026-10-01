@@ -65,6 +65,12 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<CartBatchReceipt> CartBatchReceipts => Set<CartBatchReceipt>();
 
+    public DbSet<Adjustment> Adjustments => Set<Adjustment>();
+
+    public DbSet<AdjustmentReturnLine> AdjustmentReturnLines => Set<AdjustmentReturnLine>();
+
+    public DbSet<AdjustmentReplacementLine> AdjustmentReplacementLines => Set<AdjustmentReplacementLine>();
+
     public DbSet<TransactionLineComboSelection> TransactionLineComboSelections => Set<TransactionLineComboSelection>();
 
     public DbSet<TransactionLineModifierSelection> TransactionLineModifierSelections => Set<TransactionLineModifierSelection>();
