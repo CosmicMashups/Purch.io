@@ -1,0 +1,32 @@
+flowchart LR
+    PURCH_CORE["Purch.io Backend Engine<br/>(.NET 9 Minimal API)"]
+
+    subgraph FINTECH["Fintech & Payment Aggregators"]
+        XENDIT["Xendit Payment Gateway<br/>- Dynamic QR Ph generation<br/>- GCash / Maya digital wallet acquiring<br/>- Inbound Webhook handler (/webhooks/xendit)<br/>- Protocol: HTTPS REST / Webhook"]
+        DRAGONPAY["Dragonpay Switch API<br/>- Over-the-counter utility bill payments<br/>- Prepaid mobile load top-up (Globe/Smart/DITO)<br/>- Protocol: HTTPS REST / SOAP"]
+    end
+
+    subgraph HARDWARE_INTEG["In-Store Peripherals (Web & Native)"]
+        ESCPOS["ESC/POS Thermal Receipt Printers<br/>- Protocol: Direct TCP/IP socket (9100) or USB spooler<br/>- Custom BIR receipt layout with QR Ph payload"]
+        BARCODE["Barcode Scanners<br/>- Protocol: HID Keyboard emulation or Web Serial API"]
+        SCALES["Weight Scales (Tingi / Fractional)<br/>- Protocol: Web Serial API (NCI / Toledo continuous data stream)"]
+        CFD_SCREEN["Customer Facing Display (CFD)<br/>- Protocol: Dual-head OS window or Local WebSocket mirror"]
+        CASH_DRAWER["Cash Drawer Trigger<br/>- Protocol: RJ11 solenoid pulse via receipt printer"]
+    end
+
+    subgraph CLOUD_INFRA["Cloud Hosting & Infrastructure"]
+        RENDER["Render.com<br/>- Containerized ASP.NET Core API deployment<br/>- Render Blueprint configuration (render.yaml)"]
+        SUPABASE["Supabase / Managed PostgreSQL<br/>- PostgreSQL 16+ database hosting<br/>- Automated daily WAL backups"]
+    end
+
+    PURCH_CORE <-->|REST API & Webhooks| XENDIT
+    PURCH_CORE <-->|REST API & Aggregator Switch| DRAGONPAY
+
+    PURCH_CORE -->|Database Connection Pooling Npgsql| SUPABASE
+    RENDER -.->|Hosts Container| PURCH_CORE
+
+    PURCH_CORE -.->|Delivers formatted payload| ESCPOS
+    ESCPOS -->|Triggers RJ11 Kickout Pulse| CASH_DRAWER
+    BARCODE -->|Input character stream| PURCH_CORE
+    SCALES -->|Weight reading stream| PURCH_CORE
+    PURCH_CORE -->|Cart state updates| CFD_SCREEN

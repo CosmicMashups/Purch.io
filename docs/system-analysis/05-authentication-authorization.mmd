@@ -1,0 +1,65 @@
+sequenceDiagram
+    autonumber
+    actor Staff as Cashier / Manager
+    participant UI as POS Client / Web
+    participant AuthEP as POST /auth/login
+    participant LoginSvc as LoginService
+    participant Hasher as BCryptPinHasher
+    participant DB as PurchDbContext
+    participant JWT as JwtTokenService
+
+    Note over Staff,DB: 1. Counter Staff Login (Device Code + PIN)
+    Staff->>UI: Enter Pairing Code & 4-6 digit numeric PIN
+    UI->>AuthEP: POST /auth/login { devicePairingCode, pin }
+    AuthEP->>LoginSvc: LoginAsync(request)
+    LoginSvc->>DB: Query Device by PairingCode
+    alt Device Not Found / Inactive
+        LoginSvc-->>AuthEP: LoginResult.InvalidDevice
+        AuthEP-->>UI: 401 Unauthorized (Generic Credential Error)
+    else Device Found
+        LoginSvc->>DB: Query Users where TenantId == Device.TenantId and IsActive
+        LoginSvc->>Hasher: Verify(pin, user.PinHash)
+        alt Pin Mismatch
+            LoginSvc-->>AuthEP: LoginResult.InvalidPin
+            AuthEP-->>UI: 401 Unauthorized (Generic Credential Error)
+        else Pin Matches
+            LoginSvc->>JWT: GenerateAccessToken(user, device)
+            LoginSvc->>JWT: GenerateRefreshToken(user, device)
+            LoginSvc->>DB: Insert RefreshToken entity (SHA-256 hash)
+            LoginSvc-->>AuthEP: LoginResult.Success(AccessToken, RefreshToken)
+            AuthEP-->>UI: 200 OK { accessToken, refreshToken }
+            UI->>UI: Store AccessToken in Memory & RefreshToken in SecureStorage
+        end
+    end
+
+    Note over Staff,DB: 2. Web Admin Login (Email + Password)
+    actor Admin as Business Admin
+    Admin->>UI: Enter Email & Password
+    UI->>AuthEP: POST /auth/admin-login { email, password }
+    AuthEP->>LoginSvc: AdminLoginAsync(request)
+    LoginSvc->>DB: Query User by Email where Role == Admin and IsActive
+    alt Admin Not Found or Invalid Password
+        LoginSvc-->>AuthEP: LoginResult.InvalidAdminCredentials
+        AuthEP-->>UI: 401 Unauthorized
+    else Admin Validated
+        LoginSvc->>JWT: GenerateAccessToken(adminUser, device=null)
+        LoginSvc->>JWT: GenerateRefreshToken(adminUser, device=null)
+        LoginSvc->>DB: Insert RefreshToken entity
+        LoginSvc-->>AuthEP: LoginResult.Success(AccessToken, RefreshToken)
+        AuthEP-->>UI: 200 OK { accessToken, refreshToken }
+    end
+
+    Note over Staff,DB: 3. Token Refresh Flow (Single-Flight Rotation)
+    UI->>AuthEP: POST /auth/refresh { refreshToken }
+    AuthEP->>LoginSvc: RefreshAsync(rawRefreshToken)
+    LoginSvc->>DB: Query RefreshToken by SHA-256(rawRefreshToken)
+    alt Token Expired, Revoked, or Not Found
+        LoginSvc-->>AuthEP: TokenRefreshResult.InvalidToken
+        AuthEP-->>UI: 401 Unauthorized -> Force Logout
+    else Token Active
+        LoginSvc->>DB: Set existing RefreshToken.RevokedAt = UtcNow
+        LoginSvc->>JWT: Issue new AccessToken & new RefreshToken
+        LoginSvc->>DB: Insert new RefreshToken
+        LoginSvc-->>AuthEP: TokenRefreshResult.Success
+        AuthEP-->>UI: 200 OK { accessToken, refreshToken }
+    end

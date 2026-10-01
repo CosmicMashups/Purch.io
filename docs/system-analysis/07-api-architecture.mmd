@@ -1,0 +1,71 @@
+sequenceDiagram
+    autonumber
+    actor Cashier as Cashier Terminal (POS)
+    participant POS_EP as /transactions/checkout
+    participant TxSvc as TransactionService
+    participant Pricing as Pricing & Promo Engine
+    participant RecipeSvc as ItemRecipeService
+    participant StockSvc as ItemStockService
+    participant SeqSvc as ReceiptSequence
+    participant CreditSvc as CustomerCreditLedgerService
+    participant DB as PurchDbContext
+    participant Audit as AuditLog
+
+    Cashier->>POS_EP: POST /transactions/checkout (CheckoutRequest)
+    Note over Cashier,POS_EP: Contains SaleId (idempotent), Lines, Customizations, Payments, Senior/PWD flag
+
+    POS_EP->>TxSvc: CheckoutAsync(request)
+    
+    alt Idempotency Check: SaleId already exists in DB?
+        TxSvc->>DB: Query Transaction where ClientSaleId == request.SaleId
+        TxSvc-->>POS_EP: Return existing TransactionDto (Idempotent replay, no double charge)
+    end
+
+    TxSvc->>Pricing: Compute Line Totals & Match Automatic Promos (BOGO, Combos, Discounts)
+    Pricing-->>TxSvc: Line totals + ItemPromoDiscountAmount
+
+    opt Senior / PWD Discount Applied
+        TxSvc->>Pricing: Apply BIR 20% discount + VAT Exemption pass
+    end
+
+    opt Promo Code Applied
+        TxSvc->>DB: Validate PromoCode entity (active, not expired)
+        TxSvc->>Pricing: Deduct code discount
+    end
+
+    TxSvc->>SeqSvc: Increment & Allocate Next ReceiptNumber for (BranchId, DeviceId)
+    SeqSvc-->>TxSvc: receiptNumber = LastIssuedNumber + 1
+
+    TxSvc->>DB: Insert Transaction entity (Status = Completed, ReceiptNumber)
+    TxSvc->>DB: Insert TransactionLine rows with modifier & combo selections
+
+    loop For each Payment in request.Payments
+        TxSvc->>DB: Insert Payment record (Method, Amount, AmountTendered, ChangeGiven)
+        opt Method == Utang / Credit
+            TxSvc->>CreditSvc: Verify Balance + Amount <= CreditLimit
+            TxSvc->>CreditSvc: Append CreditTransaction (Type = Charge, RunningBalance += Amount)
+        end
+    end
+
+    alt Tenant has UseSeparateInventoryTracking == true
+        loop For each line item
+            TxSvc->>RecipeSvc: Query ItemRecipeLines where ItemId == line.ItemId
+            loop For each recipe ingredient
+                TxSvc->>StockSvc: Decrement InventoryItem.StockOnHand by (QuantityPerOrder * line.Quantity)
+                TxSvc->>DB: Insert InventoryMovement (MovementType.Consumption, System)
+            end
+        end
+    else Direct Item / Variant Tracking
+        loop For each line item
+            opt Has Variant
+                TxSvc->>StockSvc: Decrement ItemVariant.StockOnHand
+            end
+            TxSvc->>DB: Insert InventoryMovement (MovementType.Sale, System)
+        end
+    end
+
+    TxSvc->>Audit: Record AuditLog (Action = TransactionCompleted, StaffId)
+    TxSvc->>DB: SaveChangesAsync() (Committed in single database transaction)
+
+    TxSvc-->>POS_EP: TransactionDto (Status: Completed, ReceiptNumber, ChangeGiven)
+    POS_EP-->>Cashier: 200 OK + Thermal Receipt Render Payload

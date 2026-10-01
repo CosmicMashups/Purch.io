@@ -1,0 +1,77 @@
+flowchart TB
+    subgraph PRESENTATION["Presentation Tier (Client Applications)"]
+        subgraph FLUTTER["Flutter Native Client (client/)"]
+            F_ROUTER["GoRouter & AuthGate<br/>- Splash / Login / CFD<br/>- Landscape Staff Shell (/home, /cashier, /inventory, /business)<br/>- Portrait Kiosk Flow (/kiosk)<br/>- Kitchen Display (/kitchen-display)<br/>- Order Board (/order-board)"]
+            F_STATE["Riverpod Providers & Notifiers<br/>- SessionScope & AuthState<br/>- CartNotifier & CheckoutState<br/>- ThemeNotifier & TenantBranding<br/>- NetworkConnectivityMonitor"]
+            F_OFFLINE["Drift Local Database (SQLite)<br/>- Local Cached Tables<br/>- PendingSyncQueue<br/>- SyncCoordinator & Backoff Timer"]
+        end
+
+        subgraph REACT["React 19 Web Client (web/)"]
+            W_ROUTER["React Router 7<br/>- RequireAuth / RequireRole Guards<br/>- RequireTab (sell, inventory, business)<br/>- RequireDevice (Kiosk, KitchenDisplay, OrderBoard)"]
+            W_STATE["TanStack Query 5 & Zustand<br/>- Server Queries & Cache Invalidation<br/>- CartStore & Modals State<br/>- ThemeContext (tokens.json)"]
+            W_API["Axios API Client<br/>- Bearer Token Interceptor<br/>- Single-flight Refresh Handler<br/>- Global Failure Mapping"]
+        end
+    end
+
+    subgraph API_TIER["Backend API Tier (Purch.Api)"]
+        MIDDLEWARE["Cross-Cutting Middleware<br/>- ExceptionHandlingMiddleware<br/>- DeploymentModeFilter<br/>- RateLimiter (AuthSensitive, Refresh, ShiftClose)"]
+        
+        subgraph ENDPOINTS["Endpoint Route Groups"]
+            EP_AUTH["AuthEndpoints<br/>POST /auth/login<br/>POST /auth/admin-login<br/>POST /auth/refresh<br/>POST /auth/logout<br/>POST /auth/password-reset/*"]
+            EP_ONBOARD["OnboardingEndpoints<br/>POST /onboarding/bootstrap<br/>GET/POST/PUT /staff<br/>GET/POST/PUT /branches<br/>GET/POST/PUT /devices<br/>GET/PUT /tenant/settings<br/>GET /audit-logs"]
+            EP_CATALOG["CatalogEndpoints<br/>GET/POST/PUT /categories<br/>GET/POST/PUT /items<br/>GET/POST /modifier-groups<br/>PUT tingi-config, batches, recipe, etc."]
+            EP_PROMOS["PromoCodeEndpoints<br/>GET/POST /promo-codes<br/>GET/POST/PUT /promos/bogo<br/>GET/POST/PUT /promos/combos<br/>GET/POST/PUT /promos/item-discounts"]
+            EP_POS["PosEndpoints<br/>GET /transactions/cart<br/>POST/PUT/DELETE /transactions/cart/lines<br/>POST /transactions/checkout<br/>POST /cart/void, refund, payments<br/>PUT senior-pwd-discount, promo-code"]
+            EP_SHIFTS["ShiftEndpoints<br/>GET /shifts/current<br/>POST /shifts/open<br/>POST /shifts/close<br/>POST /shifts/manual-drawer-open"]
+            EP_INV["InventoryEndpoints<br/>GET /inventory/dashboard, movements<br/>GET/POST /purchase-orders, receive<br/>GET/POST /branch-transfers, transit, receive<br/>GET/POST/PUT /inventory-items, count"]
+            EP_CREDIT["CreditLedgerEndpoints<br/>GET/POST /credit-ledger<br/>POST /credit-ledger/{id}/payments<br/>GET reminders, PUT limit, POST anonymize"]
+            EP_REP["ReportingEndpoints<br/>POST /reports/x-reading, z-reading<br/>GET /reports/sales-dashboard<br/>GET CSV exports, staff, department"]
+            EP_KIOSK["Kiosk & Display Endpoints<br/>POST /kiosk/session, cart/*, submit<br/>POST /order-board/session, pending<br/>POST /kitchen-display/session, status"]
+            EP_SYNC["SyncEndpoints<br/>POST /sync<br/>GET /sync/flagged<br/>POST /sync/flagged/{id}/acknowledge"]
+            EP_UPLOAD["UploadEndpoints<br/>POST /uploads/image"]
+        end
+    end
+
+    subgraph APP_TIER["Application Logic Tier (Purch.Application)"]
+        subgraph SERVICES["Domain & CQRS Application Services"]
+            S_AUTH["LoginService, TokenRefreshService, PasswordResetService"]
+            S_ONBOARD["BootstrapTenantService, BranchService, StaffService, DeviceManagementService, TenantSettingsService"]
+            S_CATALOG["ItemService, CategoryService, ModifierGroupService, ItemVariantService, BundlePromoRuleService"]
+            S_PROMO["BogoPromoRuleService, ComboPromoRuleService, ItemDiscountPromoRuleService, PromoCodeService"]
+            S_TX["TransactionService (Cart Engine, Multi-Vertical Pricing, Checkout, Kiosk Claim, Kitchen Status)"]
+            S_SHIFT["ShiftService (Cash Drawer Policy, Shift Balancing, Variance Logging)"]
+            S_INV["InventoryItemService, ItemRecipeService, InventoryMovementService, PurchaseOrderService, BranchTransferService"]
+            S_CREDIT["CustomerCreditLedgerService (Limits, Aging Reminders, Utang Collections, Data Privacy)"]
+            S_REP["SalesDashboardService, BirReadingService, StaffPerformanceService, DepartmentSalesReportService, TransactionExportService"]
+            S_SYNC["SyncService (Idempotency Verification, Timestamp Comparison, Auto-Flagging)"]
+        end
+
+        subgraph COMMON["Cross-Cutting Application Infra"]
+            GUARDS["BranchScopeGuard, ReportScopeResolver, Paging"]
+            TOKENS["JwtTokenService, BCryptPinHasher, BCryptPasswordHasher"]
+            STORAGE_INFRA["IFileStorage / TenantDirectoryStorage"]
+        end
+    end
+
+    subgraph DATA_TIER["Persistence Tier (Purch.Infrastructure)"]
+        DBCONTEXT["PurchDbContext<br/>- Global Tenant Filter (e.TenantId == CurrentTenantId)<br/>- Automated UpdatedAt Stamping<br/>- 41 Entity Sets<br/>- UnitOfWork Transactional SaveChanges"]
+        MIGRATIONS["EF Core Migrations Engine<br/>- Automated On-Boot Migration (Local Mode)<br/>- Schema Versioning & Auditing"]
+        PG_DB[("PostgreSQL Database<br/>- Tenants, Branches, Devices, Users<br/>- Items, Variants, Recipes, Batches<br/>- Transactions, Lines, Payments<br/>- Shifts, Audits, CreditLedgers<br/>- SyncedRecords, ReceiptSequences")]
+    end
+
+    F_ROUTER --> F_STATE
+    F_STATE <--> F_OFFLINE
+    F_STATE -->|HTTP/REST| MIDDLEWARE
+
+    W_ROUTER --> W_STATE
+    W_STATE --> W_API
+    W_API -->|HTTP/REST| MIDDLEWARE
+
+    MIDDLEWARE --> ENDPOINTS
+    ENDPOINTS --> SERVICES
+    SERVICES --> GUARDS
+    SERVICES --> TOKENS
+    SERVICES --> STORAGE_INFRA
+    SERVICES --> DBCONTEXT
+    DBCONTEXT --> MIGRATIONS
+    DBCONTEXT --> PG_DB

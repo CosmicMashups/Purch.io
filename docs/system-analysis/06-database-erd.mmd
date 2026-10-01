@@ -1,0 +1,230 @@
+erDiagram
+    TENANT ||--o{ BRANCH : "owns"
+    TENANT ||--o{ DEVICE : "registers"
+    TENANT ||--o{ USER : "employs"
+    TENANT ||--o{ CATEGORY : "configures"
+    TENANT ||--o{ ITEM : "catalogs"
+    TENANT ||--o{ INVENTORY_ITEM : "stocks"
+    TENANT ||--o{ SUPPLIER : "procures_from"
+    TENANT ||--o{ CUSTOMER_CREDIT_LEDGER : "extends_credit_to"
+
+    BRANCH ||--o{ DEVICE : "houses"
+    BRANCH ||--o{ DEPARTMENT : "defines"
+    BRANCH ||--o{ SHIFT : "records"
+    BRANCH ||--o{ TRANSACTION : "processes"
+    BRANCH ||--o{ PURCHASE_ORDER : "receives"
+    BRANCH ||--o{ RECEIPT_SEQUENCE : "tracks"
+    BRANCH ||--o{ KIOSK_PREP_SEQUENCE : "sequences"
+
+    DEVICE ||--o{ SHIFT : "executes"
+    DEVICE ||--o{ TRANSACTION : "rings_up"
+    DEVICE ||--o{ RECEIPT_SEQUENCE : "maintains"
+    DEVICE ||--o{ SYNCED_RECORD : "submits"
+
+    USER ||--o{ SHIFT : "opens_closes"
+    USER ||--o{ TRANSACTION : "clerks"
+    USER ||--o{ AUDIT_LOG : "triggers"
+    USER ||--o{ REFRESH_TOKEN : "owns"
+
+    CATEGORY ||--o{ ITEM : "groups"
+
+    ITEM ||--o{ ITEM_VARIANT : "has"
+    ITEM ||--o{ ITEM_BATCH : "tracks"
+    ITEM ||--o{ ITEM_RECIPE_LINE : "composes"
+    ITEM ||--o{ ITEM_COMBO_COMPONENT : "contains"
+    ITEM ||--o{ ITEM_MODIFIER_GROUP : "attaches"
+    ITEM ||--o{ BUNDLE_PROMO_RULE : "qualifies"
+    ITEM ||--o{ ITEM_DISCOUNT_PROMO_RULE : "discounts"
+    ITEM ||--o{ TRANSACTION_LINE : "billed_in"
+
+    INVENTORY_ITEM ||--o{ ITEM_RECIPE_LINE : "ingredient_for"
+    INVENTORY_ITEM ||--o{ INVENTORY_MOVEMENT : "moves"
+    INVENTORY_ITEM ||--o{ PURCHASE_ORDER_LINE : "replenished_via"
+    INVENTORY_ITEM ||--o{ BRANCH_TRANSFER_LINE : "transferred_via"
+
+    MODIFIER_GROUP ||--o{ ITEM_MODIFIER : "contains"
+    MODIFIER_GROUP ||--o{ ITEM_MODIFIER_GROUP : "links_to"
+
+    SUPPLIER ||--o{ PURCHASE_ORDER : "supplies"
+    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_LINE : "details"
+
+    BRANCH ||--o{ BRANCH_TRANSFER : "source_branch"
+    BRANCH ||--o{ BRANCH_TRANSFER : "destination_branch"
+    BRANCH_TRANSFER ||--o{ BRANCH_TRANSFER_LINE : "items"
+
+    CUSTOMER_CREDIT_LEDGER ||--o{ CREDIT_TRANSACTION : "ledger_entries"
+
+    TRANSACTION ||--o{ TRANSACTION_LINE : "items"
+    TRANSACTION ||--o{ PAYMENT : "settlements"
+    TRANSACTION_LINE ||--o{ TRANSACTION_LINE_MODIFIER_SELECTION : "customizations"
+    TRANSACTION_LINE ||--o{ TRANSACTION_LINE_COMBO_SELECTION : "meal_slots"
+
+    PAYMENT ||--o| PAYMENT_GATEWAY_TRANSACTION : "xendit_record"
+
+    TENANT {
+        Guid Id PK
+        string Name
+        int BusinessType
+        int DeploymentMode
+        string BrandingLogoUrl
+        string BrandingBackgroundColorHex
+        string BrandingAccentColorHex
+        string Tin
+        string RegisteredBusinessName
+        bool UseSeparateInventoryTracking
+        bool CreditLedgerEnabled
+        int CreditLedgerRetentionDays
+    }
+
+    BRANCH {
+        Guid Id PK
+        Guid TenantId FK
+        string Name
+        string Address
+        string ManualGcashQrImageUrl
+    }
+
+    DEVICE {
+        Guid Id PK
+        Guid TenantId FK
+        Guid BranchId FK
+        string PairingCode
+        string PairingPinHash
+        int DeviceType
+        bool IsActive
+    }
+
+    USER {
+        Guid Id PK
+        Guid TenantId FK
+        string Name
+        int Role
+        int ScopeType
+        Guid ScopeId
+        Guid BranchId
+        string PinHash
+        string Email
+        string PasswordHash
+        bool IsActive
+    }
+
+    ITEM {
+        Guid Id PK
+        Guid TenantId FK
+        Guid CategoryId FK
+        string Name
+        string Barcode
+        decimal BasePrice
+        int PricingType
+        bool IsActive
+        decimal LowStockThreshold
+        int TingiMode
+        decimal UnitsPerPack
+    }
+
+    ITEM_VARIANT {
+        Guid Id PK
+        Guid ItemId FK
+        string VariantAttributesJson
+        string Sku
+        decimal StockOnHand
+        decimal PriceOverride
+    }
+
+    INVENTORY_ITEM {
+        Guid Id PK
+        Guid TenantId FK
+        string Name
+        string Sku
+        string UnitOfMeasure
+        decimal PackagingQuantity
+        decimal StockOnHand
+        decimal ReorderPoint
+        decimal CostPrice
+    }
+
+    ITEM_RECIPE_LINE {
+        Guid Id PK
+        Guid ItemId FK
+        Guid InventoryItemId FK
+        decimal QuantityPerOrder
+    }
+
+    TRANSACTION {
+        Guid Id PK
+        Guid TenantId FK
+        Guid BranchId FK
+        Guid DeviceId FK
+        Guid ClientSaleId
+        long ReceiptNumber
+        int ZReadingNumber
+        Guid StaffUserId FK
+        int Status
+        decimal TotalAmount
+        decimal DiscountAmount
+        bool SeniorPwdDiscountApplied
+        string PromoCode
+        string OrderType
+        bool OriginatedFromKiosk
+        long KioskPrepNumber
+        int KitchenStatus
+    }
+
+    TRANSACTION_LINE {
+        Guid Id PK
+        Guid TransactionId FK
+        Guid ItemId FK
+        Guid ItemVariantId FK
+        decimal Quantity
+        decimal UnitPrice
+        decimal LineTotal
+        decimal PromoDiscountAmount
+        string AppliedPromoLabel
+    }
+
+    PAYMENT {
+        Guid Id PK
+        Guid TransactionId FK
+        int Method
+        int Status
+        decimal Amount
+        decimal AmountTendered
+        decimal ChangeGiven
+    }
+
+    CUSTOMER_CREDIT_LEDGER {
+        Guid Id PK
+        Guid TenantId FK
+        string FullName
+        string PhoneNumber
+        decimal CurrentBalance
+        decimal CreditLimit
+        DateOnly NextPaymentDue
+        bool IsAnonymized
+    }
+
+    CREDIT_TRANSACTION {
+        Guid Id PK
+        Guid CustomerCreditLedgerId FK
+        Guid TransactionId FK
+        int Type
+        decimal Amount
+        decimal RunningBalance
+        string Note
+    }
+
+    SHIFT {
+        Guid Id PK
+        Guid TenantId FK
+        Guid BranchId FK
+        Guid DeviceId FK
+        int Status
+        Guid OpenedByUserId FK
+        decimal OpeningCashAmount
+        decimal ClosingCashAmount
+        decimal ExpectedCashAmount
+        decimal VarianceAmount
+        Guid ApprovedByUserId FK
+        DateTimeOffset OpenedAt
+        DateTimeOffset ClosedAt
+    }

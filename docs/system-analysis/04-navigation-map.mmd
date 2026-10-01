@@ -1,0 +1,84 @@
+flowchart TD
+    START([App Launch]) --> SPLASH{"Device Registered /<br/>Session Active?"}
+
+    %% PUBLIC ROUTES
+    SPLASH -->|Unauthenticated| LOGIN["/login (PIN or Admin Email)"]
+    SPLASH -->|Public Onboarding| ONBOARD["/onboarding (Bootstrap Wizard)"]
+    SPLASH -->|Public Legal| LEGAL["/legal/:document (Terms / Privacy)"]
+
+    %% UNATTENDED DISPLAY ROUTES
+    SPLASH -->|Device Role = Kiosk| KIOSK_PAIR["/kiosk/pair"]
+    KIOSK_PAIR --> KIOSK_HOME["/kiosk (Promotional Landing)"]
+    KIOSK_HOME --> KIOSK_MENU["/kiosk/menu (Category & Items)"]
+    KIOSK_MENU --> KIOSK_CART["/kiosk/cart (Review & Edit)"]
+    KIOSK_CART --> KIOSK_TYPE["/kiosk/order-type (Dine In / Take Out)"]
+    KIOSK_TYPE --> KIOSK_DONE["/kiosk/done (Prep Number & 30s Auto-Reset)"]
+
+    SPLASH -->|Device Role = KitchenDisplay| KD_PAIR["/kitchen/pair"] --> KD_VIEW["/kitchen (Ticket Cards: Queued/Prep/Ready/Picked)"]
+    SPLASH -->|Device Role = OrderBoard| OB_PAIR["/order-board/pair"] --> OB_VIEW["/order-board (Prep & Ready Status Numbers)"]
+    SPLASH -->|Secondary Screen| CFD["/customer-facing-display (Mirror Cart)"]
+
+    %% AUTHENTICATED STAFF APP SHELL
+    LOGIN -->|Staff Session Valid| SHELL["Staff App Shell (Role Filtered)"]
+    
+    %% TAB 1: HOME
+    SHELL --> TAB_HOME["Tab 1: Home (/)"]
+    TAB_HOME --> H_CHARTS["Revenue, Sales Trends & Top Sellers"]
+    TAB_HOME --> H_LOWSTOCK["Low Stock Quick Action -> /inventory"]
+    TAB_HOME --> H_NEWSALE["Quick Action: New Sale -> /sell"]
+    TAB_HOME --> H_SHIFT["Quick Action: Shift Drawer -> /sell/shift"]
+
+    %% TAB 2: SELL / CASHIER
+    SHELL -->|Role: Cashier, Manager, Admin| TAB_SELL["Tab 2: Sell / Cashier (/sell)"]
+    TAB_SELL --> POS_GRID["Catalog Item Grid & Barcode Search"]
+    TAB_SELL --> POS_CART["Cart Drawer (Modifiers, Combos, Variants)"]
+    TAB_SELL --> POS_PROMO["Apply Promo Code / Senior PWD Discount"]
+    POS_CART --> POS_PAY["Payment Screen (/sell/payment)"]
+    POS_PAY -->|Tender Cash, GCash, Bank, Utang| POS_RECEIPT["Receipt Screen (/sell/receipt)"]
+    POS_RECEIPT -->|New Sale| TAB_SELL
+    TAB_SELL --> POS_SHIFT["Shift Management (/sell/shift)"]
+    TAB_SELL --> POS_KIOSK_CLAIM["Claim Pending Kiosk Orders (/sell/kiosk-orders)"]
+    TAB_SELL --> POS_HW["Local Hardware Settings (/sell/hardware)"]
+
+    %% TAB 3: INVENTORY
+    SHELL -->|Role: Warehouse, Manager, Admin| TAB_INV["Tab 3: Inventory (/inventory)"]
+    TAB_INV --> INV_HOME["Inventory Overview (/inventory)"]
+    TAB_INV --> INV_MOVEMENTS["Stock Movement Log (/inventory/movements)"]
+    INV_MOVEMENTS --> INV_NEW_MOV["Record Stock Movement (/inventory/movements/new)"]
+    TAB_INV --> INV_INGR["Raw Ingredients / Items (/inventory/ingredients)"]
+    TAB_INV --> INV_SUPPLIERS["Supplier Directory (/inventory/suppliers)"]
+    TAB_INV --> INV_PO["Purchase Orders (/inventory/purchase-orders)"]
+    TAB_INV --> INV_TRANSFERS["Branch Transfers (/inventory/transfers)"]
+
+    %% TAB 4: BUSINESS / MANAGEMENT
+    SHELL -->|Role: Manager, Admin| TAB_BIZ["Tab 4: Business (/business)"]
+    TAB_BIZ --> BIZ_PROMOS["Promotions Management (/business/promotions)"]
+    TAB_BIZ --> BIZ_REPORTS["Fiscal & Business Reports (/business/reports)"]
+    BIZ_REPORTS --> REP_XZ["X-Reading & Z-Reading Execution"]
+    BIZ_REPORTS --> REP_CSV["Export Sales / Low Stock CSVs"]
+    TAB_BIZ --> BIZ_CUSTOMERS["Customer Credit Ledger (/business/customers)"]
+    TAB_BIZ --> BIZ_SYNC["Sync Conflicts Review (/business/sync-conflicts)"]
+    TAB_BIZ --> BIZ_STAFF["Staff & Role Accounts (/business/staff)"]
+    TAB_BIZ --> BIZ_BRANCHES["Branch List & Hardware Setup (/business/branches)"]
+    TAB_BIZ --> BIZ_AUDIT["Audit Log Viewer (/business/audit-log)"]
+    
+    %% ADMIN-ONLY ROUTES UNDER BUSINESS
+    TAB_BIZ -->|Role: Admin Only| BIZ_DEVICES["Device Management (/business/devices)"]
+    TAB_BIZ -->|Role: Admin Only| BIZ_SETTINGS["Tenant Settings (/business/settings)"]
+    
+    %% CATALOG MANAGEMENT UNDER BUSINESS / INVENTORY
+    TAB_BIZ --> CAT_ITEMS["Item Master Catalog (/catalog/items)"]
+    CAT_ITEMS --> CAT_ADD["Add Item (/catalog/items/new)"]
+    CAT_ITEMS --> CAT_EDIT["Edit Item (/catalog/items/:id/edit)"]
+    CAT_EDIT --> CAT_BATCHES["Batches & Lots (/catalog/items/:id/batches)"]
+    CAT_EDIT --> CAT_TINGI["Tingi Configuration (/catalog/items/:id/tingi-config)"]
+    CAT_EDIT --> CAT_BUNDLES["Bundle Rules (/catalog/items/:id/bundle-rules)"]
+    CAT_EDIT --> CAT_SERVICE["Service Duration (/catalog/items/:id/service-duration)"]
+    CAT_EDIT --> CAT_VARIANTS["Variant Matrix (/catalog/items/:id/variants)"]
+    CAT_EDIT --> CAT_COMBOS["Combo Components (/catalog/items/:id/combo-components)"]
+    CAT_EDIT --> CAT_MODIFIERS["Item Modifiers (/catalog/items/:id/modifier-groups)"]
+    CAT_EDIT --> CAT_DEPT["Assign Department (/catalog/items/:id/department)"]
+    CAT_EDIT --> CAT_THRESH["Low Stock Threshold (/catalog/items/:id/low-stock-threshold)"]
+    CAT_EDIT --> CAT_RECIPE["Recipe Editor (/catalog/items/:id/recipe)"]
+    TAB_BIZ --> CAT_CATS["Category List (/catalog/categories)"]
+    TAB_BIZ --> CAT_MOD_GROUPS["Global Modifier Groups (/catalog/modifier-groups)"]

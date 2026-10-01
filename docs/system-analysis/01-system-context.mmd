@@ -1,0 +1,65 @@
+flowchart TB
+    subgraph ACTORS["Human Actors & Terminals"]
+        CASHIER["Cashier / Counter Staff<br/>(Landscape POS Tablet / Desktop)"]
+        MANAGER["Store Manager / Supervisor<br/>(Landscape Tablet / Web Admin)"]
+        ADMIN["Business Owner / Admin<br/>(Web Admin Portal)"]
+        WAREHOUSE["Warehouse Officer / Storekeeper<br/>(Inventory Terminal)"]
+        CUSTOMER["Walk-up Customer<br/>(Portrait Kiosk / Countertop)"]
+        KITCHEN_STAFF["Kitchen / Expediter Staff<br/>(Kitchen Display System)"]
+    end
+
+    subgraph CLIENTS["Purch.io Clients"]
+        FLUTTER_APP["Flutter Cross-Platform Client<br/>(Windows / Android / Linux / macOS)<br/>- Riverpod 2 State Management<br/>- GoRouter Navigation<br/>- Drift SQLite Offline Database<br/>- Background Sync Coordinator"]
+        REACT_APP["React 19 Web Client<br/>(Vite, TypeScript, Tailwind 4)<br/>- React Router 7<br/>- TanStack Query 5<br/>- Zustand UI Stores<br/>- Axios REST Client"]
+        HARDWARE_PERIPHERALS["Local Hardware Peripherals<br/>- USB/BT Barcode Scanner<br/>- Serial/USB Weight Scale<br/>- Customer-Facing Display (CFD)<br/>- ESC/POS Receipt Printer<br/>- RJ11 Cash Drawer Trigger"]
+    end
+
+    subgraph BACKEND["Purch.Api (.NET 9 ASP.NET Core)"]
+        AUTH_MW["Authentication & Authorization Middleware<br/>- JWT Bearer Validation<br/>- Role & Scope Claims Evaluation<br/>- Concurrency & Fixed-Window Rate Limiters"]
+        
+        API_ENDPOINTS["Minimal API Route Groups<br/>- /auth, /onboarding, /devices<br/>- /categories, /items, /modifier-groups<br/>- /promos, /promo-codes<br/>- /transactions, /shifts, /reports<br/>- /inventory, /purchase-orders, /branch-transfers<br/>- /credit-ledger, /sync, /uploads<br/>- /kiosk, /kitchen-display, /order-board"]
+
+        APP_SERVICES["Purch.Application Layer<br/>- CQRS Command & Query Services<br/>- Domain Validation & Scope Guards<br/>- Multi-Vertical Pricing Engine<br/>- Automated Promotion Pass<br/>- Stock Decrement & Recipe BOM Calculator"]
+    end
+
+    subgraph PERSISTENCE["Data Storage Layer"]
+        EF_CORE["PurchDbContext (EF Core 9)<br/>- Global Query Filters (Tenant Isolation)<br/>- Automatic UpdatedAt Audit Stamping<br/>- Unit of Work Transaction Boundaries"]
+        POSTGRES["PostgreSQL 16+ Database<br/>(Multi-Tenant Shared or Dedicated LAN DB)<br/>- 41 Relational Tables<br/>- Foreign Keys & Cascades<br/>- Unique Constraints & B-Tree Indexes"]
+        LOCAL_STORAGE["Local File Storage<br/>(wwwroot/uploads/{tenantId}/)<br/>- High-resolution Item Images<br/>- Store Branding Logos<br/>- Static GCash Countertop QR Ph Images"]
+    end
+
+    subgraph EXTERNAL["External Integrations & Services"]
+        XENDIT_API["Xendit Payment Gateway<br/>(Online Acquiring & Dynamic QR Ph / E-Wallets)"]
+        DRAGONPAY["Dragonpay Switch API<br/>(Utility Bill Payments & Telco E-Load Aggregator)"]
+        PRINT_SPOOLER["OS Printing Subsystem / Network ESC-POS<br/>(Physical Thermal Receipt Printing)"]
+        RENDER_CLOUD["Render / Cloud Infrastructure<br/>(Cloud Mode API & Managed Container Hosting)"]
+    end
+
+    CASHIER -->|Interacts with| FLUTTER_APP
+    CASHIER -->|Interacts with| REACT_APP
+    MANAGER -->|Manages via| FLUTTER_APP
+    MANAGER -->|Manages via| REACT_APP
+    ADMIN -->|Configures via| REACT_APP
+    WAREHOUSE -->|Logs movements via| FLUTTER_APP
+    WAREHOUSE -->|Logs movements via| REACT_APP
+    CUSTOMER -->|Self-orders via| FLUTTER_APP
+    CUSTOMER -->|Self-orders via| REACT_APP
+    KITCHEN_STAFF -->|Operates| FLUTTER_APP
+    KITCHEN_STAFF -->|Operates| REACT_APP
+
+    FLUTTER_APP <--> HARDWARE_PERIPHERALS
+    REACT_APP <--> HARDWARE_PERIPHERALS
+
+    FLUTTER_APP -->|HTTPS / JSON REST API| AUTH_MW
+    REACT_APP -->|HTTPS / JSON REST API| AUTH_MW
+
+    AUTH_MW --> API_ENDPOINTS
+    API_ENDPOINTS --> APP_SERVICES
+    APP_SERVICES --> EF_CORE
+    EF_CORE --> POSTGRES
+    APP_SERVICES --> LOCAL_STORAGE
+
+    APP_SERVICES -.->|Webhook & Status Verification| XENDIT_API
+    APP_SERVICES -.->|Biller Query & Load Top-up| DRAGONPAY
+    FLUTTER_APP -.->|Direct Raw ESC/POS Stream| PRINT_SPOOLER
+    BACKEND -.->|Hosted On| RENDER_CLOUD

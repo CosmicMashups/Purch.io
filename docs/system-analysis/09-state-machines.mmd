@@ -1,0 +1,50 @@
+stateDiagram-v2
+    [*] --> Draft : Create PO (Admin/Warehouse)
+
+    state "Purchase Order Lifecycle" as PO_LIFECYCLE {
+        Draft --> Sent : Mark as Sent (mark-sent)
+        Draft --> Cancelled : Cancel PO
+        Sent --> Cancelled : Cancel PO
+        Sent --> PartiallyReceived : Receive partial line items (receive)
+        PartiallyReceived --> PartiallyReceived : Receive additional lines
+        PartiallyReceived --> Received : Complete receipt of all quantities
+        Sent --> Received : Receive 100% of all ordered quantities
+    }
+
+    state "Branch Transfer Lifecycle" as TRANSFER_LIFECYCLE {
+        [*] --> TransferDraft : Create Transfer
+        TransferDraft --> InTransit : Mark In-Transit (Dispatched)
+        TransferDraft --> TransferCancelled : Cancel Transfer
+        InTransit --> TransferCancelled : Cancel Transfer
+        InTransit --> TransferReceived : Mark Received (Destination Stock Decremented / Incremented)
+    }
+
+    state "Transaction / Cart Lifecycle" as TX_LIFECYCLE {
+        [*] --> Open : Add Item to Cart / Init Kiosk
+        Open --> Open : Add/Update/Remove Lines / Promo Codes
+        Open --> Voided : Supervisor Void Cart (void)
+        Open --> Completed : Full Payment Settled / Checkout
+        Completed --> Refunded : Supervisor Refund (refund)
+    }
+
+    state "Kitchen Display Order Lifecycle" as KDS_LIFECYCLE {
+        [*] --> Queued : POS Checkout / Kiosk Submit
+        Queued --> Preparing : Cook / Barista taps 'Start Preparing'
+        Preparing --> Ready : Order finished (Appears on Order Board)
+        Ready --> PickedUp : Customer retrieves tray / ticket
+        PickedUp --> [*]
+    }
+
+    state "Cash Drawer Shift Lifecycle" as SHIFT_LIFECYCLE {
+        [*] --> ShiftOpen : Cashier opens shift + float
+        ShiftOpen --> ShiftOpen : Sales / Manual Drawer Opens
+        ShiftOpen --> ShiftClosed : Close Shift + Cash Count + Variance Audit
+        ShiftClosed --> [*]
+    }
+
+    state "Sync Record Conflict Lifecycle" as SYNC_LIFECYCLE {
+        [*] --> SyncedClean : Ingested via POST /sync (Idempotent)
+        [*] --> FlaggedForReview : Out-of-order / Conflict Detected (Later Timestamp Auto-Cancelled)
+        FlaggedForReview --> Acknowledged : Supervisor reviews & acknowledges conflict
+        Acknowledged --> [*]
+    }

@@ -1,0 +1,101 @@
+flowchart TD
+    ROOT["Purch.io Unified Enterprise System"]
+
+    %% MODULE 1: AUTH & IDENTITY
+    ROOT --> M_AUTH["1. Authentication & Identity"]
+    M_AUTH --> F_AUTH_DEVICE["Counter Staff PIN Login<br/>(DevicePairingCode + PIN)"]
+    M_AUTH --> F_AUTH_ADMIN["Web Admin Login<br/>(Email + Password)"]
+    M_AUTH --> F_AUTH_REFRESH["Token Refresh & Rotation<br/>(Single-use SHA-256 tokens)"]
+    M_AUTH --> F_AUTH_LOGOUT["Session Revocation & Logout"]
+    M_AUTH --> F_AUTH_PW_RESET["Admin Password Reset<br/>(Request & Token Confirmation)"]
+
+    %% MODULE 2: ONBOARDING & TENANCY
+    ROOT --> M_ONBOARD["2. Onboarding & Multi-Tenant Management"]
+    M_ONBOARD --> F_BOOTSTRAP["Public Merchant Bootstrap<br/>(Tenant + Default Branch + Device + Admin)"]
+    M_ONBOARD --> F_STAFF_MGMT["Staff & Role Administration<br/>(Admin, Manager, Cashier, Warehouse)"]
+    M_ONBOARD --> F_BRANCH_MGMT["Multi-Branch Administration<br/>(Branches, Hardware Config, GCash QR)"]
+    M_ONBOARD --> F_DEVICE_MGMT["Device Provisioning<br/>(Pairing Code & PIN Reset)"]
+    M_ONBOARD --> F_TENANT_SETTINGS["Tenant Configuration<br/>- Dynamic Theme Branding<br/>- BIR Compliance Info<br/>- Barcode Enforcement<br/>- Utang Ledger Retention<br/>- Recipe / Inventory Tracking Toggle"]
+    M_ONBOARD --> F_AUDIT_LOG["System-Wide Audit Logging<br/>(Actions, Staff, Cursor Paging)"]
+
+    %% MODULE 3: CATALOG & PRICING
+    ROOT --> M_CATALOG["3. Catalog & Multi-Vertical Pricing"]
+    M_CATALOG --> F_ITEM_BASE["Item Master CRUD & Deactivation"]
+    M_CATALOG --> F_CATEGORIES["Category Management"]
+    M_CATALOG --> F_MODIFIERS["Modifier Groups & Options<br/>(Single/Multi-select, Required)"]
+    M_CATALOG --> F_VARIANTS["Variant Matrices<br/>(Attributes JSON, Price Overrides, SKU)"]
+    M_CATALOG --> F_TINGI["Tingi / Fractional Packaging<br/>(Fixed portions & Continuous units)"]
+    M_CATALOG --> F_COMBOS["Combo Meals / Slot Builder<br/>(Slots, Substitutions, Upcharges)"]
+    M_CATALOG --> F_BUNDLES["Mix-and-Match Bundle Rules"]
+    M_CATALOG --> F_SERVICES["Timed Service Appointments<br/>(Duration & Resource Tracking)"]
+    M_CATALOG --> F_BATCHES["Batch / Lot & Expiry Tracking<br/>(FIFO stock decrement)"]
+    M_CATALOG --> F_DEPT_ASSIGN["Department / Concessionaire Attribution"]
+    M_CATALOG --> F_LOW_STOCK_CFG["Per-Item Low Stock Thresholds"]
+
+    %% MODULE 4: PROMOTIONS
+    ROOT --> M_PROMOS["4. Promotions & Discount Engine"]
+    M_PROMOS --> F_PROMO_CODES["Alphanumeric Promo Codes<br/>(Percentage / Fixed Amount)"]
+    M_PROMOS --> F_BOGO["Automatic Buy-1-Take-1 (BOGO)<br/>(Same-item or Cross-item)"]
+    M_PROMOS --> F_COMBO_PROMO["Automatic Combo Bundle Rules<br/>(Fixed total price for 2 items)"]
+    M_PROMOS --> F_ITEM_DISCOUNT["Automatic Item Discounts<br/>(Percentage, Amount, or Override)"]
+    M_PROMOS --> F_SENIOR_PWD["BIR Senior Citizen & PWD Discount<br/>(Mandated 20% + VAT Exemption pass)"]
+
+    %% MODULE 5: POS & CASHIER
+    ROOT --> M_POS["5. Point of Sale & Cashiering"]
+    M_POS --> F_CART_MGMT["Device Cart Engine<br/>(Add, Update, Remove, Void Cart)"]
+    M_POS --> F_SCANNER["Barcode Scanning & Fast Search"]
+    M_POS --> F_PAYMENTS["Multi-Method Tender<br/>- Cash (Tendered & Change calculation)<br/>- GCash / Static QR Ph<br/>- Bank Transfer<br/>- Utang (Customer Credit Charge)<br/>- Split Payments"]
+    M_POS --> F_CHECKOUT["One-Call Idempotent Checkout<br/>(Online / Offline Sync payload)"]
+    M_POS --> F_RECEIPT_SEQ["Sequential Receipt Numbering<br/>(Tamper-evident per-device counter)"]
+    M_POS --> F_SUPERVISOR_ACTIONS["Supervisor Authorizations<br/>(Cart Void, Refund, Discount Override)"]
+    M_POS --> F_KIOSK_CLAIM["Kiosk Order Claiming<br/>(Fetch pending ticket, bind to POS cart)"]
+
+    %% MODULE 6: SHIFTS
+    ROOT --> M_SHIFTS["6. Shift Management & Cash Drawer"]
+    M_SHIFTS --> F_SHIFT_OPEN["Opening Cash Float Declaration"]
+    M_SHIFTS --> F_DRAWER_POP["Manual Drawer Open Tracking<br/>(Audit-logged reason & actor)"]
+    M_SHIFTS --> F_SHIFT_CLOSE["Closing Cash Audit & Handover<br/>(Variance computation & Manager PIN)"]
+    M_SHIFTS --> F_SHIFT_QUERY["Current Device Shift State Query"]
+
+    %% MODULE 7: INVENTORY & RECIPES
+    ROOT --> M_INV["7. Inventory & Recipe / BOM"]
+    M_INV --> F_INV_DASH["Stock Level Overview & Low-Stock Alerts"]
+    M_INV --> F_STOCK_MOVEMENTS["Stock Movement Logging<br/>(Stock-In, Out, Damage, Waste, Transfer)"]
+    M_INV --> F_INGREDIENTS["Raw Inventory Items (Ingredients)<br/>(Packaging units & conversions)"]
+    M_INV --> F_PHYSICAL_COUNT["Physical Count Stock Adjustment"]
+    M_INV --> F_RECIPES["Recipe Bill-of-Materials Linkage<br/>(Auto-decrement ingredients on sale)"]
+    M_INV --> F_SUPPLIERS["Supplier Management"]
+    M_INV --> F_PURCHASE_ORDERS["Purchase Order Lifecycle<br/>(Draft -> Sent -> Receiving -> Closed/Cancelled)"]
+    M_INV --> F_BRANCH_TRANSFERS["Inter-Branch Stock Transfers<br/>(Draft -> In-Transit -> Received/Cancelled)"]
+
+    %% MODULE 8: CREDIT LEDGER
+    ROOT --> M_CREDIT["8. Customer Credit Ledger (Utang)"]
+    M_CREDIT --> F_CREDIT_ACCTS["Customer Credit Account Creation"]
+    M_CREDIT --> F_CREDIT_CHARGE["POS Charge-to-Account at Checkout"]
+    M_CREDIT --> F_CREDIT_REPAY["Repayment Collection Logging"]
+    M_CREDIT --> F_CREDIT_REMIND["Overdue & Upcoming Due Reminders"]
+    M_CREDIT --> F_CREDIT_LIMIT["Credit Limit Adjustment"]
+    M_CREDIT --> F_NPC_ANONYMIZE["NPC DPA Compliance Anonymization<br/>(Data erasure on zero balance)"]
+
+    %% MODULE 9: BIR & REPORTING
+    ROOT --> M_REPORTS["9. Fiscal Reporting & Analytics"]
+    M_REPORTS --> F_X_READING["BIR X-Reading Generation<br/>(Mid-shift non-resetting summary)"]
+    M_REPORTS --> F_Z_READING["BIR Z-Reading Fiscal Reset<br/>(End-of-day sequence reset counter)"]
+    M_REPORTS --> F_SALES_DASH["Interactive Sales Dashboard<br/>(Revenue, Sales Trend, Top Sellers)"]
+    M_REPORTS --> F_STAFF_PERF["Staff Sales Performance Metrics"]
+    M_REPORTS --> F_DEPT_SALES["Department Sales Attribution"]
+    M_REPORTS --> F_EXPORT_CSV["CSV Data Exports<br/>- Low Stock Reorder List<br/>- Raw Sales Transaction Ledger"]
+
+    %% MODULE 10: UNATTENDED & KIOSK
+    ROOT --> M_UNATTENDED["10. Unattended Displays & Kiosk"]
+    M_UNATTENDED --> F_KIOSK_FLOW["Portrait Self-Service Kiosk<br/>(Category menu, options, submit prep ticket)"]
+    M_UNATTENDED --> F_KDS["Kitchen Display System (KDS)<br/>(Queued -> Preparing -> Ready -> Picked Up)"]
+    M_UNATTENDED --> F_ORDER_BOARD["Customer Order Status Board<br/>(Real-time prep numbers)"]
+    M_UNATTENDED --> F_CFD["Customer-Facing Display (CFD)<br/>(Dual-screen active cart mirroring)"]
+
+    %% MODULE 11: SYNC & OFFLINE
+    ROOT --> M_SYNC["11. Offline Synchronization Engine"]
+    M_SYNC --> F_DRIFT_QUEUE["Local SQLite Mutation Queue<br/>(Client-side offline storage)"]
+    M_SYNC --> F_SYNC_BATCH["Batch Mutation Ingestion (POST /sync)<br/>(Idempotency key deduplication)"]
+    M_SYNC --> F_CONFLICT_RESOLVE["Timestamp Conflict Auto-Resolution<br/>(Later timestamp auto-cancelled)"]
+    M_SYNC --> F_FLAGGED_REVIEW["Supervisor Conflict Review & Acknowledgment"]
