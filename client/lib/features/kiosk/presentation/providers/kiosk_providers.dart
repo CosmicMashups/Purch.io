@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/db/db_providers.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../catalog/presentation/providers/catalog_providers.dart';
+import '../../../pos/data/drift_cart_draft_store.dart';
+import '../../../pos/data/local_first_pos_repository.dart' show CartIdentity;
 import '../../../pos/domain/transaction_models.dart';
 import '../../data/kiosk_branding_repository_impl.dart';
 import '../../data/kiosk_cart_repository_impl.dart';
 import '../../data/kiosk_session_repository_impl.dart';
+import '../../data/local_first_kiosk_cart_repository.dart';
 import '../../domain/kiosk_branding_repository.dart';
 import '../../domain/kiosk_cart_repository.dart';
 import '../../domain/kiosk_session_repository.dart';
@@ -18,12 +23,40 @@ KioskSessionRepository kioskSessionRepository(Ref ref) {
   return KioskSessionRepositoryImpl(
     apiClient: ref.watch(apiClientProvider),
     tokenStorage: ref.watch(secureTokenStorageProvider),
+    deviceIdentityDao: ref.watch(deviceIdentityDaoProvider),
   );
 }
 
+/// The kiosk's cart is local-first (see [LocalFirstKioskCartRepository]):
+/// everything lives on-device until [KioskCartRepository.submitOrder], which
+/// is the only call [KioskCartRepositoryImpl] (the server half) ever makes.
 @Riverpod(keepAlive: true)
 KioskCartRepository kioskCartRepository(Ref ref) {
-  return KioskCartRepositoryImpl(apiClient: ref.watch(apiClientProvider));
+  final identityDao = ref.watch(deviceIdentityDaoProvider);
+  final remote = KioskCartRepositoryImpl(
+    apiClient: ref.watch(apiClientProvider),
+  );
+  return LocalFirstKioskCartRepository(
+    placeOrder: remote.placeOrder,
+    catalog: ref.watch(catalogRepositoryProvider),
+    loadItems: () => ref.read(itemListProvider.future),
+    modifierGroupsFor:
+        (itemId) => ref.read(itemModifierGroupListProvider(itemId).future),
+    store: DriftCartDraftStore(
+      dao: ref.watch(localCartDraftDaoProvider),
+      identityDao: identityDao,
+    ),
+    identity: () async {
+      final identity = await identityDao.getIdentity();
+      return identity == null
+          ? null
+          : CartIdentity(
+            tenantId: identity.tenantId,
+            deviceId: identity.deviceId,
+            branchId: identity.branchId,
+          );
+    },
+  );
 }
 
 @Riverpod(keepAlive: true)

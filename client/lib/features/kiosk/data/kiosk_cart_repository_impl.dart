@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
 import '../../pos/domain/transaction_models.dart';
 import '../domain/kiosk_cart_repository.dart';
+import '../domain/place_kiosk_order_request.dart';
 
 class KioskCartRepositoryImpl implements KioskCartRepository {
   KioskCartRepositoryImpl({required ApiClient apiClient})
@@ -50,6 +51,17 @@ class KioskCartRepositoryImpl implements KioskCartRepository {
   @override
   Future<Transaction> submitOrder() {
     return _post('/kiosk/cart/submit', const {}, Transaction.fromJson);
+  }
+
+  /// The kiosk's local-first flow (see LocalFirstKioskCartRepository): builds,
+  /// prices and submits the whole order the kiosk assembled on-device, in
+  /// one call.
+  Future<Transaction> placeOrder(PlaceKioskOrderRequest request) {
+    return _post(
+      '/kiosk/cart/place-order',
+      request.toJson(),
+      Transaction.fromJson,
+    );
   }
 
   Future<T> _get<T>(

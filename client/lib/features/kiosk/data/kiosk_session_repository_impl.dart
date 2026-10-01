@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/auth/jwt_claims.dart';
+import '../../../core/db/daos/device_identity_dao.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
 import '../../../core/storage/secure_token_storage.dart';
@@ -9,11 +11,14 @@ class KioskSessionRepositoryImpl implements KioskSessionRepository {
   KioskSessionRepositoryImpl({
     required ApiClient apiClient,
     required SecureTokenStorage tokenStorage,
+    required DeviceIdentityDao deviceIdentityDao,
   }) : _apiClient = apiClient,
-       _tokenStorage = tokenStorage;
+       _tokenStorage = tokenStorage,
+       _deviceIdentityDao = deviceIdentityDao;
 
   final ApiClient _apiClient;
   final SecureTokenStorage _tokenStorage;
+  final DeviceIdentityDao _deviceIdentityDao;
 
   @override
   Future<void> pair({
@@ -41,6 +46,18 @@ class KioskSessionRepositoryImpl implements KioskSessionRepository {
         accessToken: accessToken,
         refreshToken: refreshToken,
       );
+
+      // This kiosk's own cart lives entirely on-device (see
+      // LocalFirstKioskCartRepository), which needs this terminal's identity
+      // to scope its draft — the token is the only place that identity comes from.
+      final claims = deviceClaimsFromJwt(accessToken);
+      if (claims != null) {
+        await _deviceIdentityDao.saveIdentity(
+          deviceId: claims.deviceId,
+          tenantId: claims.tenantId,
+          branchId: claims.branchId,
+        );
+      }
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
     }
