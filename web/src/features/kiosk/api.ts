@@ -21,15 +21,17 @@ export const deviceApi = {
     apiClient.post<SessionResponse>(SESSION_PATH[role], { devicePairingCode, pairingPin }).then((r) => r.data),
 };
 
-/** A kiosk's own cart. The server prices it and returns the whole cart on every call. */
+export interface PlaceKioskOrderRequest {
+  orderId: string;
+  lines: AddLineRequest[];
+  orderType: string;
+}
+
+/** The kiosk's cart lives on the device (see localCart.ts); placeOrder is the one call that builds
+ * and submits it, carrying its own idempotency key so a retry after a lost response never double-sends. */
 export const kioskApi = {
-  getCart: () => apiClient.get<Transaction>('/kiosk/cart').then((r) => r.data),
-  addLine: (body: AddLineRequest) => apiClient.post<Transaction>('/kiosk/cart/lines', body).then((r) => r.data),
-  updateLine: (lineId: string, quantity: number) => apiClient.put<Transaction>(`/kiosk/cart/lines/${lineId}`, { quantity }).then((r) => r.data),
-  removeLine: (lineId: string) => apiClient.delete<Transaction>(`/kiosk/cart/lines/${lineId}`).then((r) => r.data),
-  setOrderType: (orderType: string) => apiClient.put<Transaction>('/kiosk/cart/order-type', { orderType }).then((r) => r.data),
-  submit: () => apiClient.post<Transaction>('/kiosk/cart/submit').then((r) => r.data),
   branding: () => apiClient.get<{ kioskPosterImageUrl: string | null }>('/kiosk/branding').then((r) => r.data),
+  placeOrder: (body: PlaceKioskOrderRequest) => apiClient.post<Transaction>('/kiosk/cart/place-order', body).then((r) => r.data),
 };
 
 export const displayApi = {

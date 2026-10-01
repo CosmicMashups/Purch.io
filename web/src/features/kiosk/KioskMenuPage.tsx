@@ -14,25 +14,31 @@ import { addFlowFor, filterItems } from '../pos/catalogView';
 import { OptionsDialog } from '../pos/components/OptionsDialog';
 import { PricingType } from '../catalog/types';
 import type { AddLineRequest } from '../pos/types';
-import { useKioskAdds, useKioskCart } from './queries';
+import { resolveAdd, useLocalKioskCartStore } from './localCart';
 
 export function KioskMenuPage() {
   const items = useItems();
   const categories = useCategories();
-  const cart = useKioskCart();
-  const adds = useKioskAdds();
   const modifierGroups = useModifierGroups();
   const qc = useQueryClient();
+  const lines = useLocalKioskCartStore((s) => s.lines);
+  const addToCart = useLocalKioskCartStore((s) => s.add);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Item | null>(null);
 
   const visible = filterItems(items.data ?? [], { categoryId, query: '' });
-  const count = (cart.data?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0) + adds.pending.reduce((sum, row) => sum + row.quantity, 0);
+  const count = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const total = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
 
-  /** The tap is recorded and confirmed on screen at once; the order catches up as the server answers. */
-  function add(request: AddLineRequest, item: Item) {
+  /** Priced and added to the on-screen order the instant you tap; nothing is sent to the counter until
+   * you submit the whole order at the end. */
+  async function add(request: AddLineRequest, item: Item) {
     setDialog(null);
-    adds.add(item.name, request);
+    const [variants, comboComponents] = await Promise.all([
+      item.pricingType === PricingType.VariantMatrix ? qc.fetchQuery({ queryKey: catalogKeys.variants(item.id), queryFn: () => catalogApi.listVariants(item.id), staleTime: 5 * 60_000 }) : undefined,
+      item.pricingType === PricingType.Combo ? qc.fetchQuery({ queryKey: catalogKeys.comboComponents(item.id), queryFn: () => catalogApi.listComboComponents(item.id), staleTime: 5 * 60_000 }) : undefined,
+    ]);
+    addToCart(resolveAdd(item, request, { items: items.data ?? [], variants, comboComponents, modifierGroups: modifierGroups.data }));
     toast.success(`${item.name} added to your order`);
   }
 
@@ -47,11 +53,11 @@ export function KioskMenuPage() {
     }
     if (flow === 'variant' || flow === 'combo') return setDialog(item);
 
-    if (!mayHaveModifiers) return add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
+    if (!mayHaveModifiers) return void add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
     try {
       const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 5 * 60_000 });
       if (groups.length > 0) setDialog(item);
-      else add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
+      else void add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
     } catch (error) {
       toast.error(userMessage(error));
     }
@@ -118,11 +124,11 @@ export function KioskMenuPage() {
       <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl bg-gradient-to-t from-canvas via-canvas to-transparent p-4">
         <Link to="/kiosk/cart" className="flex h-16 items-center justify-between rounded-control bg-brand px-6 text-xl font-bold text-on-brand">
           <span>View your order ({count})</span>
-          <span className="tabular-nums">{cart.data ? formatPeso(cart.data.totalAmount) : ''}</span>
+          <span className="tabular-nums">{formatPeso(total)}</span>
         </Link>
       </div>
 
-      {dialog && <OptionsDialog item={dialog} items={items.data ?? []} busy={false} onAdd={(request) => add(request, dialog)} onClose={() => setDialog(null)} />}
+      {dialog && <OptionsDialog item={dialog} items={items.data ?? []} busy={false} onAdd={(request) => void add(request, dialog)} onClose={() => setDialog(null)} />}
     </div>
   );
 }

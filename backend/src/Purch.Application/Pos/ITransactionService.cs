@@ -46,6 +46,12 @@ public interface ITransactionService
     /// AwaitingPayment, leaving the kiosk free to start building a new customer's order.</summary>
     Task<TransactionDto> SubmitKioskOrderAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Kiosk-only: places a whole order in one call, built entirely from the kiosk's own local
+    /// cart (see <see cref="PlaceKioskOrderRequest"/>) rather than line-by-line. Discards whatever this
+    /// terminal's cart was holding first, so the order is built clean. Idempotent on
+    /// <see cref="PlaceKioskOrderRequest.OrderId"/> — a retry returns the already-placed order.</summary>
+    Task<TransactionDto> PlaceKioskOrderAsync(PlaceKioskOrderRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>Lists this branch's kiosk orders still awaiting pickup, oldest first.</summary>
     Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default);
 

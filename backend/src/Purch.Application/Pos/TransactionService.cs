@@ -1171,6 +1171,73 @@ public sealed class TransactionService(
         return await ToDtoAsync(cart, cancellationToken);
     }
 
+    public async Task<TransactionDto> PlaceKioskOrderAsync(PlaceKioskOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.OrderId == Guid.Empty)
+        {
+            throw new ValidationException(nameof(request.OrderId), "An order id is required.");
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            throw new ValidationException(nameof(request.Lines), "Add at least one item before submitting your order.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OrderType))
+        {
+            throw new ValidationException(nameof(request.OrderType), "Order type is required.");
+        }
+
+        // Idempotent replay: this exact order already went through (a retry after a lost response),
+        // so return it as-is instead of placing a second one.
+        var existing = await transactionRepository.GetByClientSaleIdAsync(request.OrderId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.Status == TransactionStatus.AwaitingPayment)
+            {
+                return await ToDtoAsync(existing, cancellationToken);
+            }
+
+            if (existing.DeviceId != CurrentDeviceId)
+            {
+                throw new ConflictException("This order id was already used by another terminal.");
+            }
+
+            // A previous attempt stopped before submitting (an unavailable item, a crash). Discard it
+            // and release the id so this attempt can claim it.
+            existing.Status = TransactionStatus.Voided;
+            existing.ClientSaleId = null;
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        // Discard whatever this terminal was holding — an abandoned walk-away cart, or a leftover from
+        // the older line-by-line kiosk flow — so the order is built on a clean cart.
+        var open = await transactionRepository.GetOpenByDeviceAsync(CurrentDeviceId, cancellationToken);
+        if (open is not null)
+        {
+            open.Status = TransactionStatus.Voided;
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        cart.ClientSaleId = request.OrderId;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Deliberately no cleanup in a catch: if a line fails (an unavailable item), this cart is left
+        // Open holding the OrderId, and a retry with the same OrderId discards it above and starts clean.
+        var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
+        foreach (var line in request.Lines)
+        {
+            await StageLineAsync(stage, line, cancellationToken);
+        }
+
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        cart.OrderType = request.OrderType.Trim();
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await SubmitKioskOrderAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default)
     {
         var pending = await transactionRepository.ListPendingKioskOrdersByBranchAsync(branchId, cancellationToken);

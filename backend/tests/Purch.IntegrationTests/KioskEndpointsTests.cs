@@ -96,6 +96,82 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Placing_a_kiosk_order_builds_and_submits_it_in_one_call()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var itemResponse = await adminClient.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Rice Meal", null, null, null, 85m, null, PricingType.Unit));
+        var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var orderId = Guid.NewGuid();
+        var response = await kioskClient.PostAsJsonAsync(
+            "/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(orderId, [new AddTransactionLineRequest(item.Id, null, 2m)], "Take Out"));
+        var placed = await response.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(TransactionStatus.AwaitingPayment, placed!.Status);
+        Assert.True(placed.OriginatedFromKiosk);
+        _ = Assert.NotNull(placed.KioskPrepNumber);
+        Assert.Equal("Take Out", placed.OrderType);
+        Assert.Equal(170m, placed.TotalAmount);
+
+        // The kiosk's next customer gets a fresh cart.
+        var nextCart = await kioskClient.GetFromJsonAsync<TransactionDto>("/kiosk/cart", JsonOptions);
+        Assert.NotEqual(placed.Id, nextCart!.Id);
+    }
+
+    [Fact]
+    public async Task Retrying_the_same_kiosk_order_id_returns_the_already_placed_order_instead_of_duplicating_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, branchId, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Siomai", null, null, null, 45m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var orderId = Guid.NewGuid();
+        var request = new PlaceKioskOrderRequest(orderId, [new AddTransactionLineRequest(item.Id, null, 1m)], "Take Out");
+        var first = await (await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        var retry = await (await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        Assert.Equal(first!.Id, retry!.Id);
+        Assert.Equal(first.KioskPrepNumber, retry.KioskPrepNumber);
+
+        var pending = await adminClient.GetFromJsonAsync<List<TransactionDto>>($"/transactions/kiosk-pending?branchId={branchId}", JsonOptions);
+        Assert.Single(pending!, order => order.Id == first.Id);
+    }
+
+    [Fact]
+    public async Task Placing_a_kiosk_order_with_an_inactive_item_is_refused_and_a_retry_still_works()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Halo-Halo", null, null, null, 60m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await adminClient.PutAsJsonAsync($"/items/{item.Id}", new UpdateItemRequest(item.Name, item.Sku, item.Barcode, item.CategoryId, item.BasePrice, item.ImageUrl, false, item.DepartmentId));
+
+        var orderId = Guid.NewGuid();
+        var request = new PlaceKioskOrderRequest(orderId, [new AddTransactionLineRequest(item.Id, null, 1m)], "Take Out");
+        var refused = await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+
+        // Nothing was queued for the kitchen.
+        var cart = await kioskClient.GetFromJsonAsync<TransactionDto>("/kiosk/cart", JsonOptions);
+        Assert.Empty(cart!.Lines);
+
+        // A retry under the same order id, once the order is fixed client-side, still works.
+        _ = await adminClient.PutAsJsonAsync($"/items/{item.Id}", new UpdateItemRequest(item.Name, item.Sku, item.Barcode, item.CategoryId, item.BasePrice, item.ImageUrl, true, item.DepartmentId));
+        var retried = await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request);
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+    }
+
+    [Fact]
     public async Task A_cashier_can_claim_a_submitted_kiosk_order_and_complete_payment_on_it()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

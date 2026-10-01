@@ -1,44 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../lib/authStore';
-import { createAddQueue } from '../pos/addQueue';
-import { useCartAdds, type CartAdds } from '../pos/useCartAdds';
 import { displayApi, kioskApi } from './api';
-import type { AddLineRequest, KitchenStatus, Transaction } from '../pos/types';
+import type { KitchenStatus } from '../pos/types';
 
 export const kioskKeys = {
-  cart: ['kiosk', 'cart'] as const,
   branding: ['kiosk', 'branding'] as const,
   display: (role: string, branchId: string) => ['display', role, branchId] as const,
 };
 
-export const useKioskCart = () => useQuery({ queryKey: kioskKeys.cart, queryFn: kioskApi.getCart, staleTime: 0 });
-
 /** The poster is decoration. If it cannot load the landing screen simply shows the wordmark. */
 export const useKioskBranding = () => useQuery({ queryKey: kioskKeys.branding, queryFn: kioskApi.branding, retry: false, staleTime: 5 * 60_000 });
 
-function useCartMutation<TVars>(fn: (vars: TVars) => Promise<Transaction>) {
-  const qc = useQueryClient();
-  return useMutation({ mutationFn: (vars: TVars) => fn(vars), onSuccess: (cart) => qc.setQueryData(kioskKeys.cart, cart) });
-}
-
-export const useKioskAddLine = () => useCartMutation((body: AddLineRequest) => kioskApi.addLine(body));
-export const useKioskUpdateLine = () => useCartMutation(({ lineId, quantity }: { lineId: string; quantity: number }) => kioskApi.updateLine(lineId, quantity));
-export const useKioskRemoveLine = () => useCartMutation((lineId: string) => kioskApi.removeLine(lineId));
-
-/**
- * Choosing how to receive the order is what sends it: the type is set, then the order is submitted.
- * The submitted order is the confirmation; the next customer gets a fresh cart.
- */
-export function useSubmitKioskOrder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (orderType: string) => {
-      await kioskApi.setOrderType(orderType);
-      return kioskApi.submit();
-    },
-    onSuccess: () => qc.removeQueries({ queryKey: kioskKeys.cart }),
-  });
-}
+/** Reports its own, friendlier failure message (see KioskOrderTypePage), so the global toast is silenced. */
+export const usePlaceKioskOrder = () => useMutation({ mutationFn: kioskApi.placeOrder, meta: { silent: true } });
 
 /** Both displays poll, because the API has no push channel. */
 export const DISPLAY_POLL_MS = 5_000;
@@ -59,22 +32,3 @@ export function useSetKitchenStatus(branchId: string | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: kioskKeys.display('KitchenDisplay', branchId ?? '') }),
   });
 }
-
-/** Adds to the kiosk's own cart, queued so a customer tapping quickly is never held up. */
-export const kioskAddQueue = createAddQueue();
-
-useAuthStore.subscribe((state, previous) => {
-  if (previous.accessToken && !state.accessToken) kioskAddQueue.reset();
-});
-
-/**
- * The kiosk's server takes one line at a time, so a batch goes line by line, and a failed batch is not retried (a retry
- * would add the lines that already landed a second time). The POS register uses a batch endpoint that is safe to retry.
- */
-const sendKioskBatch = async (_batchId: string, requests: AddLineRequest[]): Promise<Transaction> => {
-  let cart!: Transaction;
-  for (const request of requests) cart = await kioskApi.addLine(request);
-  return cart;
-};
-
-export const useKioskAdds = (): CartAdds => useCartAdds(kioskAddQueue, sendKioskBatch, kioskKeys.cart, { retry: false });

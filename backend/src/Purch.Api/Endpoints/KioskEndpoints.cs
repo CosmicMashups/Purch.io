@@ -82,6 +82,15 @@ public static class KioskEndpoints
             Results.Ok(await transactionService.SubmitKioskOrderAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
 
+        // The kiosk's local-first flow (E6 design decision): the whole order, built entirely on the
+        // kiosk's own screen from its cached menu, in one call instead of a request per tap.
+        _ = app.MapPost("/kiosk/cart/place-order", async (
+            PlaceKioskOrderRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.PlaceKioskOrderAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
+
         // Kiosk branding — poster image URL for the landing screen (E1).
         // Scoped to Role.Kiosk (not Admin) because the terminal fetches it on boot,
         // before any staff interaction. No sensitive data: just a nullable URL.
