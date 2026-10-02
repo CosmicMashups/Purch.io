@@ -72,6 +72,9 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
   Future<Transaction> getOrCreateOpenCart() async => _toTransaction(await _load());
 
   @override
+  Future<void> clear() => _serial(_reset);
+
+  @override
   Future<Transaction> addLine(AddTransactionLineRequest request) =>
       _serial(() => _addLine(request));
 

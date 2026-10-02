@@ -119,6 +119,11 @@ class FakeKioskCartRepository implements KioskCartRepository {
     return submitted;
   }
 
+  @override
+  Future<void> clear() async {
+    cart = _emptyCart(cart.id);
+  }
+
   Transaction _withLines(List<TransactionLine> lines) {
     final total = lines.fold<double>(0, (sum, line) => sum + line.lineTotal);
     return Transaction(

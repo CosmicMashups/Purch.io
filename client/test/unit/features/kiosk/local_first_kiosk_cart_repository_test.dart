@@ -268,4 +268,17 @@ void main() {
     expect(placeOrderRequests, hasLength(2));
     expect(placeOrderRequests[0].orderId, placeOrderRequests[1].orderId);
   });
+
+  test('clear drops the draft without ever calling the server', () async {
+    final repo = build();
+    await repo.addLine(
+      const AddTransactionLineRequest(itemId: 'latte', quantity: 1),
+    );
+
+    await repo.clear();
+
+    final cart = await repo.getOrCreateOpenCart();
+    expect(cart.lines, isEmpty);
+    expect(placeOrderRequests, isEmpty);
+  });
 }

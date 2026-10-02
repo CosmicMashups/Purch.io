@@ -21,4 +21,8 @@ abstract class KioskCartRepository {
 
   /// E6: closes the cart to further edits and issues its KioskPrepNumber.
   Future<Transaction> submitOrder();
+
+  /// Drops whatever is on the cart without submitting it — used when the
+  /// kiosk decides a cart was abandoned (E6's idle timeout).
+  Future<void> clear();
 }

@@ -53,6 +53,14 @@ class KioskCartRepositoryImpl implements KioskCartRepository {
     return _post('/kiosk/cart/submit', const {}, Transaction.fromJson);
   }
 
+  @override
+  Future<void> clear() async {
+    final cart = await getOrCreateOpenCart();
+    for (final line in cart.lines) {
+      await removeLine(line.id);
+    }
+  }
+
   /// The kiosk's local-first flow (see LocalFirstKioskCartRepository): builds,
   /// prices and submits the whole order the kiosk assembled on-device, in
   /// one call.

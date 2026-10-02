@@ -13,6 +13,7 @@ import 'core/routing/app_router.dart';
 import 'core/session/session_scope.dart';
 import 'core/storage/server_connection_storage.dart';
 import 'core/theming/theme_builder.dart';
+import 'features/kiosk/presentation/widgets/kiosk_idle_guard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,6 +74,7 @@ class _PurchAppState extends ConsumerState<PurchApp>
 
   @override
   Widget build(BuildContext context) {
+    final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'Purch.io',
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -80,7 +82,11 @@ class _PurchAppState extends ConsumerState<PurchApp>
       // Built at runtime from the tenant's cached branding colours, so an
       // admin's Business Settings change re-themes the app immediately.
       theme: ref.watch(staffThemeProvider),
-      routerConfig: ref.watch(appRouterProvider),
+      routerConfig: router,
+      // Above the Router's Navigator, so it sees every tap across every
+      // screen the kiosk flow pushes — see KioskIdleGuard's own doc comment
+      // for why it can't just wrap the kiosk's landing screen instead.
+      builder: (context, child) => KioskIdleGuard(router: router, child: child!),
     );
   }
 }

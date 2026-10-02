@@ -141,6 +141,15 @@ class KioskCartNotifier extends _$KioskCartNotifier {
     return submitted.value;
   }
 
+  /// E6's idle timeout: a cart sitting untouched long enough is assumed
+  /// abandoned, so it's dropped rather than left for the next customer to
+  /// find pre-filled. Safe to call even on an empty cart.
+  Future<void> resetForIdleTimeout() async {
+    await ref.read(kioskCartRepositoryProvider).clear();
+    ref.invalidateSelf();
+    await future;
+  }
+
   Future<bool> _mutate(
     Future<Transaction> Function(KioskCartRepository) action,
   ) async {
