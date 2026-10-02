@@ -57,7 +57,7 @@ class ReceiptEscPosFormatter {
         : 'TX-${transaction.id.substring(0, 8)}';
     builder.twoColumn('Invoice No:', receiptNo, isBold: true);
 
-    final now = DateTime.now();
+    final now = transaction.receiptTime;
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';

@@ -617,6 +617,8 @@ class LocalFirstPosRepository implements PosRepository {
       totalAmount: total,
       receiptNumber: number,
       orderType: local.orderType,
+      createdAt: now,
+      completedAt: now,
       payments: [
         Payment(
           id: 'offline-payment-${cart.saleId}',

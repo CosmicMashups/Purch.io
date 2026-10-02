@@ -32,6 +32,8 @@ class Transaction {
     this.seniorPwdSavings,
     this.promoSavings,
     this.promoCodeNotApplied = PromoCodeNotApplied.none,
+    this.createdAt,
+    this.completedAt,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
@@ -63,8 +65,13 @@ class Transaction {
               .cast<Map<String, dynamic>>()
               .map(Payment.fromJson)
               .toList(),
+      createdAt: _parseTime(json['createdAt']),
+      completedAt: _parseTime(json['completedAt']),
     );
   }
+
+  static DateTime? _parseTime(Object? value) =>
+      value is String ? DateTime.tryParse(value) : null;
 
   final String id;
   final String branchId;
@@ -94,6 +101,17 @@ class Transaction {
 
   /// Why a valid promo code on the cart is not discounting right now.
   final PromoCodeNotApplied promoCodeNotApplied;
+
+  /// When the cart was started, and when it was paid. A receipt shows the paid
+  /// time ([receiptTime]); the cart can be started long before. Null for a cart
+  /// that came from somewhere that does not record them.
+  final DateTime? createdAt;
+  final DateTime? completedAt;
+
+  /// The moment printed on the receipt, in the device's local time, falling back
+  /// to the creation time and then to now.
+  DateTime get receiptTime =>
+      (completedAt ?? createdAt ?? DateTime.now()).toLocal();
 
   int get itemCount =>
       lines.fold(0, (total, line) => total + line.quantity.ceil());
