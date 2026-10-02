@@ -21,6 +21,8 @@ class BirReading {
     required this.seniorPwdDiscountTotal,
     required this.promoDiscountTotal,
     required this.totalDiscounts,
+    required this.exchangeAdjustmentsTotal,
+    required this.refundsTotal,
     required this.netSales,
     required this.voidedCount,
     required this.voidedAmount,
@@ -48,6 +50,10 @@ class BirReading {
           (json['seniorPwdDiscountTotal'] as num).toDouble(),
       promoDiscountTotal: (json['promoDiscountTotal'] as num).toDouble(),
       totalDiscounts: (json['totalDiscounts'] as num).toDouble(),
+      // Tolerate an older server payload without these: null reads as "not yet folded in anywhere".
+      exchangeAdjustmentsTotal:
+          (json['exchangeAdjustmentsTotal'] as num?)?.toDouble() ?? 0,
+      refundsTotal: (json['refundsTotal'] as num?)?.toDouble() ?? 0,
       netSales: (json['netSales'] as num).toDouble(),
       voidedCount: json['voidedCount'] as int,
       voidedAmount: (json['voidedAmount'] as num).toDouble(),
@@ -78,6 +84,14 @@ class BirReading {
   final double seniorPwdDiscountTotal;
   final double promoDiscountTotal;
   final double totalDiscounts;
+
+  /// Exchanges processed on this device since the last reading (replacement minus returned), already
+  /// folded into grossSales/netSales — broken out so the reading stays auditable.
+  final double exchangeAdjustmentsTotal;
+
+  /// Sales originally rung up on this device that were refunded since the last reading, whether or not
+  /// the sale itself was reported on an earlier one. Already subtracted from grossSales/netSales.
+  final double refundsTotal;
   final double netSales;
   final int voidedCount;
   final double voidedAmount;

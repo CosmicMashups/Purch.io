@@ -51,6 +51,8 @@ class FakeBirReadingRepository implements BirReadingRepository {
       seniorPwdDiscountTotal: 0,
       promoDiscountTotal: 0,
       totalDiscounts: 0,
+      exchangeAdjustmentsTotal: 0,
+      refundsTotal: 0,
       netSales: 100,
       voidedCount: 0,
       voidedAmount: 0,

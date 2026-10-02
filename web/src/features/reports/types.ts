@@ -57,6 +57,12 @@ export interface BirReading {
   seniorPwdDiscountTotal: number;
   promoDiscountTotal: number;
   totalDiscounts: number;
+  /** Exchanges processed on this device since the last reading (replacement minus returned), already
+   * folded into grossSales/netSales below — broken out so the reading stays auditable. */
+  exchangeAdjustmentsTotal: number;
+  /** Sales originally rung up on this device that were refunded since the last reading, whether or not
+   * the sale itself was reported on an earlier one. Already subtracted from grossSales/netSales below. */
+  refundsTotal: number;
   netSales: number;
   voidedCount: number;
   voidedAmount: number;

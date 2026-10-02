@@ -235,6 +235,14 @@ class _ReadingReport extends StatelessWidget {
               formatCurrency(reading.totalDiscounts),
             ),
             _Row(
+              'Exchange adjustments',
+              formatCurrency(reading.exchangeAdjustmentsTotal),
+            ),
+            _Row(
+              'Refunds',
+              formatCurrency(reading.refundsTotal),
+            ),
+            _Row(
               'Net sales',
               formatCurrency(reading.netSales),
               emphasize: true,

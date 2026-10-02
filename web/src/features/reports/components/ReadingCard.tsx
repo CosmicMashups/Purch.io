@@ -46,6 +46,8 @@ export function ReadingCard({ reading }: { reading: BirReading }) {
         <Row label="Senior / PWD discounts" value={formatPeso(reading.seniorPwdDiscountTotal)} />
         <Row label="Promo discounts" value={formatPeso(reading.promoDiscountTotal)} />
         <Row label="Total discounts" value={formatPeso(reading.totalDiscounts)} />
+        <Row label="Exchange adjustments" value={formatPeso(reading.exchangeAdjustmentsTotal)} />
+        <Row label="Refunds" value={formatPeso(reading.refundsTotal)} />
         <Row label="Net sales" value={formatPeso(reading.netSales)} strong />
         <Row label="Voided" value={`${reading.voidedCount} for ${formatPeso(reading.voidedAmount)}`} />
         <Row label="Grand accumulated (before)" value={formatPeso(reading.oldGrandAccumulatedSales)} />
