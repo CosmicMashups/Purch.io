@@ -104,6 +104,21 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<List<Transaction>> findByReceiptNumber(int receiptNumber) async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/transactions/by-receipt/$receiptNumber',
+      );
+      return (response.data ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(Transaction.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
   Future<int> getLastIssuedReceiptNumber() async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(

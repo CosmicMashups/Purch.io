@@ -33,6 +33,7 @@ import '../hardware/cfd/customer_facing_display_screen.dart';
 import '../../features/pos/presentation/screens/bir_reading_screen.dart';
 import '../../features/pos/presentation/screens/cashier_screen.dart';
 import '../../features/pos/presentation/screens/promos_screen.dart';
+import '../../features/pos/presentation/screens/find_sale_screen.dart';
 import '../../features/pos/presentation/screens/pending_kiosk_orders_screen.dart';
 import '../../features/pos/presentation/screens/shift_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
@@ -182,6 +183,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'pending-kiosk-orders',
                     builder: (context, state) => const PendingKioskOrdersScreen(),
+                  ),
+                  GoRoute(
+                    path: 'find-sale',
+                    builder: (context, state) => const FindSaleScreen(),
                   ),
                 ],
               ),

@@ -198,6 +198,10 @@ class _RecordingRemote implements PosRepository {
   ) => throw UnimplementedError();
 
   @override
+  Future<List<Transaction>> findByReceiptNumber(int receiptNumber) =>
+      throw UnimplementedError();
+
+  @override
   Future<List<Transaction>> listPendingKioskOrders(String branchId) async =>
       const [];
 

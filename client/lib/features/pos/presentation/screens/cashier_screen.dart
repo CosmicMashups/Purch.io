@@ -72,6 +72,11 @@ const _secondaryActions = <_SecondaryActionSpec>[
     label: 'Kiosk Orders',
     path: '/cashier/pending-kiosk-orders',
   ),
+  _SecondaryActionSpec(
+    icon: Icons.search_outlined,
+    label: 'Find Sale',
+    path: '/cashier/find-sale',
+  ),
 ];
 
 class _SecondaryActionSpec {

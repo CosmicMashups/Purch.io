@@ -32,6 +32,11 @@ abstract class PosRepository {
     RefundTransactionRequest request,
   );
 
+  /// Finds completed sales by receipt number, so one the cashier doesn't already have open (an earlier
+  /// day, a different terminal) can still be refunded or exchanged. Receipt numbers are only unique per
+  /// device, so this can come back with more than one match.
+  Future<List<Transaction>> findByReceiptNumber(int receiptNumber);
+
   /// Sends a whole sale — cart lines, discounts and payment — in one call.
   /// Idempotent on [CheckoutRequest.saleId].
   Future<Transaction> checkout(CheckoutRequest request);

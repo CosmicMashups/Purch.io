@@ -373,6 +373,10 @@ class LocalFirstPosRepository implements PosRepository {
   ) => _remote.refundTransaction(transactionId, request);
 
   @override
+  Future<List<Transaction>> findByReceiptNumber(int receiptNumber) =>
+      _remote.findByReceiptNumber(receiptNumber);
+
+  @override
   Future<Transaction> claimKioskOrder(String transactionId) async {
     final cart = await _load();
     if (cart.lines.isNotEmpty) {

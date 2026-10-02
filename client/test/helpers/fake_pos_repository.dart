@@ -333,6 +333,12 @@ class FakePosRepository implements PosRepository {
     return cart;
   }
 
+  List<Transaction> foundByReceiptNumber = [];
+
+  @override
+  Future<List<Transaction>> findByReceiptNumber(int receiptNumber) async =>
+      foundByReceiptNumber;
+
   Transaction _withLines(List<TransactionLine> lines) {
     final subtotal = lines.fold(0.0, (total, line) => total + line.lineTotal);
     final seniorAmount = cart.seniorPwdDiscountApplied ? subtotal * 0.2 : 0.0;
