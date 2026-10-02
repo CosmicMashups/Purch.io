@@ -719,6 +719,18 @@ public sealed class TransactionService(
         return await ToDtoAsync(transaction, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TransactionDto>> FindCompletedByReceiptNumberAsync(long receiptNumber, CancellationToken cancellationToken = default)
+    {
+        var matches = await transactionRepository.ListCompletedByReceiptNumberAsync(CurrentTenantId, receiptNumber, cancellationToken);
+        var dtos = new List<TransactionDto>();
+        foreach (var match in matches)
+        {
+            dtos.Add(await ToDtoAsync(match, cancellationToken));
+        }
+
+        return dtos;
+    }
+
     public async Task<long> GetLastIssuedReceiptNumberAsync(CancellationToken cancellationToken = default)
     {
         var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, CurrentBranchId, CurrentDeviceId, cancellationToken);

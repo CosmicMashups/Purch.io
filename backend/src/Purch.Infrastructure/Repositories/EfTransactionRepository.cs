@@ -31,6 +31,18 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
         return dbContext.Transactions.FirstOrDefaultAsync(transaction => transaction.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Transaction>> ListCompletedByReceiptNumberAsync(Guid tenantId, long receiptNumber, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.TenantId == tenantId
+                && transaction.Status == TransactionStatus.Completed
+                && transaction.ReceiptNumber == receiptNumber)
+            .OrderByDescending(transaction => transaction.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TransactionLine>> ListLinesAsync(Guid transactionId, CancellationToken cancellationToken = default)
     {
         return await dbContext.TransactionLines

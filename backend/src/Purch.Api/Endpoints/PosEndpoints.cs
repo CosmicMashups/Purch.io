@@ -58,6 +58,15 @@ public static class PosEndpoints
             Results.Ok(await transactionService.VoidCartAsync(request ?? new VoidCartRequest(null), cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        // Looking up an older sale by its receipt number, so it can be refunded or exchanged without
+        // the cashier already having it open (e.g. from an earlier day or a different terminal).
+        _ = app.MapGet("/transactions/by-receipt/{receiptNumber:long}", async (
+            long receiptNumber,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.FindCompletedByReceiptNumberAsync(receiptNumber, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPost("/transactions/{transactionId:guid}/refund", async (
             Guid transactionId,
             RefundTransactionRequest request,

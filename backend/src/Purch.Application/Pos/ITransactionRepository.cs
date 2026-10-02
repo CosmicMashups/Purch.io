@@ -15,6 +15,11 @@ public interface ITransactionRepository
 
     Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Completed sales across the tenant carrying this receipt number — for looking up an older sale
+    /// to refund or exchange. Receipt numbers are only unique per device, so more than one device's sale can
+    /// share a number; ordered most recent first so the common case (one match) needs no further choice.</summary>
+    Task<IReadOnlyList<Transaction>> ListCompletedByReceiptNumberAsync(Guid tenantId, long receiptNumber, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<TransactionLine>> ListLinesAsync(Guid transactionId, CancellationToken cancellationToken = default);
 
     Task<TransactionLine?> GetLineAsync(Guid lineId, CancellationToken cancellationToken = default);
