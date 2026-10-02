@@ -20,7 +20,9 @@ public sealed record TransactionDto(
     bool OriginatedFromKiosk,
     long? KioskPrepNumber,
     KitchenStatus KitchenStatus,
-    IReadOnlyList<PaymentDto> Payments);
+    IReadOnlyList<PaymentDto> Payments,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt);
 
 /// <summary>Kitchen Display's request to advance a kiosk order's kitchen-prep state.</summary>
 public sealed record UpdateKitchenStatusRequest(KitchenStatus KitchenStatus);

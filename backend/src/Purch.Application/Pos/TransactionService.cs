@@ -496,6 +496,7 @@ public sealed class TransactionService(
             var now = DateTimeOffset.UtcNow;
             saleTimeOverride = soldAt > now ? now : (soldAt < now - MaxOfflineSaleAge ? now - MaxOfflineSaleAge : soldAt);
             cart.CreatedAt = saleTimeOverride.Value;
+            cart.CompletedAt = saleTimeOverride.Value;
         }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -825,6 +826,7 @@ public sealed class TransactionService(
         }
 
         cart.Status = TransactionStatus.Completed;
+        cart.CompletedAt ??= DateTimeOffset.UtcNow;
 
         await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
         await ConsumeInventoryForCompletedSaleAsync(cart, cancellationToken);
@@ -1639,7 +1641,9 @@ public sealed class TransactionService(
             transaction.OriginatedFromKiosk,
             transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,
             transaction.KitchenStatus,
-            paymentDtos);
+            paymentDtos,
+            transaction.CreatedAt,
+            transaction.CompletedAt);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

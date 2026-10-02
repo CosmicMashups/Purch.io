@@ -40,6 +40,10 @@ public class Transaction : TenantScopedEntity
     /// after the sale's own CreatedAt and often after the sale was already reported on an earlier reading.</summary>
     public DateTimeOffset? RefundedAt { get; set; }
 
+    /// <summary>When the sale was paid and its receipt issued, or null while it is still an open cart. CreatedAt is when the
+    /// cart was started, which can be long before; a receipt shows this moment.</summary>
+    public DateTimeOffset? CompletedAt { get; set; }
+
     public decimal TotalAmount { get; set; }
 
     public decimal DiscountAmount { get; set; }

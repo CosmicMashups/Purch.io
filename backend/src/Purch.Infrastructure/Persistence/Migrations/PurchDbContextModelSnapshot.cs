@@ -1830,6 +1830,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<long?>("ReceiptNumber")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("RefundedAt")
                         .HasColumnType("timestamp with time zone");
 

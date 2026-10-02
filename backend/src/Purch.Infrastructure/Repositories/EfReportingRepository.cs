@@ -18,8 +18,8 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .AsNoTracking()
             .Where(transaction =>
                 transaction.Status == TransactionStatus.Completed
-                && transaction.CreatedAt >= fromUtc
-                && transaction.CreatedAt < toUtc);
+                && (transaction.CompletedAt ?? transaction.CreatedAt) >= fromUtc
+                && (transaction.CompletedAt ?? transaction.CreatedAt) < toUtc);
 
         if (branchId is { } id)
         {
@@ -54,8 +54,8 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .Select(group => new
             {
                 BranchId = group.Key,
-                Today = group.Sum(t => t.CreatedAt >= todayStart ? t.TotalAmount : 0m),
-                Last7Days = group.Sum(t => t.CreatedAt >= last7Start ? t.TotalAmount : 0m),
+                Today = group.Sum(t => (t.CompletedAt ?? t.CreatedAt) >= todayStart ? t.TotalAmount : 0m),
+                Last7Days = group.Sum(t => (t.CompletedAt ?? t.CreatedAt) >= last7Start ? t.TotalAmount : 0m),
                 Last30Days = group.Sum(t => t.TotalAmount),
             })
             .ToListAsync(cancellationToken);
@@ -70,7 +70,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
         CancellationToken cancellationToken = default)
     {
         var rows = await CompletedTransactions(branchId, firstDayStart, firstDayStart.AddDays(dayCount))
-            .GroupBy(transaction => (int)Math.Floor((transaction.CreatedAt - firstDayStart).TotalDays))
+            .GroupBy(transaction => (int)Math.Floor(((transaction.CompletedAt ?? transaction.CreatedAt) - firstDayStart).TotalDays))
             .Select(group => new { DayIndex = group.Key, Revenue = group.Sum(t => t.TotalAmount) })
             .ToListAsync(cancellationToken);
 
@@ -108,8 +108,8 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .AsNoTracking()
             .Where(transaction =>
                 transaction.Status == TransactionStatus.Completed
-                && transaction.CreatedAt >= fromUtc
-                && transaction.CreatedAt < toUtc);
+                && (transaction.CompletedAt ?? transaction.CreatedAt) >= fromUtc
+                && (transaction.CompletedAt ?? transaction.CreatedAt) < toUtc);
 
         return branchId is { } id ? query.Where(transaction => transaction.BranchId == id) : query;
     }

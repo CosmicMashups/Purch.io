@@ -105,8 +105,10 @@ public static class OnboardingEndpoints
             Results.Ok(await deviceService.ResetPairingPinAsync(deviceId, request.NewPin, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
         // --- Tenant settings: branding (A2), BIR/compliance (A5), barcode requirement ---
+        // Read-only for every signed-in user and device (a till prints the registered business details on receipts and
+        // a kiosk shows the poster), so an Admin does not have to sign in on each device. Every change below stays Admin-only.
         _ = app.MapGet("/tenant/settings", async (ITenantSettingsService settingsService, CancellationToken cancellationToken) =>
-            Results.Ok(await settingsService.GetAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+            Results.Ok(await settingsService.GetAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPut("/tenant/settings/branding", async (
             UpdateBrandingRequest request,

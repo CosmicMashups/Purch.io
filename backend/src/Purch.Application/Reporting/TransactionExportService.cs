@@ -32,12 +32,12 @@ public sealed class TransactionExportService(
         var csv = new StringBuilder();
         _ = csv.AppendLine("Receipt Number,Date/Time,Branch,Staff,Total,Discount,Senior/PWD Discount Applied,Promo Code,Order Type");
 
-        foreach (var transaction in transactions.OrderBy(t => t.CreatedAt))
+        foreach (var transaction in transactions.OrderBy(t => t.CompletedAt ?? t.CreatedAt))
         {
             _ = csv.AppendLine(string.Join(
                 ',',
                 transaction.ReceiptNumber?.ToString(CultureInfo.InvariantCulture) ?? "",
-                transaction.CreatedAt.UtcDateTime.ToString("o", CultureInfo.InvariantCulture),
+                (transaction.CompletedAt ?? transaction.CreatedAt).UtcDateTime.ToString("o", CultureInfo.InvariantCulture),
                 CsvField(branchNamesById.GetValueOrDefault(transaction.BranchId, "(deleted branch)")),
                 CsvField(transaction.StaffUserId is { } staffId ? staffNamesById.GetValueOrDefault(staffId, "(removed user)") : ""),
                 transaction.TotalAmount.ToString(CultureInfo.InvariantCulture),
