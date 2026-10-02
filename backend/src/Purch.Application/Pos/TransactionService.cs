@@ -185,7 +185,7 @@ public sealed class TransactionService(
 
         if (!item.IsActive)
         {
-            throw new ValidationException(nameof(request.ItemId), "This item is not active.");
+            throw new ValidationException(nameof(request.ItemId), $"{item.Name} is no longer available.");
         }
 
         if (item.PricingType == PricingType.VariantMatrix && request.ItemVariantId is null)

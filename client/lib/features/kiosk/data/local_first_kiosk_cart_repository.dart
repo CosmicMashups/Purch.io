@@ -186,7 +186,7 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
       throw NotFoundFailure('Item ${request.itemId} was not found.');
     }
     if (!item.isActive) {
-      throw _invalid('This item is not active.', field: 'itemId');
+      throw _invalid('${item.name} is no longer available.', field: 'itemId');
     }
     if (item.pricingType == PricingType.variantMatrix &&
         request.itemVariantId == null) {

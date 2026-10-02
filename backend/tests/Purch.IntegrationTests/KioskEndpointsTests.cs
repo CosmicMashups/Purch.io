@@ -160,6 +160,8 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var request = new PlaceKioskOrderRequest(orderId, [new AddTransactionLineRequest(item.Id, null, 1m)], "Take Out");
         var refused = await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request);
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        // The customer is told which item, not just that something failed.
+        Assert.Contains("Halo-Halo is no longer available.", await refused.Content.ReadAsStringAsync());
 
         // Nothing was queued for the kitchen.
         var cart = await kioskClient.GetFromJsonAsync<TransactionDto>("/kiosk/cart", JsonOptions);
