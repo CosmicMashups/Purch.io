@@ -8,6 +8,7 @@ using Purch.Application.Devices;
 using Purch.Application.Kiosk;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Promotions;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -172,6 +173,32 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var retried = await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order", request);
         Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
     }
+
+    [Fact]
+    public async Task The_kiosk_can_read_active_item_promotions_but_the_server_still_prices_the_order()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Halo-Halo", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var rule = await adminClient.PostAsJsonAsync("/promos/item-discounts", new CreateItemDiscountPromoRuleRequest("Merienda", item.Id, PromoDiscountType.Percentage, 10m, null, null));
+        Assert.Equal(HttpStatusCode.OK, rule.StatusCode);
+
+        var rules = await kioskClient.GetFromJsonAsync<KioskPromoRules>("/kiosk/promo-rules", JsonOptions);
+        var discount = Assert.Single(rules!.ItemDiscounts);
+        Assert.Equal(item.Id, discount.ItemId);
+
+        var placed = await (await kioskClient.PostAsJsonAsync(
+            "/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], "Take Out"))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        Assert.Equal(90m, placed!.TotalAmount);
+    }
+
+    private sealed record KioskPromoRules(
+        IReadOnlyList<BogoPromoRuleDto> Bogo,
+        IReadOnlyList<ComboPromoRuleDto> Combos,
+        IReadOnlyList<ItemDiscountPromoRuleDto> ItemDiscounts);
 
     [Fact]
     public async Task A_cashier_can_claim_a_submitted_kiosk_order_and_complete_payment_on_it()

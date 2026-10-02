@@ -2,6 +2,7 @@ using Purch.Api.RateLimiting;
 using Purch.Application.Kiosk;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Promotions;
 using Purch.Domain.Enums;
 
 namespace Purch.Api.Endpoints;
@@ -89,6 +90,22 @@ public static class KioskEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.PlaceKioskOrderAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
+
+        // The automatic promotions (BOGO, combo, item discount), so the kiosk can show the same total on its own
+        // screen that the server will queue. Promo codes are deliberately not included: the kiosk never accepts
+        // one, and the code list is effectively a list of discounts anyone holding a code can claim.
+        _ = app.MapGet("/kiosk/promo-rules", async (
+            IBogoPromoRuleService bogoService,
+            IComboPromoRuleService comboService,
+            IItemDiscountPromoRuleService itemDiscountService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(new
+            {
+                bogo = (await bogoService.ListAsync(cancellationToken)).Where(r => r.IsActive),
+                combos = (await comboService.ListAsync(cancellationToken)).Where(r => r.IsActive),
+                itemDiscounts = (await itemDiscountService.ListAsync(cancellationToken)).Where(r => r.IsActive),
+            }))
             .RequireAuthorization(policy => policy.RequireRole(kioskOnly));
 
         // Kiosk branding — poster image URL for the landing screen (E1).

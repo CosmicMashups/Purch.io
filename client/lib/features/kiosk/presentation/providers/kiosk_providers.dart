@@ -38,6 +38,7 @@ KioskCartRepository kioskCartRepository(Ref ref) {
   );
   return LocalFirstKioskCartRepository(
     placeOrder: remote.placeOrder,
+    loadRules: remote.loadPromoRules,
     catalog: ref.watch(catalogRepositoryProvider),
     loadItems: () => ref.read(itemListProvider.future),
     modifierGroupsFor:

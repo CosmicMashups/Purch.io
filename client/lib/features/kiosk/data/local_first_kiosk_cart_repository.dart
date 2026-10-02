@@ -10,6 +10,7 @@ import '../../catalog/domain/modifier_models.dart';
 import '../../catalog/domain/pricing_type.dart';
 import '../../pos/data/local_cart_models.dart';
 import '../../pos/data/local_first_pos_repository.dart' show CartDraftStore, CartIdentity;
+import '../../pos/domain/pricing_engine.dart';
 import '../../pos/domain/transaction_models.dart';
 import '../domain/kiosk_cart_repository.dart';
 import '../domain/place_kiosk_order_request.dart';
@@ -23,9 +24,11 @@ import '../domain/place_kiosk_order_request.dart';
 ///
 /// Unlike the Cashier's [LocalFirstPosRepository] this never falls back to a
 /// server-backed cart (kiosk orders have no claim step), does not run the
-/// automatic item-promo engine locally (the kiosk has no promo-rules feed —
-/// see the matching note in web's localCart.ts), and tracks no receipt
-/// number or offline sale queue.
+/// tracks no receipt number or offline sale queue. It does run the automatic
+/// item-promo engine locally (BOGO, combo, item discount) on the rules the
+/// server publishes for kiosks, so the on-screen total matches what the
+/// server will queue; if the rules can't be loaded it shows the pre-promo
+/// total and the server's pricing at submit is still what counts.
 class LocalFirstKioskCartRepository implements KioskCartRepository {
   LocalFirstKioskCartRepository({
     required Future<Transaction> Function(PlaceKioskOrderRequest) placeOrder,
@@ -34,7 +37,9 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
     required CartDraftStore store,
     required Future<CartIdentity?> Function() identity,
     Future<List<ModifierGroup>> Function(String itemId)? modifierGroupsFor,
+    Future<PricingRules> Function()? loadRules,
   }) : _placeOrder = placeOrder,
+       _loadRules = loadRules,
        _catalog = catalog,
        _loadItems = loadItems,
        _store = store,
@@ -42,6 +47,9 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
        _modifierGroupsLoader = modifierGroupsFor;
 
   final Future<Transaction> Function(PlaceKioskOrderRequest) _placeOrder;
+  final Future<PricingRules> Function()? _loadRules;
+  PricingRules? _rules;
+  DateTime? _rulesFailedAt;
   final CatalogRepository _catalog;
   final Future<List<Item>> Function() _loadItems;
   final CartDraftStore _store;
@@ -440,12 +448,52 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
   }
 
   Future<void> _reset() async {
+    _rules = null; // pick up promo changes before the next order
+    _rulesFailedAt = null;
     _cart = LocalCart(id: _newId(), saleId: _newUuid());
     await _store.clear();
   }
 
+  /// The promo rules to price with. Never throws: when they can't be loaded
+  /// the cart keeps working on the pre-promo total (the server re-prices at
+  /// submit), and a failed load isn't retried on every tap.
+  Future<PricingRules> _currentRules() async {
+    final cached = _rules;
+    if (cached != null) {
+      return cached;
+    }
+    final load = _loadRules;
+    final failedAt = _rulesFailedAt;
+    if (load == null ||
+        (failedAt != null &&
+            DateTime.now().difference(failedAt) < _rulesRetryAfter)) {
+      return PricingRules.empty;
+    }
+    try {
+      return _rules = await load();
+    } on Object {
+      _rulesFailedAt = DateTime.now();
+      return PricingRules.empty;
+    }
+  }
+
+  static const _rulesRetryAfter = Duration(seconds: 30);
+
   Future<Transaction> _toTransaction(LocalCart cart) async {
     final identity = await _identity();
+    final priced = PricingEngine.price(
+      lines: [
+        for (final line in cart.lines)
+          PricingLineInput(
+            lineId: line.id,
+            itemId: line.request.itemId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+          ),
+      ],
+      rules: cart.lines.isEmpty ? PricingRules.empty : await _currentRules(),
+      seniorPwdApplied: false,
+    );
     return Transaction(
       id: cart.id,
       branchId: identity?.branchId ?? '',
@@ -462,22 +510,19 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.quantity * line.unitPrice,
+            promoDiscountAmount: priced.lineDiscounts[line.id]?.discount ?? 0,
+            appliedPromoLabel: priced.lineDiscounts[line.id]?.label,
             comboSelections: line.comboSelections,
             modifierSelections: line.modifiers,
           ),
       ],
-      subtotal: cart.lines.fold<double>(
-        0,
-        (sum, line) => sum + line.quantity * line.unitPrice,
-      ),
+      subtotal: priced.grossSubtotal,
       discountAmount: 0,
       seniorPwdDiscountApplied: false,
       promoCode: null,
       promoDiscountAmount: 0,
-      totalAmount: cart.lines.fold<double>(
-        0,
-        (sum, line) => sum + line.quantity * line.unitPrice,
-      ),
+      itemPromoDiscountAmount: priced.itemPromoDiscountAmount,
+      totalAmount: priced.totalAmount,
       receiptNumber: null,
       orderType: cart.orderType,
       originatedFromKiosk: true,
