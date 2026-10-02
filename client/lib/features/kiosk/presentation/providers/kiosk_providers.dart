@@ -9,7 +9,7 @@ import '../../../pos/data/drift_cart_draft_store.dart';
 import '../../../pos/data/local_first_pos_repository.dart' show CartIdentity;
 import '../../../pos/domain/transaction_models.dart';
 import '../../data/kiosk_branding_repository_impl.dart';
-import '../../data/kiosk_cart_repository_impl.dart';
+import '../../data/kiosk_order_remote.dart';
 import '../../data/kiosk_session_repository_impl.dart';
 import '../../data/local_first_kiosk_cart_repository.dart';
 import '../../domain/kiosk_branding_repository.dart';
@@ -29,11 +29,11 @@ KioskSessionRepository kioskSessionRepository(Ref ref) {
 
 /// The kiosk's cart is local-first (see [LocalFirstKioskCartRepository]):
 /// everything lives on-device until [KioskCartRepository.submitOrder], which
-/// is the only call [KioskCartRepositoryImpl] (the server half) ever makes.
+/// is the only call [KioskOrderRemote] (the server half) ever makes.
 @Riverpod(keepAlive: true)
 KioskCartRepository kioskCartRepository(Ref ref) {
   final identityDao = ref.watch(deviceIdentityDaoProvider);
-  final remote = KioskCartRepositoryImpl(
+  final remote = KioskOrderRemote(
     apiClient: ref.watch(apiClientProvider),
   );
   return LocalFirstKioskCartRepository(

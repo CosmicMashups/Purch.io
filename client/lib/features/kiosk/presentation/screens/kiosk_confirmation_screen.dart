@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theming/app_tokens.dart';
 import '../../../pos/domain/transaction_models.dart';
-import 'kiosk_landing_screen.dart';
 
 /// E6 — the order/prep number confirmation. A dead end by design (PopScope
 /// blocks back navigation, same "no way back into a finished cart" pattern
@@ -153,14 +152,15 @@ class KioskConfirmationScreen extends StatelessWidget {
                           ),
                           elevation: 0,
                         ),
+                        // The route at the bottom IS the landing screen (the
+                        // router's '/kiosk' page), so pop back to it. Pushing
+                        // a fresh one with a remove-all predicate would try to
+                        // remove go_router's page-based root imperatively,
+                        // which Navigator asserts against.
                         onPressed:
-                            () =>
-                                Navigator.of(context).pushAndRemoveUntil<void>(
-                                  MaterialPageRoute(
-                                    builder: (_) => const KioskLandingScreen(),
-                                  ),
-                                  (route) => false,
-                                ),
+                            () => Navigator.of(
+                              context,
+                            ).popUntil((route) => route.isFirst),
                         child: const Text(
                           'New Order',
                           style: TextStyle(
