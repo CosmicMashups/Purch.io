@@ -69,7 +69,35 @@ void main() {
     expect(find.text('₱5.00'), findsOneWidget);
   });
 
+  testWidgets('the Exchange button opens the exchange screen for this sale', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = FakePosRepository(initialCart: _completedCart);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          posRepositoryProvider.overrideWithValue(repository),
+          catalogRepositoryProvider.overrideWithValue(FakeCatalogRepository()),
+        ],
+        child: const MaterialApp(home: ReceiptScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('open-exchange')));
+    await tester.tap(find.byKey(const Key('open-exchange')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Exchange receipt No. 7'), findsOneWidget);
+    expect(find.text('Bottled Water'), findsOneWidget);
+  });
+
   testWidgets('tapping New Sale starts a fresh cart', (tester) async {
+    // The Exchange button makes the receipt taller than the default test surface.
+    await tester.binding.setSurfaceSize(const Size(800, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final repository = FakePosRepository(initialCart: _completedCart);
     await tester.pumpWidget(
       ProviderScope(

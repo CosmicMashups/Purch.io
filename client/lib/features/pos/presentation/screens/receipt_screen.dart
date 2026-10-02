@@ -10,6 +10,7 @@ import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import '../widgets/refund_dialog.dart';
 import 'cashier_screen.dart';
+import 'exchange_screen.dart';
 
 /// D6, minimal slice — shows the just-completed sale's sequential BIR
 /// receipt number and a summary.
@@ -517,6 +518,32 @@ class ReceiptScreen extends ConsumerWidget {
                                 ),
                               ],
                             ),
+                            if (cart.status == TransactionStatus.completed) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  key: const Key('open-exchange'),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: AppRadius.mdBorder,
+                                    ),
+                                  ),
+                                  onPressed:
+                                      () => Navigator.of(context).push<void>(
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => ExchangeScreen(sale: cart),
+                                        ),
+                                      ),
+                                  icon: const Icon(
+                                    Icons.swap_horiz_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Exchange'),
+                                ),
+                              ),
+                            ],
                             if (cart.status != TransactionStatus.refunded) ...[
                               const SizedBox(height: 12),
                               SizedBox(
