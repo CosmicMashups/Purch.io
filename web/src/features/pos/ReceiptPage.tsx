@@ -121,6 +121,11 @@ export function ReceiptPage() {
         <button type="button" onClick={() => window.print()} className="h-16 rounded-control border border-line bg-surface px-8 text-xl font-bold hover:border-brand">
           Print
         </button>
+        {receipt.status === TransactionStatus.Completed && (
+          <button type="button" onClick={() => navigate('/sell/exchange')} className="h-16 rounded-control border border-line bg-surface px-8 text-xl font-bold hover:border-brand">
+            Exchange
+          </button>
+        )}
         {!refunded && (
           <button type="button" onClick={() => setRefunding(true)} className="h-16 rounded-control border border-danger px-8 text-xl font-bold text-danger hover:bg-danger/10">
             Refund

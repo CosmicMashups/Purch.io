@@ -105,3 +105,42 @@ export interface RefundTransactionRequest {
   reason: string;
   approverPin?: string;
 }
+
+/** Mirrors Purch.Application.Pos.CreateExchangeRequest. Always needs a manager/admin PIN. */
+export interface CreateExchangeRequest {
+  returnLines: { originalLineId: string; quantity: number }[];
+  replacementLines: { itemId: string; itemVariantId: string | null; quantity: number }[];
+  reason: string;
+  approverPin: string;
+  /** Required only when the two totals differ. Cash, BankTransfer or ManualGcashQr. */
+  settlementMethod?: PaymentMethod;
+  settlementAmountTendered?: number;
+}
+
+export interface AdjustmentLine {
+  itemId: string;
+  itemName: string;
+  itemVariantId: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+/** Mirrors Purch.Application.Pos.AdjustmentDto. */
+export interface Adjustment {
+  id: string;
+  originalTransactionId: string;
+  originalReceiptNumber: number | null;
+  createdAt: string;
+  reason: string;
+  approvedByUserId: string;
+  approvedByName: string;
+  returnLines: AdjustmentLine[];
+  replacementLines: AdjustmentLine[];
+  returnedTotal: number;
+  replacementTotal: number;
+  /** Replacement minus returned: positive means the customer owed more, negative means they were refunded. */
+  priceDifference: number;
+  settlementMethod: PaymentMethod | null;
+  changeGiven: number | null;
+}

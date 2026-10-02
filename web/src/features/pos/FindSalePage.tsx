@@ -61,7 +61,7 @@ export function FindSalePage() {
           Back to Sell
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Find a sale</h1>
-        <p className="text-base text-ink-soft">Look up a completed sale by its receipt number to refund it.</p>
+        <p className="text-base text-ink-soft">Look up a completed sale by its receipt number to refund or exchange it.</p>
       </div>
 
       <form onSubmit={search} className="flex flex-col gap-4 rounded-panel border border-line bg-surface p-6">

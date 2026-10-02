@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/apiClient';
-import type { AddLineRequest, RecordPaymentRequest, RefundTransactionRequest, Transaction } from './types';
+import type { AddLineRequest, Adjustment, CreateExchangeRequest, RecordPaymentRequest, RefundTransactionRequest, Transaction } from './types';
 
 /** The server owns the cart and prices it. Every call returns the whole priced cart to render as-is. */
 export const posApi = {
@@ -22,6 +22,8 @@ export const posApi = {
   claimKioskOrder: (transactionId: string) => apiClient.post<Transaction>(`/transactions/kiosk-pending/${transactionId}/claim`).then((r) => r.data),
   pay: (body: RecordPaymentRequest) => apiClient.post<Transaction>('/transactions/cart/payments', body).then((r) => r.data),
   refund: (transactionId: string, body: RefundTransactionRequest) => apiClient.post<Transaction>(`/transactions/${transactionId}/refund`, body).then((r) => r.data),
+  exchange: (transactionId: string, body: CreateExchangeRequest) =>
+    apiClient.post<Adjustment>(`/transactions/${transactionId}/exchange`, body).then((r) => r.data),
   /** Finds a completed sale by its receipt number, to refund or exchange one the cashier doesn't already
    * have open. Receipt numbers are only unique per device, so more than one sale can come back. */
   findByReceiptNumber: (receiptNumber: number) => apiClient.get<Transaction[]>(`/transactions/by-receipt/${receiptNumber}`).then((r) => r.data),

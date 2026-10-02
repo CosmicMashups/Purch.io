@@ -17,9 +17,8 @@ namespace Purch.Application.Pos;
 ///    resolve), no WeightVolume (batch consumption isn't touched here), no Service (nothing to restock).
 ///  - Settlement is Cash, BankTransfer or ManualGcashQr only — no UtangCredit (would need the credit-limit
 ///    checks TransactionService.ChargeToCreditLedgerAsync has, not duplicated here).
-///  - Not yet wired into the sales dashboard, BIR X/Z-readings or net-sales figures — see the design
-///    review's note that those should count an adjustment on the day it happens. Today it only affects
-///    stock and the audit trail.
+///  - The price difference counts on the BIR X/Z-reading of the device that processed the exchange, in the
+///    window it happened (see BirReadingService).
 /// </summary>
 public sealed class AdjustmentService(
     ITransactionRepository transactionRepository,
