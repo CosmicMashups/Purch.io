@@ -1,6 +1,7 @@
 import { apiClient } from '../../lib/apiClient';
 import type { AddLineRequest, KitchenStatus, Transaction } from '../pos/types';
 import type { DeviceRole } from './deviceRoles';
+import type { KioskPromoRulesResponse } from './promoRules';
 
 interface SessionResponse {
   accessToken: string;
@@ -31,6 +32,8 @@ export interface PlaceKioskOrderRequest {
  * and submits it, carrying its own idempotency key so a retry after a lost response never double-sends. */
 export const kioskApi = {
   branding: () => apiClient.get<{ kioskPosterImageUrl: string | null }>('/kiosk/branding').then((r) => r.data),
+  /** The active automatic promotions (no promo codes) the cart totals itself with. */
+  promoRules: () => apiClient.get<KioskPromoRulesResponse>('/kiosk/promo-rules').then((r) => r.data),
   placeOrder: (body: PlaceKioskOrderRequest) => apiClient.post<Transaction>('/kiosk/cart/place-order', body).then((r) => r.data),
 };
 

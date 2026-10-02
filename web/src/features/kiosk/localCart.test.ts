@@ -105,3 +105,21 @@ describe('toLocalTransaction', () => {
     expect(cart.lines[0]?.lineTotal).toBe(300);
   });
 });
+
+describe('toLocalTransaction with promotions', () => {
+  const line = { localId: 'a', itemId: 'latte', itemName: 'Iced Latte', itemVariantId: null, itemVariantAttributes: {}, quantity: 2, unitPrice: 150, comboSelections: [], modifierSelections: [] };
+
+  it('shows the pre-promo total when no rules are known', () => {
+    const cart = toLocalTransaction([line]);
+    expect(cart.totalAmount).toBe(300);
+    expect(cart.itemPromoDiscountAmount).toBe(0);
+  });
+
+  it('applies an automatic item discount and labels the line', () => {
+    const cart = toLocalTransaction([line], { itemDiscount: [{ itemId: 'latte', discountType: 'percentage', discountValue: 10, isActive: true }] });
+    expect(cart.subtotal).toBe(300);
+    expect(cart.itemPromoDiscountAmount).toBe(30);
+    expect(cart.totalAmount).toBe(270);
+    expect(cart.lines[0].appliedPromoLabel).toBe('10% OFF');
+  });
+});

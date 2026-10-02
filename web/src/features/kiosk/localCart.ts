@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useAuthStore } from '../../lib/authStore';
 import { PricingType, type Item, type ItemComboComponent, type ItemVariant, type ModifierGroup } from '../catalog/types';
+import { priceCart, type PricingRules } from '../pos/pricing/pricingEngine';
 import type { AddLineRequest, ComboSelection, ModifierSelection, Transaction, TransactionLine } from '../pos/types';
 
 /**
@@ -8,8 +9,8 @@ import type { AddLineRequest, ComboSelection, ModifierSelection, Transaction, Tr
  * decision). Every add is priced and shown instantly from catalog data already cached on the kiosk;
  * the server re-prices and validates the whole order in one call at Submit (`PlaceKioskOrderAsync`),
  * which is the figure actually charged. This file resolves one add into a priced line and keeps the
- * running cart; it does not reproduce the server's automatic item promos (BOGO/combo/item discounts),
- * so a cart that would qualify for one shows its pre-promo total until the order is placed.
+ * running cart. The automatic item promos (BOGO/combo/item discounts) are applied with the shared pricing
+ * engine on the rules the server publishes for kiosks; without them the cart shows its pre-promo total.
  */
 
 export interface LocalCartLine {
@@ -103,7 +104,7 @@ function mergeKey(line: Pick<LocalCartLine, 'itemId' | 'itemVariantId' | 'modifi
   return `${line.itemId}:${line.itemVariantId ?? ''}`;
 }
 
-function toTransactionLine(line: LocalCartLine): TransactionLine {
+function toTransactionLine(line: LocalCartLine, discount?: { discount: number; label: string | null }): TransactionLine {
   return {
     id: line.localId,
     itemId: line.itemId,
@@ -113,8 +114,8 @@ function toTransactionLine(line: LocalCartLine): TransactionLine {
     quantity: line.quantity,
     unitPrice: line.unitPrice,
     lineTotal: round2(line.unitPrice * line.quantity),
-    promoDiscountAmount: 0,
-    appliedPromoLabel: null,
+    promoDiscountAmount: discount?.discount ?? 0,
+    appliedPromoLabel: discount?.label ?? null,
     comboSelections: line.comboSelections,
     modifierSelections: line.modifierSelections,
   };
@@ -122,21 +123,22 @@ function toTransactionLine(line: LocalCartLine): TransactionLine {
 
 /** The cart in the same shape the rest of the app already renders (`Transaction`), so the cart/order-type
  * screens built for the server-backed cart work unchanged against this local one. */
-export function toLocalTransaction(lines: LocalCartLine[]): Transaction {
-  const subtotal = round2(lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0));
+export function toLocalTransaction(lines: LocalCartLine[], rules?: PricingRules): Transaction {
+  const priced = priceCart({ lines: lines.map((l) => ({ lineId: l.localId, itemId: l.itemId, quantity: l.quantity, unitPrice: l.unitPrice })), rules });
+  const subtotal = round2(priced.grossSubtotal);
   return {
     id: 'local',
     branchId: '',
     deviceId: '',
     status: 0,
-    lines: lines.map(toTransactionLine),
+    lines: lines.map((line) => toTransactionLine(line, priced.lineDiscounts[line.localId])),
     subtotal,
     discountAmount: 0,
     seniorPwdDiscountApplied: false,
     promoCode: null,
     promoDiscountAmount: 0,
-    itemPromoDiscountAmount: 0,
-    totalAmount: subtotal,
+    itemPromoDiscountAmount: round2(priced.itemPromoDiscountAmount),
+    totalAmount: round2(priced.totalAmount),
     receiptNumber: null,
     orderType: null,
     originatedFromKiosk: true,

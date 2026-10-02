@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { formatPeso } from '../dashboard/format';
 import { toLocalTransaction, useLocalKioskCartStore } from './localCart';
+import { useKioskPromoRules } from './queries';
 import { lineDetails } from './tickets';
 
 const stepper = 'grid size-14 place-items-center rounded-control border border-line text-2xl font-semibold disabled:opacity-40';
@@ -9,7 +10,8 @@ export function KioskCartPage() {
   const lines = useLocalKioskCartStore((s) => s.lines);
   const updateQuantity = useLocalKioskCartStore((s) => s.updateQuantity);
   const removeLine = useLocalKioskCartStore((s) => s.removeLine);
-  const cart = toLocalTransaction(lines);
+  const { data: rules } = useKioskPromoRules();
+  const cart = toLocalTransaction(lines, rules);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
@@ -41,6 +43,7 @@ export function KioskCartPage() {
                     <div>
                       <p className="text-lg font-semibold">{line.itemName}</p>
                       {details.length > 0 && <p className="text-base text-ink-soft">{details.join(' · ')}</p>}
+                      {line.appliedPromoLabel && <p className="text-base font-semibold text-brand-strong">{line.appliedPromoLabel}</p>}
                     </div>
                     <p className="text-lg font-bold tabular-nums">{formatPeso(line.lineTotal)}</p>
                   </div>
