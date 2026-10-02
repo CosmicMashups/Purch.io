@@ -49,6 +49,8 @@ const cart = (over: Partial<Transaction> = {}): Transaction => ({
   kioskPrepNumber: null,
   kitchenStatus: KitchenStatus.Queued,
   payments: [],
+  createdAt: '2026-10-03T02:15:00Z',
+  completedAt: null,
   ...over,
 });
 

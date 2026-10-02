@@ -3,7 +3,6 @@ import { CategoryStrip } from './components/CategoryStrip';
 import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
-import { LinkButton } from '../../components/PageHeader';
 import { toast } from '../../components/feedback/toastStore';
 import { userMessage } from '../../lib/apiError';
 import { catalogApi } from '../catalog/api';
@@ -15,6 +14,7 @@ import { formatPeso } from '../dashboard/format';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { addFlowFor, filterItems, findByCode } from './catalogView';
 import { previewFor, withPending } from './optimisticCart';
+import { CashierTopBar, type MenuAction } from './components/CashierTopBar';
 import { CartPanel } from './components/CartPanel';
 import { DeviceRequired } from './components/DeviceRequired';
 import { ItemGrid } from './components/ItemGrid';
@@ -35,10 +35,10 @@ type Dialog = { kind: 'options'; item: Item } | { kind: 'weight'; item: Item } |
 export function SellPage() {
   const { claims, role } = useSession();
   if (!claims?.deviceId) return <DeviceRequired />;
-  return <Register isSupervisor={role === 'Admin' || role === 'Manager'} />;
+  return <Register isSupervisor={role === 'Admin' || role === 'Manager'} role={role} />;
 }
 
-function Register({ isSupervisor }: { isSupervisor: boolean }) {
+function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string | null }) {
   const navigate = useNavigate();
   const online = useOnlineStatus();
   const items = useItems();
@@ -114,36 +114,24 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
     void beginAdd(match);
   }
 
+  const menuActions: MenuAction[] = [
+    { label: 'Find order', to: '/sell/find-sale' },
+    { label: 'Manage till', to: '/sell/shift' },
+    ...(customerDisplaySupported() ? [{ label: 'Customer display', onSelect: () => window.open(CUSTOMER_DISPLAY_PATH, 'purch-customer-display') }] : []),
+    { label: 'Hardware', to: '/sell/hardware' },
+    ...(cameraScanSupported() ? [{ label: 'Scan with camera', onSelect: () => setCameraOpen(true) }] : []),
+  ];
+
   if (!online) {
     return <ErrorState title="Selling needs a connection" message="Prices and stock are worked out by the server, so the till is paused while you are offline. It resumes when the connection returns." />;
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    <div className="flex flex-col gap-4">
+      <CashierTopBar role={role} kioskTo="/sell/kiosk-orders" onRefresh={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))} actions={menuActions} />
+      <CategoryStrip categories={categories.data ?? []} selectedId={categoryId} onSelect={setCategoryId} />
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          <LinkButton to="/sell/kiosk-orders">Kiosk orders</LinkButton>
-          <LinkButton to="/sell/find-sale">Find a sale</LinkButton>
-          <LinkButton to="/sell/shift">Shift and drawer</LinkButton>
-          <LinkButton to="/sell/hardware">Hardware</LinkButton>
-          <button
-            type="button"
-            onClick={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))}
-            className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand"
-          >
-            Refresh prices
-          </button>
-          {cameraScanSupported() && (
-            <button type="button" onClick={() => setCameraOpen(true)} className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand">
-              Scan with camera
-            </button>
-          )}
-          {customerDisplaySupported() && (
-            <button type="button" onClick={() => window.open(CUSTOMER_DISPLAY_PATH, 'purch-customer-display')} className="inline-flex h-12 items-center rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand">
-              Customer display
-            </button>
-          )}
-        </div>
         <input
           type="search"
           aria-label="Search items or scan a barcode"
@@ -153,8 +141,6 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
           onKeyDown={onSearchKey}
           className="h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-lg"
         />
-
-        <CategoryStrip categories={categories.data ?? []} selectedId={categoryId} onSelect={setCategoryId} />
 
         {items.isPending && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4" aria-busy="true">
@@ -171,7 +157,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
         <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
       </aside>
 
-      <div className="fixed inset-x-4 bottom-24 z-30 lg:hidden">
+      <div className="fixed inset-x-4 bottom-4 z-30 md:left-60 lg:hidden">
         <button
           type="button"
           onClick={() => setCartOpen(true)}
@@ -206,6 +192,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
       {dialog?.kind === 'weight' && (
         <WeightDialog item={dialog.item} busy={false} onAdd={(quantity) => add(dialog.item, { itemId: dialog.item.id, itemVariantId: null, quantity })} onClose={() => setDialog(null)} />
       )}
+      </div>
     </div>
   );
 }

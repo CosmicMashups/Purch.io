@@ -48,7 +48,7 @@ describe('FindSalePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find sale' }));
 
     await waitFor(() => expect(posApi.findByReceiptNumber).toHaveBeenCalledWith(1047));
-    expect(await screen.findByText('Receipt No. 1047')).toBeInTheDocument();
+    expect(await screen.findByText('OR No. 00001047')).toBeInTheDocument();
   });
 
   it('lets the cashier pick when more than one sale shares a receipt number', async () => {
@@ -62,7 +62,7 @@ describe('FindSalePage', () => {
     expect(await screen.findByText('Mocha')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Mocha'));
 
-    expect(await screen.findByText('Receipt No. 7')).toBeInTheDocument();
+    expect(await screen.findByText('OR No. 00000007')).toBeInTheDocument();
     expect(await screen.findByText(/170/)).toBeInTheDocument();
   });
 });

@@ -86,10 +86,10 @@ export function BrandingSection({ settings }: { settings: TenantSettings }) {
         </FormField>
 
         <input type="hidden" {...register('logoUrl')} />
-        <ImageUploadField label="Logo" value={values.logoUrl || null} onChange={(url) => setValue('logoUrl', url ?? '', { shouldDirty: true })} />
+        <ImageUploadField label="Logo" allowUrl value={values.logoUrl || null} onChange={(url) => setValue('logoUrl', url ?? '', { shouldDirty: true })} />
 
         <input type="hidden" {...register('kioskPosterImageUrl')} />
-        <ImageUploadField label="Kiosk poster" samples={[{ label: 'Use default', value: SAMPLE_IMAGE.kioskPoster }]} value={values.kioskPosterImageUrl || null} onChange={(url) => setValue('kioskPosterImageUrl', url ?? '', { shouldDirty: true })} />
+        <ImageUploadField label="Kiosk poster" allowUrl samples={[{ label: 'Use default', value: SAMPLE_IMAGE.kioskPoster }]} value={values.kioskPosterImageUrl || null} onChange={(url) => setValue('kioskPosterImageUrl', url ?? '', { shouldDirty: true })} />
 
         <div>
           <PrimaryButton type="submit" busy={save.isPending}>

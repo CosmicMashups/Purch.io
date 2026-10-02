@@ -88,7 +88,7 @@ describe('PaymentPage', () => {
 
     await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 0, amountTendered: 200, customerCreditLedgerId: null, expectedTotal: 137.5 }));
     expect(await screen.findByText('Sale complete')).toBeInTheDocument();
-    expect(screen.getByText('Receipt No. 41')).toBeInTheDocument();
+    expect(screen.getByText('OR No. 00000041')).toBeInTheDocument();
     expect(screen.getByText('Change')).toBeInTheDocument();
     expect(screen.getByText('₱62.50')).toBeInTheDocument();
 
@@ -175,10 +175,12 @@ describe('ReceiptPage', () => {
     expect(await screen.findByText('Sell home')).toBeInTheDocument();
   });
 
-  it('says plainly that it is not the BIR official receipt', () => {
+  it('lays the receipt out as an official receipt with the VAT breakdown', () => {
     usePosStore.setState({ receipt: completed });
     renderPage(<ReceiptPage />);
-    expect(screen.getByText(/BIR official receipt is not available from the web yet/)).toBeInTheDocument();
+    expect(screen.getByText('OFFICIAL RECEIPT')).toBeInTheDocument();
+    expect(screen.getByText('VATable Sales')).toBeInTheDocument();
+    expect(screen.getByText('THIS SERVES AS YOUR OFFICIAL RECEIPT')).toBeInTheDocument();
   });
 
   it('refunds the sale once a reason and an approver PIN are given, and shows it as refunded', async () => {
@@ -205,7 +207,7 @@ describe('ReceiptPage', () => {
       expect(posApi.refund).toHaveBeenLastCalledWith('cart1', { reason: 'Customer changed their mind', approverPin: '5678' }),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByText('REFUNDED')).toBeInTheDocument();
+    expect(screen.getByText('*** REFUNDED ***')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Refund' })).not.toBeInTheDocument();
   });
 

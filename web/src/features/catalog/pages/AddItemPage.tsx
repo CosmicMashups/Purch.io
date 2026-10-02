@@ -156,7 +156,7 @@ export function AddItemPage() {
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />
-      <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+      <ImageUploadField label="Image" allowUrl samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <Field label="Pricing Type">
         <select {...register('pricingType', { valueAsNumber: true })} className={inputClass}>

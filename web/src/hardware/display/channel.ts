@@ -5,6 +5,7 @@ export type CustomerDisplayMode = 'idle' | 'cart' | 'payment' | 'completed';
 export interface CustomerDisplayLine {
   name: string;
   quantity: number;
+  unitPrice: number;
   lineTotal: number;
 }
 
@@ -15,12 +16,14 @@ export interface CustomerDisplayState {
   savings: { label: string; amount: number }[];
   subtotal: number;
   total: number;
+  /** The 12% VAT already inside the total, worked out the way the server's BIR reading does. */
+  vat: number;
   tendered: number | null;
   change: number | null;
   receiptNumber: number | null;
 }
 
-export const IDLE_STATE: CustomerDisplayState = { mode: 'idle', lines: [], savings: [], subtotal: 0, total: 0, tendered: null, change: null, receiptNumber: null };
+export const IDLE_STATE: CustomerDisplayState = { mode: 'idle', lines: [], savings: [], subtotal: 0, total: 0, vat: 0, tendered: null, change: null, receiptNumber: null };
 
 function savingsOf(t: Transaction): CustomerDisplayState['savings'] {
   return [
@@ -30,16 +33,24 @@ function savingsOf(t: Transaction): CustomerDisplayState['savings'] {
   ];
 }
 
+const VAT_RATE = 0.12;
+
+/** Prices include VAT, so it is the part of the total above total / 1.12. */
+export function vatIncluded(total: number): number {
+  return Math.round((total - total / (1 + VAT_RATE)) * 100) / 100;
+}
+
 /** An empty cart shows the welcome screen; otherwise the running order. */
 export function stateForCart(cart: Transaction | null | undefined): CustomerDisplayState {
   if (!cart || cart.lines.length === 0) return IDLE_STATE;
   return {
     ...IDLE_STATE,
     mode: 'cart',
-    lines: cart.lines.map((l) => ({ name: l.itemName, quantity: l.quantity, lineTotal: l.lineTotal })),
+    lines: cart.lines.map((l) => ({ name: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, lineTotal: l.lineTotal })),
     savings: savingsOf(cart),
     subtotal: cart.subtotal,
     total: cart.totalAmount,
+    vat: vatIncluded(cart.totalAmount),
   };
 }
 
@@ -54,6 +65,7 @@ export function stateForReceipt(receipt: Transaction): CustomerDisplayState {
     ...stateForCart(receipt),
     mode: 'completed',
     total: receipt.totalAmount,
+    vat: vatIncluded(receipt.totalAmount),
     tendered: payment?.amountTendered ?? null,
     change: payment?.changeGiven ?? null,
     receiptNumber: receipt.receiptNumber,

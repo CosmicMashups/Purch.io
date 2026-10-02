@@ -80,6 +80,10 @@ export interface Transaction {
   kioskPrepNumber: number | null;
   kitchenStatus: KitchenStatus;
   payments: Payment[];
+  /** When the cart was started. */
+  createdAt: string;
+  /** When it was paid, which is the moment the receipt shows. Null while the sale is still open. */
+  completedAt: string | null;
 }
 
 export interface AddLineRequest {

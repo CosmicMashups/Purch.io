@@ -21,6 +21,11 @@ function toBranding(s: TenantSettings): TenantBranding {
     primaryTextColorHex: s.brandingPrimaryTextColorHex,
     secondaryTextColorHex: s.brandingSecondaryTextColorHex,
     fontFamily: s.brandingFontFamily,
+    businessName: s.name,
+    tin: s.tin,
+    registeredBusinessName: s.registeredBusinessName,
+    registeredAddress: s.registeredAddress,
+    kioskPosterImageUrl: s.kioskPosterImageUrl,
   };
 }
 

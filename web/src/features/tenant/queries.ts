@@ -5,15 +5,15 @@ import { tenantApi } from './api';
 export const tenantKeys = { settings: ['tenant', 'settings'] as const };
 
 /**
- * GET /tenant/settings is Admin-only, so for every other role this is disabled and `data` stays
- * undefined. Callers must treat "unknown" as "off", as the Flutter client does.
+ * GET /tenant/settings is readable by every signed-in user and device; only the changes are Admin-only.
+ * Until it loads, callers must treat "unknown" as "off", as the Flutter client does.
  */
 export function useTenantSettings() {
-  const { role } = useSession();
+  const { claims } = useSession();
   return useQuery({
     queryKey: tenantKeys.settings,
     queryFn: () => tenantApi.get(),
-    enabled: role === 'Admin',
+    enabled: claims !== null,
     staleTime: 5 * 60_000,
   });
 }

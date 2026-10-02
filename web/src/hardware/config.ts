@@ -8,11 +8,13 @@ export interface HardwareConfig {
   scaleProtocol: ScaleProtocol;
   scaleBaudRate: number;
   paperWidth: PaperWidth;
+  /** Open the print window by itself when a sale is completed. */
+  autoPrintReceipt: boolean;
 }
 
 export const BAUD_RATES = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] as const;
 
-export const DEFAULT_CONFIG: HardwareConfig = { scaleProtocol: 'cas', scaleBaudRate: 9600, paperWidth: 'mm80' };
+export const DEFAULT_CONFIG: HardwareConfig = { scaleProtocol: 'cas', scaleBaudRate: 9600, paperWidth: 'mm80', autoPrintReceipt: false };
 
 const KEY = 'purch.hardware';
 
@@ -23,6 +25,7 @@ export function sanitizeConfig(value: unknown): HardwareConfig {
     scaleProtocol: v.scaleProtocol === 'cas' || v.scaleProtocol === 'mettlerToledo' ? v.scaleProtocol : DEFAULT_CONFIG.scaleProtocol,
     scaleBaudRate: typeof v.scaleBaudRate === 'number' && (BAUD_RATES as readonly number[]).includes(v.scaleBaudRate) ? v.scaleBaudRate : DEFAULT_CONFIG.scaleBaudRate,
     paperWidth: v.paperWidth === 'mm58' || v.paperWidth === 'mm80' ? v.paperWidth : DEFAULT_CONFIG.paperWidth,
+    autoPrintReceipt: typeof v.autoPrintReceipt === 'boolean' ? v.autoPrintReceipt : DEFAULT_CONFIG.autoPrintReceipt,
   };
 }
 

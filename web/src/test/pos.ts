@@ -60,6 +60,8 @@ export function makeCart(over: Partial<Transaction> = {}): Transaction {
     kioskPrepNumber: null,
     kitchenStatus: 0,
     payments: [],
+    createdAt: '2026-10-03T02:15:00Z',
+    completedAt: null,
     ...over,
   };
 }

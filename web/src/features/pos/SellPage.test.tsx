@@ -398,7 +398,8 @@ describe('SellPage hardware', () => {
 
   it('links to the hardware settings', async () => {
     renderPage(<SellPage />);
-    expect(await screen.findByRole('link', { name: 'Hardware' })).toHaveAttribute('href', '/sell/hardware');
+    fireEvent.click(await screen.findByRole('button', { name: 'More' }));
+    expect(await screen.findByRole('menuitem', { name: 'Hardware' })).toHaveAttribute('href', '/sell/hardware');
   });
 
   it('fills the weight from a connected scale once it has settled', async () => {

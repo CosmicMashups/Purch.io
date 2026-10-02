@@ -5,6 +5,12 @@ export interface TenantBranding {
   primaryTextColorHex: string | null;
   secondaryTextColorHex: string | null;
   fontFamily: string | null;
+  /** Not theme colours: kept in the same device cache so the customer display window can show them. */
+  businessName?: string;
+  tin?: string | null;
+  registeredBusinessName?: string | null;
+  registeredAddress?: string | null;
+  kioskPosterImageUrl?: string | null;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

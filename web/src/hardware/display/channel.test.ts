@@ -23,7 +23,7 @@ describe('stateForCart', () => {
     expect(s.mode).toBe('cart');
     expect(s.total).toBe(270);
     expect(s.subtotal).toBe(300);
-    expect(s.lines).toEqual([{ name: 'Latte', quantity: 2, lineTotal: 300 }]);
+    expect(s.lines).toEqual([{ name: 'Latte', quantity: 2, unitPrice: expect.any(Number), lineTotal: 300 }]);
   });
 
   it('lists each saving the server reported, and only those', () => {

@@ -107,6 +107,13 @@ export function HardwarePage() {
             <option value="mm58">58 mm</option>
           </select>
         </FormField>
+        <label className="flex min-h-12 items-center justify-between gap-3 text-base font-semibold">
+          <span>
+            Print the receipt automatically after each sale
+            <span className="block text-sm font-normal text-ink-soft">Turn this on once the receipt printer is set up. Chrome and Edge skip the print window when started with the kiosk printing option.</span>
+          </span>
+          <input type="checkbox" role="switch" checked={config.autoPrintReceipt} onChange={(e) => config.update({ autoPrintReceipt: e.target.checked })} className="size-7 shrink-0 accent-brand" />
+        </label>
         <p className="text-sm text-ink-soft">In the print window, turn off headers and footers and set margins to none for the neatest receipt.</p>
       </Section>
 

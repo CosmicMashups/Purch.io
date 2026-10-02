@@ -12,15 +12,19 @@ interface CategoryStripProps {
 export function CategoryStrip({ categories, selectedId, onSelect }: CategoryStripProps) {
   const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
   return (
-    <div role="group" aria-label="Categories" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-      <CategoryTile label="All" selected={selectedId === null} onClick={() => onSelect(null)} icon={<SquaresFour size={24} aria-hidden="true" />} />
+    <div
+      role="group"
+      aria-label="Categories"
+      className="fixed bottom-0 left-0 top-[4.5rem] z-20 flex w-24 snap-y flex-col overflow-y-auto overflow-x-hidden border-r border-line bg-surface [scrollbar-width:none] md:left-28 md:top-0 print:hidden"
+    >
+      <CategoryTile label="All" selected={selectedId === null} onClick={() => onSelect(null)} icon={<SquaresFour size={36} aria-hidden="true" />} />
       {sorted.map((category) => (
         <CategoryTile
           key={category.id}
           label={category.name}
           selected={selectedId === category.id}
           onClick={() => onSelect(category.id)}
-          icon={<Tag size={24} aria-hidden="true" />}
+          icon={<Tag size={36} aria-hidden="true" />}
           imageUrl={category.imageUrl}
         />
       ))}
@@ -28,20 +32,22 @@ export function CategoryStrip({ categories, selectedId, onSelect }: CategoryStri
   );
 }
 
+/** One slot in the rail: the picture on top with no backdrop, the name underneath. Every slot is the same size. */
 function CategoryTile({ label, selected, onClick, icon, imageUrl }: { label: string; selected: boolean; onClick: () => void; icon: React.ReactNode; imageUrl?: string | null }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`flex h-16 w-44 shrink-0 items-center gap-3 rounded-control border py-2 pl-2 pr-4 text-left active:translate-y-px ${
-        selected ? 'border-brand bg-brand-tint text-brand-strong ring-1 ring-brand' : 'border-line bg-surface hover:border-brand'
+      className={`relative flex h-28 w-24 shrink-0 snap-start flex-col items-center justify-center gap-1.5 px-1.5 text-center w-full border-b border-line/60 ${
+        selected ? 'bg-brand-tint text-brand-strong' : 'text-ink hover:bg-canvas'
       }`}
     >
-      <span className={`grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg ${selected ? 'bg-surface text-brand-strong' : 'bg-canvas text-ink-soft'}`}>
-        <PurchImage src={imageUrl} alt="" className="size-full object-cover" errorNode={icon} />
+      {selected && <span aria-hidden="true" className="absolute inset-y-3 left-0 w-1 rounded-r bg-brand" />}
+      <span className="grid size-14 shrink-0 place-items-center text-ink-soft">
+        <PurchImage src={imageUrl} alt="" className="size-full object-contain" errorNode={icon} />
       </span>
-      <span className={`line-clamp-2 min-w-0 text-base leading-tight ${selected ? 'font-bold' : 'font-semibold'}`}>{label}</span>
+      <span className={`line-clamp-2 w-full text-xs leading-tight ${selected ? 'font-bold' : 'font-semibold'}`}>{label}</span>
     </button>
   );
 }

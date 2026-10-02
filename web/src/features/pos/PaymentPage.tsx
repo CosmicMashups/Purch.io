@@ -9,7 +9,7 @@ import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
 import { useCreditLedgers } from '../credit/queries';
 import { formatPeso } from '../dashboard/format';
-import { stateForPayment } from '../../hardware/display/channel';
+import { stateForPayment, vatIncluded } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { tenderCoversTotal } from './catalogView';
 import { CashKeypad } from './components/CashKeypad';
@@ -71,7 +71,7 @@ export function PaymentPage() {
     pay.mutate(body, {
       onSuccess: (completed) => {
         showReceipt(completed);
-        navigate('/sell/receipt', { replace: true });
+        navigate('/sell/receipt', { replace: true, state: { justSold: true } });
       },
     });
   }
@@ -85,6 +85,7 @@ export function PaymentPage() {
         <p className="text-5xl font-bold tabular-nums tracking-tight" data-testid="amount-due">
           {formatPeso(total)}
         </p>
+        <p className="mt-1 text-base text-ink-soft">VAT (12%): {formatPeso(vatIncluded(total))}</p>
       </div>
 
       <div role="radiogroup" aria-label="Payment method" className="grid gap-3 sm:grid-cols-2">

@@ -5,7 +5,7 @@ beforeEach(() => window.localStorage.clear());
 
 describe('sanitizeConfig', () => {
   it('keeps valid values', () => {
-    expect(sanitizeConfig({ scaleProtocol: 'mettlerToledo', scaleBaudRate: 19200, paperWidth: 'mm58' })).toEqual({ scaleProtocol: 'mettlerToledo', scaleBaudRate: 19200, paperWidth: 'mm58' });
+    expect(sanitizeConfig({ scaleProtocol: 'mettlerToledo', scaleBaudRate: 19200, paperWidth: 'mm58', autoPrintReceipt: true })).toEqual({ scaleProtocol: 'mettlerToledo', scaleBaudRate: 19200, paperWidth: 'mm58', autoPrintReceipt: true });
   });
 
   it('replaces each bad field with its default and keeps the good ones', () => {

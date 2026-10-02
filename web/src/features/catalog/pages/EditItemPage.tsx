@@ -110,7 +110,7 @@ export function EditItemPage() {
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />
-      <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+      <ImageUploadField label="Image" allowUrl samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
 
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         <input type="checkbox" {...register('isActive')} />

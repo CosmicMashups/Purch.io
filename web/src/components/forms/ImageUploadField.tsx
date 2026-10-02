@@ -11,14 +11,33 @@ interface ImageUploadFieldProps {
   onChange: (url: string | null) => void;
   /** Bundled pictures the user can pick instead of uploading, e.g. Rice Bowl. The stored value is the assets/ path. */
   samples?: { label: string; value: string }[];
+  /** Also lets the user paste the address of a picture that is already hosted somewhere. */
+  allowUrl?: boolean;
 }
 
 /** Uploads through the API and hands back the hosted URL. Never stores the file itself. */
-export function ImageUploadField({ label, value, onChange, samples = [] }: ImageUploadFieldProps) {
+export function ImageUploadField({ label, value, onChange, samples = [], allowUrl = false }: ImageUploadFieldProps) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState<string | null>(null);
+  const shown = typed ?? (value && /^https?:\/\//i.test(value) ? value : '');
+
+  function commitUrl() {
+    if (typed === null) return;
+    const text = typed.trim();
+    setTyped(null);
+    if (!text) return;
+    try {
+      const url = new URL(text);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('protocol');
+      setError(null);
+      onChange(url.toString());
+    } catch {
+      setError('Enter a full web address that starts with http:// or https://');
+    }
+  }
 
   async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -68,6 +87,29 @@ export function ImageUploadField({ label, value, onChange, samples = [] }: Image
           )}
         </div>
       </div>
+      {allowUrl && (
+        <div className="mt-3">
+          <label htmlFor={`${id}-url`} className="mb-1 block text-sm font-semibold">
+            {label} URL
+          </label>
+          <input
+            id={`${id}-url`}
+            type="url"
+            inputMode="url"
+            placeholder="https://example.com/photo.jpg"
+            value={shown}
+            disabled={busy}
+            onChange={(e) => setTyped(e.target.value)}
+            onBlur={commitUrl}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              commitUrl();
+            }}
+            className="h-11 w-full rounded-control border border-ink-soft/40 bg-surface px-3 text-base"
+          />
+        </div>
+      )}
       <input
         ref={input}
         id={id}

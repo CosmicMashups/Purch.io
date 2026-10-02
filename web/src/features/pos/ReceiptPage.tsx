@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { readBrandCache } from '../../theme/brandCache';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { RefundDialog } from '../../components/RefundDialog';
 import { toast } from '../../components/feedback/toastStore';
 import { formatPeso } from '../dashboard/format';
 import { useHardwareConfig } from '../../hardware/config';
-import { IDLE_STATE, stateForReceipt } from '../../hardware/display/channel';
+import { IDLE_STATE, stateForReceipt, vatIncluded } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { posApi } from './api';
 import { usePosStore } from './posStore';
@@ -30,19 +31,39 @@ function details(line: TransactionLine): string[] {
 
 export function ReceiptPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const receipt = usePosStore((s) => s.receipt);
   const clearReceipt = usePosStore((s) => s.clearReceipt);
   const showReceipt = usePosStore((s) => s.showReceipt);
   const paperWidth = useHardwareConfig((s) => s.paperWidth);
+  const autoPrint = useHardwareConfig((s) => s.autoPrintReceipt);
   const [refunding, setRefunding] = useState(false);
   const [refundBusy, setRefundBusy] = useState(false);
   usePublishCustomerDisplay(receipt ? stateForReceipt(receipt) : IDLE_STATE);
+  const [brand] = useState(() => readBrandCache() ?? {});
+  const [shownAt] = useState(() => new Date());
+  const printedFor = useRef<string | null>(null);
+  const justSold = (location.state as { justSold?: boolean } | null)?.justSold === true;
+
+  // Straight after a sale is paid, once the receipt printer is set up, the print window opens by itself. Looking a sale up
+  // later never does, and a re-render never prints twice.
+  useEffect(() => {
+    if (!receipt || !justSold || !autoPrint || receipt.status !== TransactionStatus.Completed || printedFor.current === receipt.id) return;
+    const id = receipt.id;
+    const timer = window.setTimeout(() => {
+      printedFor.current = id;
+      window.print();
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [receipt, justSold, autoPrint]);
 
   if (!receipt) return <Navigate to="/sell" replace />;
 
   const payment = receipt.payments[0];
   const refunded = receipt.status === TransactionStatus.Refunded;
   const receiptId = receipt.id;
+  const vat = vatIncluded(receipt.totalAmount);
+  const printedAt = new Date(receipt.completedAt ?? receipt.createdAt ?? shownAt);
 
   function newSale() {
     clearReceipt();
@@ -68,51 +89,94 @@ export function ReceiptPage() {
         <p className="text-base text-ink-soft">The payment is recorded. Hand over the receipt.</p>
       </div>
 
-      <article aria-label="Receipt" className={`receipt-paper receipt-${paperWidth} rounded-panel border border-line bg-surface p-6 print:border-0 print:p-0`}>
-        <header className="border-b border-dashed border-line pb-4">
-          <p className="text-lg font-bold">Receipt No. {receipt.receiptNumber ?? 'pending'}</p>
-          {receipt.orderType && <p className="text-base text-ink-soft">{receipt.orderType}</p>}
-          {receipt.kioskPrepNumber !== null && <p className="text-base text-ink-soft">Order number {receipt.kioskPrepNumber}</p>}
-          {refunded && <p className="mt-1 text-base font-bold text-danger">REFUNDED</p>}
+      <article aria-label="Receipt" className={`receipt-paper receipt-${paperWidth} rounded-panel border border-line bg-surface p-6 font-mono text-sm leading-snug print:rounded-none print:border-0 print:p-0 print:text-black`}>
+        <header className="flex flex-col items-center gap-0.5 pb-3 text-center">
+          <p className="text-base font-bold uppercase">{brand.registeredBusinessName || brand.businessName || 'Business name not set'}</p>
+          {brand.registeredAddress && <p>{brand.registeredAddress}</p>}
+          <p>{brand.tin ? `VAT REG TIN: ${brand.tin}` : 'VAT REG TIN: not set'}</p>
+          <p className="mt-2 text-base font-bold tracking-wide">OFFICIAL RECEIPT</p>
+          <p className="font-bold">OR No. {receipt.receiptNumber === null ? 'pending' : String(receipt.receiptNumber).padStart(8, '0')}</p>
+          {refunded && <p className="font-bold text-danger print:text-black">*** REFUNDED ***</p>}
         </header>
 
-        <ul className="divide-y divide-line">
-          {receipt.lines.map((line) => {
-            const extra = details(line);
-            return (
-              <li key={line.id} className="py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-base font-semibold">
-                    {line.itemName} x {line.quantity}
-                  </p>
-                  <p className="text-base tabular-nums">{formatPeso(line.lineTotal)}</p>
-                </div>
-                {extra.length > 0 && <p className="text-sm text-ink-soft">{extra.join(', ')}</p>}
-                {line.appliedPromoLabel && <p className="text-sm text-ink-soft">Promo: {line.appliedPromoLabel}</p>}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="border-y border-dashed border-ink-soft py-2">
+          <Pair label="Date" value={printedAt.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' })} />
+          <Pair label="Time" value={printedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} />
+          {receipt.orderType && <Pair label="Order type" value={receipt.orderType} />}
+          {receipt.kioskPrepNumber !== null && <Pair label="Order no." value={String(receipt.kioskPrepNumber)} />}
+        </div>
 
-        <dl className="mt-2 flex flex-col gap-1 border-t border-dashed border-line pt-4 text-base">
-          <Row label="Subtotal" value={receipt.subtotal} />
-          {receipt.itemPromoDiscountAmount > 0 && <Row label="Item promotions" value={-receipt.itemPromoDiscountAmount} />}
-          {receipt.promoDiscountAmount > 0 && <Row label={`Promo code ${receipt.promoCode ?? ''}`.trim()} value={-receipt.promoDiscountAmount} />}
-          {receipt.discountAmount > 0 && <Row label="Senior / PWD discount" value={-receipt.discountAmount} />}
-          <div className="mt-1 flex items-baseline justify-between text-2xl font-bold">
-            <dt>Total</dt>
+        <table className="mt-2 w-full text-left">
+          <thead>
+            <tr className="border-b border-dashed border-ink-soft">
+              <th className="py-1 pr-1 font-bold">Qty</th>
+              <th className="px-1 py-1 font-bold">Description</th>
+              <th className="px-1 py-1 text-right font-bold">Price</th>
+              <th className="py-1 pl-1 text-right font-bold">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {receipt.lines.map((line) => {
+              const extra = details(line);
+              return (
+                <tr key={line.id} className="align-top">
+                  <td className="py-1 pr-1 tabular-nums">{line.quantity}</td>
+                  <td className="px-1 py-1">
+                    {line.itemName}
+                    {extra.length > 0 && <span className="block text-xs">{extra.join(', ')}</span>}
+                    {line.appliedPromoLabel && <span className="block text-xs">Promo: {line.appliedPromoLabel}</span>}
+                  </td>
+                  <td className="px-1 py-1 text-right tabular-nums">{plain(line.unitPrice)}</td>
+                  <td className="py-1 pl-1 text-right tabular-nums">{plain(line.lineTotal)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <dl className="mt-2 flex flex-col gap-0.5 border-t border-dashed border-ink-soft pt-2">
+          <Row label="Total Sales (VAT Inclusive)" value={receipt.subtotal} />
+          {receipt.itemPromoDiscountAmount > 0 && <Row label="Less: Item promotions" value={-receipt.itemPromoDiscountAmount} />}
+          {receipt.promoDiscountAmount > 0 && <Row label={`Less: Promo ${receipt.promoCode ?? ''}`.trim()} value={-receipt.promoDiscountAmount} />}
+          {receipt.discountAmount > 0 && <Row label="Less: SC/PWD Discount" value={-receipt.discountAmount} />}
+          <div className="mt-1 flex items-baseline justify-between border-y border-ink-soft py-1 text-base font-bold">
+            <dt>TOTAL AMOUNT DUE</dt>
             <dd className="tabular-nums">{formatPeso(receipt.totalAmount)}</dd>
           </div>
           {payment && (
             <>
-              <Row label={METHOD_LABEL[payment.method] ?? 'Payment'} value={payment.amountTendered ?? payment.amount} />
+              <Row label={`Tendered (${METHOD_LABEL[payment.method] ?? 'Payment'})`} value={payment.amountTendered ?? payment.amount} />
               {payment.changeGiven !== null && payment.changeGiven > 0 && <Row label="Change" value={payment.changeGiven} />}
             </>
           )}
         </dl>
-      </article>
 
-      <p className="text-sm text-ink-soft print:hidden">This is a sale summary. The BIR official receipt is not available from the web yet.</p>
+        <dl className="mt-3 flex flex-col gap-0.5 border-t border-dashed border-ink-soft pt-2">
+          <Row label="VATable Sales" value={receipt.totalAmount - vat} />
+          <Row label="VAT-Exempt Sales" value={0} />
+          <Row label="Zero-Rated Sales" value={0} />
+          <Row label="VAT Amount (12%)" value={vat} />
+        </dl>
+
+        {receipt.seniorPwdDiscountApplied && (
+          <div className="mt-3 flex flex-col gap-2 border-t border-dashed border-ink-soft pt-2">
+            <Blank label="SC/PWD Name" />
+            <Blank label="SC/PWD ID No." />
+            <Blank label="Signature" />
+          </div>
+        )}
+
+        <div className="mt-3 flex flex-col gap-2 border-t border-dashed border-ink-soft pt-2">
+          <Blank label="Sold to" />
+          <Blank label="TIN" />
+          <Blank label="Address" />
+        </div>
+
+        <footer className="mt-4 border-t border-dashed border-ink-soft pt-3 text-center">
+          <p className="font-bold">THIS SERVES AS YOUR OFFICIAL RECEIPT</p>
+          <p className="mt-1">Thank you. Please come again.</p>
+        </footer>
+      </article>
 
       <div className="flex flex-wrap gap-3 print:hidden">
         <button type="button" onClick={newSale} className="h-16 rounded-control bg-brand px-8 text-xl font-bold text-on-brand hover:bg-brand-strong active:translate-y-px">
@@ -138,11 +202,34 @@ export function ReceiptPage() {
   );
 }
 
+function plain(value: number): string {
+  return value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function Row({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-baseline justify-between">
-      <dt className="text-ink-soft">{label}</dt>
-      <dd className="tabular-nums">{formatPeso(value)}</dd>
+    <div className="flex items-baseline justify-between gap-2">
+      <dt>{label}</dt>
+      <dd className="tabular-nums">{value < 0 ? `-${formatPeso(-value)}` : formatPeso(value)}</dd>
     </div>
+  );
+}
+
+function Pair({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex justify-between gap-2">
+      <span>{label}</span>
+      <span>{value}</span>
+    </p>
+  );
+}
+
+/** A line the customer or cashier fills in by hand on the printed copy. */
+function Blank({ label }: { label: string }) {
+  return (
+    <p className="flex items-end gap-2">
+      <span className="shrink-0">{label}:</span>
+      <span className="h-4 flex-1 border-b border-ink-soft" />
+    </p>
   );
 }

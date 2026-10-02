@@ -32,7 +32,7 @@ describe('CustomerDisplayPage', () => {
   it('follows the order as it is built', () => {
     renderPage(<CustomerDisplayPage />);
     act(() =>
-      push({ ...IDLE_STATE, mode: 'cart', lines: [{ name: 'Latte', quantity: 2, lineTotal: 300 }], savings: [{ label: 'Item promotions', amount: 20 }], subtotal: 300, total: 280 }),
+      push({ ...IDLE_STATE, mode: 'cart', lines: [{ name: 'Latte', quantity: 2, unitPrice: 150, lineTotal: 300 }], savings: [{ label: 'Item promotions', amount: 20 }], subtotal: 300, total: 280 }),
     );
     expect(screen.getByText('Latte')).toBeInTheDocument();
     expect(screen.getByText('₱280.00')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('CustomerDisplayPage', () => {
 
   it('says how much to pay at the payment step', () => {
     renderPage(<CustomerDisplayPage />);
-    act(() => push({ ...IDLE_STATE, mode: 'payment', lines: [{ name: 'Tea', quantity: 1, lineTotal: 90 }], subtotal: 90, total: 90 }));
+    act(() => push({ ...IDLE_STATE, mode: 'payment', lines: [{ name: 'Tea', quantity: 1, unitPrice: 90, lineTotal: 90 }], subtotal: 90, total: 90 }));
     expect(screen.getByRole('heading', { name: 'Amount to pay' })).toBeInTheDocument();
   });
 

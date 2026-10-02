@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Cube, House, CashRegister, SignOut, Storefront, WifiSlash } from '@phosphor-icons/react';
+import { Cube, House, CashRegister, List, SignOut, Storefront, WifiSlash, X } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { BrandMark } from '../../components/brand/Brand';
 import { signOut } from '../../features/auth/signOut';
@@ -20,7 +21,7 @@ const TAB_META: Record<AppTab, { label: string; icon: Icon; matches: (path: stri
 
 function tabClass(active: boolean): string {
   return [
-    'flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium md:flex-none md:min-h-20 md:w-full',
+    'flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium md:min-h-20 md:w-full',
     active ? 'bg-brand text-on-brand' : 'text-ink-soft hover:bg-canvas hover:text-ink',
   ].join(' ');
 }
@@ -30,13 +31,43 @@ export function AppShell() {
   const { role } = useSession();
   const online = useOnlineStatus();
   const tabs = tabsForRole(role);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Phones keep the navigation in a drawer: it closes when a page is chosen or Escape is pressed.
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
     <div className="min-h-dvh md:pl-28 print:pl-0">
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface px-4 py-2 md:hidden print:hidden">
+        <button
+          type="button"
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          aria-controls="main-nav"
+          onClick={() => setMenuOpen(true)}
+          className="grid size-12 place-items-center rounded-control border border-line hover:border-brand"
+        >
+          <List size={26} aria-hidden="true" />
+        </button>
+        <BrandMark size={40} />
+      </header>
+
+      {menuOpen && <button type="button" aria-label="Close menu" tabIndex={-1} onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-ink/40 md:hidden" />}
+
       <nav
+        id="main-nav"
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 print:hidden flex items-stretch gap-1 border-t border-line bg-surface p-2 md:inset-y-0 md:right-auto md:w-28 md:flex-col md:justify-start md:border-t-0 md:border-r"
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col items-stretch gap-1 border-r border-line bg-surface p-2 transition-transform md:z-40 md:w-28 md:translate-x-0 md:justify-start print:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
+        <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="grid size-12 place-items-center self-end rounded-control hover:bg-canvas md:hidden">
+          <X size={24} aria-hidden="true" />
+        </button>
         <div className="hidden justify-center pb-3 pt-2 md:flex">
           <BrandMark size={56} />
         </div>
@@ -53,7 +84,7 @@ export function AppShell() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink md:mt-auto md:min-h-20 md:flex-none"
+          className="mt-auto flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink md:min-h-20"
         >
           <SignOut size={28} aria-hidden="true" />
           Sign out
@@ -70,8 +101,8 @@ export function AppShell() {
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 md:pb-10">
-        {role && <p className="mb-4 text-sm text-ink-soft print:hidden">Signed in as {role}</p>}
+      <main className={pathname === '/sell' ? 'pb-10 pl-28 pr-4 pt-4 md:pt-6' : 'mx-auto max-w-6xl px-4 pb-10 pt-4 md:pt-6'}>
+        {role && pathname !== '/sell' && <p className="mb-4 text-sm text-ink-soft print:hidden">Signed in as {role}</p>}
         <Outlet />
       </main>
     </div>

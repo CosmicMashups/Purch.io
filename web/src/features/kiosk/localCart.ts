@@ -145,6 +145,8 @@ export function toLocalTransaction(lines: LocalCartLine[], rules?: PricingRules)
     kioskPrepNumber: null,
     kitchenStatus: 0,
     payments: [],
+    createdAt: new Date(0).toISOString(),
+    completedAt: null,
   };
 }
 
