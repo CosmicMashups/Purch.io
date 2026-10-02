@@ -10,6 +10,7 @@ import '../../catalog/domain/modifier_models.dart';
 import '../../catalog/domain/pricing_type.dart';
 import '../domain/offline_limits.dart';
 import '../domain/payment_method.dart';
+import '../domain/exchange_models.dart';
 import '../domain/pos_repository.dart';
 import '../domain/pricing_engine.dart';
 import '../domain/transaction_models.dart';
@@ -371,6 +372,12 @@ class LocalFirstPosRepository implements PosRepository {
     String transactionId,
     RefundTransactionRequest request,
   ) => _remote.refundTransaction(transactionId, request);
+
+  @override
+  Future<Adjustment> createExchange(
+    String transactionId,
+    ExchangeRequest request,
+  ) => _remote.createExchange(transactionId, request);
 
   @override
   Future<List<Transaction>> findByReceiptNumber(int receiptNumber) =>

@@ -8,6 +8,7 @@ import '../../../../core/widgets/empty_state_view.dart';
 import '../../domain/transaction_models.dart';
 import '../providers/pos_providers.dart';
 import '../widgets/refund_dialog.dart';
+import 'exchange_screen.dart';
 
 /// Looking up an older sale by its receipt number — for a refund the cashier
 /// can't reach from an open cart or the receipt they just printed (an
@@ -99,6 +100,12 @@ class _FindSaleScreenState extends ConsumerState<FindSaleScreen> {
     }
   }
 
+  Future<void> _exchange(Transaction sale) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => ExchangeScreen(sale: sale)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
@@ -113,7 +120,7 @@ class _FindSaleScreenState extends ConsumerState<FindSaleScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Look up a completed sale by its receipt number to refund it.',
+                'Look up a completed sale by its receipt number to refund or exchange it.',
                 style: TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -181,7 +188,12 @@ class _FindSaleScreenState extends ConsumerState<FindSaleScreen> {
                     ],
                   ),
                 ),
-              if (selected != null) _SaleSummary(sale: selected, onRefund: () => _refund(selected)),
+              if (selected != null)
+                _SaleSummary(
+                  sale: selected,
+                  onRefund: () => _refund(selected),
+                  onExchange: () => _exchange(selected),
+                ),
             ],
           ),
         ),
@@ -233,10 +245,15 @@ class _SaleCard extends StatelessWidget {
 }
 
 class _SaleSummary extends StatelessWidget {
-  const _SaleSummary({required this.sale, required this.onRefund});
+  const _SaleSummary({
+    required this.sale,
+    required this.onRefund,
+    required this.onExchange,
+  });
 
   final Transaction sale;
   final VoidCallback onRefund;
+  final VoidCallback onExchange;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +303,18 @@ class _SaleSummary extends StatelessWidget {
               ),
             ],
           ),
+          if (sale.status == TransactionStatus.completed) ...[
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 44,
+              child: OutlinedButton.icon(
+                key: const Key('open-exchange'),
+                onPressed: onExchange,
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                label: const Text('Exchange'),
+              ),
+            ),
+          ],
           if (!refunded) ...[
             const SizedBox(height: AppSpacing.md),
             SizedBox(

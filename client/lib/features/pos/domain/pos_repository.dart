@@ -1,3 +1,4 @@
+import 'exchange_models.dart';
 import 'transaction_models.dart';
 
 /// D1's cart engine — a single in-progress Open transaction per device.
@@ -36,6 +37,13 @@ abstract class PosRepository {
   /// day, a different terminal) can still be refunded or exchanged. Receipt numbers are only unique per
   /// device, so this can come back with more than one match.
   Future<List<Transaction>> findByReceiptNumber(int receiptNumber);
+
+  /// Records an exchange against a completed sale: some of its lines come back, other items go out, and
+  /// the price difference is settled. Always needs a manager/admin's approval — see [ExchangeRequest].
+  Future<Adjustment> createExchange(
+    String transactionId,
+    ExchangeRequest request,
+  );
 
   /// Sends a whole sale — cart lines, discounts and payment — in one call.
   /// Idempotent on [CheckoutRequest.saleId].

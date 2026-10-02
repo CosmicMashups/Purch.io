@@ -6,6 +6,7 @@ import 'package:purch_client/features/catalog/domain/modifier_models.dart';
 import 'package:purch_client/features/catalog/domain/pricing_type.dart';
 import 'package:purch_client/features/catalog/domain/tingi_mode.dart';
 import 'package:purch_client/features/pos/data/local_first_pos_repository.dart';
+import 'package:purch_client/features/pos/domain/exchange_models.dart';
 import 'package:purch_client/features/pos/domain/item_promo_models.dart';
 import 'package:purch_client/features/pos/domain/payment_method.dart';
 import 'package:purch_client/features/pos/domain/pos_repository.dart';
@@ -195,6 +196,12 @@ class _RecordingRemote implements PosRepository {
   Future<Transaction> refundTransaction(
     String transactionId,
     RefundTransactionRequest request,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<Adjustment> createExchange(
+    String transactionId,
+    ExchangeRequest request,
   ) => throw UnimplementedError();
 
   @override

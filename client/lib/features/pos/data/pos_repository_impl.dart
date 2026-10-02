@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/failure_mapper.dart';
+import '../domain/exchange_models.dart';
 import '../domain/pos_repository.dart';
 import '../domain/transaction_models.dart';
 
@@ -100,6 +101,18 @@ class PosRepositoryImpl implements PosRepository {
       '/transactions/$transactionId/refund',
       request.toJson(),
       Transaction.fromJson,
+    );
+  }
+
+  @override
+  Future<Adjustment> createExchange(
+    String transactionId,
+    ExchangeRequest request,
+  ) {
+    return _post(
+      '/transactions/$transactionId/exchange',
+      request.toJson(),
+      Adjustment.fromJson,
     );
   }
 

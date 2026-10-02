@@ -1,3 +1,5 @@
+import 'package:purch_client/core/errors/failure.dart';
+import 'package:purch_client/features/pos/domain/exchange_models.dart';
 import 'package:purch_client/features/pos/domain/payment_method.dart';
 import 'package:purch_client/features/pos/domain/pos_repository.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
@@ -331,6 +333,20 @@ class FakePosRepository implements PosRepository {
       payments: cart.payments,
     );
     return cart;
+  }
+
+  ExchangeRequest? lastExchange;
+  Adjustment? exchangeResult;
+  Failure? exchangeFailure;
+
+  @override
+  Future<Adjustment> createExchange(
+    String transactionId,
+    ExchangeRequest request,
+  ) async {
+    lastExchange = request;
+    if (exchangeFailure != null) throw exchangeFailure!;
+    return exchangeResult!;
   }
 
   List<Transaction> foundByReceiptNumber = [];
