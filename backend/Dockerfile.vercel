@@ -15,7 +15,9 @@ COPY src/Purch.Api/Purch.Api.csproj src/Purch.Api/
 # linux-x64 + ReadyToRun: the assemblies ship precompiled, so a cold start skips most JIT compilation
 # (the biggest part of a .NET cold start). On a non-x64 host the precompiled code is ignored and the
 # runtime JITs as before, so this is safe either way. Framework-dependent, so the runtime image is unchanged.
-RUN dotnet restore src/Purch.Api/Purch.Api.csproj -r linux-x64
+# The restore must carry PublishReadyToRun too: it is what pulls the runtime pack the publish step needs, and
+# without it publish --no-restore fails with NETSDK1094 ("a valid runtime package was not found").
+RUN dotnet restore src/Purch.Api/Purch.Api.csproj -r linux-x64 -p:PublishReadyToRun=true
 
 COPY src/ src/
 RUN dotnet publish src/Purch.Api/Purch.Api.csproj -c Release -o /app/publish --no-restore \
