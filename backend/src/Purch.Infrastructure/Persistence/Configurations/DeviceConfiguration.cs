@@ -10,6 +10,8 @@ public class DeviceConfiguration : IEntityTypeConfiguration<Device>
     {
         // Global uniqueness (not per-tenant): the anonymous login flow looks up a
         // device by pairing code alone, before it knows which tenant to scope to.
-        _ = builder.HasIndex(d => d.PairingCode).IsUnique();
+        // Devices paired with a one-time code have no permanent code, so the empty value is left out of the index.
+        _ = builder.HasIndex(d => d.PairingCode).IsUnique().HasFilter("\"PairingCode\" <> ''");
+        _ = builder.HasIndex(d => d.PairingCodeHash).IsUnique().HasFilter("\"PairingCodeHash\" IS NOT NULL");
     }
 }

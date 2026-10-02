@@ -25,4 +25,7 @@ public enum DeviceType
     /// pairing PIN. Its session carries the Warehouse role, so it only ever
     /// sees Home and Inventory.</summary>
     WarehouseOfficer,
+
+    /// <summary>An unattended customer-facing screen paired to one Register, which relays its live cart.</summary>
+    CustomerDisplay,
 }

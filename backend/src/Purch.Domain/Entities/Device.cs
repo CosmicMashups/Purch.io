@@ -22,6 +22,24 @@ public class Device : TenantScopedEntity
     /// PINs use.</summary>
     public string? PairingPinHash { get; set; }
 
+    /// <summary>What the Admin calls this device, for example "Front counter till".</summary>
+    public string? Name { get; set; }
+
+    public DeviceStatus Status { get; set; } = DeviceStatus.Active;
+
+    /// <summary>SHA-256 of the one-time code that pairs this device, or null once it has been used or has expired.
+    /// Replaces the permanent PairingCode and PairingPinHash, which stay until the old sign-in is removed.</summary>
+    public string? PairingCodeHash { get; set; }
+
+    public DateTimeOffset? PairingCodeExpiresAt { get; set; }
+
+    public DateTimeOffset? PairedAt { get; set; }
+
+    public DateTimeOffset? RevokedAt { get; set; }
+
+    /// <summary>For a CustomerDisplay: the Register whose cart it mirrors.</summary>
+    public Guid? LinkedRegisterDeviceId { get; set; }
+
     public DateTimeOffset? LastSeenAt { get; set; }
 
     /// <summary>Bumped whenever this device's pairing code or PIN is reset. Embedded

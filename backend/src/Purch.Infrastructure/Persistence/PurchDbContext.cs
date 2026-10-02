@@ -19,6 +19,16 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<Account> Accounts => Set<Account>();
+
+    public DbSet<Membership> Memberships => Set<Membership>();
+
+    public DbSet<MembershipBranch> MembershipBranches => Set<MembershipBranch>();
+
+    public DbSet<EnrolmentInvite> EnrolmentInvites => Set<EnrolmentInvite>();
+
+    public DbSet<DeviceCredential> DeviceCredentials => Set<DeviceCredential>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Item> Items => Set<Item>();
