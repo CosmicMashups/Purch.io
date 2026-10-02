@@ -41,4 +41,20 @@ public sealed class EfAdjustmentRepository(PurchDbContext dbContext) : IAdjustme
     {
         return await dbContext.AdjustmentReplacementLines.AsNoTracking().Where(line => line.AdjustmentId == adjustmentId).ToListAsync(cancellationToken);
     }
+
+    public async Task<AdjustmentTotals> GetTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var row = await dbContext.Adjustments
+            .AsNoTracking()
+            .Where(adjustment => adjustment.DeviceId == deviceId && adjustment.CreatedAt >= since)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                PriceDifferenceTotal = g.Sum(a => a.PriceDifference),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? new AdjustmentTotals(0, 0m) : new AdjustmentTotals(row.Count, row.PriceDifferenceTotal);
+    }
 }

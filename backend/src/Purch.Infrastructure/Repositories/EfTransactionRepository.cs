@@ -91,10 +91,14 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
 
     public async Task<IReadOnlyList<Transaction>> ListUnreportedCompletedByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
+        // Completed OR Refunded: a sale refunded before ever being read must still be reported here (its
+        // TotalAmount nets out against the matching entry in GetRefundedTotalsByDeviceSinceAsync) and get
+        // its ZReadingNumber stamped — otherwise it silently never appears on any reading at all. Never
+        // Voided, which never gets a receipt number in the first place.
         return await dbContext.Transactions
             .Where(transaction =>
                 transaction.DeviceId == deviceId
-                && transaction.Status == TransactionStatus.Completed
+                && (transaction.Status == TransactionStatus.Completed || transaction.Status == TransactionStatus.Refunded)
                 && transaction.ReceiptNumber != null
                 && transaction.ZReadingNumber == null)
             .OrderBy(transaction => transaction.ReceiptNumber)
@@ -129,6 +133,28 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .FirstOrDefaultAsync(cancellationToken);
 
         return row is null ? new VoidedTotals(0, 0m) : new VoidedTotals(row.Count, row.Amount);
+    }
+
+    public async Task<RefundedTotals> GetRefundedTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        // Filtered by RefundedAt, not CreatedAt — a refund belongs to the reading whose window it
+        // actually happened in, which can be long after (and even already-reported past) the sale itself.
+        var row = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.DeviceId == deviceId
+                && transaction.Status == TransactionStatus.Refunded
+                && transaction.RefundedAt != null
+                && transaction.RefundedAt >= since)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                Amount = g.Sum(t => t.TotalAmount),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? new RefundedTotals(0, 0m) : new RefundedTotals(row.Count, row.Amount);
     }
 
     public async Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default)

@@ -695,6 +695,7 @@ public sealed class TransactionService(
 
         var beforeState = new { status = transaction.Status.ToString(), total = transaction.TotalAmount };
         transaction.Status = TransactionStatus.Refunded;
+        transaction.RefundedAt = DateTimeOffset.UtcNow;
 
         auditLogRepository.Add(new AuditLog
         {

@@ -35,6 +35,11 @@ public class Transaction : TenantScopedEntity
 
     public TransactionStatus Status { get; set; } = TransactionStatus.Open;
 
+    /// <summary>When this sale was refunded, or null — the precise moment a Z-reading needs to decide
+    /// whether a refund falls in its window (see BirReadingService), since the refund can happen long
+    /// after the sale's own CreatedAt and often after the sale was already reported on an earlier reading.</summary>
+    public DateTimeOffset? RefundedAt { get; set; }
+
     public decimal TotalAmount { get; set; }
 
     public decimal DiscountAmount { get; set; }

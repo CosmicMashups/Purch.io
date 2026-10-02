@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
+using Purch.Application.Common;
 using Purch.Common.TestUtilities;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -21,6 +22,31 @@ public sealed class OpenPerDeviceAndMigrationTests(PostgresContainerFixture post
     {
         var options = new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(connectionString).Options;
         return new PurchDbContext(options, new TestCurrentTenantProvider { TenantId = tenantId });
+    }
+
+    /// <summary>Inserts a cart row by raw SQL, naming only the columns that exist at
+    /// <see cref="MigrationBeforeIndexes"/> — seeding through the live <see cref="PurchDbContext"/> model
+    /// would reference columns (like Transaction.RefundedAt) that migration hasn't added to the scratch
+    /// database yet. Every column added to Transaction after that checkpoint stays out of this list.</summary>
+    private static async Task InsertCartBeforeIndexesAsync(NpgsqlConnection connection, Guid tenantId, Guid deviceId, TransactionStatus status, DateTimeOffset createdAt)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO "Transactions"
+                ("Id", "TenantId", "CreatedAt", "BranchId", "DeviceId", "Status", "TotalAmount", "DiscountAmount",
+                 "SeniorPwdDiscountApplied", "PromoDiscountAmount", "ItemPromoDiscountAmount", "OriginatedFromKiosk",
+                 "KioskPrepNumber", "KitchenStatus")
+            VALUES
+                (@id, @tenantId, @createdAt, @branchId, @deviceId, @status, 0, 0, false, 0, 0, false, 0, 0)
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", Guid.NewGuid());
+        command.Parameters.AddWithValue("tenantId", tenantId);
+        command.Parameters.AddWithValue("createdAt", createdAt);
+        command.Parameters.AddWithValue("branchId", Guid.NewGuid());
+        command.Parameters.AddWithValue("deviceId", deviceId);
+        command.Parameters.AddWithValue("status", (int)status);
+        _ = await command.ExecuteNonQueryAsync();
     }
 
     private static Transaction Cart(Guid tenantId, Guid deviceId, TransactionStatus status, DateTimeOffset createdAt)
@@ -89,11 +115,13 @@ public sealed class OpenPerDeviceAndMigrationTests(PostgresContainerFixture post
         {
             await before.GetService<IMigrator>().MigrateAsync(MigrationBeforeIndexes);
 
-            _ = before.Transactions.Add(Cart(tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-30)));
-            _ = before.Transactions.Add(Cart(tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-20)));
-            _ = before.Transactions.Add(Cart(tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-10)));
-            _ = before.Transactions.Add(Cart(tenantId, deviceId, TransactionStatus.Completed, now.AddMinutes(-40)));
-            _ = before.Transactions.Add(Cart(tenantId, otherDeviceId, TransactionStatus.Open, now.AddMinutes(-5)));
+            await using var connection = new NpgsqlConnection(scratch);
+            await connection.OpenAsync();
+            await InsertCartBeforeIndexesAsync(connection, tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-30));
+            await InsertCartBeforeIndexesAsync(connection, tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-20));
+            await InsertCartBeforeIndexesAsync(connection, tenantId, deviceId, TransactionStatus.Open, now.AddMinutes(-10));
+            await InsertCartBeforeIndexesAsync(connection, tenantId, deviceId, TransactionStatus.Completed, now.AddMinutes(-40));
+            await InsertCartBeforeIndexesAsync(connection, tenantId, otherDeviceId, TransactionStatus.Open, now.AddMinutes(-5));
 
             _ = before.Shifts.Add(OpenShift(tenantId, deviceId, ShiftStatus.Open, now.AddHours(-3)));
             _ = before.Shifts.Add(OpenShift(tenantId, deviceId, ShiftStatus.Open, now.AddHours(-1)));

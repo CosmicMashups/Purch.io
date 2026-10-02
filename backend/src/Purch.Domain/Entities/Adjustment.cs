@@ -16,6 +16,11 @@ public class Adjustment : TenantScopedEntity
 
     public Guid BranchId { get; set; }
 
+    /// <summary>The terminal that processed the exchange — not necessarily the one that rang up the
+    /// original sale. Its Z-reading is the one whose cash drawer the settlement actually moved, so this
+    /// is the device BirReadingService attributes the exchange's net revenue to.</summary>
+    public Guid DeviceId { get; set; }
+
     public Guid RequestedByUserId { get; set; }
 
     public Guid ApprovedByUserId { get; set; }

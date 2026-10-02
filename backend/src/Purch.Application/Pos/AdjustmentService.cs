@@ -194,6 +194,7 @@ public sealed class AdjustmentService(
             TenantId = CurrentTenantId,
             OriginalTransactionId = transaction.Id,
             BranchId = transaction.BranchId,
+            DeviceId = CurrentDeviceId,
             RequestedByUserId = CurrentUserId,
             ApprovedByUserId = approver.Id,
             Reason = request.Reason,
@@ -314,4 +315,7 @@ public sealed class AdjustmentService(
 
     private Guid CurrentUserId => currentActorProvider.UserId
         ?? throw new InvalidOperationException("An exchange requires an authenticated staff user.");
+
+    private Guid CurrentDeviceId => currentActorProvider.DeviceId
+        ?? throw new InvalidOperationException("An exchange requires an authenticated device context.");
 }

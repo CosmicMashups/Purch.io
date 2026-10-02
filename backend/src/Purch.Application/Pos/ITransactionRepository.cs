@@ -41,6 +41,11 @@ public interface ITransactionRepository
 
     Task<VoidedTotals> GetVoidedTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
 
+    /// <summary>Sales originally rung up on this device that were refunded since the given time — filtered
+    /// by RefundedAt, not CreatedAt, so a refund of an old (even already-reported) sale still lands in the
+    /// reading whose window it actually happened in. See BirReadingDto.RefundsTotal.</summary>
+    Task<RefundedTotals> GetRefundedTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
+
     /// <summary>Kiosk orders submitted at this branch, awaiting pickup by a cashier — see TransactionService.SubmitKioskOrderAsync/ClaimKioskOrderAsync.</summary>
     Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
 
@@ -61,3 +66,5 @@ public interface ITransactionRepository
 }
 
 public sealed record VoidedTotals(int Count, decimal Amount);
+
+public sealed record RefundedTotals(int Count, decimal Amount);

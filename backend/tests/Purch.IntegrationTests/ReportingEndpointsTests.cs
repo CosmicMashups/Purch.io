@@ -225,6 +225,96 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_sale_refunded_before_its_first_reading_still_counts_but_nets_to_zero()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Noodles", 100m);
+        var sale = (await (await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], false, null, null, new RecordPaymentRequest(PaymentMethod.Cash, 100m))))
+            .Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        var refundResponse = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Wrong order", "1234"));
+        Assert.Equal(HttpStatusCode.OK, refundResponse.StatusCode);
+
+        var reading = await (await client.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        // The sale is still reported (so it is never lost) and its refund nets it straight back out.
+        Assert.Equal(1, reading!.TransactionCount);
+        Assert.Equal(100m, reading.RefundsTotal);
+        Assert.Equal(0m, reading.NetSales);
+        Assert.Equal(0m, reading.NewGrandAccumulatedSales);
+    }
+
+    [Fact]
+    public async Task A_refund_of_an_already_reported_sale_counts_on_the_reading_covering_when_it_was_refunded()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Pancit", 100m);
+        var sale = (await (await client.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], false, null, null, new RecordPaymentRequest(PaymentMethod.Cash, 100m))))
+            .Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        var firstReading = await (await client.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        Assert.Equal(100m, firstReading!.NetSales);
+        Assert.Equal(100m, firstReading.NewGrandAccumulatedSales);
+
+        _ = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Customer changed their mind", "1234"));
+
+        var secondReading = await (await client.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        // No new sale this period, but the refund of the old one still shows up and pulls sales negative.
+        Assert.Equal(0, secondReading!.TransactionCount);
+        Assert.Equal(100m, secondReading.RefundsTotal);
+        Assert.Equal(-100m, secondReading.NetSales);
+        Assert.Equal(0m, secondReading.NewGrandAccumulatedSales);
+    }
+
+    [Fact]
+    public async Task An_exchanges_net_revenue_counts_on_the_terminal_that_processed_it_not_the_original_sale()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var deviceA = await AuthenticatedAdminClientAsync(factory);
+        var ramen = await CreateItemAsync(deviceA, "Ramen", 100m);
+        var katsudon = await CreateItemAsync(deviceA, "Katsudon", 130m);
+        var sale = (await (await deviceA.PostAsJsonAsync(
+            "/transactions/checkout",
+            new CheckoutRequest(Guid.NewGuid(), [new AddTransactionLineRequest(ramen.Id, null, 1m)], false, null, null, new RecordPaymentRequest(PaymentMethod.Cash, 100m))))
+            .Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        var ramenLine = sale.Lines.Single();
+
+        // A second terminal (device B) processes the exchange — not the one that rang up the sale.
+        var branches = await deviceA.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
+        var branchId = branches!.Single().Id;
+        var deviceBResponse = await deviceA.PostAsJsonAsync("/devices", new CreateDeviceRequest(branchId, DeviceIdentifier: null));
+        var deviceBInfo = (await deviceBResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions))!;
+        using var deviceB = factory.CreateClient();
+        var deviceBLogin = await deviceB.PostAsJsonAsync("/auth/login", new LoginRequest(deviceBInfo.PairingCode, "1234"));
+        deviceB.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await deviceBLogin.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+
+        var exchangeResponse = await deviceB.PostAsJsonAsync(
+            $"/transactions/{sale.Id}/exchange",
+            new CreateExchangeRequest(
+                [new ReturnLineRequest(ramenLine.Id, 1m)],
+                [new ReplacementLineRequest(katsudon.Id, null, 1m)],
+                "Customer wanted katsudon instead",
+                "1234",
+                PaymentMethod.Cash,
+                30m));
+        Assert.Equal(HttpStatusCode.OK, exchangeResponse.StatusCode);
+
+        var deviceAReading = await (await deviceA.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        Assert.Equal(0m, deviceAReading!.ExchangeAdjustmentsTotal);
+
+        var deviceBReading = await (await deviceB.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+        Assert.Equal(30m, deviceBReading!.ExchangeAdjustmentsTotal);
+        Assert.Equal(30m, deviceBReading.NetSales);
+    }
+
+    [Fact]
     public async Task The_sales_dashboard_reflects_a_completed_sale_in_today_and_the_trend()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

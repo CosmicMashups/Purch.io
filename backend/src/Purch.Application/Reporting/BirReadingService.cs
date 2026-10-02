@@ -11,6 +11,7 @@ namespace Purch.Application.Reporting;
 /// accreditation review (docs/adr/0005).</summary>
 public sealed class BirReadingService(
     ITransactionRepository transactionRepository,
+    IAdjustmentRepository adjustmentRepository,
     IReceiptSequenceRepository receiptSequenceRepository,
     IDeviceRepository deviceRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -62,24 +63,35 @@ public sealed class BirReadingService(
             .ToList();
         var missingReceiptNumbers = FindMissingReceiptNumbers(transactions, previousEnding, endingReceiptNumber);
 
+        var lastZReadingAt = sequence.LastZReadingAt ?? DateTimeOffset.MinValue;
+        var voidedTotals = await transactionRepository.GetVoidedTotalsByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
+        // Filtered by RefundedAt/CreatedAt respectively, not by "unreported" — both are current-period
+        // events that can apply to a sale reported (or even rung up) on an earlier reading.
+        var refundedTotals = await transactionRepository.GetRefundedTotalsByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
+        var adjustmentTotals = await adjustmentRepository.GetTotalsByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
+
         // A sale's total is gross - item promos (BOGO / combo / item discount) - cart discounts, and the cart
         // discounts (DiscountAmount) are the Senior/PWD amount plus the promo code. Item promos are stored
         // apart from them, so leaving them out understated gross sales and hid promo discounts entirely:
         // gross minus the reported discounts has to equal net.
-        var netSales = transactions.Sum(t => t.TotalAmount);
+        var salesTotal = transactions.Sum(t => t.TotalAmount);
         var promoCodeDiscountTotal = transactions.Sum(t => t.PromoDiscountAmount);
         var seniorPwdDiscountTotal = transactions.Sum(t => t.DiscountAmount) - promoCodeDiscountTotal;
         var promoDiscountTotal = promoCodeDiscountTotal + transactions.Sum(t => t.ItemPromoDiscountAmount);
         var totalDiscounts = seniorPwdDiscountTotal + promoDiscountTotal;
+
+        // Exchanges add (or give back) revenue, refunds take it away — both fold into net sales right
+        // alongside the period's ordinary sales, and are also kept on their own DTO fields so the reading
+        // stays auditable instead of blending a different kind of event into "sales".
+        var exchangeAdjustmentsTotal = adjustmentTotals.PriceDifferenceTotal;
+        var refundsTotal = refundedTotals.Amount;
+        var netSales = salesTotal + exchangeAdjustmentsTotal - refundsTotal;
         var grossSales = netSales + totalDiscounts;
 
         // VAT computed off net sales (post-Senior/PWD discount, which is VAT-exempt under RA 9994) —
         // see the TODO(BIR-ACCREDITATION) on BirReadingDto for why this is best-effort, not final.
         var vatableSales = netSales / (1 + VatRate);
         var vatAmount = netSales - vatableSales;
-
-        var lastZReadingAt = sequence.LastZReadingAt ?? DateTimeOffset.MinValue;
-        var voidedTotals = await transactionRepository.GetVoidedTotalsByDeviceSinceAsync(deviceId, lastZReadingAt, cancellationToken);
 
         var oldGrandAccumulatedSales = sequence.GrandAccumulatedSales;
         var newGrandAccumulatedSales = oldGrandAccumulatedSales + netSales;
@@ -117,6 +129,8 @@ public sealed class BirReadingService(
             seniorPwdDiscountTotal,
             promoDiscountTotal,
             totalDiscounts,
+            exchangeAdjustmentsTotal,
+            refundsTotal,
             netSales,
             voidedTotals.Count,
             voidedTotals.Amount,

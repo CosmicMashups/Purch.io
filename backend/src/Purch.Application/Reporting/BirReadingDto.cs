@@ -25,6 +25,14 @@ public sealed record BirReadingDto(
     decimal SeniorPwdDiscountTotal,
     decimal PromoDiscountTotal,
     decimal TotalDiscounts,
+    // Exchanges (Adjustment) processed on this device since the last reading: ReplacementTotal minus
+    // ReturnedTotal, already folded into GrossSales/NetSales below — broken out here so the reading stays
+    // auditable (what actually happened) instead of blending a different kind of event into "sales".
+    decimal ExchangeAdjustmentsTotal,
+    // Sales originally rung up on this device that were refunded since the last reading, whether or not
+    // the sale itself was already reported on an earlier one — a refund is a current-period event even
+    // when it reverses an old sale. Already subtracted from GrossSales/NetSales below.
+    decimal RefundsTotal,
     decimal NetSales,
     int VoidedCount,
     decimal VoidedAmount,

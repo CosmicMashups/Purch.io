@@ -17,4 +17,10 @@ public interface IAdjustmentRepository
     Task<IReadOnlyList<AdjustmentReturnLine>> ListReturnLinesAsync(Guid adjustmentId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AdjustmentReplacementLine>> ListReplacementLinesAsync(Guid adjustmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Exchanges processed on this device since the given time — what BirReadingService folds
+    /// into a reading's net sales (see BirReadingDto.ExchangeAdjustmentsTotal).</summary>
+    Task<AdjustmentTotals> GetTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
 }
+
+public sealed record AdjustmentTotals(int Count, decimal PriceDifferenceTotal);
