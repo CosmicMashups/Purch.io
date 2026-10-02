@@ -28,6 +28,7 @@ import { KioskOrdersPage } from './features/pos/KioskOrdersPage';
 import { ShiftPage } from './features/shifts/ShiftPage';
 import { CustomerDisplayPage } from './hardware/display/CustomerDisplayPage';
 import { HardwarePage } from './hardware/HardwarePage';
+import { FindSalePage } from './features/pos/FindSalePage';
 import { PaymentPage } from './features/pos/PaymentPage';
 import { ReceiptPage } from './features/pos/ReceiptPage';
 import { SellPage } from './features/pos/SellPage';
@@ -97,6 +98,7 @@ export function App() {
             <Route path="/sell/hardware" element={<HardwarePage />} />
             <Route path="/sell/payment" element={<PaymentPage />} />
             <Route path="/sell/receipt" element={<ReceiptPage />} />
+            <Route path="/sell/find-sale" element={<FindSalePage />} />
             <Route path="/sell/*" element={<Navigate to="/sell" replace />} />
           </Route>
 

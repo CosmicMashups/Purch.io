@@ -123,6 +123,7 @@ function Register({ isSupervisor }: { isSupervisor: boolean }) {
       <div className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap gap-2">
           <LinkButton to="/sell/kiosk-orders">Kiosk orders</LinkButton>
+          <LinkButton to="/sell/find-sale">Find a sale</LinkButton>
           <LinkButton to="/sell/shift">Shift and drawer</LinkButton>
           <LinkButton to="/sell/hardware">Hardware</LinkButton>
           <button
