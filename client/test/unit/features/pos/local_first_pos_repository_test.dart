@@ -199,6 +199,10 @@ class _RecordingRemote implements PosRepository {
   ) => throw UnimplementedError();
 
   @override
+  Future<Map<String, double>> listReturnableLines(String transactionId) =>
+      throw UnimplementedError();
+
+  @override
   Future<Adjustment> createExchange(
     String transactionId,
     ExchangeRequest request,

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
@@ -38,6 +39,13 @@ function variantLabel(variant: ItemVariant) {
 export function ExchangePage() {
   const receipt = usePosStore((s) => s.receipt);
   const { data: items = [] } = useItems();
+  // How much of each line earlier exchanges have left. Until it loads, a line can go up to what was bought
+  // (the server still checks), so a slow or failed lookup never blocks the cashier.
+  const { data: returnable } = useQuery({
+    queryKey: ['returnable-lines', receipt?.id],
+    queryFn: () => posApi.returnableLines(receipt!.id),
+    enabled: !!receipt,
+  });
 
   const [returns, setReturns] = useState<Record<string, number>>({});
   const [replacements, setReplacements] = useState<Replacement[]>([]);
@@ -153,15 +161,17 @@ export function ExchangePage() {
         <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
           {receipt.lines.map((line) => {
             const quantity = returns[line.id] ?? 0;
+            const remaining = returnable?.find((r) => r.lineId === line.id)?.remainingQuantity ?? line.quantity;
             return (
               <li key={line.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold">{line.itemName}</p>
                   <p className="text-sm text-ink-soft">
                     Bought {line.quantity} at {formatPeso(line.unitPrice)}
+                    {remaining < line.quantity && (remaining > 0 ? `, ${remaining} left to return` : ', all already returned')}
                   </p>
                 </div>
-                <Stepper label={`Return quantity for ${line.itemName}`} value={quantity} max={line.quantity} onChange={(q) => setReturnQuantity(line.id, q)} />
+                <Stepper label={`Return quantity for ${line.itemName}`} value={quantity} max={remaining} onChange={(q) => setReturnQuantity(line.id, q)} />
               </li>
             );
           })}

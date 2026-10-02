@@ -277,6 +277,22 @@ public sealed class AdjustmentService(
         return await ToDtoAsync(adjustment, transaction, returnLines, replacementLines, changeGiven, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ReturnableLineDto>> ListReturnableLinesAsync(Guid originalTransactionId, CancellationToken cancellationToken = default)
+    {
+        var transaction = await transactionRepository.GetByIdAsync(originalTransactionId, cancellationToken);
+        if (transaction is null || transaction.TenantId != CurrentTenantId)
+        {
+            throw new NotFoundException("Transaction", originalTransactionId);
+        }
+
+        var alreadyReturned = (await adjustmentRepository.ListReturnLinesByTransactionAsync(transaction.Id, cancellationToken))
+            .GroupBy(line => line.OriginalLineId)
+            .ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
+
+        return [.. (await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken))
+            .Select(line => new ReturnableLineDto(line.Id, line.Quantity - alreadyReturned.GetValueOrDefault(line.Id)))];
+    }
+
     private async Task<AdjustmentDto> ToDtoAsync(
         Adjustment adjustment,
         Transaction transaction,

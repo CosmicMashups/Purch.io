@@ -163,6 +163,26 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Returnable_lines_shrink_as_exchanges_take_quantity_back()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var (ramen, katsudon, sale) = await RamenAndKatsudonSaleAsync(client);
+        var ramenLine = sale.Lines.Single(l => l.ItemId == ramen.Id);
+
+        var before = await client.GetFromJsonAsync<List<ReturnableLineDto>>($"/transactions/{sale.Id}/returnable-lines", JsonOptions);
+        Assert.Equal(2m, before!.Single(l => l.LineId == ramenLine.Id).RemainingQuantity);
+
+        var exchange = await client.PostAsJsonAsync(
+            $"/transactions/{sale.Id}/exchange",
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap one", "1234"));
+        Assert.Equal(HttpStatusCode.OK, exchange.StatusCode);
+
+        var after = await client.GetFromJsonAsync<List<ReturnableLineDto>>($"/transactions/{sale.Id}/returnable-lines", JsonOptions);
+        Assert.Equal(1m, after!.Single(l => l.LineId == ramenLine.Id).RemainingQuantity);
+    }
+
+    [Fact]
     public async Task A_combo_or_service_item_cannot_be_taken_as_a_replacement_yet()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

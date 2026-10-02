@@ -71,8 +71,11 @@ const _result = Adjustment(
   changeGiven: 180,
 );
 
-Future<FakePosRepository> _open(WidgetTester tester) async {
-  final repository = FakePosRepository(initialCart: _sale);
+Future<FakePosRepository> _open(
+  WidgetTester tester, {
+  Map<String, double>? returnable,
+}) async {
+  final repository = FakePosRepository(initialCart: _sale)..returnableLines = returnable;
   final catalog = FakeCatalogRepository()
     ..items.addAll([
       _item('mocha', 'Mocha', 170, PricingType.unit),
@@ -102,6 +105,19 @@ Future<void> _fillAndPick(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('caps the return quantity at what earlier exchanges left', (tester) async {
+    final repository = await _open(tester, returnable: {'line-1': 1});
+
+    expect(find.textContaining('1 left to return'), findsOneWidget);
+    await tester.tap(find.byTooltip('Increase Iced Latte'));
+    await tester.pump();
+    final increase = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, Icons.add_circle_outline),
+    );
+    expect(increase.onPressed, isNull);
+    expect(repository.lastExchange, isNull);
+  });
+
   testWidgets('only offers items an exchange supports', (tester) async {
     await _open(tester);
     await tester.enterText(find.byKey(const Key('exchange-search')), 'moc');

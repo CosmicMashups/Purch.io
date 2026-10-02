@@ -374,6 +374,10 @@ class LocalFirstPosRepository implements PosRepository {
   ) => _remote.refundTransaction(transactionId, request);
 
   @override
+  Future<Map<String, double>> listReturnableLines(String transactionId) =>
+      _remote.listReturnableLines(transactionId);
+
+  @override
   Future<Adjustment> createExchange(
     String transactionId,
     ExchangeRequest request,

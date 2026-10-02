@@ -85,6 +85,13 @@ public static class PosEndpoints
             Results.Ok(await adjustmentService.CreateExchangeAsync(transactionId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        _ = app.MapGet("/transactions/{transactionId:guid}/returnable-lines", async (
+            Guid transactionId,
+            IAdjustmentService adjustmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await adjustmentService.ListReturnableLinesAsync(transactionId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,
             ITransactionService transactionService,

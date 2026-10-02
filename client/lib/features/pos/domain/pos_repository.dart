@@ -45,6 +45,10 @@ abstract class PosRepository {
     ExchangeRequest request,
   );
 
+  /// How much of each line of a completed sale can still be returned, keyed by line id (what was bought,
+  /// less what earlier exchanges already took back).
+  Future<Map<String, double>> listReturnableLines(String transactionId);
+
   /// Sends a whole sale — cart lines, discounts and payment — in one call.
   /// Idempotent on [CheckoutRequest.saleId].
   Future<Transaction> checkout(CheckoutRequest request);

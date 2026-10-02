@@ -10,7 +10,7 @@ import { ExchangePage } from './ExchangePage';
 import { usePosStore } from './posStore';
 import { PaymentMethod, TransactionStatus, type Adjustment } from './types';
 
-vi.mock('./api', () => ({ posApi: { exchange: vi.fn() } }));
+vi.mock('./api', () => ({ posApi: { exchange: vi.fn(), returnableLines: vi.fn() } }));
 vi.mock('../catalog/api', () => ({ catalogApi: { listItems: vi.fn(), listVariants: vi.fn() } }));
 
 const sale = makeCart({
@@ -63,9 +63,20 @@ beforeEach(() => {
     makeItem({ id: 'combo', name: 'Mocha Combo', pricingType: PricingType.Combo }),
   ]);
   vi.mocked(catalogApi.listVariants).mockResolvedValue([]);
+  vi.mocked(posApi.returnableLines).mockResolvedValue([{ lineId: 'l1', remainingQuantity: 2 }]);
 });
 
 describe('ExchangePage', () => {
+  it('caps the return quantity at what earlier exchanges left', async () => {
+    vi.mocked(posApi.returnableLines).mockResolvedValue([{ lineId: 'l1', remainingQuantity: 1 }]);
+    renderExchange();
+
+    expect(await screen.findByText(/1 left to return/)).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: 'Return quantity for Iced Latte' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Increase' }));
+    expect(within(group).getByRole('button', { name: 'Increase' })).toBeDisabled();
+  });
+
   it('only offers items an exchange supports', async () => {
     renderExchange();
     fireEvent.change(screen.getByPlaceholderText('Name, SKU or barcode'), { target: { value: 'moc' } });

@@ -67,6 +67,27 @@ class _ExchangeScreenState extends ConsumerState<ExchangeScreen> {
   String? _error;
   Adjustment? _done;
 
+  /// What earlier exchanges left of each line. Until it loads (or if the lookup fails) a line can go up
+  /// to what was bought; the server still checks, so a slow lookup never blocks the cashier.
+  Map<String, double> _returnable = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReturnable();
+  }
+
+  Future<void> _loadReturnable() async {
+    try {
+      final returnable = await ref
+          .read(posRepositoryProvider)
+          .listReturnableLines(widget.sale.id);
+      if (mounted) setState(() => _returnable = returnable);
+    } on Failure {
+      // Keep the optimistic caps.
+    }
+  }
+
   @override
   void dispose() {
     _search.dispose();
@@ -116,6 +137,16 @@ class _ExchangeScreenState extends ConsumerState<ExchangeScreen> {
         )
         .take(6)
         .toList();
+  }
+
+  String _returnSubtitle(TransactionLine line) {
+    final bought =
+        'Bought ${_fmt(line.quantity)} at ${formatCurrency(line.unitPrice)}';
+    final remaining = _returnable[line.id];
+    if (remaining == null || remaining >= line.quantity) return bought;
+    return remaining > 0
+        ? '$bought, ${_fmt(remaining)} left to return'
+        : '$bought, all already returned';
   }
 
   void _setReturn(String lineId, double quantity) =>
@@ -253,10 +284,9 @@ class _ExchangeScreenState extends ConsumerState<ExchangeScreen> {
         for (final line in widget.sale.lines)
           _StepperRow(
             title: line.itemName,
-            subtitle:
-                'Bought ${_fmt(line.quantity)} at ${formatCurrency(line.unitPrice)}',
+            subtitle: _returnSubtitle(line),
             value: _returns[line.id] ?? 0,
-            max: line.quantity,
+            max: _returnable[line.id] ?? line.quantity,
             onChanged: (q) => _setReturn(line.id, q),
           ),
         const SizedBox(height: AppSpacing.xl),

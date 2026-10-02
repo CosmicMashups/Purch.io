@@ -24,6 +24,9 @@ export const posApi = {
   refund: (transactionId: string, body: RefundTransactionRequest) => apiClient.post<Transaction>(`/transactions/${transactionId}/refund`, body).then((r) => r.data),
   exchange: (transactionId: string, body: CreateExchangeRequest) =>
     apiClient.post<Adjustment>(`/transactions/${transactionId}/exchange`, body).then((r) => r.data),
+  /** How much of each line can still be returned, after earlier exchanges. */
+  returnableLines: (transactionId: string) =>
+    apiClient.get<{ lineId: string; remainingQuantity: number }[]>(`/transactions/${transactionId}/returnable-lines`).then((r) => r.data),
   /** Finds a completed sale by its receipt number, to refund or exchange one the cashier doesn't already
    * have open. Receipt numbers are only unique per device, so more than one sale can come back. */
   findByReceiptNumber: (receiptNumber: number) => apiClient.get<Transaction[]>(`/transactions/by-receipt/${receiptNumber}`).then((r) => r.data),

@@ -335,6 +335,13 @@ class FakePosRepository implements PosRepository {
     return cart;
   }
 
+  Map<String, double>? returnableLines;
+
+  @override
+  Future<Map<String, double>> listReturnableLines(String transactionId) async =>
+      returnableLines ??
+      {for (final line in cart.lines) line.id: line.quantity};
+
   ExchangeRequest? lastExchange;
   Adjustment? exchangeResult;
   Failure? exchangeFailure;

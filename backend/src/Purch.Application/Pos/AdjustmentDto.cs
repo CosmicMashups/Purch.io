@@ -46,3 +46,6 @@ public sealed record AdjustmentDto(
     decimal PriceDifference,
     PaymentMethod? SettlementMethod,
     decimal? ChangeGiven);
+
+/// <summary>How much of one original sale line is still available to return.</summary>
+public sealed record ReturnableLineDto(Guid LineId, decimal RemainingQuantity);

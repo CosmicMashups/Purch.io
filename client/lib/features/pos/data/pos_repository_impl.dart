@@ -105,6 +105,21 @@ class PosRepositoryImpl implements PosRepository {
   }
 
   @override
+  Future<Map<String, double>> listReturnableLines(String transactionId) async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/transactions/$transactionId/returnable-lines',
+      );
+      return {
+        for (final row in (response.data ?? []).cast<Map<String, dynamic>>())
+          row['lineId'] as String: (row['remainingQuantity'] as num).toDouble(),
+      };
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
   Future<Adjustment> createExchange(
     String transactionId,
     ExchangeRequest request,
