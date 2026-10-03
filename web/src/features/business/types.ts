@@ -12,6 +12,26 @@ export type DeviceType = (typeof DeviceType)[keyof typeof DeviceType];
 export const DeviceStatus = { Active: 0, Pending: 1, Revoked: 2 } as const;
 export type DeviceStatus = (typeof DeviceStatus)[keyof typeof DeviceStatus];
 
+/** A person's standing in one business (MembershipRole). A Staff member is further limited by their duties. */
+export const MembershipRole = { Admin: 0, Manager: 1, Staff: 2 } as const;
+export type MembershipRole = (typeof MembershipRole)[keyof typeof MembershipRole];
+
+export const membershipRoleLabels: Record<number, string> = {
+  [MembershipRole.Admin]: 'Admin',
+  [MembershipRole.Manager]: 'Manager',
+  [MembershipRole.Staff]: 'Staff',
+};
+
+/** What a staff member is qualified to work as (StaffDuty flags). Several can be combined. */
+export const StaffDuty = { Cashier: 1, Warehouse: 2, Kitchen: 4 } as const;
+export const dutyLabels: Record<number, string> = { [StaffDuty.Cashier]: 'Cashier', [StaffDuty.Warehouse]: 'Warehouse', [StaffDuty.Kitchen]: 'Kitchen' };
+export const DUTIES: readonly number[] = [StaffDuty.Cashier, StaffDuty.Warehouse, StaffDuty.Kitchen];
+
+export function describeDuties(duties: number): string {
+  const names = DUTIES.filter((d) => (duties & d) !== 0).map((d) => dutyLabels[d]);
+  return names.length > 0 ? names.join(', ') : 'No duties';
+}
+
 export const ReceiptPrinterProfile = { None: 0, ThermalEscPos: 1 } as const;
 export type ReceiptPrinterProfile = (typeof ReceiptPrinterProfile)[keyof typeof ReceiptPrinterProfile];
 

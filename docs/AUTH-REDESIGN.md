@@ -58,6 +58,21 @@ scope because a token carries one scope id. Both are replaced when sessions are 
   kind of device. The old per-device pairing PIN screens redirect there. The Flutter client still uses the old pairing.
 - The old permanent pairing code, pairing PIN and `/kiosk/session` style endpoints still exist until step 8.
 
+## Staff enrolment (step 4)
+
+- Admin or Manager: `POST /staff/invites` (name, email, role, duties, branches) returns a single-use token once, shown as a
+  link and QR code (`/enrol/<token>`, valid three days). A Manager can only invite and manage Staff. A staff invite needs at
+  least one duty and one branch. `GET /staff/invites` lists the waiting ones, `DELETE /staff/invites/{id}` cancels one.
+- Person (no session): `POST /enrol/preview` shows what the link is for; `POST /enrol/redeem` sets the password (a new
+  account) or checks the existing one (someone already registered in another business), sets the personal PIN, creates the
+  membership and signs them in. The link works once even if two people race for it (xmin row version).
+- `GET /staff/members`, `PUT /staff/members/{id}` (role, duties, branches, active; the business always keeps one active
+  Admin; a change ends that person's sessions) and `POST /staff/members/{id}/reset-link` (a single-use link to choose a new
+  password, which also ends their sessions). Changes are written to the audit log.
+- Web: Business, Staff is now the new people list, an invite form with the link and QR dialog, waiting links, and the reset
+  link. `/enrol/:token` is the public page the person opens. The old PIN-only staff list is no longer shown (the rows
+  remain until step 8).
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.

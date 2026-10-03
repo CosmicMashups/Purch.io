@@ -1,199 +1,208 @@
 import { useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { toast } from '../../components/feedback/toastStore';
 import { EditorCard } from '../../components/forms/EditorCard';
 import { FormField, controlClass } from '../../components/forms/FormField';
 import { FormLoader } from '../../components/forms/FormLoader';
 import { ListCard, Pill, QueryList } from '../../components/lists/QueryList';
 import { PageHeader } from '../../components/PageHeader';
+import { formatDateTime } from '../../lib/dates';
 import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
-import { useDepartments } from '../catalog/queries';
-import type { Department } from '../catalog/types';
-import type { StaffMember } from './staffApi';
-import { useCreateStaff, useStaff, useUpdateStaff } from './staffQueries';
-import { pinProblem, scopeChoicesFor, scopeFields, staffSchema, type StaffForm } from './staffRules';
-import { Role, ScopeType, STAFF_ROLES, labelOf, roleLabels, scopeLabels } from './types';
+import { InviteLinkDialog } from './components/InviteLinkDialog';
+import type { Invite, InviteLink, Member } from './memberApi';
+import { useCancelInvite, useInvite, useInvites, useMembers, useResetLink, useUpdateMember } from './memberQueries';
+import { DUTIES, MembershipRole, StaffDuty, describeDuties, dutyLabels, labelOf, membershipRoleLabels } from './types';
 
-function describeScope(member: StaffMember, branches: Branch[], departments: Department[]): string {
-  if (member.scopeType === ScopeType.Branch) return branches.find((b) => b.id === member.scopeId)?.name ?? 'One branch';
-  if (member.scopeType === ScopeType.Department) return departments.find((d) => d.id === member.scopeId)?.name ?? 'One department';
-  return 'Whole business';
+const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
+const dangerLink = 'h-12 text-base font-semibold text-danger underline';
+
+function branchNames(ids: string[], branches: Branch[]): string {
+  return ids.map((id) => branches.find((b) => b.id === id)?.name ?? 'a branch').join(', ');
+}
+
+function describeAccess(person: { role: number; duties: number; branchIds: string[] }, branches: Branch[]): string {
+  if (person.role !== MembershipRole.Staff) return `${labelOf(membershipRoleLabels, person.role)}, every branch`;
+  return `${describeDuties(person.duties)} at ${branchNames(person.branchIds, branches) || 'no branch'}`;
 }
 
 export function StaffPage() {
   const { role } = useSession();
   const isAdmin = role === 'Admin';
-  const staff = useStaff();
+  const members = useMembers();
+  const invites = useInvites();
   const branches = useBranches();
-  const departments = useDepartments();
-  const [editing, setEditing] = useState<StaffMember | null>(null);
+  const cancel = useCancelInvite();
+  const resetLink = useResetLink();
+  const [editing, setEditing] = useState<Member | null>(null);
+  const [shown, setShown] = useState<InviteLink | null>(null);
+  const [cancelFor, setCancelFor] = useState<Invite | null>(null);
+
+  // A Manager looks after staff only; the server refuses the rest, so the buttons are simply not offered.
+  const mayManage = (member: Member) => isAdmin || member.role === MembershipRole.Staff;
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Staff" subtitle={isAdmin ? undefined : 'Only an admin can add or change staff.'} backTo={{ to: '/business', label: 'Business' }} />
-      <div className={isAdmin ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]' : ''}>
-        <QueryList
-          query={staff}
-          errorTitle="Staff could not be loaded"
-          emptyMessage="No staff yet."
-          renderRow={(member) => (
-            <ListCard key={member.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{member.name}</p>
-                <p className="text-base">
-                  {labelOf(roleLabels, member.role)}, {describeScope(member, branches.data ?? [], departments.data ?? [])}
-                </p>
-                {isAdmin && (
-                  <button type="button" onClick={() => setEditing(member)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                    Edit
-                  </button>
-                )}
-              </div>
-              {!member.isActive && <Pill>Inactive</Pill>}
-            </ListCard>
-          )}
-        />
-        {isAdmin && (
-          <FormLoader
-            failed={branches.isError ? branches : departments.isError ? departments : null}
-            ready={!!(branches.data && departments.data)}
-          >
-            {branches.data && departments.data && (
-              <StaffEditor key={editing?.id ?? 'new'} member={editing} branches={branches.data} departments={departments.data} onDone={() => setEditing(null)} />
+      <PageHeader title="Staff" subtitle="Invite people with a link. They set their own password and PIN." backTo={{ to: '/business', label: 'Business' }} />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+        <div className="flex flex-col gap-6">
+          <QueryList
+            query={members}
+            errorTitle="Staff could not be loaded"
+            emptyMessage="No one here yet. Invite your first person."
+            renderRow={(member) => (
+              <ListCard key={member.id}>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold">{member.name}</p>
+                  <p className="text-sm text-ink-soft">{member.email}</p>
+                  <p className="text-base">{describeAccess(member, branches.data ?? [])}</p>
+                  {mayManage(member) && (
+                    <div className="mt-2 flex flex-wrap gap-x-5">
+                      <button type="button" onClick={() => setEditing(member)} className={linkButton}>
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => resetLink.mutate(member.id, { onSuccess: setShown })} className={linkButton}>
+                        Password reset link
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!member.isActive && <Pill>Inactive</Pill>}
+              </ListCard>
             )}
-          </FormLoader>
-        )}
+          />
+
+          {(invites.data?.length ?? 0) > 0 && (
+            <section aria-labelledby="pending-heading" className="flex flex-col gap-2">
+              <h2 id="pending-heading" className="text-lg font-semibold">
+                Waiting to join
+              </h2>
+              {invites.data?.map((invite) => (
+                <ListCard key={invite.id}>
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold">{invite.name || invite.email}</p>
+                    <p className="text-sm text-ink-soft">
+                      {invite.purpose === 1 ? 'Password reset' : describeAccess(invite, branches.data ?? [])}, link expires {formatDateTime(invite.expiresAt)}
+                    </p>
+                    <button type="button" onClick={() => setCancelFor(invite)} className={dangerLink}>
+                      Cancel link
+                    </button>
+                  </div>
+                </ListCard>
+              ))}
+            </section>
+          )}
+        </div>
+
+        <FormLoader failed={branches.isError ? branches : null} ready={!!branches.data}>
+          {branches.data && <PersonEditor key={editing?.id ?? 'new'} member={editing} branches={branches.data} isAdmin={isAdmin} onDone={() => setEditing(null)} onInvited={setShown} />}
+        </FormLoader>
       </div>
+
+      <ConfirmModal
+        open={cancelFor !== null}
+        destructive
+        title="Cancel this link?"
+        description="It stops working at once. You can invite the person again."
+        confirmLabel="Cancel link"
+        onConfirm={() => {
+          if (cancelFor) cancel.mutate(cancelFor.id, { onSuccess: () => toast.info('Link cancelled') });
+          setCancelFor(null);
+        }}
+        onCancel={() => setCancelFor(null)}
+      />
+      {shown && <InviteLinkDialog link={shown} onClose={() => setShown(null)} />}
     </div>
   );
 }
 
-function StaffEditor({ member, branches, departments, onDone }: { member: StaffMember | null; branches: Branch[]; departments: Department[]; onDone: () => void }) {
-  const create = useCreateStaff();
-  const update = useUpdateStaff();
-  const {
-    register,
-    control,
-    handleSubmit,
-    setValue,
-    setError,
-    formState: { errors },
-  } = useForm<StaffForm>({
-    resolver: zodResolver(staffSchema),
-    defaultValues: {
-      name: member?.name ?? '',
-      role: member?.role ?? Role.Cashier,
-      scopeType: member?.scopeType ?? ScopeType.Tenant,
-      branchId: member?.scopeType === ScopeType.Branch ? (member.scopeId ?? '') : '',
-      departmentId: member?.scopeType === ScopeType.Department ? (member.scopeId ?? '') : '',
-      pin: '',
-      isActive: member?.isActive ?? true,
-    },
-  });
-  const roleValue = Number(useWatch({ control, name: 'role' }));
-  const scopeType = Number(useWatch({ control, name: 'scopeType' }));
+function PersonEditor({ member, branches, isAdmin, onDone, onInvited }: { member: Member | null; branches: Branch[]; isAdmin: boolean; onDone: () => void; onInvited: (link: InviteLink) => void }) {
+  const invite = useInvite();
+  const update = useUpdateMember();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<number>(member?.role ?? MembershipRole.Staff);
+  const [duties, setDuties] = useState<number>(member?.duties ?? StaffDuty.Cashier);
+  const [branchIds, setBranchIds] = useState<string[]>(member?.branchIds ?? (branches.length === 1 ? [branches[0].id] : []));
+  const [isActive, setIsActive] = useState(member?.isActive ?? true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const submit = handleSubmit((v) => {
-    const scope = scopeFields(v.scopeType, v.branchId, v.departmentId, departments);
-    if (!scope.ok) {
-      setError(v.scopeType === ScopeType.Branch ? 'branchId' : 'departmentId', { message: scope.message });
-      return;
-    }
+  const isStaff = role === MembershipRole.Staff;
+  const toggleDuty = (duty: number) => setDuties((d) => d ^ duty);
+  const toggleBranch = (id: string) => setBranchIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const found: Record<string, string> = {};
+    if (!member && !name.trim()) found.name = 'Enter their name';
+    if (!member && !/^\S+@\S+\.\S+$/.test(email.trim())) found.email = 'Enter a valid email address';
+    if (isStaff && duties === 0) found.duties = 'Choose at least one duty';
+    if (isStaff && branchIds.length === 0) found.branches = 'Choose at least one branch';
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    const access = { role, duties: isStaff ? duties : 0, branchIds: isStaff ? branchIds : [] };
     if (member) {
-      update.mutate(
-        { id: member.id, body: { role: v.role, scopeType: v.scopeType, scopeId: scope.scopeId, branchId: scope.branchId, isActive: v.isActive } },
-        { onSuccess: () => { toast.success('Staff member updated'); onDone(); } },
-      );
+      update.mutate({ id: member.id, body: { ...access, isActive } }, { onSuccess: () => { toast.success('Saved'); onDone(); } });
       return;
     }
-    const problem = pinProblem(v.pin);
-    if (problem) {
-      setError('pin', { message: problem });
-      return;
-    }
-    create.mutate(
-      { name: v.name, role: v.role, scopeType: v.scopeType, scopeId: scope.scopeId, branchId: scope.branchId, pin: v.pin.trim() },
-      { onSuccess: () => { toast.success('Staff member added'); onDone(); } },
-    );
-  });
+    invite.mutate({ name: name.trim(), email: email.trim(), ...access }, { onSuccess: onInvited });
+    setName('');
+    setEmail('');
+  }
 
   return (
-    <EditorCard title="staff member" editing={!!member} busy={create.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
-      {member ? (
-        <p className="text-base font-semibold">{member.name}</p>
-      ) : (
-        <FormField label="Name" error={errors.name?.message}>
-          <input {...register('name')} className={controlClass} />
-        </FormField>
-      )}
-
-      <FormField label="Role" error={errors.role?.message}>
-        <select
-          {...register('role', {
-            valueAsNumber: true,
-            onChange: (e) => {
-              // An admin is always whole-business.
-              if (Number(e.target.value) === Role.Admin) setValue('scopeType', ScopeType.Tenant);
-            },
-          })}
-          className={controlClass}
-        >
-          {STAFF_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {roleLabels[r]}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Can work in">
-        <select {...register('scopeType', { valueAsNumber: true })} className={controlClass}>
-          {scopeChoicesFor(roleValue).map((s) => (
-            <option key={s} value={s}>
-              {scopeLabels[s]}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      {scopeType === ScopeType.Branch && (
-        <FormField label="Branch" error={errors.branchId?.message}>
-          <select {...register('branchId')} className={controlClass}>
-            <option value="">Choose a branch</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-      )}
-
-      {scopeType === ScopeType.Department && (
-        <FormField label="Department" error={errors.departmentId?.message}>
-          <select {...register('departmentId')} className={controlClass}>
-            <option value="">Choose a department</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({branches.find((b) => b.id === d.branchId)?.name ?? 'branch'})
-              </option>
-            ))}
-          </select>
-        </FormField>
-      )}
-
+    <EditorCard title="person" editing={!!member} heading={member ? `Edit ${member.name}` : 'Invite someone'} submitLabel={member ? 'Save' : 'Invite'} busy={invite.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
       {!member && (
-        <FormField label="PIN" hint="4 to 8 digits. Each person needs a PIN nobody else uses." error={errors.pin?.message}>
-          <input type="password" inputMode="numeric" autoComplete="new-password" {...register('pin')} className={controlClass} />
-        </FormField>
+        <>
+          <FormField label="Name" error={errors.name}>
+            <input value={name} onChange={(e) => setName(e.target.value)} className={controlClass} />
+          </FormField>
+          <FormField label="Email" hint="Their login name. No email is sent." error={errors.email}>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" className={controlClass} />
+          </FormField>
+        </>
+      )}
+
+      <FormField label="Role">
+        <select value={role} onChange={(e) => setRole(Number(e.target.value))} className={controlClass} disabled={!isAdmin}>
+          {(isAdmin ? [MembershipRole.Staff, MembershipRole.Manager, MembershipRole.Admin] : [MembershipRole.Staff]).map((r) => (
+            <option key={r} value={r}>
+              {membershipRoleLabels[r]}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      {isStaff && (
+        <>
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-base font-semibold">Can work as</legend>
+            {DUTIES.map((duty) => (
+              <label key={duty} className="flex h-12 items-center gap-3 text-base">
+                <input type="checkbox" checked={(duties & duty) !== 0} onChange={() => toggleDuty(duty)} className="size-6 accent-brand" />
+                {dutyLabels[duty]}
+              </label>
+            ))}
+            {errors.duties && <p role="alert" className="text-sm font-medium text-danger">{errors.duties}</p>}
+          </fieldset>
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-base font-semibold">Works at</legend>
+            {branches.map((b) => (
+              <label key={b.id} className="flex h-12 items-center gap-3 text-base">
+                <input type="checkbox" checked={branchIds.includes(b.id)} onChange={() => toggleBranch(b.id)} className="size-6 accent-brand" />
+                {b.name}
+              </label>
+            ))}
+            {errors.branches && <p role="alert" className="text-sm font-medium text-danger">{errors.branches}</p>}
+          </fieldset>
+        </>
       )}
 
       {member && (
         <label className="flex h-12 items-center gap-3 text-base font-semibold">
-          <input type="checkbox" {...register('isActive')} className="size-6 accent-brand" />
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="size-6 accent-brand" />
           Active
         </label>
       )}

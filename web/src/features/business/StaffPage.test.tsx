@@ -1,154 +1,125 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useToastStore } from '../../components/feedback/toastStore';
-import { ApiError } from '../../lib/apiError';
 import { renderPage, signInAs } from '../../test/render';
 import { branchesApi } from '../branches/api';
-import { departmentsApi } from '../departments/api';
-import { staffApi, type StaffMember } from './staffApi';
+import { memberApi, type Invite, type Member } from './memberApi';
 import { StaffPage } from './StaffPage';
 
-vi.mock('./staffApi', () => ({ staffApi: { list: vi.fn(), create: vi.fn(), update: vi.fn() } }));
+vi.mock('./memberApi', () => ({ memberApi: { list: vi.fn(), update: vi.fn(), resetLink: vi.fn(), invites: vi.fn(), invite: vi.fn(), cancelInvite: vi.fn() } }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
-vi.mock('../departments/api', () => ({ departmentsApi: { listAllDepartments: vi.fn() } }));
+vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,AAAA') } }));
 
-const members: StaffMember[] = [
-  { id: 'u1', name: 'Mario Cruz', role: 0, scopeType: 0, scopeId: null, branchId: null, isActive: true },
-  { id: 'u2', name: 'Ana Reyes', role: 2, scopeType: 1, scopeId: 'kat', branchId: 'kat', isActive: true },
-  { id: 'u3', name: 'Old Timer', role: 3, scopeType: 0, scopeId: null, branchId: null, isActive: false },
-];
+const owner: Member = { id: 'm1', name: 'Ana Reyes', email: 'ana@example.com', role: 0, duties: 0, branchIds: [], isActive: true, hasPin: true };
+const manager: Member = { id: 'm2', name: 'Maria Lopez', email: 'maria@example.com', role: 1, duties: 0, branchIds: [], isActive: true, hasPin: true };
+const cashier: Member = { id: 'm3', name: 'Ben Santos', email: 'ben@example.com', role: 2, duties: 1, branchIds: ['kat'], isActive: true, hasPin: true };
+const pending: Invite = { id: 'i1', purpose: 0, name: 'Carla Dizon', email: 'carla@example.com', role: 2, duties: 2, branchIds: ['kat'], expiresAt: '2026-10-06T02:00:00Z' };
+
+const linkFor = (invite: Invite, token = 'tok123') => ({ invite, token });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useToastStore.setState({ toasts: [] });
   signInAs('Admin');
-  vi.mocked(staffApi.list).mockResolvedValue(members);
+  vi.mocked(memberApi.list).mockResolvedValue([owner, manager, cashier]);
+  vi.mocked(memberApi.invites).mockResolvedValue([pending]);
   vi.mocked(branchesApi.list).mockResolvedValue([
     { id: 'kat', name: 'Katipunan', address: null },
-    { id: 'kam', name: 'Kamuning', address: null },
+    { id: 'qc', name: 'Cubao', address: null },
   ]);
-  vi.mocked(departmentsApi.listAllDepartments).mockResolvedValue([{ id: 'grill', name: 'Grill', branchId: 'kam' }]);
-  vi.mocked(staffApi.create).mockResolvedValue(members[1]);
-  vi.mocked(staffApi.update).mockResolvedValue(members[1]);
 });
 
-describe('StaffPage list', () => {
-  it('shows each person with their role and where they can work', async () => {
+describe('StaffPage', () => {
+  it('lists each person with what they can do and where, and who is still waiting to join', async () => {
     renderPage(<StaffPage />);
-    expect(await screen.findByText('Mario Cruz')).toBeInTheDocument();
-    expect(screen.getByText('Admin, Whole business')).toBeInTheDocument();
-    expect(screen.getByText('Cashier, Katipunan')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(await screen.findByText('Ben Santos')).toBeInTheDocument();
+    expect(screen.getByText('Cashier at Katipunan')).toBeInTheDocument();
+    expect(screen.getByText('Admin, every branch')).toBeInTheDocument();
+    expect(screen.getByText('maria@example.com')).toBeInTheDocument();
+    expect(await screen.findByText('Carla Dizon')).toBeInTheDocument();
+    expect(screen.getByText(/Warehouse at Katipunan, link expires/)).toBeInTheDocument();
   });
 
-  it('lets a manager look but not change', async () => {
+  it('invites a person and shows the single-use link once, with a QR code', async () => {
+    vi.mocked(memberApi.invite).mockResolvedValue(linkFor({ ...pending, id: 'i2', name: 'Dan Uy', email: 'dan@example.com' }));
+    renderPage(<StaffPage />);
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: ' Dan Uy ' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'dan@example.com' } });
+    fireEvent.click(screen.getByLabelText('Warehouse'));
+    fireEvent.click(screen.getByLabelText('Katipunan'));
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+
+    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Dan Uy', email: 'dan@example.com', role: 2, duties: 3, branchIds: ['kat'] }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invitation link' });
+    expect(within(dialog).getByTestId('invite-url')).toHaveTextContent('/enrol/tok123');
+    expect(await within(dialog).findByAltText('QR code for dan@example.com')).toBeInTheDocument();
+    expect(within(dialog).getByText(/No email is sent/)).toBeInTheDocument();
+  });
+
+  it('needs a name, a valid email, a duty and a branch before inviting', async () => {
+    renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByLabelText('Cashier'));
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    expect(await screen.findByText('Enter their name')).toBeInTheDocument();
+    expect(screen.getByText('Enter a valid email address')).toBeInTheDocument();
+    expect(screen.getByText('Choose at least one duty')).toBeInTheDocument();
+    expect(screen.getByText('Choose at least one branch')).toBeInTheDocument();
+    expect(memberApi.invite).not.toHaveBeenCalled();
+  });
+
+  it('lets an Admin invite a manager, who works every branch so needs no duties or branches', async () => {
+    vi.mocked(memberApi.invite).mockResolvedValue(linkFor({ ...pending, role: 1 }));
+    renderPage(<StaffPage />);
+    fireEvent.change(await screen.findByLabelText('Role'), { target: { value: '1' } });
+    expect(screen.queryByLabelText('Warehouse')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Eve Tan' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'eve@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Eve Tan', email: 'eve@example.com', role: 1, duties: 0, branchIds: [] }));
+  });
+
+  it('only offers a Manager the staff role and only staff to manage', async () => {
     signInAs('Manager');
     renderPage(<StaffPage />);
-    expect(await screen.findByText('Mario Cruz')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument();
-    expect(screen.getByText('Only an admin can add or change staff.')).toBeInTheDocument();
+    const role = await screen.findByLabelText('Role');
+    expect(within(role).getAllByRole('option').map((o) => o.textContent)).toEqual(['Staff']);
+    await screen.findByText('Ben Santos');
+    // Edit and reset buttons exist for the one staff member only.
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Password reset link' })).toHaveLength(1);
+  });
+
+  it('edits a person: duties, branches and active', async () => {
+    vi.mocked(memberApi.update).mockResolvedValue({ ...cashier, duties: 3 });
+    renderPage(<StaffPage />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[2]);
+    fireEvent.click(await screen.findByLabelText('Warehouse'));
+    fireEvent.click(screen.getByLabelText('Cubao'));
+    fireEvent.click(screen.getByLabelText('Active'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(memberApi.update).toHaveBeenCalledWith('m3', { role: 2, duties: 3, branchIds: ['kat', 'qc'], isActive: false }));
+  });
+
+  it('makes a password reset link without any email', async () => {
+    vi.mocked(memberApi.resetLink).mockResolvedValue(linkFor({ ...pending, purpose: 1, name: 'Ben Santos' }, 'reset9'));
+    renderPage(<StaffPage />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Password reset link' }))[2]);
+    await waitFor(() => expect(memberApi.resetLink).toHaveBeenCalledWith('m3'));
+    const dialog = await screen.findByRole('dialog', { name: 'Password reset link' });
+    expect(within(dialog).getByTestId('invite-url')).toHaveTextContent('/enrol/reset9');
+  });
+
+  it('asks before cancelling a waiting link', async () => {
+    vi.mocked(memberApi.cancelInvite).mockResolvedValue(undefined);
+    renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel link' }));
+    const dialog = screen.getByRole('dialog', { name: 'Cancel this link?' });
+    expect(memberApi.cancelInvite).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel link' }));
+    await waitFor(() => expect(memberApi.cancelInvite).toHaveBeenCalledWith('i1'));
   });
 
   it('shows a retryable error instead of an empty list', async () => {
-    vi.mocked(staffApi.list).mockRejectedValue(new Error('boom'));
+    vi.mocked(memberApi.list).mockRejectedValue(new Error('boom'));
     renderPage(<StaffPage />);
     expect(await screen.findByText('Staff could not be loaded')).toBeInTheDocument();
-  });
-});
-
-describe('adding staff', () => {
-  async function fill(name: string, pin: string) {
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: name } });
-    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: pin } });
-  }
-
-  it('adds a whole-business cashier with no scope id or branch', async () => {
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', ' 4321 ');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(staffApi.create).toHaveBeenCalledTimes(1));
-    expect(staffApi.create).toHaveBeenCalledWith({ name: 'Ben Cruz', role: 2, scopeType: 0, scopeId: null, branchId: null, pin: '4321' });
-  });
-
-  it('gives a branch-limited person their branch as scope and branch together', async () => {
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', '4321');
-    fireEvent.change(screen.getByLabelText('Can work in'), { target: { value: '1' } });
-    fireEvent.change(await screen.findByLabelText('Branch'), { target: { value: 'kam' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(staffApi.create).toHaveBeenCalledWith({ name: 'Ben Cruz', role: 2, scopeType: 1, scopeId: 'kam', branchId: 'kam', pin: '4321' }));
-  });
-
-  it("gives a department-limited person the department and that department's branch", async () => {
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', '4321');
-    fireEvent.change(screen.getByLabelText('Can work in'), { target: { value: '2' } });
-    fireEvent.change(await screen.findByLabelText('Department'), { target: { value: 'grill' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(staffApi.create).toHaveBeenCalledWith({ name: 'Ben Cruz', role: 2, scopeType: 2, scopeId: 'grill', branchId: 'kam', pin: '4321' }));
-  });
-
-  it('asks for a branch when one-branch access is chosen without one', async () => {
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', '4321');
-    fireEvent.change(screen.getByLabelText('Can work in'), { target: { value: '1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Choose a branch', { selector: 'p' })).toBeInTheDocument();
-    expect(staffApi.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects a short or non-numeric PIN before calling the API', async () => {
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', '12a');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Use 4 to 8 digits')).toBeInTheDocument();
-    expect(staffApi.create).not.toHaveBeenCalled();
-  });
-
-  it('needs a name', async () => {
-    renderPage(<StaffPage />);
-    fireEvent.change(await screen.findByLabelText('PIN'), { target: { value: '4321' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Enter a name')).toBeInTheDocument();
-  });
-
-  it('locks an admin to the whole business', async () => {
-    renderPage(<StaffPage />);
-    fireEvent.change(await screen.findByLabelText('Role'), { target: { value: '0' } });
-    const scope = screen.getByLabelText('Can work in');
-    expect([...scope.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Whole business']);
-  });
-
-  it('shows the API message when a PIN is already taken', async () => {
-    vi.mocked(staffApi.create).mockRejectedValue(new ApiError('validation', 'That PIN is already in use by another staff member. Choose a different one.'));
-    renderPage(<StaffPage />);
-    await fill('Ben Cruz', '4321');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toMatch(/already in use/));
-  });
-});
-
-describe('editing staff', () => {
-  it('shows the person without a PIN field, and saves a role and access change', async () => {
-    renderPage(<StaffPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[1]);
-
-    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Role')).toHaveValue('2');
-    expect(screen.getByLabelText('Branch')).toHaveValue('kat');
-
-    fireEvent.change(screen.getByLabelText('Role'), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Can work in'), { target: { value: '0' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(staffApi.update).toHaveBeenCalledWith('u2', { role: 1, scopeType: 0, scopeId: null, branchId: null, isActive: true }));
-  });
-
-  it('can deactivate someone', async () => {
-    renderPage(<StaffPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[1]);
-    fireEvent.click(screen.getByLabelText('Active'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(vi.mocked(staffApi.update).mock.calls[0][1]).toMatchObject({ isActive: false }));
   });
 });

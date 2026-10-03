@@ -124,6 +124,9 @@ builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<IDeploymentContext>()));
 builder.Services.AddScoped<IAccountRepository, EfAccountRepository>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IMembershipRepository, EfMembershipRepository>();
+builder.Services.AddScoped<IEnrolmentInviteRepository, EfEnrolmentInviteRepository>();
+builder.Services.AddScoped<IStaffEnrolmentService, StaffEnrolmentService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IDeviceCredentialRepository, EfDeviceCredentialRepository>();
 builder.Services.AddScoped<IDevicePairingService, DevicePairingService>();

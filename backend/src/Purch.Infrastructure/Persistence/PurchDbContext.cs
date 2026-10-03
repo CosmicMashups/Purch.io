@@ -159,6 +159,7 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         // column). Two requests that loaded the same row can no longer both save — the second gets
         // a DbUpdateConcurrencyException (a 409) instead of double-charging or losing an update.
         _ = modelBuilder.Entity<Transaction>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<EnrolmentInvite>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<Item>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<InventoryItem>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<CustomerCreditLedger>().Property<uint>("Version").IsRowVersion();

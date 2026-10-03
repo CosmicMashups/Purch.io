@@ -5,6 +5,8 @@ using Purch.Domain.Enums;
 
 namespace Purch.Api.Endpoints;
 
+public sealed record TokenBody(string Token);
+
 public static class OnboardingEndpoints
 {
     public static IEndpointRouteBuilder MapOnboardingEndpoints(this IEndpointRouteBuilder app)
@@ -104,6 +106,74 @@ public static class OnboardingEndpoints
             IDeviceManagementService deviceService,
             CancellationToken cancellationToken) =>
             Results.Ok(await deviceService.ResetPairingPinAsync(deviceId, request.NewPin, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        // --- Staff accounts (sign-in redesign): an Admin or Manager invites a person, who opens a single-use link or QR
+        // code on their own phone to set a password and a personal PIN. No email is sent. A Manager can only deal with
+        // staff; the service refuses anything that would create or change an Admin or Manager for a Manager. ---
+        var adminOrManager = new[] { admin, nameof(Role.Manager) };
+
+        _ = app.MapGet("/staff/members", async (IStaffEnrolmentService enrolmentService, CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.ListMembersAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapPut("/staff/members/{memberId:guid}", async (
+            Guid memberId,
+            UpdateMemberRequest request,
+            System.Security.Claims.ClaimsPrincipal user,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.UpdateMemberAsync(memberId, request, user.IsInRole(admin), cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapPost("/staff/members/{memberId:guid}/reset-link", async (
+            Guid memberId,
+            System.Security.Claims.ClaimsPrincipal user,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.CreateResetLinkAsync(memberId, user.IsInRole(admin), cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapGet("/staff/invites", async (IStaffEnrolmentService enrolmentService, CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.ListInvitesAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapPost("/staff/invites", async (
+            CreateInviteRequest request,
+            System.Security.Claims.ClaimsPrincipal user,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.CreateInviteAsync(request, user.IsInRole(admin), cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapDelete("/staff/invites/{inviteId:guid}", async (
+            Guid inviteId,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+        {
+            await enrolmentService.RevokeInviteAsync(inviteId, cancellationToken);
+            return Results.NoContent();
+        }).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        // The person opening the link has no session yet.
+        _ = app.MapPost("/enrol/preview", async (
+            TokenBody body,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+        {
+            var preview = await enrolmentService.PreviewAsync(body.Token, cancellationToken);
+            return preview is null
+                ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Link not usable.", detail: "This link was already used, was cancelled, or has expired. Ask for a new one.")
+                : Results.Ok(preview);
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
+
+        _ = app.MapPost("/enrol/redeem", async (
+            RedeemInviteRequest request,
+            IStaffEnrolmentService enrolmentService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await enrolmentService.RedeemAsync(request, cancellationToken);
+            return result switch
+            {
+                RedeemInviteResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
+                RedeemInviteResult.InvalidLink => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Link not usable.", detail: "This link was already used, was cancelled, or has expired. Ask for a new one."),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(RedeemInviteResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
 
         // --- One-time device pairing (replaces the permanent pairing code and PIN above) ---
         // The Admin creates the device and is shown a code valid for ten minutes; the device exchanges it for its own
