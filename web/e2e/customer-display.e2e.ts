@@ -3,7 +3,7 @@ import { expect, test } from './support/fixtures';
 
 test('the customer display in a second window follows the sale on the till', async ({ page, context, signInAs, ip, seed }) => {
   await signInAs('cashier');
-  await resetRegister(seed.register.code, seed.pins.manager, ip);
+  await resetRegister(seed, ip);
 
   await page.goto('/sell');
   await expect(page.getByRole('button', { name: /Iced Latte/ })).toBeVisible();
@@ -23,7 +23,7 @@ test('the customer display in a second window follows the sale on the till', asy
 
 test('a display window opened after the order started still shows it', async ({ page, context, signInAs, ip, seed }) => {
   await signInAs('cashier');
-  await resetRegister(seed.register.code, seed.pins.manager, ip);
+  await resetRegister(seed, ip);
 
   await page.goto('/sell');
   await page.getByRole('button', { name: /Iced Latte/ }).click();

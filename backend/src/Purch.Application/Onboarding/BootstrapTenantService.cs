@@ -9,10 +9,7 @@ namespace Purch.Application.Onboarding;
 public sealed class BootstrapTenantService(
     ITenantRepository tenantRepository,
     IBranchRepository branchRepository,
-    IDeviceRepository deviceRepository,
-    IUserRepository userRepository,
     IPinHasher pinHasher,
-    IPasswordHasher passwordHasher,
     IDeploymentContext deploymentContext,
     IAccountService accountService,
     IAccountRepository accountRepository,
@@ -36,51 +33,23 @@ public sealed class BootstrapTenantService(
         var branch = new Branch { TenantId = tenant.Id, Name = request.BranchName.Trim() };
         branchRepository.Add(branch);
 
-        var device = new Device
+        // The owner is an account (email and password, checked by the identity provider) with an Admin membership here. If
+        // the email already has an account, the password must be that account's: anyone may register a business, but only the
+        // person who knows the password may attach it to an existing login. No device is registered at this point: the
+        // owner's session is an ordinary personal-device sign-in, and devices are added afterwards from the Devices page.
+        var account = await accountService.CreateAccountAsync(request.AdminEmail!, request.AdminName, request.AdminPassword!, cancellationToken);
+        var membership = new Membership
         {
             TenantId = tenant.Id,
-            BranchId = branch.Id,
-            PairingCode = PairingCodeGenerator.Generate(),
-        };
-        deviceRepository.Add(device);
-
-        // The old PIN user keeps the email only when this is the first business for it: that column is unique across
-        // businesses, and a person adding a second business already has the email on their account.
-        var emailIsNew = string.IsNullOrWhiteSpace(request.AdminEmail)
-            || await accountRepository.FindByEmailAsync(AccountService.NormalizeEmail(request.AdminEmail), cancellationToken) is null;
-
-        var admin = new User
-        {
-            TenantId = tenant.Id,
-            Name = request.AdminName.Trim(),
-            Role = Role.Admin,
-            ScopeType = ScopeType.Tenant,
+            AccountId = account.Id,
+            Role = MembershipRole.Admin,
             PinHash = pinHasher.Hash(request.AdminPin),
-            Email = emailIsNew ? request.AdminEmail?.Trim() : null,
-            PasswordHash = emailIsNew && request.AdminPassword is { Length: > 0 }
-                ? passwordHasher.Hash(request.AdminPassword)
-                : null,
-            IsActive = true,
         };
-        userRepository.Add(admin);
-
-        // The owner also gets the new kind of login: an account (email and password, checked by the identity
-        // provider) with an Admin membership in this business. The old PIN user above stays until it is retired.
-        if (!string.IsNullOrWhiteSpace(request.AdminEmail) && request.AdminPassword is { Length: > 0 })
-        {
-            var account = await accountService.CreateAccountAsync(request.AdminEmail, request.AdminName, request.AdminPassword, cancellationToken);
-            accountRepository.Add(new Membership
-            {
-                TenantId = tenant.Id,
-                AccountId = account.Id,
-                Role = MembershipRole.Admin,
-                LegacyUserId = admin.Id,
-            });
-        }
+        accountRepository.Add(membership);
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new BootstrapTenantResult(tenant.Id, branch.Id, device.Id, device.PairingCode, admin.Id);
+        return new BootstrapTenantResult(tenant.Id, branch.Id, membership.Id);
     }
 
     private static void Validate(BootstrapTenantRequest request)
@@ -107,17 +76,14 @@ public sealed class BootstrapTenantService(
             errors[nameof(request.AdminPin)] = [adminPinError.Replace("PIN", "Admin PIN", StringComparison.Ordinal)];
         }
 
-        var hasEmail = !string.IsNullOrWhiteSpace(request.AdminEmail);
-        var hasPassword = !string.IsNullOrWhiteSpace(request.AdminPassword);
-        if (hasPassword && PasswordPolicy.Validate(request.AdminPassword) is { } adminPasswordError)
+        if (string.IsNullOrWhiteSpace(request.AdminEmail))
         {
-            errors[nameof(request.AdminPassword)] = [adminPasswordError];
+            errors[nameof(request.AdminEmail)] = ["Admin email is required."];
         }
 
-        if (hasEmail != hasPassword)
+        if (PasswordPolicy.Validate(request.AdminPassword) is { } adminPasswordError)
         {
-            errors[nameof(request.AdminEmail)] =
-                ["Admin email and password must both be provided together, or both omitted."];
+            errors[nameof(request.AdminPassword)] = [adminPasswordError];
         }
 
         if (errors.Count > 0)

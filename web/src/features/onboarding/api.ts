@@ -5,9 +5,7 @@ import type { BootstrapBody } from './rules';
 export interface BootstrapResult {
   tenantId: string;
   branchId: string;
-  deviceId: string;
-  devicePairingCode: string;
-  adminUserId: string;
+  adminMembershipId: string;
 }
 
 export const onboardingApi = {

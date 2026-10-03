@@ -36,6 +36,17 @@ export interface CreateInviteBody {
   role: number;
   duties: number;
   branchIds: string[];
+  /** Re-enrols someone from the old sign-in, so their earlier sales and shifts stay theirs. */
+  legacyUserId?: string | null;
+}
+
+/** Someone from the old sign-in who has not been invited to the new one yet. The role and duty are suggestions. */
+export interface LegacyStaff {
+  id: string;
+  name: string;
+  suggestedRole: number;
+  suggestedDuties: number;
+  branchId: string | null;
 }
 
 export interface UpdateMemberBody {
@@ -50,6 +61,7 @@ export const memberApi = {
   update: (id: string, body: UpdateMemberBody) => apiClient.put<Member>(`/staff/members/${id}`, body).then((r) => r.data),
   resetLink: (id: string) => apiClient.post<InviteLink>(`/staff/members/${id}/reset-link`).then((r) => r.data),
   invites: () => apiClient.get<Invite[]>('/staff/invites').then((r) => r.data),
+  legacy: () => apiClient.get<LegacyStaff[]>('/staff/legacy').then((r) => r.data),
   invite: (body: CreateInviteBody) => apiClient.post<InviteLink>('/staff/invites', body).then((r) => r.data),
   cancelInvite: (id: string) => apiClient.delete(`/staff/invites/${id}`).then(() => undefined),
 };

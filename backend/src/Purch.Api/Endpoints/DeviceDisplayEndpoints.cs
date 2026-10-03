@@ -16,15 +16,6 @@ public static class DeviceDisplayEndpoints
         var orderBoardOnly = new[] { nameof(Role.OrderBoard) };
         var kitchenDisplayOnly = new[] { nameof(Role.KitchenDisplay) };
 
-        _ = app.MapPost("/order-board/session", async (
-            UnattendedSessionRequest request,
-            IUnattendedSessionService sessionService,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await sessionService.PairAsync(request, DeviceType.OrderBoard, Role.OrderBoard, cancellationToken);
-            return MapSessionResult(result);
-        }).AllowAnonymous();
-
         _ = app.MapGet("/order-board/pending", async (
             Guid branchId,
             ITransactionService transactionService,
@@ -33,15 +24,6 @@ public static class DeviceDisplayEndpoints
             var orders = await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken);
             return Results.Ok(ExcludePickedUp(orders));
         }).RequireAuthorization(policy => policy.RequireRole(orderBoardOnly));
-
-        _ = app.MapPost("/kitchen-display/session", async (
-            UnattendedSessionRequest request,
-            IUnattendedSessionService sessionService,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await sessionService.PairAsync(request, DeviceType.KitchenDisplay, Role.KitchenDisplay, cancellationToken);
-            return MapSessionResult(result);
-        }).AllowAnonymous();
 
         _ = app.MapGet("/kitchen-display/pending", async (
             Guid branchId,
@@ -60,15 +42,6 @@ public static class DeviceDisplayEndpoints
             Results.Ok(await transactionService.UpdateKitchenStatusAsync(transactionId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(kitchenDisplayOnly));
 
-        _ = app.MapPost("/warehouse-officer/session", async (
-            UnattendedSessionRequest request,
-            IUnattendedSessionService sessionService,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await sessionService.PairAsync(request, DeviceType.WarehouseOfficer, Role.Warehouse, cancellationToken);
-            return MapSessionResult(result);
-        }).AllowAnonymous();
-
         return app;
     }
 
@@ -78,18 +51,5 @@ public static class DeviceDisplayEndpoints
     private static IReadOnlyList<TransactionDto> ExcludePickedUp(IReadOnlyList<TransactionDto> orders)
     {
         return [.. orders.Where(order => order.KitchenStatus != KitchenStatus.PickedUp)];
-    }
-
-    private static IResult MapSessionResult(UnattendedSessionResult result)
-    {
-        return result switch
-        {
-            UnattendedSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
-            UnattendedSessionResult.InvalidDevice => Results.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Invalid credentials.",
-                detail: "The device pairing code or PIN was not recognized."),
-            _ => throw new InvalidOperationException($"Unhandled {nameof(UnattendedSessionResult)} case: {result.GetType().Name}"),
-        };
     }
 }

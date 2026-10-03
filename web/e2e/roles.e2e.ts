@@ -18,20 +18,24 @@ test.describe('what each role can reach', () => {
     await expect(page.getByRole('link', { name: /^Settings/ })).toHaveCount(0);
   });
 
-  test('a cashier sees Home and Cashier only, and is turned away from Business', async ({ page, signInAs }) => {
+  test('a cashier sees the Cashier page only, with no Home, and is turned away from Business', async ({ page, signInAs }) => {
     await signInAs('cashier');
     await page.goto('/');
+    await expect(page).toHaveURL(/\/sell$/);
     await expect(nav(page).getByRole('link', { name: 'Cashier' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Home' })).toHaveCount(0);
     await expect(nav(page).getByRole('link', { name: 'Business' })).toHaveCount(0);
     await expect(nav(page).getByRole('link', { name: 'Inventory' })).toHaveCount(0);
     await page.goto('/business');
     await expect(page).not.toHaveURL(/\/business/);
   });
 
-  test('a warehouse officer sees Home and Inventory only, and is turned away from Cashier', async ({ page, signInAs }) => {
+  test('a warehouse officer sees Inventory only, with no Home, and is turned away from Cashier', async ({ page, signInAs }) => {
     await signInAs('warehouse');
     await page.goto('/');
+    await expect(page).toHaveURL(/\/inventory$/);
     await expect(nav(page).getByRole('link', { name: 'Inventory' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: 'Home' })).toHaveCount(0);
     await expect(nav(page).getByRole('link', { name: 'Cashier' })).toHaveCount(0);
     await page.goto('/sell');
     await expect(page).not.toHaveURL(/\/sell/);
@@ -54,7 +58,7 @@ test.describe('device sessions stay apart from staff', () => {
 
   test('an unpaired browser is sent to pair the kiosk', async ({ page }) => {
     await page.goto('/kiosk');
-    await expect(page).toHaveURL(/\/kiosk\/pair$/);
+    await expect(page).toHaveURL(/\/pair$/);
   });
 
   test('a staff session on a device screen is told it is set up for something else', async ({ page, signInAs }) => {

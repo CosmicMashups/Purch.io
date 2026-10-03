@@ -37,11 +37,8 @@ export function OnboardingPage() {
   if (result) {
     return (
       <Shell title="You are all set">
-        <p className="text-base text-ink-soft">Your business is ready. This is the code for your first register. Keep it safe: you enter it on the device together with your PIN.</p>
-        <p className="mt-6 rounded-panel border border-brand bg-brand-tint p-6 text-center font-mono text-5xl font-bold tracking-widest" aria-label={`Device code ${result.devicePairingCode}`}>
-          {result.devicePairingCode}
-        </p>
-        <p className="mt-4 text-base">On the sign-in screen choose Staff PIN, then enter this code and the PIN you just chose.</p>
+        <p className="text-base text-ink-soft">Your business is ready. Sign in with the email and password you just chose.</p>
+        <p className="mt-4 text-base">Then add your register, kiosk and screens under Business, Devices, and invite your staff under Business, Staff. Your PIN is for unlocking a till once it is paired.</p>
         <Link to="/login" className="mt-6 inline-grid h-14 place-items-center rounded-control bg-brand px-8 text-lg font-semibold text-on-brand hover:bg-brand-strong">
           Go to sign in
         </Link>
@@ -94,7 +91,7 @@ export function OnboardingPage() {
             </FormField>
             <fieldset className="flex flex-col gap-4 rounded-panel border border-line p-4">
               <legend className="px-2 text-base font-semibold">Sign in from a computer (optional)</legend>
-              <p className="text-sm text-ink-soft">Add an email and password to manage your business from this website. Leave both blank to use your PIN only.</p>
+              <p className="text-sm text-ink-soft">This is how you sign in. Your PIN above unlocks a till.</p>
               <FormField label="Email" error={errors.adminEmail?.message}>
                 <input type="email" autoComplete="email" {...register('adminEmail')} className={controlClass} />
               </FormField>

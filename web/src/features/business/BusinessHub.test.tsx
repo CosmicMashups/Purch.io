@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.mocked(creditApi.reminders).mockResolvedValue([]);
   vi.mocked(dashboardApi.inventory).mockResolvedValue({ totalSkus: 2, outOfStockCount: 0, lowStockCount: 0, lowStockItems: [] });
   vi.mocked(dashboardApi.flaggedSync).mockResolvedValue([{ id: 'r', deviceId: 'd', entityType: 'Sale', entityId: 'e', clientTimestamp: '', reviewedAt: null }]);
-  vi.mocked(deviceApi.list).mockResolvedValue([{ id: 'd1', branchId: 'b1', pairingCode: 'AB', deviceIdentifier: 'Front counter', deviceType: 0, lastSeenAt: null }]);
+  vi.mocked(deviceApi.list).mockResolvedValue([{ id: 'd1', branchId: 'b1', deviceIdentifier: 'Front counter', deviceType: 0, lastSeenAt: null }]);
   vi.mocked(staffApi.list).mockResolvedValue([
     { id: 's1', name: 'Olive', role: 0, scopeType: 0, scopeId: null, branchId: null, isActive: true },
     { id: 's2', name: 'Ana', role: 2, scopeType: 1, scopeId: 'b1', branchId: 'b1', isActive: true },

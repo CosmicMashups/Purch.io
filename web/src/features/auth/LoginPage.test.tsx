@@ -17,7 +17,6 @@ function renderLogin() {
 }
 
 function openEmail() {
-  fireEvent.click(screen.getByRole('button', { name: 'Email' }));
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@example.com' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct horse battery' } });
 }
@@ -47,19 +46,8 @@ describe('LoginPage email sign-in', () => {
     expect(signIn).toHaveBeenLastCalledWith('ana@example.com', 'correct horse battery', 't2');
   });
 
-  it('still lets an owner in through the older back-office login until it is retired', async () => {
-    vi.spyOn(authApi, 'signIn').mockRejectedValue(new ApiError('unauthorized', 'raw'));
-    const legacy = vi.spyOn(authApi, 'adminLogin').mockResolvedValue({ accessToken: 'a3', refreshToken: 'r3' });
-    renderLogin();
-    openEmail();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByText('Home')).toBeInTheDocument();
-    expect(legacy).toHaveBeenCalledWith('ana@example.com', 'correct horse battery');
-  });
-
   it('says the details were not recognised when neither login accepts them', async () => {
     vi.spyOn(authApi, 'signIn').mockRejectedValue(new ApiError('unauthorized', 'raw'));
-    vi.spyOn(authApi, 'adminLogin').mockRejectedValue(new ApiError('unauthorized', 'raw'));
     renderLogin();
     openEmail();
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));

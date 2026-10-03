@@ -5,7 +5,7 @@ import { branchesApi } from '../branches/api';
 import { memberApi, type Invite, type Member } from './memberApi';
 import { StaffPage } from './StaffPage';
 
-vi.mock('./memberApi', () => ({ memberApi: { list: vi.fn(), update: vi.fn(), resetLink: vi.fn(), invites: vi.fn(), invite: vi.fn(), cancelInvite: vi.fn() } }));
+vi.mock('./memberApi', () => ({ memberApi: { list: vi.fn(), update: vi.fn(), resetLink: vi.fn(), invites: vi.fn(), legacy: vi.fn(), invite: vi.fn(), cancelInvite: vi.fn() } }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,AAAA') } }));
 
@@ -21,6 +21,7 @@ beforeEach(() => {
   signInAs('Admin');
   vi.mocked(memberApi.list).mockResolvedValue([owner, manager, cashier]);
   vi.mocked(memberApi.invites).mockResolvedValue([pending]);
+  vi.mocked(memberApi.legacy).mockResolvedValue([]);
   vi.mocked(branchesApi.list).mockResolvedValue([
     { id: 'kat', name: 'Katipunan', address: null },
     { id: 'qc', name: 'Cubao', address: null },
@@ -47,7 +48,7 @@ describe('StaffPage', () => {
     fireEvent.click(screen.getByLabelText('Katipunan'));
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
 
-    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Dan Uy', email: 'dan@example.com', role: 2, duties: 3, branchIds: ['kat'] }));
+    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Dan Uy', email: 'dan@example.com', role: 2, duties: 3, branchIds: ['kat'], legacyUserId: null }));
     const dialog = await screen.findByRole('dialog', { name: 'Invitation link' });
     expect(within(dialog).getByTestId('invite-url')).toHaveTextContent('/enrol/tok123');
     expect(await within(dialog).findByAltText('QR code for dan@example.com')).toBeInTheDocument();
@@ -73,7 +74,7 @@ describe('StaffPage', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Eve Tan' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'eve@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
-    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Eve Tan', email: 'eve@example.com', role: 1, duties: 0, branchIds: [] }));
+    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Eve Tan', email: 'eve@example.com', role: 1, duties: 0, branchIds: [], legacyUserId: null }));
   });
 
   it('only offers a Manager the staff role and only staff to manage', async () => {
@@ -115,6 +116,19 @@ describe('StaffPage', () => {
     expect(memberApi.cancelInvite).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel link' }));
     await waitFor(() => expect(memberApi.cancelInvite).toHaveBeenCalledWith('i1'));
+  });
+
+  it('lists people from the old sign-in and invites one with their old id carried over', async () => {
+    vi.mocked(memberApi.legacy).mockResolvedValue([{ id: 'u7', name: 'Old Cashier', suggestedRole: 2, suggestedDuties: 1, branchId: 'kat' }]);
+    vi.mocked(memberApi.invite).mockResolvedValue(linkFor({ ...pending, id: 'i3', name: 'Old Cashier', email: 'old@example.com' }));
+    renderPage(<StaffPage />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Invite' }))[0]);
+    expect(await screen.findByRole('heading', { name: 'Invite Old Cashier' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Old Cashier');
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'old@example.com' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Invite' }).at(-1)!);
+
+    await waitFor(() => expect(memberApi.invite).toHaveBeenCalledWith({ name: 'Old Cashier', email: 'old@example.com', role: 2, duties: 1, branchIds: ['kat'], legacyUserId: 'u7' }));
   });
 
   it('shows a retryable error instead of an empty list', async () => {

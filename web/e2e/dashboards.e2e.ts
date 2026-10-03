@@ -1,11 +1,11 @@
-import { pinLogin, resetRegister } from './support/api';
+import { resetRegister, unlockOnTill } from './support/api';
 import { expect, test } from './support/fixtures';
 
 test.describe('the Home dashboard', () => {
   test('shows real revenue, the calendar, top sellers and stock health, with no error', async ({ page, signInAs, ip, seed }) => {
     // Give the day something to show: one sale rung up at the register.
-    const cashier = await pinLogin(seed.register.code, seed.pins.cashier, ip);
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    const cashier = await unlockOnTill(seed, 'cashier', ip);
+    await resetRegister(seed, ip);
     const add = await fetch(`http://127.0.0.1:${process.env.E2E_API_PORT ?? '5099'}/transactions/cart/lines`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${cashier.accessToken}`, 'x-forwarded-for': ip },
@@ -30,17 +30,10 @@ test.describe('the Home dashboard', () => {
     await expect(page.getByRole('table').first()).toBeVisible();
   });
 
-  test('a manager sees the same charts, and a warehouse officer only stock', async ({ page, signInAs }) => {
+  test('a manager sees the same charts', async ({ page, signInAs }) => {
     await signInAs('manager');
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Revenue' })).toBeVisible();
-  });
-
-  test('a warehouse officer sees stock and no money', async ({ page, signInAs }) => {
-    await signInAs('warehouse');
-    await page.goto('/');
-    await expect(page.getByRole('meter', { name: 'Running low' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Revenue' })).toHaveCount(0);
   });
 
   test('the chart can be read with the keyboard', async ({ page, signInAs }) => {

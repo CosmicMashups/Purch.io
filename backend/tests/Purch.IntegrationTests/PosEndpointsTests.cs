@@ -480,17 +480,11 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
     private static async Task<(StaffLogin Staff, HttpClient Admin)> ManagerAndCashierAsync(PurchApiFactory factory)
     {
         var admin = await AuthenticatedAdminClientAsync(factory);
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
-        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
+        var managerId = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        var cashierId = await TestSessions.AddPersonAsync(admin, "Cal Cashier", MembershipRole.Staff, StaffDuty.Cashier, "6789");
+        var cashier = await TestSessions.UnlockAsync(admin, cashierId, "6789");
 
-        var cashier = factory.CreateClient();
-        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "6789"));
-        var token = (await login.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken;
-        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        return (new StaffLogin(cashier, staff!.Single(x => x.Role == Role.Manager).Id, staff!.Single(x => x.Role == Role.Cashier).Id), admin);
+        return (new StaffLogin(cashier, managerId, cashierId), admin);
     }
 
     private static CheckoutRequest OfflineSeniorSale(ItemDto item, Guid? rungBy)
@@ -1338,28 +1332,6 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         return (await response.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 }

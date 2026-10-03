@@ -4,7 +4,11 @@ using Purch.Domain.Enums;
 
 namespace Purch.Application.Onboarding;
 
-public sealed record CreateInviteRequest(string Name, string Email, MembershipRole Role, StaffDuty Duties, IReadOnlyList<Guid>? BranchIds);
+public sealed record CreateInviteRequest(string Name, string Email, MembershipRole Role, StaffDuty Duties, IReadOnlyList<Guid>? BranchIds, Guid? LegacyUserId = null);
+
+/// <summary>Someone from the old sign-in who has not been invited to the new one yet. The role and duty are suggestions taken
+/// from what they were; the Admin confirms them, and gives the email the old system never had.</summary>
+public sealed record LegacyStaffDto(Guid Id, string Name, MembershipRole SuggestedRole, StaffDuty SuggestedDuties, Guid? BranchId);
 
 public sealed record InviteDto(Guid Id, InvitePurpose Purpose, string Name, string Email, MembershipRole Role, StaffDuty Duties, IReadOnlyList<Guid> BranchIds, DateTimeOffset ExpiresAt);
 
@@ -73,6 +77,9 @@ public interface IStaffEnrolmentService
     Task<InviteLinkDto> CreateInviteAsync(CreateInviteRequest request, bool actorIsAdmin, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<InviteDto>> ListInvitesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>People from the old sign-in still to be invited, so none is forgotten when it is retired.</summary>
+    Task<IReadOnlyList<LegacyStaffDto>> ListLegacyAsync(CancellationToken cancellationToken = default);
 
     Task RevokeInviteAsync(Guid inviteId, CancellationToken cancellationToken = default);
 

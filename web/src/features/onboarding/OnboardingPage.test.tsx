@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useToastStore.setState({ toasts: [] });
   useAuthStore.setState({ accessToken: null, refreshToken: null });
-  vi.mocked(onboardingApi.bootstrap).mockResolvedValue({ tenantId: 't', branchId: 'b', deviceId: 'd', devicePairingCode: 'KAP-2026', adminUserId: 'u' });
+  vi.mocked(onboardingApi.bootstrap).mockResolvedValue({ tenantId: 't', branchId: 'b', adminMembershipId: 'm' });
 });
 
 const type = (target: string | RegExp | HTMLElement, value: string) =>
@@ -53,10 +53,12 @@ describe('OnboardingPage', () => {
     expect(await screen.findByLabelText('Business name')).toHaveValue('Kape');
   });
 
-  it('creates a PIN-only business and shows the device code to enter on the register', async () => {
+  it('creates the business with the owner email and password and points to sign in', async () => {
     await toStepThree();
     type('Your name', 'Mario Cruz');
     type('Choose a PIN', '4321');
+    type('Email', 'mario@kape.ph');
+    type('Password', 'longenough1');
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Create my business' }));
 
@@ -67,32 +69,21 @@ describe('OnboardingPage', () => {
       branchName: 'Main',
       adminName: 'Mario Cruz',
       adminPin: '4321',
-      adminEmail: null,
-      adminPassword: null,
+      adminEmail: 'mario@kape.ph',
+      adminPassword: 'longenough1',
     });
-    expect(await screen.findByLabelText('Device code KAP-2026')).toBeInTheDocument();
+    expect(await screen.findByText(/Sign in with the email and password you just chose/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to sign in' })).toHaveAttribute('href', '/login');
   });
 
-  it('sends an email and password together when both are given', async () => {
-    await toStepThree();
-    type('Your name', 'Mario Cruz');
-    type('Choose a PIN', '4321');
-    type('Email', 'mario@kape.ph');
-    type('Password', 'longenough1');
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Create my business' }));
-    await waitFor(() => expect(onboardingApi.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ adminEmail: 'mario@kape.ph', adminPassword: 'longenough1' })));
-  });
-
-  it('will not create anything without the agreement, a good PIN, or a matching email and password', async () => {
+  it('will not create anything without the agreement, a good PIN, an email and a password', async () => {
     await toStepThree();
     type('Your name', 'Mario Cruz');
     type('Choose a PIN', '12');
-    type('Email', 'mario@kape.ph');
     fireEvent.click(screen.getByRole('button', { name: 'Create my business' }));
     expect(await screen.findByText('Use 4 to 8 digits')).toBeInTheDocument();
-    expect(screen.getByText('Add a password too, or clear the email')).toBeInTheDocument();
+    expect(screen.getByText('Enter your email')).toBeInTheDocument();
+    expect(screen.getByText('Enter a password')).toBeInTheDocument();
     expect(screen.getByText('Please review and accept to continue')).toBeInTheDocument();
     expect(onboardingApi.bootstrap).not.toHaveBeenCalled();
   });
@@ -108,10 +99,12 @@ describe('OnboardingPage', () => {
     await toStepThree();
     type('Your name', 'Mario Cruz');
     type('Choose a PIN', '4321');
+    type('Email', 'mario@kape.ph');
+    type('Password', 'longenough1');
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Create my business' }));
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toBe('Admin PIN is already in use.'));
-    expect(screen.queryByLabelText(/^Device code/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Go to sign in' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create my business' })).toBeEnabled();
   });
 

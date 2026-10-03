@@ -7,8 +7,8 @@ const good: BootstrapForm = {
   branchName: 'Main',
   adminName: 'Mario Cruz',
   adminPin: '4321',
-  adminEmail: '',
-  adminPassword: '',
+  adminEmail: 'mario@kape.ph',
+  adminPassword: 'longenough1',
   agreed: true,
 };
 
@@ -27,19 +27,18 @@ describe('passwordProblem', () => {
 });
 
 describe('bootstrapSchema', () => {
-  it('accepts a PIN-only owner with no email', () => {
+  it('accepts an owner with an email, a password and a PIN', () => {
     expect(bootstrapSchema.safeParse(good).success).toBe(true);
   });
 
-  it('accepts an email with a password, and requires them together', () => {
-    expect(bootstrapSchema.safeParse({ ...good, adminEmail: 'mario@kape.ph', adminPassword: 'longenough1' }).success).toBe(true);
-    expect(messages({ ...good, adminEmail: 'mario@kape.ph' })).toContain('Add a password too, or clear the email');
-    expect(messages({ ...good, adminPassword: 'longenough1' })).toContain('Add an email too, or clear the password');
+  it('needs an email and a password', () => {
+    expect(messages({ ...good, adminEmail: '' })).toContain('Enter your email');
+    expect(messages({ ...good, adminPassword: '' })).toContain('Enter a password');
   });
 
   it('checks the password length and email format', () => {
-    expect(messages({ ...good, adminEmail: 'mario@kape.ph', adminPassword: 'short' })).toContain('Password must be 8 to 128 characters');
-    expect(messages({ ...good, adminEmail: 'not-an-email', adminPassword: 'longenough1' })).toContain('Enter a valid email');
+    expect(messages({ ...good, adminPassword: 'short' })).toContain('Password must be 8 to 128 characters');
+    expect(messages({ ...good, adminEmail: 'not-an-email' })).toContain('Enter a valid email');
   });
 
   it('applies the PIN rule', () => {
@@ -64,19 +63,15 @@ describe('STEP_FIELDS', () => {
 });
 
 describe('toBootstrapBody', () => {
-  it('trims, and sends no email or password for a PIN-only owner', () => {
-    expect(toBootstrapBody({ ...good, tenantName: ' Kape ', adminPin: ' 4321 ' })).toEqual({
+  it('trims the text fields and sends the email and password', () => {
+    expect(toBootstrapBody({ ...good, tenantName: ' Kape ', adminPin: ' 4321 ', adminEmail: ' mario@kape.ph ' })).toEqual({
       tenantName: 'Kape',
       businessType: 2,
       branchName: 'Main',
       adminName: 'Mario Cruz',
       adminPin: '4321',
-      adminEmail: null,
-      adminPassword: null,
+      adminEmail: 'mario@kape.ph',
+      adminPassword: 'longenough1',
     });
-  });
-
-  it('sends both email and password when given', () => {
-    expect(toBootstrapBody({ ...good, adminEmail: ' mario@kape.ph ', adminPassword: 'longenough1' })).toMatchObject({ adminEmail: 'mario@kape.ph', adminPassword: 'longenough1' });
   });
 });

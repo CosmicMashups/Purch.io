@@ -33,4 +33,8 @@ public class EnrolmentInvite : TenantScopedEntity
     public DateTimeOffset? RevokedAt { get; set; }
 
     public Guid? CreatedByMembershipId { get; set; }
+
+    /// <summary>When this invitation re-enrols someone from the old sign-in: their old User row. It is carried to the new
+    /// membership so their earlier sales, shifts and approvals stay theirs.</summary>
+    public Guid? LegacyUserId { get; set; }
 }

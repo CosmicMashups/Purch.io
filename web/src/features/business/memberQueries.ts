@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { memberApi, type CreateInviteBody, type UpdateMemberBody } from './memberApi';
 
-export const memberKeys = { members: ['staff', 'members'] as const, invites: ['staff', 'invites'] as const };
+export const memberKeys = { members: ['staff', 'members'] as const, invites: ['staff', 'invites'] as const, legacy: ['staff', 'legacy'] as const };
 
 export const useMembers = () => useQuery({ queryKey: memberKeys.members, queryFn: () => memberApi.list() });
+export const useLegacyStaff = () => useQuery({ queryKey: memberKeys.legacy, queryFn: () => memberApi.legacy() });
 export const useInvites = () => useQuery({ queryKey: memberKeys.invites, queryFn: () => memberApi.invites() });
 
 export function useInvite() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateInviteBody) => memberApi.invite(body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: memberKeys.invites }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: memberKeys.invites });
+      void qc.invalidateQueries({ queryKey: memberKeys.legacy });
+    },
   });
 }
 

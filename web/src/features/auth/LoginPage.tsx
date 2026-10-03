@@ -5,43 +5,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { gsap } from 'gsap';
-import { DeviceMobile, Key, EnvelopeSimple, LockKey, Eye, EyeSlash } from '@phosphor-icons/react';
+import { EnvelopeSimple, LockKey, Eye, EyeSlash } from '@phosphor-icons/react';
 import { authApi, type BusinessChoice } from './api';
 import { useSession } from './useSession';
 import { useAuthStore } from '../../lib/authStore';
 import { ApiError, userMessage } from '../../lib/apiError';
-
-const PAIRING_CODE_KEY = 'purch.devicePairingCode';
-
-function readPairingCode(): string {
-  try {
-    return window.localStorage.getItem(PAIRING_CODE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function rememberPairingCode(code: string): void {
-  try {
-    window.localStorage.setItem(PAIRING_CODE_KEY, code);
-  } catch {
-    // Not remembering the code only means it is typed again next time.
-  }
-}
-
-const staffSchema = z.object({
-  devicePairingCode: z.string().trim().min(1, 'Enter the device code'),
-  pin: z.string().regex(/^\d{4,8}$/, 'PIN is 4 to 8 digits'),
-});
 
 const adminSchema = z.object({
   email: z.string().trim().email('Enter a valid email'),
   password: z.string().min(1, 'Enter your password'),
 });
 
-type StaffForm = z.infer<typeof staffSchema>;
 type AdminForm = z.infer<typeof adminSchema>;
-type Mode = 'staff' | 'admin';
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   return message ? (
@@ -112,7 +87,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { claims } = useSession();
   const setTokens = useAuthStore((s) => s.setTokens);
-  const [mode, setMode] = useState<Mode>('staff');
   const [formError, setFormError] = useState<string | null>(null);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [choices, setChoices] = useState<{ email: string; password: string; businesses: BusinessChoice[] } | null>(null);
@@ -120,13 +94,9 @@ export function LoginPage() {
   const formContainerRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
 
-  const staff = useForm<StaffForm>({
-    resolver: zodResolver(staffSchema),
-    defaultValues: { devicePairingCode: readPairingCode(), pin: '' },
-  });
   const admin = useForm<AdminForm>({ resolver: zodResolver(adminSchema), defaultValues: { email: '', password: '' } });
 
-  // GSAP stagger entry animation on mount and mode switch
+  // GSAP stagger entry animation on mount
   useEffect(() => {
     if (!formContainerRef.current) return;
     const ctx = gsap.context(() => {
@@ -145,7 +115,7 @@ export function LoginPage() {
     }, formContainerRef);
 
     return () => ctx.revert();
-  }, [mode]);
+  }, []);
 
   // Subtle alert bounce on error update
   useEffect(() => {
@@ -162,33 +132,11 @@ export function LoginPage() {
 
   if (claims) return <Navigate to="/" replace />;
 
-  async function finish(request: Promise<{ accessToken: string; refreshToken: string }>) {
-    setFormError(null);
-    try {
-      const { accessToken, refreshToken } = await request;
-      setTokens(accessToken, refreshToken);
-      navigate('/', { replace: true });
-    } catch (error) {
-      staff.resetField('pin');
-      setFormError(loginMessage(error));
-    }
-  }
-
-  const submitStaff = staff.handleSubmit((v) => {
-    rememberPairingCode(v.devicePairingCode);
-    return finish(authApi.pinLogin(v.devicePairingCode, v.pin));
-  });
-  /**
-   * Email and password. The new account sign-in is tried first; an owner who only has the older back-office login (set up
-   * before accounts existed) is still let in by it until that is retired.
-   */
+  /** Email and password. A person who belongs to several businesses is asked which one, then signs in again with it. */
   async function emailSignIn(email: string, password: string, tenantId?: string) {
     setFormError(null);
     try {
-      const result = await authApi.signIn(email, password, tenantId).catch(async (error: unknown) => {
-        if (!(error instanceof ApiError && error.kind === 'unauthorized')) throw error;
-        return authApi.adminLogin(email, password);
-      });
+      const result = await authApi.signIn(email, password, tenantId);
       if ('chooseBusiness' in result && result.chooseBusiness) {
         setChoices({ email, password, businesses: result.businesses });
         return;
@@ -203,16 +151,6 @@ export function LoginPage() {
   }
 
   const submitAdmin = admin.handleSubmit((v) => emailSignIn(v.email, v.password));
-
-  const switchMode = (next: Mode) => {
-    setMode(next);
-    setFormError(null);
-  };
-
-  const tabClass = (active: boolean) =>
-    `h-12 flex-1 rounded-control text-base font-semibold transition-all duration-200 ${
-      active ? 'bg-surface text-ink shadow-sm' : 'text-ink-soft hover:text-ink'
-    }`;
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,5.5fr)_minmax(0,4.5fr)]">
@@ -263,15 +201,6 @@ export function LoginPage() {
 
           <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
 
-          <div role="group" aria-label="Sign-in type" className="mt-6 flex gap-1 rounded-panel bg-line/60 p-1">
-            <button type="button" aria-pressed={mode === 'staff'} onClick={() => switchMode('staff')} className={tabClass(mode === 'staff')}>
-              Staff PIN
-            </button>
-            <button type="button" aria-pressed={mode === 'admin'} onClick={() => switchMode('admin')} className={tabClass(mode === 'admin')}>
-              Email
-            </button>
-          </div>
-
           {formError && (
             <p
               ref={errorRef}
@@ -283,51 +212,7 @@ export function LoginPage() {
           )}
 
           <div ref={formContainerRef} className="mt-6">
-            {mode === 'staff' ? (
-              <form onSubmit={submitStaff} noValidate className="flex flex-col gap-5">
-                <FormFieldWrapper
-                  id="devicePairingCode"
-                  label="Device pairing code"
-                  icon={<DeviceMobile size={18} weight="bold" />}
-                  error={staff.formState.errors.devicePairingCode?.message}
-                >
-                  <input
-                    id="devicePairingCode"
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    placeholder="e.g. POS-01-COUNTER"
-                    aria-invalid={!!staff.formState.errors.devicePairingCode}
-                    aria-describedby="devicePairingCode-error"
-                    className="h-13 w-full rounded-control bg-transparent px-4 text-base font-medium text-ink placeholder:text-ink-soft/45 focus:outline-none"
-                    {...staff.register('devicePairingCode')}
-                  />
-                </FormFieldWrapper>
-
-                <FormFieldWrapper
-                  id="pin"
-                  label="Staff PIN"
-                  icon={<Key size={18} weight="bold" />}
-                  error={staff.formState.errors.pin?.message}
-                >
-                  <input
-                    id="pin"
-                    type="password"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="4 to 8 digit staff PIN"
-                    aria-invalid={!!staff.formState.errors.pin}
-                    aria-describedby="pin-error"
-                    className="h-13 w-full rounded-control bg-transparent px-4 text-base font-medium text-ink tracking-[0.25em] placeholder:tracking-normal placeholder:text-ink-soft/45 focus:outline-none"
-                    {...staff.register('pin')}
-                  />
-                </FormFieldWrapper>
-
-                <div className="gsap-field-item pt-2">
-                  <SubmitButton busy={staff.formState.isSubmitting} />
-                </div>
-              </form>
-            ) : (
-              choices ? (
+            {choices ? (
                 <div className="flex flex-col gap-3" role="group" aria-label="Choose a business">
                   <p className="text-base font-semibold">Which business?</p>
                   {choices.businesses.map((b) => (
@@ -393,8 +278,7 @@ export function LoginPage() {
                   <SubmitButton busy={admin.formState.isSubmitting} />
                 </div>
               </form>
-              )
-            )}
+              )}
           </div>
 
           <p className="mt-8 text-base text-ink-soft">

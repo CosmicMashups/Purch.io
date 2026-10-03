@@ -46,6 +46,27 @@ public sealed class SupabaseIdentityProvider(HttpClient httpClient, IDeploymentC
         return user.Id;
     }
 
+    public async Task<Guid> CreateUserWithPasswordHashAsync(string email, string bcryptHash, CancellationToken cancellationToken = default)
+    {
+        // Supabase accepts a bcrypt hash in place of a password, so the owner's existing password keeps working.
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/auth/v1/admin/users")
+        {
+            Content = JsonContent.Create(new { email, password_hash = bcryptHash, email_confirm = true }),
+        };
+        Authorize(request, ServiceKey);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.UnprocessableEntity || response.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new ConflictException("That email already has a login.");
+        }
+
+        _ = response.EnsureSuccessStatusCode();
+        var user = await response.Content.ReadFromJsonAsync<SupabaseUser>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Supabase Auth returned no user.");
+        return user.Id;
+    }
+
     public async Task<Guid?> VerifyPasswordAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/auth/v1/token?grant_type=password")

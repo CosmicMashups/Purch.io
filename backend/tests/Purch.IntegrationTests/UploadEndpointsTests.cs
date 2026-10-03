@@ -33,19 +33,7 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
     public async Task Authenticated_upload_with_valid_image_returns_url_and_persists_file()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest("Upload Test Shop", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
+        using var client = await TestSessions.AdminClientAsync(factory, "Upload Test Shop");
 
         using var content = new MultipartFormDataContent();
         var sampleBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46 }; // Fake JPEG header
@@ -67,19 +55,7 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
     public async Task Upload_with_disallowed_extension_returns_400()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest("Upload Test Shop 2", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
+        using var client = await TestSessions.AdminClientAsync(factory, "Upload Test Shop 2");
 
         using var content = new MultipartFormDataContent
         {
@@ -90,17 +66,10 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static async Task<(HttpClient Client, BootstrapTenantResult Tenant)> AdminClientAsync(PurchApiFactory factory, string tenantName)
+    private static async Task<(HttpClient Client, TestSessions.Shop Shop)> AdminClientAsync(PurchApiFactory factory, string tenantName)
     {
-        var client = factory.CreateClient();
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(tenantName, BusinessType.ConvenienceStore, "Main Branch", "Admin User", "1234"));
-        var tenant = (await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
-        var loginResponse = await client.PostAsJsonAsync("/auth/login", new LoginRequest(tenant.DevicePairingCode, "1234"));
-        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login!.AccessToken);
-        return (client, tenant);
+        var client = await TestSessions.AdminClientAsync(factory, tenantName);
+        return (client, TestSessions.ShopOf(client));
     }
 
     private static MultipartFormDataContent ImageForm(byte[] bytes, string fileName, string contentType = "image/jpeg")
@@ -177,14 +146,9 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
     public async Task A_cashier_cannot_upload_images()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        var (admin, tenant) = await AdminClientAsync(factory, "Role Shop");
+        var (admin, _) = await AdminClientAsync(factory, "Role Shop");
         using var _admin = admin;
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cash Ier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-
-        using var cashier = factory.CreateClient();
-        var loginResponse = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(tenant.DevicePairingCode, "5678"));
-        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login!.AccessToken);
+        using var cashier = await TestSessions.CashierClientAsync(admin, "5678", "Cash Ier");
 
         using var form = ImageForm([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46], "banner.jpg");
         var response = await cashier.PostAsync("/uploads/image", form);
@@ -192,5 +156,4 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private sealed record LoginResponseBody(string AccessToken);
 }

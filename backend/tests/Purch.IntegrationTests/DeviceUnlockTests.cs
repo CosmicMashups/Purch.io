@@ -239,7 +239,7 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
-    public async Task A_managers_pin_can_approve_things_but_never_signs_anyone_in_through_the_old_pin_login()
+    public async Task A_managers_pin_is_known_to_the_approval_checks_and_a_person_is_shown_to_older_lookups_as_a_user()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
@@ -258,13 +258,6 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
             var projectedCashier = everyone.Single(u => u.Id == cashier.MembershipId);
             Assert.Equal("Ben Santos", projectedCashier.Name);
             Assert.Equal(Role.Cashier, projectedCashier.Role);
-
-            // The older lookups used by the PIN sign-in never see a membership.
-            Assert.DoesNotContain(await users.GetActiveUsersByTenantAsync(shop.Business.TenantId), u => u.Id == manager.MembershipId);
-            Assert.Null(await users.GetByIdAsync(manager.MembershipId));
         }
-
-        var oldLogin = await shop.Anonymous.PostAsJsonAsync("/auth/login", new LoginRequest(shop.Business.DevicePairingCode, "6643"));
-        Assert.Equal(HttpStatusCode.Unauthorized, oldLogin.StatusCode);
     }
 }

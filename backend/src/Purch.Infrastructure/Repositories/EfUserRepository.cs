@@ -90,4 +90,15 @@ public sealed class EfUserRepository(PurchDbContext dbContext) : IUserRepository
     {
         _ = dbContext.Users.Add(user);
     }
+
+    public async Task<IReadOnlyList<User>> ListUninvitedLegacyAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var linked = dbContext.Memberships.IgnoreQueryFilters().Where(m => m.TenantId == tenantId && m.LegacyUserId != null).Select(m => m.LegacyUserId!.Value);
+        return await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.TenantId == tenantId && u.IsActive && !linked.Contains(u.Id))
+            .OrderBy(u => u.Name)
+            .ToListAsync(cancellationToken);
+    }
 }

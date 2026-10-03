@@ -287,13 +287,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         var ramenLine = sale.Lines.Single();
 
         // A second terminal (device B) processes the exchange — not the one that rang up the sale.
-        var branches = await deviceA.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
-        var branchId = branches!.Single().Id;
-        var deviceBResponse = await deviceA.PostAsJsonAsync("/devices", new CreateDeviceRequest(branchId, DeviceIdentifier: null));
-        var deviceBInfo = (await deviceBResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions))!;
-        using var deviceB = factory.CreateClient();
-        var deviceBLogin = await deviceB.PostAsJsonAsync("/auth/login", new LoginRequest(deviceBInfo.PairingCode, "1234"));
-        deviceB.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await deviceBLogin.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+        using var deviceB = await TestSessions.AdminOnNewRegisterAsync(deviceA);
 
         var exchangeResponse = await deviceB.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
@@ -501,15 +495,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
-        _ = await admin.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-
-        using var managerClient = factory.CreateClient();
-        var loginResponse = await managerClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-        managerClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+        using var managerClient = await TestSessions.ManagerClientAsync(admin);
 
         var from = DateTimeOffset.UtcNow.AddDays(-1);
         var to = DateTimeOffset.UtcNow.AddDays(1);
@@ -538,14 +524,8 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
-
-        using var cashier = factory.CreateClient();
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
-        var cashierLogin = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, "6789"));
-        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await cashierLogin.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        using var cashier = await TestSessions.CashierClientAsync(admin, "6789", "Cal Cashier");
 
         var itemResponse = await admin.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit));
         var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
@@ -585,41 +565,13 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, "6789"));
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
-
-        using var cashier = factory.CreateClient();
-        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, "6789"));
-        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await login.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions))!.AccessToken);
+        using var cashier = await TestSessions.CashierClientAsync(admin, "6789", "Cal Cashier");
 
         var response = await cashier.GetAsync("/reports/approvals-review");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 }

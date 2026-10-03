@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -17,12 +16,6 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
 {
     public const string TestJwtSigningKey = "integration-test-signing-key-do-not-use-in-prod";
     public const string TestJwtIssuer = "purch.io.tests";
-
-    /// <summary>The real notifier only writes to stdout (no email provider exists yet —
-    /// see ConsolePasswordResetTokenNotifier), which tests can't observe. This capturing
-    /// double stands in for it so password-reset tests can retrieve the raw token that
-    /// would otherwise only ever reach the user's inbox.</summary>
-    public CapturingPasswordResetTokenNotifier PasswordResetTokenNotifier { get; } = new();
 
     /// <summary>Extra configuration for one test (set before the first request creates the host), e.g.
     /// <c>new PurchApiFactory(cs) { ExtraSettings = { ["PUBLIC_BASE_URL"] = "https://cdn.example" } }</c>.</summary>
@@ -53,9 +46,6 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
             _ = services.RemoveAll<IIdentityProvider>();
             _ = services.AddScoped<IIdentityProvider, Purch.Infrastructure.Auth.LocalIdentityProvider>();
 
-            _ = services.RemoveAll<IPasswordResetTokenNotifier>();
-            _ = services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
-
             // Real IFileStorage in Cloud mode hits Supabase Storage over HTTP, which
             // has nothing to talk to in tests (SUPABASE_STORAGE_URL above is a fake
             // host). Swap in LocalFileStorage against a temp dir so upload tests
@@ -70,21 +60,5 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
             // against RetentionSweeper instead; nothing here needs it actually running.
             _ = services.RemoveAll<IHostedService>();
         });
-    }
-}
-
-public sealed class CapturingPasswordResetTokenNotifier : IPasswordResetTokenNotifier
-{
-    private readonly ConcurrentDictionary<Guid, string> _tokensByUserId = new();
-
-    public Task NotifyAsync(User user, string rawToken, CancellationToken cancellationToken = default)
-    {
-        _tokensByUserId[user.Id] = rawToken;
-        return Task.CompletedTask;
-    }
-
-    public string LastTokenFor(Guid userId)
-    {
-        return _tokensByUserId[userId];
     }
 }

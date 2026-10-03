@@ -115,28 +115,6 @@ public sealed class BundleAndVariantEndpointsTests(PostgresContainerFixture post
         Assert.Equal(HttpStatusCode.BadRequest, variantResponse.StatusCode);
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 }

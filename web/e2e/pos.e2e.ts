@@ -4,7 +4,7 @@ import { expect, test } from './support/fixtures';
 test.describe('the register', () => {
   test('rings up two items and takes cash, showing the change the server worked out', async ({ page, signInAs, ip, seed }) => {
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell');
 
     await page.getByRole('button', { name: /Iced Latte/ }).click();
@@ -24,7 +24,7 @@ test.describe('the register', () => {
 
   test('a scanned barcode adds the item without touching the screen', async ({ page, signInAs, ip, seed }) => {
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell');
     await expect(page.getByRole('button', { name: /Ube Cookie/ })).toBeVisible();
 

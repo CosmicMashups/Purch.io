@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { call } from './support/api';
+import { call, signIn } from './support/api';
 import { expect, test } from './support/fixtures';
 
 /** Rows in the saved catalog cache, read straight from the browser's IndexedDB. */
@@ -67,10 +67,11 @@ test.describe('offline browsing', () => {
 
     // A different business signs in on this same browser without the first one signing out.
     const stamp = Date.now().toString(36);
-    const other = await call<{ devicePairingCode: string }>('POST', '/onboarding/bootstrap', {
-      body: { tenantName: `Other Shop ${stamp}`, businessType: 0, branchName: 'Main', adminName: 'Other Owner', adminPin: '1234', adminEmail: null, adminPassword: null },
+    const email = `other-${stamp}@e2e.test`;
+    await call('POST', '/onboarding/bootstrap', {
+      body: { tenantName: `Other Shop ${stamp}`, businessType: 0, branchName: 'Main', adminName: 'Other Owner', adminPin: '1234', adminEmail: email, adminPassword: 'Other-password-1' },
     });
-    const tokens = await call<{ accessToken: string; refreshToken: string }>('POST', '/auth/login', { body: { devicePairingCode: other.devicePairingCode, pin: '1234' } });
+    const tokens = await signIn(email, 'Other-password-1');
     await page.evaluate((t) => {
       localStorage.setItem('purch.accessToken', t.accessToken);
       localStorage.setItem('purch.refreshToken', t.refreshToken);

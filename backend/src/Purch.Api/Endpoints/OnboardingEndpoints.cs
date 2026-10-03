@@ -24,23 +24,6 @@ public static class OnboardingEndpoints
         // --- Staff & roles (A4) ---
         var admin = nameof(Role.Admin);
 
-        _ = app.MapGet("/staff", async (IStaffService staffService, CancellationToken cancellationToken) =>
-            Results.Ok(await staffService.ListAsync(cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(admin, nameof(Role.Manager)));
-
-        _ = app.MapPost("/staff", async (
-            CreateStaffRequest request,
-            IStaffService staffService,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await staffService.CreateAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
-
-        _ = app.MapPut("/staff/{staffId:guid}", async (
-            Guid staffId,
-            UpdateStaffRequest request,
-            IStaffService staffService,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await staffService.UpdateAsync(staffId, request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
-
         // --- Branches & devices (A3) ---
         _ = app.MapGet("/branches", async (IBranchService branchService, CancellationToken cancellationToken) =>
             Results.Ok(await branchService.ListAsync(cancellationToken))).RequireAuthorization();
@@ -86,27 +69,6 @@ public static class OnboardingEndpoints
         _ = app.MapGet("/devices", async (IDeviceManagementService deviceService, CancellationToken cancellationToken) =>
             Results.Ok(await deviceService.ListAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
-        _ = app.MapPost("/devices", async (
-            CreateDeviceRequest request,
-            IDeviceManagementService deviceService,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await deviceService.CreateAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
-
-        // Regenerates the pairing code, immediately invalidating the old one and revoking
-        // any session already issued under it — for a device that's been lost/replaced.
-        _ = app.MapPost("/devices/{deviceId:guid}/reset-pairing-code", async (
-            Guid deviceId,
-            IDeviceManagementService deviceService,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await deviceService.ResetPairingCodeAsync(deviceId, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
-
-        _ = app.MapPost("/devices/{deviceId:guid}/reset-pairing-pin", async (
-            Guid deviceId,
-            ResetDevicePairingPinRequest request,
-            IDeviceManagementService deviceService,
-            CancellationToken cancellationToken) =>
-            Results.Ok(await deviceService.ResetPairingPinAsync(deviceId, request.NewPin, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
-
         // --- Staff accounts (sign-in redesign): an Admin or Manager invites a person, who opens a single-use link or QR
         // code on their own phone to set a password and a personal PIN. No email is sent. A Manager can only deal with
         // staff; the service refuses anything that would create or change an Admin or Manager for a Manager. ---
@@ -129,6 +91,9 @@ public static class OnboardingEndpoints
             IStaffEnrolmentService enrolmentService,
             CancellationToken cancellationToken) =>
             Results.Ok(await enrolmentService.CreateResetLinkAsync(memberId, user.IsInRole(admin), cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
+
+        _ = app.MapGet("/staff/legacy", async (IStaffEnrolmentService enrolmentService, CancellationToken cancellationToken) =>
+            Results.Ok(await enrolmentService.ListLegacyAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));
 
         _ = app.MapGet("/staff/invites", async (IStaffEnrolmentService enrolmentService, CancellationToken cancellationToken) =>
             Results.Ok(await enrolmentService.ListInvitesAsync(cancellationToken))).RequireAuthorization(policy => policy.RequireRole(adminOrManager));

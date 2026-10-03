@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Purch.Application.Auth;
+using Purch.Application.Devices;
 using Purch.Application.Onboarding;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
@@ -15,24 +16,40 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
-    public async Task Bootstrap_then_login_with_the_returned_pairing_code_and_chosen_pin_succeeds()
+    public async Task Bootstrap_then_sign_in_with_the_owner_email_and_password_succeeds_and_creates_no_device()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = factory.CreateClient();
+        var email = $"{Guid.NewGuid():N}@example.com";
+
+        var bootstrapResponse = await client.PostAsJsonAsync(
+            "/onboarding/bootstrap",
+            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234", email, "correct horse battery"));
+
+        Assert.Equal(HttpStatusCode.OK, bootstrapResponse.StatusCode);
+        var result = (await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
+
+        var signIn = await client.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, "correct horse battery"));
+        Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
+        using var owner = TestSessions.Bearer(factory, (await signIn.Content.ReadFromJsonAsync<SessionBody>(JsonOptions))!.AccessToken);
+        Assert.Empty((await owner.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions))!);
+        Assert.Equal(result.BranchId, Assert.Single((await owner.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions))!).Id);
+    }
+
+    [Theory]
+    [InlineData(null, "correct horse battery")]
+    [InlineData("ana@example.com", null)]
+    [InlineData("ana@example.com", "short")]
+    public async Task Bootstrap_needs_an_email_and_a_password_that_meets_the_rules(string? email, string? password)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = factory.CreateClient();
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
+        var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234"));
+            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234", email, password));
 
-        Assert.Equal(HttpStatusCode.OK, bootstrapResponse.StatusCode);
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-        Assert.NotNull(bootstrapResult);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-
-        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -49,153 +66,22 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
-    public async Task Admin_can_create_staff_but_a_cashier_is_forbidden_from_doing_so()
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-
-        var createCashierResponse = await client.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Ben Cashier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        Assert.Equal(HttpStatusCode.OK, createCashierResponse.StatusCode);
-
-        var (pairingCode, staffId) = await GetLastCreatedUserLoginAsync(client);
-
-        // Now act as the cashier we just created — they should be rejected from staff management.
-        using var cashierClient = factory.CreateClient();
-        var cashierToken = await LoginAsync(cashierClient, pairingCode, "5678");
-        cashierClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierToken);
-
-        var forbiddenResponse = await cashierClient.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Someone Else", Role.Cashier, ScopeType.Tenant, null, null, "9999"));
-
-        Assert.Equal(HttpStatusCode.Forbidden, forbiddenResponse.StatusCode);
-    }
-
-    [Fact]
-    public async Task Changing_a_staff_members_role_ends_their_existing_refresh_sessions()
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var admin = factory.CreateClient();
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
-        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        _ = await admin.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Ben Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
-        var ben = staff!.Single(s => s.Role == Role.Manager);
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-
-        using var benClient = factory.CreateClient();
-        var loginResponse = await benClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
-        var session = await loginResponse.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
-
-        // Demoted: whatever he could do as a manager must not survive on a 30-day refresh token.
-        var demote = await admin.PutAsJsonAsync(
-            $"/staff/{ben.Id}",
-            new UpdateStaffRequest(Role.Cashier, ScopeType.Tenant, null, null, true));
-        Assert.Equal(HttpStatusCode.OK, demote.StatusCode);
-
-        var refresh = await benClient.PostAsJsonAsync("/auth/refresh", new { refreshToken = session!.RefreshToken });
-        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
-    }
-
-    [Fact]
-    public async Task Saving_a_staff_member_without_changing_anything_keeps_their_session()
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var admin = factory.CreateClient();
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
-        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        _ = await admin.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Ben Cashier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
-        var ben = staff!.Single(s => s.Role == Role.Cashier);
-        var devices = await admin.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-
-        using var benClient = factory.CreateClient();
-        var loginResponse = await benClient.PostAsJsonAsync("/auth/login", new LoginRequest(devices!.Single().PairingCode, "5678"));
-        var session = await loginResponse.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
-
-        _ = await admin.PutAsJsonAsync($"/staff/{ben.Id}", new UpdateStaffRequest(Role.Cashier, ScopeType.Tenant, null, null, true));
-
-        var refresh = await benClient.PostAsJsonAsync("/auth/refresh", new { refreshToken = session!.RefreshToken });
-        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
-    }
-
-    [Fact]
     public async Task Read_access_to_staff_and_promo_codes_is_limited_to_the_roles_that_need_it()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var admin = factory.CreateClient();
-        var (adminToken, pairingCode) = await BootstrapAndLoginAsAdminAsync(admin);
-        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Cash Ier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        _ = await admin.PostAsJsonAsync("/staff", new CreateStaffRequest("Ware House", Role.Warehouse, ScopeType.Tenant, null, null, "6789"));
-
-        async Task<HttpClient> SignedInAsync(string pin)
-        {
-            var client = factory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await LoginAsync(client, pairingCode, pin));
-            return client;
-        }
-
-        using var cashier = await SignedInAsync("5678");
-        using var warehouse = await SignedInAsync("6789");
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        using var cashier = await TestSessions.CashierClientAsync(admin, "5678", "Cash Ier");
+        using var warehouse = await TestSessions.StaffClientAsync(admin, "Ware House", MembershipRole.Staff, StaffDuty.Warehouse, "6789");
 
         // The staff list (names, roles, scopes) is for managers only.
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/staff")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/staff")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/staff/members")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/staff/members")).StatusCode);
 
         // The cashier's POS prices with promo data, so it keeps read access; warehouse has no use for it.
         Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/promo-codes")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/promos/bogo")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.GetAsync("/promo-codes")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.GetAsync("/promos/bogo")).StatusCode);
-    }
-
-    [Theory]
-    [InlineData("12")]
-    [InlineData("123456789")]
-    [InlineData("12a4")]
-    [InlineData("12 4")]
-    public async Task A_staff_pin_must_be_four_to_eight_digits(string pin)
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-
-        var response = await client.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Bad Pin", Role.Cashier, ScopeType.Tenant, null, null, pin));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Two_staff_cannot_share_a_pin_because_login_could_not_tell_them_apart()
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-
-        // "1234" is the admin's own PIN.
-        var duplicate = await client.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Copycat", Role.Cashier, ScopeType.Tenant, null, null, "1234"));
-        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
-
-        var distinct = await client.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Ben Cashier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        Assert.Equal(HttpStatusCode.OK, distinct.StatusCode);
     }
 
     [Fact]
@@ -206,7 +92,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "abcd"));
+            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "abcd", $"{Guid.NewGuid():N}@example.com", "correct horse battery"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -215,63 +101,27 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Admin_can_create_a_branch_and_then_a_device_paired_to_it()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, pairingCode) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        _ = pairingCode;
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var branchResponse = await client.PostAsJsonAsync("/branches", new CreateBranchRequest("Second Branch", "123 Rizal St."));
         Assert.Equal(HttpStatusCode.OK, branchResponse.StatusCode);
         var branch = await branchResponse.Content.ReadFromJsonAsync<BranchDto>(JsonOptions);
 
-        var deviceResponse = await client.PostAsJsonAsync("/devices", new CreateDeviceRequest(branch!.Id, "Tablet-2"));
+        var deviceResponse = await client.PostAsJsonAsync("/devices/pairing-requests", new CreateDevicePairingRequest("Tablet-2", DeviceType.Register, branch!.Id));
         Assert.Equal(HttpStatusCode.OK, deviceResponse.StatusCode);
-        var device = await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
+        var device = (await deviceResponse.Content.ReadFromJsonAsync<DevicePairingCodeDto>(JsonOptions))!;
 
-        Assert.Equal(branch.Id, device!.BranchId);
+        Assert.Equal(branch.Id, device.Device.BranchId);
         Assert.NotEmpty(device.PairingCode);
-    }
-
-    [Theory]
-    [InlineData(DeviceType.OrderBoard, "/order-board/session", nameof(Role.OrderBoard))]
-    [InlineData(DeviceType.KitchenDisplay, "/kitchen-display/session", nameof(Role.KitchenDisplay))]
-    [InlineData(DeviceType.Kiosk, "/kiosk/session", nameof(Role.Kiosk))]
-    [InlineData(DeviceType.WarehouseOfficer, "/warehouse-officer/session", nameof(Role.Warehouse))]
-    public async Task An_unattended_device_pairs_and_keeps_its_own_role_when_its_token_is_refreshed(DeviceType deviceType, string sessionPath, string expectedRole)
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var admin = factory.CreateClient();
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(admin);
-        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        var branches = await admin.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
-        var deviceResponse = await admin.PostAsJsonAsync("/devices", new CreateDeviceRequest(branches!.Single().Id, "Screen-1", deviceType, "4321"));
-        var device = await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
-
-        // Pairing is anonymous: it must find the device by its code even though no tenant is in context.
-        using var screen = factory.CreateClient();
-        var pair = await screen.PostAsJsonAsync(sessionPath, new { devicePairingCode = device!.PairingCode, pairingPin = "4321" });
-        Assert.Equal(HttpStatusCode.OK, pair.StatusCode);
-        var session = await pair.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
-        Assert.Equal(expectedRole, new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(session!.AccessToken).Claims.Single(c => c.Type == JwtClaimTypes.Role).Value);
-
-        // Refreshing is anonymous too, and must not turn the device into a different role.
-        var refresh = await screen.PostAsJsonAsync("/auth/refresh", new { refreshToken = session.RefreshToken });
-        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
-        var refreshed = await refresh.Content.ReadFromJsonAsync<SessionBody>(JsonOptions);
-        Assert.Equal(expectedRole, new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(refreshed!.AccessToken).Claims.Single(c => c.Type == JwtClaimTypes.Role).Value);
     }
 
     [Fact]
     public async Task Creating_a_device_for_a_nonexistent_branch_returns_404()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
+        using var client = await TestSessions.AdminClientAsync(factory);
 
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-
-        var response = await client.PostAsJsonAsync("/devices", new CreateDeviceRequest(Guid.NewGuid(), null));
+        var response = await client.PostAsJsonAsync("/devices/pairing-requests", new CreateDevicePairingRequest("Ghost", DeviceType.Register, Guid.NewGuid()));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -280,10 +130,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Admin_can_update_branding_and_bir_settings()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var brandingResponse = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
@@ -314,10 +161,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Admin_can_toggle_the_credit_ledger_setting_and_it_defaults_to_off()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var settings = await client.GetFromJsonAsync<TenantSettingsDto>("/tenant/settings", JsonOptions);
         Assert.False(settings!.CreditLedgerEnabled);
@@ -340,10 +184,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Invalid_branding_color_is_rejected_with_400()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var response = await client.PutAsJsonAsync(
             "/tenant/settings/branding",
@@ -356,10 +197,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Enabling_a_cash_drawer_without_a_printer_profile_is_rejected()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
         var branchId = branches!.Single().Id;
@@ -375,10 +213,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Admin_can_set_the_manual_gcash_qr_for_a_branch()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
         var branchId = branches!.Single().Id;
@@ -400,10 +235,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Setting_a_manual_gcash_qr_image_with_no_account_name_or_number_is_rejected()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var branches = await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
         var branchId = branches!.Single().Id;
@@ -419,10 +251,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     public async Task Audit_log_endpoint_is_reachable_by_admin_and_returns_an_empty_list_before_any_sensitive_action()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var client = factory.CreateClient();
-
-        var (adminToken, _) = await BootstrapAndLoginAsAdminAsync(client);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var client = await TestSessions.AdminClientAsync(factory);
 
         var response = await client.GetAsync("/audit-logs");
 
@@ -437,50 +266,10 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/staff");
+        var response = await client.GetAsync("/staff/members");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-
-    private static async Task<(string AccessToken, string PairingCode)> BootstrapAndLoginAsAdminAsync(HttpClient client)
-    {
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-        var token = await LoginAsync(client, bootstrapResult!.DevicePairingCode, "1234");
-
-        return (token, bootstrapResult.DevicePairingCode);
-    }
-
-    private static async Task<string> LoginAsync(HttpClient client, string pairingCode, string pin)
-    {
-        var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest(pairingCode, pin));
-        var body = await response.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-        return body!.AccessToken;
-    }
-
-    /// <summary>
-    /// Test-only convenience: since staff creation doesn't return a device pairing code
-    /// (staff log into whatever device they're handed, not a device tied to their own
-    /// account), reuse the admin's own device pairing code to exercise the cashier's login.
-    /// </summary>
-    private static async Task<(string pairingCode, Guid staffId)> GetLastCreatedUserLoginAsync(HttpClient client)
-    {
-        var staff = await client.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
-        var cashier = staff!.Single(s => s.Role == Role.Cashier);
-
-        var devices = await client.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        return (devices!.Single().PairingCode, cashier.Id);
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 
     private sealed record SessionBody(string AccessToken, string RefreshToken);
 }

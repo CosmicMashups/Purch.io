@@ -1,6 +1,6 @@
 /* oxlint-disable react-hooks/rules-of-hooks, no-empty-pattern -- Playwright fixtures: `use` is its own callback, not a React hook, and it requires a destructured first argument. */
 import { test as base, expect, type Browser, type Page } from '@playwright/test';
-import { devicePair, freshIp, pinLogin, type Tokens } from './api';
+import { deviceSession, freshIp, unlockOnTill, type Tokens } from './api';
 import { readSeed, type Seed } from './seed';
 
 export type Person = 'admin' | 'manager' | 'cashier' | 'warehouse';
@@ -17,8 +17,6 @@ interface Fixtures {
   actor: (who: Person | 'kiosk' | 'kitchen' | 'orderBoard') => Promise<Page>;
 }
 
-const PAIR_PATH = { kiosk: '/kiosk/session', kitchen: '/kitchen-display/session', orderBoard: '/order-board/session' } as const;
-
 export const test = base.extend<Fixtures>({
   seed: async ({}, use) => use(readSeed()),
 
@@ -32,8 +30,8 @@ export const test = base.extend<Fixtures>({
 
   signInAs: async ({ context, seed, ip }, use) => {
     await use(async (person) => {
-      const tokens = await pinLogin(seed.register.code, seed.pins[person], ip);
-      await seedSession(context, tokens);
+      const tokens = await unlockOnTill(seed, person, ip);
+      await seedSession(context, tokens, person === 'warehouse' ? seed.warehouse.credential : seed.register.credential);
       return tokens;
     });
   },
@@ -41,8 +39,8 @@ export const test = base.extend<Fixtures>({
   pairDevice: async ({ context, seed, ip }, use) => {
     await use(async (kind) => {
       const device = seed[kind];
-      const tokens = await devicePair(PAIR_PATH[kind], device.code, device.pin, ip);
-      await seedSession(context, tokens);
+      const tokens = await deviceSession(device.credential, ip);
+      await seedSession(context, tokens, device.credential);
       return tokens;
     });
   },
@@ -51,8 +49,10 @@ export const test = base.extend<Fixtures>({
     const opened: Page[] = [];
     await use(async (who) => {
       const ip = freshIp();
-      const tokens = who === 'kiosk' || who === 'kitchen' || who === 'orderBoard' ? await devicePair(PAIR_PATH[who], seed[who].code, seed[who].pin, ip) : await pinLogin(seed.register.code, seed.pins[who], ip);
-      const page = await newActor(browser, ip, tokens);
+      const unattended = who === 'kiosk' || who === 'kitchen' || who === 'orderBoard';
+      const credential = unattended ? seed[who].credential : who === 'warehouse' ? seed.warehouse.credential : seed.register.credential;
+      const tokens = unattended ? await deviceSession(credential, ip) : await unlockOnTill(seed, who, ip);
+      const page = await newActor(browser, ip, tokens, credential);
       opened.push(page);
       return page;
     });
@@ -60,23 +60,25 @@ export const test = base.extend<Fixtures>({
   },
 });
 
-async function newActor(browser: Browser, ip: string, tokens: Tokens): Promise<Page> {
+async function newActor(browser: Browser, ip: string, tokens: Tokens, credential: string): Promise<Page> {
   const context = await browser.newContext();
   await context.route('**/api/**', (route) => route.continue({ headers: { ...route.request().headers(), 'x-forwarded-for': ip } }));
-  await seedSession(context, tokens);
+  await seedSession(context, tokens, credential);
   return context.newPage();
 }
 
 /** Writes the session before the app starts, once per tab, so a later refresh rotation is never overwritten. */
-async function seedSession(context: import('@playwright/test').BrowserContext, tokens: Tokens): Promise<void> {
+async function seedSession(context: import('@playwright/test').BrowserContext, tokens: Tokens, credential: string): Promise<void> {
   await context.addInitScript(
-    ({ accessToken, refreshToken }) => {
+    ({ accessToken, refreshToken, credential }) => {
       if (sessionStorage.getItem('e2e-seeded')) return;
       localStorage.setItem('purch.accessToken', accessToken);
       localStorage.setItem('purch.refreshToken', refreshToken);
+      // A paired device keeps its credential, which is also what makes the app treat this browser as one.
+      localStorage.setItem('purch.deviceCredential', credential);
       sessionStorage.setItem('e2e-seeded', '1');
     },
-    tokens,
+    { ...tokens, credential },
   );
 }
 

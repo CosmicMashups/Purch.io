@@ -42,9 +42,6 @@ public sealed class ApproverAuthorizationServiceTests
 
     private sealed class FakeUserRepository(IReadOnlyList<User> users) : IUserRepository
     {
-        public Task<IReadOnlyList<User>> GetActiveUsersByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(users);
-
         public Task<IReadOnlyList<User>> GetActiveActorsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult(users);
 
@@ -52,15 +49,7 @@ public sealed class ApproverAuthorizationServiceTests
 
         public Task<IReadOnlyList<User>> ListActorsAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<IReadOnlyList<User>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<User?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public void Add(User user) => throw new NotSupportedException();
+        public Task<IReadOnlyList<User>> ListUninvitedLegacyAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeCurrentTenantProvider : ICurrentTenantProvider

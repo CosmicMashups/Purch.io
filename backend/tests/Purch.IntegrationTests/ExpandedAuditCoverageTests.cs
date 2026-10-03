@@ -25,28 +25,21 @@ public sealed class ExpandedAuditCoverageTests(PostgresContainerFixture postgres
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
 
-        _ = await admin.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Cash Ier", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        var staff = await admin.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions);
-        var cashier = staff!.Single(s => s.Role == Role.Cashier);
+        var shop = TestSessions.ShopOf(admin);
+        var cashierId = await TestSessions.AddPersonAsync(admin, "Cash Ier", MembershipRole.Staff, StaffDuty.Cashier, "5678");
 
         // A save that changes nothing must not add a spurious entry.
-        _ = await admin.PutAsJsonAsync(
-            $"/staff/{cashier.Id}",
-            new UpdateStaffRequest(Role.Cashier, ScopeType.Tenant, null, null, true));
+        _ = await admin.PutAsJsonAsync($"/staff/members/{cashierId}", new UpdateMemberRequest(MembershipRole.Staff, StaffDuty.Cashier, [shop.Tenant.BranchId], true));
 
         var beforePromotion = await admin.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);
         Assert.DoesNotContain(beforePromotion!, log => log.ActionType == AuditActionType.StaffAccessChanged);
 
-        _ = await admin.PutAsJsonAsync(
-            $"/staff/{cashier.Id}",
-            new UpdateStaffRequest(Role.Manager, ScopeType.Tenant, null, null, true));
+        _ = await admin.PutAsJsonAsync($"/staff/members/{cashierId}", new UpdateMemberRequest(MembershipRole.Manager, StaffDuty.None, null, true));
 
         var afterPromotion = await admin.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);
         var entry = Assert.Single(afterPromotion!, log => log.ActionType == AuditActionType.StaffAccessChanged);
-        Assert.Equal(cashier.Id, entry.TargetEntityId);
-        Assert.Equal(nameof(User), entry.TargetEntityType);
+        Assert.Equal(cashierId, entry.TargetEntityId);
+        Assert.Equal(nameof(Membership), entry.TargetEntityType);
     }
 
     [Fact]
@@ -248,28 +241,6 @@ public sealed class ExpandedAuditCoverageTests(PostgresContainerFixture postgres
         return branches!.Single().Id;
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 }

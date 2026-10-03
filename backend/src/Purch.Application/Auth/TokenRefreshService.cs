@@ -5,7 +5,6 @@ namespace Purch.Application.Auth;
 
 public sealed class TokenRefreshService(
     IRefreshTokenService refreshTokenService,
-    IUserRepository userRepository,
     IDeviceRepository deviceRepository,
     IAccountRepository accountRepository,
     IJwtTokenService jwtTokenService) : ITokenRefreshService
@@ -45,54 +44,37 @@ public sealed class TokenRefreshService(
             return new TokenRefreshResult.Success(membershipAccess, membershipRefresh);
         }
 
-        var user = owner.UserId is { } userId ? await userRepository.GetByIdUnscopedAsync(userId, cancellationToken) : null;
-        var device = owner.DeviceId is { } deviceId ? await deviceRepository.GetByIdUnscopedAsync(deviceId, cancellationToken) : null;
-
-        // A deactivated staff member must not be able to keep renewing their session.
-        if (user is { IsActive: false })
+        // Only a person's session (a membership) or an unattended device's session can renew. A refresh token from the old
+        // sign-in, which named a user and no membership, ends here.
+        if (owner.UserId is not null || owner.DeviceId is not { } deviceId)
         {
             return new TokenRefreshResult.InvalidToken();
         }
 
-        // A token bound to a device that no longer exists must die, not fall through to an
-        // admin token below (which would silently drop the device binding of a staff session).
-        if (owner.DeviceId is not null && device is null)
+        var device = await deviceRepository.GetByIdUnscopedAsync(deviceId, cancellationToken);
+        if (device is not { Status: DeviceStatus.Active })
         {
             return new TokenRefreshResult.InvalidToken();
         }
 
-        // Mirrors exactly which Issue* method originally produced the access token
-        // this refresh token was paired with (see RefreshTokenOwner).
-        string accessToken;
-        if (user is not null && device is not null)
+        // Re-issue with the device's own role: OrderBoard/KitchenDisplay/CustomerDisplay tokens must not turn into Kiosk tokens
+        // on refresh (they'd lose their endpoints and gain cart rights).
+        string accessToken = device.DeviceType switch
         {
-            accessToken = jwtTokenService.IssueAccessToken(user, device);
-        }
-        else if (device is not null)
+            DeviceType.OrderBoard => jwtTokenService.IssueUnattendedAccessToken(device, Role.OrderBoard),
+            DeviceType.KitchenDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.KitchenDisplay),
+            DeviceType.CustomerDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.CustomerDisplay),
+            DeviceType.Kiosk => jwtTokenService.IssueKioskAccessToken(device),
+
+            // A Register or Warehouse device is only ever used by a person (a membership session, handled above).
+            _ => string.Empty,
+        };
+        if (accessToken.Length == 0)
         {
-            // Re-issue with the device's own role: OrderBoard/KitchenDisplay tokens must not
-            // turn into Kiosk tokens on refresh (they'd lose their endpoints and gain cart rights).
-            accessToken = device.DeviceType switch
-            {
-                DeviceType.OrderBoard => jwtTokenService.IssueUnattendedAccessToken(device, Role.OrderBoard),
-                DeviceType.KitchenDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.KitchenDisplay),
-                DeviceType.WarehouseOfficer => jwtTokenService.IssueUnattendedAccessToken(device, Role.Warehouse),
-                DeviceType.CustomerDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.CustomerDisplay),
-                DeviceType.Kiosk or DeviceType.Register => jwtTokenService.IssueKioskAccessToken(device),
-                _ => throw new InvalidOperationException($"Unhandled {nameof(DeviceType)}: {device.DeviceType}"),
-            };
-        }
-        else if (user is not null)
-        {
-            accessToken = jwtTokenService.IssueAdminAccessToken(user);
-        }
-        else
-        {
-            // The owning user/device was deleted since this refresh token was issued.
             return new TokenRefreshResult.InvalidToken();
         }
 
-        var newRefreshToken = await refreshTokenService.IssueAsync(owner.TenantId, owner.UserId, owner.DeviceId, cancellationToken);
+        var newRefreshToken = await refreshTokenService.IssueAsync(owner.TenantId, null, device.Id, cancellationToken);
         return new TokenRefreshResult.Success(accessToken, newRefreshToken);
     }
 }

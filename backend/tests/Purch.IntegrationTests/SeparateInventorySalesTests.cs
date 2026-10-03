@@ -107,15 +107,7 @@ public sealed class SeparateInventorySalesTests(PostgresContainerFixture postgre
 
     private static async Task<Shop> OpenShopAsync(PurchApiFactory factory, bool separateTracking = true)
     {
-        var client = factory.CreateClient();
-        var bootstrap = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "1234"));
-        var tenant = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
-        var login = await client.PostAsJsonAsync("/auth/login", new LoginRequest(tenant.DevicePairingCode, "1234"));
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            (await login.Content.ReadFromJsonAsync<TokenBody>(JsonOptions))!.AccessToken);
+        var client = await TestSessions.AdminClientAsync(factory);
 
         if (separateTracking)
         {

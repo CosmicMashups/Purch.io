@@ -16,7 +16,7 @@ test.describe('at the counter', () => {
 
     // The cashier takes it and is paid.
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip, { removeCart: true });
+    await resetRegister(seed, ip, { removeCart: true });
     await page.goto('/sell/kiosk-orders');
     const order = page.getByRole('listitem').filter({ hasText: `Order ${number}` });
     await order.getByRole('button', { name: 'Take this order' }).click();
@@ -32,7 +32,7 @@ test.describe('at the counter', () => {
 
   test('a cashier opens a shift with a cash count and closes it with a matching count', async ({ page, signInAs, ip, seed }) => {
     await signInAs('manager');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell/shift');
 
     // A shift left open by an earlier run is closed first, so the test starts from a closed drawer.
@@ -73,7 +73,7 @@ test.fixme('a cashier who has looked at an empty register can still take a kiosk
   await expect(kiosk.getByLabel(/Order number \d+/)).toBeVisible();
 
   await signInAs('cashier');
-  await resetRegister(seed.register.code, seed.pins.manager, ip, { removeCart: true });
+  await resetRegister(seed, ip, { removeCart: true });
   await page.goto('/sell');
   await expect(page.getByRole('button', { name: /Iced Latte/ })).toBeVisible();
   await page.goto('/sell/kiosk-orders');

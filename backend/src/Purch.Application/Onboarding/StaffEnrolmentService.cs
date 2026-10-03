@@ -11,6 +11,7 @@ namespace Purch.Application.Onboarding;
 
 public sealed class StaffEnrolmentService(
     IMembershipRepository membershipRepository,
+    IUserRepository userRepository,
     IEnrolmentInviteRepository inviteRepository,
     IAccountRepository accountRepository,
     IAccountService accountService,
@@ -47,10 +48,17 @@ public sealed class StaffEnrolmentService(
             throw new ConflictException("That email already belongs to someone in this business.");
         }
 
+        if (request.LegacyUserId is { } legacyId
+            && (await userRepository.ListUninvitedLegacyAsync(CurrentTenantId, cancellationToken)).All(u => u.Id != legacyId))
+        {
+            throw new NotFoundException("Person from the old sign-in", legacyId);
+        }
+
         var invite = new EnrolmentInvite
         {
             TenantId = CurrentTenantId,
             Purpose = InvitePurpose.Enrolment,
+            LegacyUserId = request.LegacyUserId,
             Name = request.Name.Trim(),
             Email = email,
             Role = request.Role,
@@ -68,6 +76,17 @@ public sealed class StaffEnrolmentService(
     public async Task<IReadOnlyList<InviteDto>> ListInvitesAsync(CancellationToken cancellationToken = default)
     {
         return [.. (await inviteRepository.ListPendingAsync(cancellationToken)).Select(ToDto)];
+    }
+
+    public async Task<IReadOnlyList<LegacyStaffDto>> ListLegacyAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await userRepository.ListUninvitedLegacyAsync(CurrentTenantId, cancellationToken);
+        return [.. users.Select(user => new LegacyStaffDto(
+            user.Id,
+            user.Name,
+            user.Role switch { Role.Admin => MembershipRole.Admin, Role.Manager => MembershipRole.Manager, _ => MembershipRole.Staff },
+            user.Role switch { Role.Cashier => StaffDuty.Cashier, Role.Warehouse => StaffDuty.Warehouse, _ => StaffDuty.None },
+            user.BranchId ?? (user.ScopeType == ScopeType.Branch ? user.ScopeId : null)))];
     }
 
     public async Task RevokeInviteAsync(Guid inviteId, CancellationToken cancellationToken = default)
@@ -235,6 +254,7 @@ public sealed class StaffEnrolmentService(
             Role = invite.Role,
             Duties = invite.Duties,
             PinHash = pinHasher.Hash(request.Pin!),
+            LegacyUserId = invite.LegacyUserId,
         };
         membership.Branches.AddRange(invite.BranchIds.Select(branchId => new MembershipBranch { TenantId = invite.TenantId, MembershipId = membership.Id, BranchId = branchId }));
         accountRepository.Add(membership);

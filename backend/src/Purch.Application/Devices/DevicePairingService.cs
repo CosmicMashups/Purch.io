@@ -48,7 +48,7 @@ public sealed class DevicePairingService(
         var code = StageNewCode(device);
         deviceRepository.Add(device);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new DevicePairingCodeDto(ToDto(device), code, device.PairingCodeExpiresAt!.Value);
+        return new DevicePairingCodeDto(DeviceManagementService.ToDto(device), code, device.PairingCodeExpiresAt!.Value);
     }
 
     public async Task<DevicePairingCodeDto> NewPairingCodeAsync(Guid deviceId, CancellationToken cancellationToken = default)
@@ -67,7 +67,7 @@ public sealed class DevicePairingService(
 
         var code = StageNewCode(device);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new DevicePairingCodeDto(ToDto(device), code, device.PairingCodeExpiresAt!.Value);
+        return new DevicePairingCodeDto(DeviceManagementService.ToDto(device), code, device.PairingCodeExpiresAt!.Value);
     }
 
     public async Task<DeviceDto> RevokeAsync(Guid deviceId, CancellationToken cancellationToken = default)
@@ -81,7 +81,7 @@ public sealed class DevicePairingService(
         device.PairingCodeHash = null;
         device.PairingCodeExpiresAt = null;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return ToDto(device);
+        return DeviceManagementService.ToDto(device);
     }
 
     public async Task<DevicePairResult> PairAsync(PairDeviceRequest request, CancellationToken cancellationToken = default)
@@ -212,20 +212,4 @@ public sealed class DevicePairingService(
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Device management requires an authenticated tenant context.");
-
-    private static DeviceDto ToDto(Device device)
-    {
-        return new DeviceDto(
-            device.Id,
-            device.BranchId,
-            device.PairingCode,
-            device.DeviceIdentifier,
-            device.DeviceType,
-            device.LastSeenAt,
-            device.Name,
-            device.Status,
-            device.PairedAt,
-            device.PairingCodeExpiresAt,
-            device.LinkedRegisterDeviceId);
-    }
 }

@@ -141,8 +141,8 @@ describe('DevicesPanel', () => {
   it('shows when each device last checked in, most recent first', async () => {
     const recent = new Date(Date.now() - 10 * 60_000).toISOString();
     vi.mocked(deviceApi.list).mockResolvedValue([
-      { id: 'a', branchId: 'b', pairingCode: 'X', deviceIdentifier: 'Old kiosk', deviceType: 1, lastSeenAt: null },
-      { id: 'b', branchId: 'b', pairingCode: 'Y', deviceIdentifier: 'Front counter', deviceType: 0, lastSeenAt: recent },
+      { id: 'a', branchId: 'b', deviceIdentifier: 'Old kiosk', deviceType: 1, lastSeenAt: null },
+      { id: 'b', branchId: 'b', deviceIdentifier: 'Front counter', deviceType: 0, lastSeenAt: recent },
     ]);
     renderPage(<DevicesPanel />);
     expect(await screen.findByText('10 min ago')).toBeInTheDocument();

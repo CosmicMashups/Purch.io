@@ -6,7 +6,7 @@ import { expect, test } from './support/fixtures';
 test.describe('adding items to the cart quickly', () => {
   test('two different items tapped back to back both reach the cart', async ({ page, signInAs, ip, seed }) => {
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell');
     await expect(page.getByRole('button', { name: /^Iced Latte/ })).toBeVisible();
 
@@ -19,7 +19,7 @@ test.describe('adding items to the cart quickly', () => {
 
   test('every tap is accepted on the spot even when the server is slow, and the cart ends up right', async ({ page, signInAs, ip, seed }) => {
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell');
     await expect(page.getByRole('button', { name: /^Iced Latte/ })).toBeVisible();
 
@@ -60,7 +60,7 @@ test.describe('adding items to the cart quickly', () => {
 
   test('a rapid burst of taps on one item comes out as the right quantity', async ({ page, signInAs, ip, seed }) => {
     await signInAs('cashier');
-    await resetRegister(seed.register.code, seed.pins.manager, ip);
+    await resetRegister(seed, ip);
     await page.goto('/sell');
     const cookie = page.getByRole('button', { name: /^Ube Cookie/ });
     await expect(cookie).toBeVisible();

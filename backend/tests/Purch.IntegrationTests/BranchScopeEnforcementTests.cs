@@ -27,28 +27,16 @@ public sealed class BranchScopeEnforcementTests(PostgresContainerFixture postgre
 
     private static async Task<Setup> SetUpAsync(PurchApiFactory factory)
     {
-        var admin = factory.CreateClient();
-        var bootstrap = await admin.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Admin User", "1234"));
-        var tenant = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
-        var adminLogin = await admin.PostAsJsonAsync("/auth/login", new LoginRequest(tenant.DevicePairingCode, "1234"));
-        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            (await adminLogin.Content.ReadFromJsonAsync<TokenBody>(JsonOptions))!.AccessToken);
-
-        var mainBranchId = (await admin.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions))!.Single().Id;
+        var admin = await TestSessions.AdminClientAsync(factory);
+        var mainBranchId = TestSessions.ShopOf(admin).Tenant.BranchId;
         var own = (await (await admin.PostAsJsonAsync("/branches", new CreateBranchRequest("Second Branch", null))).Content.ReadFromJsonAsync<BranchDto>(JsonOptions))!;
 
-        _ = await admin.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Bea Branch", Role.Manager, ScopeType.Branch, own.Id, own.Id, "5678"));
-
-        var manager = factory.CreateClient();
-        var managerLogin = await manager.PostAsJsonAsync("/auth/login", new LoginRequest(tenant.DevicePairingCode, "5678"));
-        manager.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            (await managerLogin.Content.ReadFromJsonAsync<TokenBody>(JsonOptions))!.AccessToken);
+        // Staff are confined to the branch their device is in. Warehouse staff at the second branch, on that branch's own
+        // Warehouse device, stand in for the branch-limited manager the old sign-in allowed.
+        var staffId = await TestSessions.AddPersonAsync(admin, "Bea Branch", MembershipRole.Staff, StaffDuty.Warehouse, "5678", own.Id);
+        using var anonymous = factory.CreateClient();
+        var (_, credential) = await TestSessions.PairAsync(admin, anonymous, own.Id, DeviceType.WarehouseOfficer, "Second branch stock room");
+        var manager = await TestSessions.UnlockAsync(admin, staffId, "5678", credential);
 
         var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Canned Goods", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         _ = await admin.PostAsJsonAsync(
@@ -150,5 +138,4 @@ public sealed class BranchScopeEnforcementTests(PostgresContainerFixture postgre
         Assert.Equal(HttpStatusCode.OK, ownOrder.StatusCode);
     }
 
-    private sealed record TokenBody(string AccessToken);
 }

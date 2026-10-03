@@ -18,7 +18,7 @@ export const bootstrapSchema = z
     branchName: z.string().trim().min(1, 'Enter your first branch name'),
     adminName: z.string().trim().min(1, 'Enter your name'),
     adminPin: z.string(),
-    adminEmail: z.string().trim().refine((v) => v === '' || z.string().email().safeParse(v).success, 'Enter a valid email'),
+    adminEmail: z.string().trim().min(1, 'Enter your email').email('Enter a valid email'),
     adminPassword: z.string(),
     agreed: z.boolean(),
   })
@@ -26,18 +26,8 @@ export const bootstrapSchema = z
     const pin = pinProblem(v.adminPin);
     if (pin) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['adminPin'], message: pin });
 
-    const hasEmail = v.adminEmail.trim() !== '';
-    const hasPassword = v.adminPassword.trim() !== '';
-    if (hasEmail !== hasPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [hasEmail ? 'adminPassword' : 'adminEmail'],
-        message: hasEmail ? 'Add a password too, or clear the email' : 'Add an email too, or clear the password',
-      });
-    } else if (hasPassword) {
-      const problem = passwordProblem(v.adminPassword);
-      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['adminPassword'], message: problem });
-    }
+    const problem = passwordProblem(v.adminPassword);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['adminPassword'], message: problem });
 
     if (!v.agreed) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['agreed'], message: 'Please review and accept to continue' });
   });
@@ -57,19 +47,18 @@ export interface BootstrapBody {
   branchName: string;
   adminName: string;
   adminPin: string;
-  adminEmail: string | null;
-  adminPassword: string | null;
+  adminEmail: string;
+  adminPassword: string;
 }
 
 export function toBootstrapBody(v: BootstrapForm): BootstrapBody {
-  const email = v.adminEmail.trim();
   return {
     tenantName: v.tenantName.trim(),
     businessType: v.businessType,
     branchName: v.branchName.trim(),
     adminName: v.adminName.trim(),
     adminPin: v.adminPin.trim(),
-    adminEmail: email === '' ? null : email,
-    adminPassword: email === '' ? null : v.adminPassword,
+    adminEmail: v.adminEmail.trim(),
+    adminPassword: v.adminPassword,
   };
 }

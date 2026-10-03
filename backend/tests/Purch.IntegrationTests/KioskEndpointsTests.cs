@@ -25,7 +25,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest("not-a-real-code", "1234"));
+        var response = await client.PostAsJsonAsync("/devices/pair", new PairDeviceRequest("NOTACODE"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -261,8 +261,8 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var (claimed, item) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
         var lineId = claimed.Lines.Single().Id;
 
@@ -279,10 +279,9 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(2m, updated!.Lines.Single().Quantity);
         _ = item;
 
-        var manager = (await adminClient.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions))!.Single(s => s.Name == "Mae Manager");
         var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
         var entry = Assert.Single(auditLogs!, log => log.TargetEntityId == lineId);
-        Assert.Equal(manager.Id, entry.ApprovedByUserId);
+        Assert.Equal(managerId, entry.ApprovedByUserId);
     }
 
     [Fact]
@@ -308,8 +307,8 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
         var lineId = claimed.Lines.Single().Id;
 
@@ -320,10 +319,9 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.OK, withPin.StatusCode);
         Assert.Empty((await withPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines);
 
-        var manager = (await adminClient.GetFromJsonAsync<List<StaffDto>>("/staff", JsonOptions))!.Single(s => s.Name == "Mae Manager");
         var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
         var entry = Assert.Single(auditLogs!, log => log.TargetEntityId == lineId);
-        Assert.Equal(manager.Id, entry.ApprovedByUserId);
+        Assert.Equal(managerId, entry.ApprovedByUserId);
     }
 
     [Fact]
@@ -351,8 +349,8 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Mae Manager", Role.Manager, ScopeType.Tenant, null, null, "5678"));
-        using var cashierClient = await CashierClientAsync(adminClient, factory);
+        _ = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Soda", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         var addResponse = await cashierClient.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
         var lineId = (await addResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines.Single().Id;
@@ -364,18 +362,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     private static async Task<(HttpClient Client, Guid BranchId, Guid DeviceId)> PairedKitchenDisplayClientAsync(PurchApiFactory factory, HttpClient adminClient)
-    {
-        var branches = await adminClient.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
-        var branchId = branches!.Single().Id;
-        var deviceResponse = await adminClient.PostAsJsonAsync("/devices", new CreateDeviceRequest(branchId, DeviceIdentifier: null, DeviceType.KitchenDisplay, PairingPin: "9999"));
-        var device = (await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions))!;
-
-        var client = factory.CreateClient();
-        var session = await client.PostAsJsonAsync("/kitchen-display/session", new UnattendedSessionRequest(device.PairingCode, "9999"));
-        var token = (await session.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions))!.AccessToken;
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return (client, branchId, device.Id);
-    }
+        => await PairedDeviceClientAsync(factory, adminClient, DeviceType.KitchenDisplay, "Kitchen");
 
     [Fact]
     public async Task Claiming_a_kiosk_order_is_rejected_if_the_cashier_already_has_an_open_cart()
@@ -402,65 +389,22 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
-    public async Task Resetting_a_devices_pairing_code_invalidates_the_old_code_and_revokes_its_sessions()
+    public async Task Pairing_a_device_again_ends_its_credential_and_sessions_and_needs_the_new_code()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
         var (kioskClient, _, deviceId) = await PairedKioskClientAsync(factory, adminClient);
 
-        var devicesBeforeReset = await adminClient.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        var oldPairingCode = devicesBeforeReset!.Single(d => d.Id == deviceId).PairingCode;
-
-        var resetResponse = await adminClient.PostAsync($"/devices/{deviceId}/reset-pairing-code", null);
-        var resetDevice = await resetResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
-
+        var resetResponse = await adminClient.PostAsync($"/devices/{deviceId}/pairing-code", null);
         Assert.Equal(HttpStatusCode.OK, resetResponse.StatusCode);
-        Assert.NotNull(resetDevice);
-        Assert.NotEqual(oldPairingCode, resetDevice!.PairingCode);
+        var fresh = (await resetResponse.Content.ReadFromJsonAsync<DevicePairingCodeDto>(JsonOptions))!;
 
-        // The token issued under the old pairing code no longer works...
-        var cartAfterResetResponse = await kioskClient.GetAsync("/kiosk/cart");
-        Assert.Equal(HttpStatusCode.Unauthorized, cartAfterResetResponse.StatusCode);
+        // The token issued before no longer works...
+        Assert.Equal(HttpStatusCode.Unauthorized, (await kioskClient.GetAsync("/kiosk/cart")).StatusCode);
 
-        // ...pairing with the old code is rejected...
-        using var staleKioskClient = factory.CreateClient();
-        var staleSessionResponse = await staleKioskClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(oldPairingCode, "5678"));
-        Assert.Equal(HttpStatusCode.Unauthorized, staleSessionResponse.StatusCode);
-
-        // ...but pairing with the new code succeeds.
+        // ...and the new code pairs it again.
         using var freshKioskClient = factory.CreateClient();
-        var freshSessionResponse = await freshKioskClient.PostAsJsonAsync(
-            "/kiosk/session",
-            new KioskSessionRequest(resetDevice.PairingCode, "5678"));
-        Assert.Equal(HttpStatusCode.OK, freshSessionResponse.StatusCode);
-    }
-
-    [Fact]
-    public async Task Resetting_a_devices_pairing_pin_invalidates_the_old_pin_and_revokes_its_sessions()
-    {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        var (kioskClient, _, deviceId) = await PairedKioskClientAsync(factory, adminClient);
-
-        var resetResponse = await adminClient.PostAsJsonAsync(
-            $"/devices/{deviceId}/reset-pairing-pin",
-            new ResetDevicePairingPinRequest("4321"));
-        var resetDevice = await resetResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
-        Assert.Equal(HttpStatusCode.OK, resetResponse.StatusCode);
-
-        // The old session is revoked by the PIN reset...
-        var cartAfterResetResponse = await kioskClient.GetAsync("/kiosk/cart");
-        Assert.Equal(HttpStatusCode.Unauthorized, cartAfterResetResponse.StatusCode);
-
-        // ...the old PIN no longer works...
-        using var oldPinClient = factory.CreateClient();
-        var oldPinResponse = await oldPinClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(resetDevice!.PairingCode, "5678"));
-        Assert.Equal(HttpStatusCode.Unauthorized, oldPinResponse.StatusCode);
-
-        // ...but the new one does.
-        using var newPinClient = factory.CreateClient();
-        var newPinResponse = await newPinClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(resetDevice.PairingCode, "4321"));
-        Assert.Equal(HttpStatusCode.OK, newPinResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await freshKioskClient.PostAsJsonAsync("/devices/pair", new PairDeviceRequest(fresh.PairingCode))).StatusCode);
     }
 
     private static async Task<(HttpClient KioskClient, Guid BranchId, Guid DeviceId)> PairedKioskClientAsync(
@@ -468,59 +412,20 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         HttpClient? existingAdminClient = null)
     {
         var adminClient = existingAdminClient ?? await AuthenticatedAdminClientAsync(factory);
-        var branches = await adminClient.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions);
-        var branchId = branches!.Single().Id;
-
-        var deviceResponse = await adminClient.PostAsJsonAsync(
-            "/devices",
-            new CreateDeviceRequest(branchId, "Kiosk Terminal 1", DeviceType.Kiosk, "5678"));
-        var device = await deviceResponse.Content.ReadFromJsonAsync<DeviceDto>(JsonOptions);
-
-        var kioskClient = factory.CreateClient();
-        var sessionResponse = await kioskClient.PostAsJsonAsync("/kiosk/session", new KioskSessionRequest(device!.PairingCode, "5678"));
-        var session = await sessionResponse.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions);
-
-        kioskClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session!.AccessToken);
-        return (kioskClient, branchId, device.Id);
+        return await PairedDeviceClientAsync(factory, adminClient, DeviceType.Kiosk, "Kiosk Terminal 1");
     }
 
-    /// <summary>A cashier signed in on the same tenant/device as an already-paired admin — for the
-    /// kitchen-edit gate, where who is asking (not just who is signed in on the same terminal) matters.</summary>
-    private static async Task<HttpClient> CashierClientAsync(HttpClient adminClient, PurchApiFactory factory, string pin = "6789")
+    /// <summary>Creates an unattended device, pairs it with its one-time code and starts its session: the device signs itself in.</summary>
+    private static async Task<(HttpClient Client, Guid BranchId, Guid DeviceId)> PairedDeviceClientAsync(PurchApiFactory factory, HttpClient adminClient, DeviceType type, string name)
     {
-        _ = await adminClient.PostAsJsonAsync("/staff", new CreateStaffRequest("Cal Cashier", Role.Cashier, ScopeType.Tenant, null, null, pin));
-        var devices = await adminClient.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        var registerDevice = devices!.Single(d => d.DeviceType == DeviceType.Register);
-
-        var cashier = factory.CreateClient();
-        var login = await cashier.PostAsJsonAsync("/auth/login", new LoginRequest(registerDevice.PairingCode, pin));
-        var token = (await login.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions))!.AccessToken;
-        cashier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return cashier;
+        var branchId = TestSessions.ShopOf(adminClient).Tenant.BranchId;
+        using var anonymous = factory.CreateClient();
+        var (deviceId, credential) = await TestSessions.PairAsync(adminClient, anonymous, branchId, type, name);
+        var session = await anonymous.PostAsJsonAsync("/devices/session", new DeviceSessionRequest(credential));
+        var token = (await session.Content.ReadFromJsonAsync<DeviceSessionDto>(JsonOptions))!.AccessToken!;
+        return (TestSessions.Bearer(factory, token), branchId, deviceId);
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<KioskSessionResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record KioskSessionResponseBody(string AccessToken);
 }

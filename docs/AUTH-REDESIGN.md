@@ -217,4 +217,20 @@ single-use link to set an email, password and new PIN; each device is re-paired 
 5. [x] Register lock, PIN switch, offline PIN cache, lockout.
 6. [x] Access rule in the API and in web and Flutter navigation (Home for Admin and Manager only, landing page per duty).
 7. [x] Customer display pairing and server relay (`/customer-display/state` PUT & conditional GET with ETags).
-8. [ ] Remove the old mechanisms and re-enrol existing staff and devices.
+8. [x] Remove the old mechanisms and re-enrol existing staff and devices.
+
+## Step 8: old mechanisms removed, existing staff and devices re-enrolled
+
+**Removed:** PIN-at-a-permanent-pairing-code sign-in (`/auth/login`, `/auth/admin-login`), the old password-reset flow, unattended sessions, the PIN-only staff create/update endpoints and the "create device" / "reset pairing PIN" endpoints. `Device.PairingCode`, `Device.PairingPinHash` and the `User` rows stay in the database (history still points at them) but nothing reads them for sign-in.
+
+**Deploy order:** run `migrate`, then `migrate-legacy` once.
+
+`migrate-legacy` is safe to repeat. It:
+- moves each old owner (email + password) to an Account with an Admin Membership, keeping their password and PIN;
+- ends every old-style session;
+- sets devices paired the old way back to Pending so they wait for a one-time code (devices already paired the new way are untouched);
+- prints how many owners moved, sessions ended, devices to pair again and staff to invite.
+
+**Staff who only had a PIN** appear under `GET /staff/legacy` and on the Staff page. Inviting one of them passes `legacyUserId`, so their earlier sales and shifts stay linked to them.
+
+**Known gaps:** Flutter cannot sign in until it is ported to the new flows. The offline PIN cache is still deferred.

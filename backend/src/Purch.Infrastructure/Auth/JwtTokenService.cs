@@ -14,53 +14,6 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
 {
     private readonly IConfiguration _configuration = configuration;
 
-    public string IssueAccessToken(User user, Device device)
-    {
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtClaimTypes.TenantId, user.TenantId.ToString()),
-            new(JwtClaimTypes.Role, user.Role.ToString()),
-            new(JwtClaimTypes.ScopeType, user.ScopeType.ToString()),
-            new(JwtClaimTypes.DeviceId, device.Id.ToString()),
-            // The device's own branch, not the user's — a tenant-scoped staff
-            // member's User.BranchId is null, but a transaction always happens
-            // at one physical terminal's branch.
-            new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
-            new(JwtClaimTypes.DeviceSessionVersion, device.SessionVersion.ToString(CultureInfo.InvariantCulture)),
-        };
-
-        if (user.ScopeId is { } scopeId)
-        {
-            claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
-        }
-
-        // Short-lived by design now that a refresh token backs it (see
-        // IRefreshTokenService) — the client silently exchanges the refresh token
-        // for a new one well before this expires, so shortening this window only
-        // reduces how long a leaked access token stays usable, without shortening
-        // the shift itself.
-        return WriteToken(claims, TimeSpan.FromMinutes(30));
-    }
-
-    public string IssueAdminAccessToken(User user)
-    {
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtClaimTypes.TenantId, user.TenantId.ToString()),
-            new(JwtClaimTypes.Role, user.Role.ToString()),
-            new(JwtClaimTypes.ScopeType, user.ScopeType.ToString()),
-        };
-
-        if (user.ScopeId is { } scopeId)
-        {
-            claims.Add(new Claim(JwtClaimTypes.ScopeId, scopeId.ToString()));
-        }
-
-        return WriteToken(claims, TimeSpan.FromMinutes(30));
-    }
-
     public string IssueKioskAccessToken(Device device)
     {
         var claims = new List<Claim>

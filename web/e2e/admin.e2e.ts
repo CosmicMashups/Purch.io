@@ -14,43 +14,36 @@ test.describe('running the business', () => {
     await expect(page.getByText(name)).toBeVisible();
   });
 
-  test('an admin adds a staff member, who can then sign in with the new PIN', async ({ page, signInAs, seed }) => {
+  test('an admin invites a staff member, who opens the link and sets a password and PIN', async ({ page, signInAs, browser }) => {
     await signInAs('admin');
     const name = `Rina ${Date.now().toString(36)}`;
 
     await page.goto('/business/staff');
     await page.getByLabel('Name').fill(name);
-    await page.getByLabel('Role').selectOption({ label: 'Cashier' });
-    await page.getByLabel('Can work in').selectOption({ index: 1 });
-    await page.getByLabel('Branch').selectOption({ index: 1 });
-    await page.getByLabel('PIN').fill('8642');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.getByText(name)).toBeVisible();
+    await page.getByLabel('Email').fill(`rina-${Date.now().toString(36)}@e2e.test`);
+    await page.getByLabel('Cashier').check();
+    await page.getByLabel('Main Branch').check();
+    await page.getByRole('button', { name: 'Invite', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Sign out' }).click();
-    await page.getByLabel(/device code/i).fill(seed.register.code);
-    await page.getByLabel(/pin/i).fill('8642');
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByText('Signed in as Cashier')).toBeVisible();
+    const link = await page.getByTestId('invite-url').innerText();
+    expect(link).toMatch(/\/enrol\//);
+
+    // The person opens it on their own phone: a different browser with no session.
+    const phone = await (await browser.newContext()).newPage();
+    await phone.goto(link);
+    await expect(phone.getByRole('heading', { name: /^Join / })).toBeVisible();
+    await phone.getByLabel(/^Choose a password/).fill('Rina-password-1');
+    await phone.getByLabel(/^Type it again/).fill('Rina-password-1');
+    await phone.getByLabel(/^Choose a PIN/).fill('8642');
+    await phone.getByRole('button', { name: 'Join' }).click();
+    await expect(phone).toHaveURL(/\/sell$/);
+    await phone.context().close();
   });
 
-  test('a PIN somebody already uses is refused with a plain message', async ({ page, signInAs, seed }) => {
-    await signInAs('admin');
-    await page.goto('/business/staff');
-    await page.getByLabel('Name').fill('Copycat');
-    await page.getByLabel('Role').selectOption({ label: 'Cashier' });
-    await page.getByLabel('Can work in').selectOption({ index: 1 });
-    await page.getByLabel('Branch').selectOption({ index: 1 });
-    await page.getByLabel('PIN').fill(seed.pins.cashier);
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.getByText('Copycat')).toHaveCount(0);
-    await expect(page.getByRole('status').or(page.getByRole('alert')).first()).toBeVisible();
-  });
-
-  test('a manager can see the staff list but has no form to change it', async ({ page, signInAs }) => {
+  test('a manager sees the staff list and can only invite staff', async ({ page, signInAs }) => {
     await signInAs('manager');
     await page.goto('/business/staff');
     await expect(page.getByText('Carlo Cashier')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'New staff member' })).toHaveCount(0);
+    await expect(page.getByLabel('Role').locator('option')).toHaveText(['Staff']);
   });
 });

@@ -8,9 +8,9 @@ import { DevicesPage } from './DevicesPage';
 vi.mock('./deviceApi', () => ({ deviceApi: { list: vi.fn(), createPairing: vi.fn(), newPairingCode: vi.fn(), revoke: vi.fn() } }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
 
-const register: Device = { id: 'd1', branchId: 'kat', pairingCode: '', deviceIdentifier: null, name: 'Front counter', deviceType: 0, status: 0, lastSeenAt: '2026-09-24T02:00:00Z' };
-const kiosk: Device = { id: 'd2', branchId: 'kat', pairingCode: '', deviceIdentifier: null, name: 'Entrance kiosk', deviceType: 1, status: 1, lastSeenAt: null, pairingCodeExpiresAt: '2026-10-03T03:00:00Z' };
-const retired: Device = { id: 'd3', branchId: 'kat', pairingCode: '', deviceIdentifier: null, name: 'Old tablet', deviceType: 2, status: 2, lastSeenAt: null };
+const register: Device = { id: 'd1', branchId: 'kat', deviceIdentifier: null, name: 'Front counter', deviceType: 0, status: 0, lastSeenAt: '2026-09-24T02:00:00Z' };
+const kiosk: Device = { id: 'd2', branchId: 'kat', deviceIdentifier: null, name: 'Entrance kiosk', deviceType: 1, status: 1, lastSeenAt: null, pairingCodeExpiresAt: '2026-10-03T03:00:00Z' };
+const retired: Device = { id: 'd3', branchId: 'kat', deviceIdentifier: null, name: 'Old tablet', deviceType: 2, status: 2, lastSeenAt: null };
 
 const issued = (device: Device, code: string) => ({ device, pairingCode: code, expiresAt: '2026-10-03T03:10:00Z' });
 

@@ -123,6 +123,7 @@ builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(SupabaseIdentityProvider.HttpClientName),
             serviceProvider.GetRequiredService<IDeploymentContext>()));
 builder.Services.AddScoped<IAccountRepository, EfAccountRepository>();
+builder.Services.AddScoped<LegacyMigration>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IMembershipRepository, EfMembershipRepository>();
 builder.Services.AddScoped<IEnrolmentInviteRepository, EfEnrolmentInviteRepository>();
@@ -134,13 +135,9 @@ builder.Services.AddScoped<IDeviceUnlockService, DeviceUnlockService>();
 builder.Services.AddScoped<ICustomerDisplayRepository, EfCustomerDisplayRepository>();
 builder.Services.AddScoped<ICustomerDisplayService, CustomerDisplayService>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
-builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
-builder.Services.AddScoped<IPasswordResetTokenRepository, EfPasswordResetTokenRepository>();
-builder.Services.AddSingleton<IPasswordResetTokenNotifier>(new ConsolePasswordResetTokenNotifier(revealToken: builder.Environment.IsDevelopment()));
-builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<ITenantRepository, EfTenantRepository>();
@@ -148,7 +145,6 @@ builder.Services.AddScoped<IBranchRepository, EfBranchRepository>();
 builder.Services.AddScoped<IAuditLogRepository, EfAuditLogRepository>();
 builder.Services.AddScoped<IDepartmentRepository, EfDepartmentRepository>();
 builder.Services.AddScoped<IBootstrapTenantService, BootstrapTenantService>();
-builder.Services.AddScoped<IStaffService, StaffService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IDeviceManagementService, DeviceManagementService>();
@@ -183,7 +179,6 @@ builder.Services.AddScoped<IApproverAuthorizationService, ApproverAuthorizationS
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IAdjustmentService, AdjustmentService>();
 builder.Services.AddScoped<IKioskSessionService, KioskSessionService>();
-builder.Services.AddScoped<IUnattendedSessionService, UnattendedSessionService>();
 builder.Services.AddScoped<IShiftRepository, EfShiftRepository>();
 builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IPromoCodeRepository, EfPromoCodeRepository>();
@@ -333,6 +328,16 @@ if (args is ["migrate"])
     using var migrateScope = app.Services.CreateScope();
     var migrateDbContext = migrateScope.ServiceProvider.GetRequiredService<PurchDbContext>();
     await migrateDbContext.Database.MigrateAsync();
+    return;
+}
+
+// One time, when the old PIN-at-a-pairing-code sign-in is retired: carries each owner over to the new sign-in, ends the old
+// sessions, and sends the old devices back to waiting for a one-time code. Safe to run again. Run after "migrate".
+if (args is ["migrate-legacy"])
+{
+    using var legacyScope = app.Services.CreateScope();
+    var report = await legacyScope.ServiceProvider.GetRequiredService<LegacyMigration>().RunAsync();
+    Console.WriteLine($"{report.OwnersMoved} owner(s) moved, {report.OwnersAlreadyMoved} already moved, {report.SessionsEnded} session(s) ended, {report.DevicesToPairAgain} device(s) to pair again, {report.StaffToInvite} staff member(s) to invite.");
     return;
 }
 

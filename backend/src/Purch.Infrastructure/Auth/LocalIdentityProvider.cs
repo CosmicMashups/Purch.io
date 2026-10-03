@@ -26,6 +26,19 @@ public sealed class LocalIdentityProvider(PurchDbContext dbContext, IPasswordHas
         return credential.Id;
     }
 
+    public async Task<Guid> CreateUserWithPasswordHashAsync(string email, string bcryptHash, CancellationToken cancellationToken = default)
+    {
+        if (await dbContext.LocalCredentials.AnyAsync(c => c.Email == email, cancellationToken))
+        {
+            throw new ConflictException("That email already has a login.");
+        }
+
+        var credential = new LocalCredential { Email = email, PasswordHash = bcryptHash };
+        _ = dbContext.LocalCredentials.Add(credential);
+        _ = await dbContext.SaveChangesAsync(cancellationToken);
+        return credential.Id;
+    }
+
     public async Task<Guid?> VerifyPasswordAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         var credential = await dbContext.LocalCredentials.AsNoTracking().FirstOrDefaultAsync(c => c.Email == email, cancellationToken);

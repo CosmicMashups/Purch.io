@@ -103,18 +103,7 @@ public sealed class CatalogEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
 
-        var createStaffResponse = await adminClient.PostAsJsonAsync(
-            "/staff",
-            new CreateStaffRequest("Cashier One", Role.Cashier, ScopeType.Tenant, null, null, "5678"));
-        Assert.Equal(HttpStatusCode.OK, createStaffResponse.StatusCode);
-
-        var devices = await adminClient.GetFromJsonAsync<List<DeviceDto>>("/devices", JsonOptions);
-        using var cashierClient = factory.CreateClient();
-        var loginResponse = await cashierClient.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(devices!.Single().PairingCode, "5678"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-        cashierClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient, "5678", "Cashier One");
 
         var listResponse = await cashierClient.GetAsync("/items");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
@@ -125,28 +114,6 @@ public sealed class CatalogEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.Forbidden, createResponse.StatusCode);
     }
 
-    private static async Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory)
-    {
-        var client = factory.CreateClient();
+    private static Task<HttpClient> AuthenticatedAdminClientAsync(PurchApiFactory factory) => TestSessions.AdminClientAsync(factory);
 
-        var bootstrapResponse = await client.PostAsJsonAsync(
-            "/onboarding/bootstrap",
-            new BootstrapTenantRequest(
-                $"Tenant-{Guid.NewGuid():N}",
-                BusinessType.ConvenienceStore,
-                "Main Branch",
-                "Admin User",
-                "1234"));
-        var bootstrapResult = await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions);
-
-        var loginResponse = await client.PostAsJsonAsync(
-            "/auth/login",
-            new LoginRequest(bootstrapResult!.DevicePairingCode, "1234"));
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponseBody>(JsonOptions);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginBody!.AccessToken);
-        return client;
-    }
-
-    private sealed record LoginResponseBody(string AccessToken);
 }

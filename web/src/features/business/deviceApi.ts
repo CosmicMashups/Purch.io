@@ -4,7 +4,6 @@ import { apiClient } from '../../lib/apiClient';
 export interface Device {
   id: string;
   branchId: string;
-  pairingCode: string;
   deviceIdentifier: string | null;
   deviceType: number;
   lastSeenAt: string | null;

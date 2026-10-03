@@ -25,23 +25,6 @@ public static class KioskEndpoints
     {
         var kioskOnly = new[] { nameof(Role.Kiosk) };
 
-        _ = app.MapPost("/kiosk/session", async (
-            KioskSessionRequest request,
-            IKioskSessionService kioskSessionService,
-            CancellationToken cancellationToken) =>
-        {
-            var result = await kioskSessionService.PairAsync(request, cancellationToken);
-            return result switch
-            {
-                KioskSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
-                KioskSessionResult.InvalidDevice => Results.Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    title: "Invalid credentials.",
-                    detail: "The device pairing code or PIN was not recognized."),
-                _ => throw new InvalidOperationException($"Unhandled {nameof(KioskSessionResult)} case: {result.GetType().Name}"),
-            };
-        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
-
         _ = app.MapGet("/kiosk/cart", async (
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>

@@ -11,8 +11,8 @@ import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
 import { InviteLinkDialog } from './components/InviteLinkDialog';
-import type { Invite, InviteLink, Member } from './memberApi';
-import { useCancelInvite, useInvite, useInvites, useMembers, useResetLink, useUpdateMember } from './memberQueries';
+import type { Invite, InviteLink, LegacyStaff, Member } from './memberApi';
+import { useCancelInvite, useInvite, useInvites, useLegacyStaff, useMembers, useResetLink, useUpdateMember } from './memberQueries';
 import { DUTIES, MembershipRole, StaffDuty, describeDuties, dutyLabels, labelOf, membershipRoleLabels } from './types';
 
 const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
@@ -32,10 +32,12 @@ export function StaffPage() {
   const isAdmin = role === 'Admin';
   const members = useMembers();
   const invites = useInvites();
+  const legacy = useLegacyStaff();
   const branches = useBranches();
   const cancel = useCancelInvite();
   const resetLink = useResetLink();
   const [editing, setEditing] = useState<Member | null>(null);
+  const [reEnrol, setReEnrol] = useState<LegacyStaff | null>(null);
   const [shown, setShown] = useState<InviteLink | null>(null);
   const [cancelFor, setCancelFor] = useState<Invite | null>(null);
 
@@ -73,6 +75,25 @@ export function StaffPage() {
             )}
           />
 
+          {(legacy.data?.length ?? 0) > 0 && (
+            <section aria-labelledby="legacy-heading" className="flex flex-col gap-2">
+              <h2 id="legacy-heading" className="text-lg font-semibold">
+                Still to invite
+              </h2>
+              <p className="text-sm text-ink-soft">These people were on the old sign-in. Invite each with an email so they can sign in again; their earlier sales stay theirs.</p>
+              {legacy.data?.map((person) => (
+                <ListCard key={person.id}>
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold">{person.name}</p>
+                    <button type="button" onClick={() => { setEditing(null); setReEnrol(person); }} className={linkButton}>
+                      Invite
+                    </button>
+                  </div>
+                </ListCard>
+              ))}
+            </section>
+          )}
+
           {(invites.data?.length ?? 0) > 0 && (
             <section aria-labelledby="pending-heading" className="flex flex-col gap-2">
               <h2 id="pending-heading" className="text-lg font-semibold">
@@ -96,7 +117,7 @@ export function StaffPage() {
         </div>
 
         <FormLoader failed={branches.isError ? branches : null} ready={!!branches.data}>
-          {branches.data && <PersonEditor key={editing?.id ?? 'new'} member={editing} branches={branches.data} isAdmin={isAdmin} onDone={() => setEditing(null)} onInvited={setShown} />}
+          {branches.data && <PersonEditor key={editing?.id ?? reEnrol?.id ?? 'new'} member={editing} legacy={reEnrol} branches={branches.data} isAdmin={isAdmin} onDone={() => { setEditing(null); setReEnrol(null); }} onInvited={(link) => { setReEnrol(null); setShown(link); }} />}
         </FormLoader>
       </div>
 
@@ -117,14 +138,15 @@ export function StaffPage() {
   );
 }
 
-function PersonEditor({ member, branches, isAdmin, onDone, onInvited }: { member: Member | null; branches: Branch[]; isAdmin: boolean; onDone: () => void; onInvited: (link: InviteLink) => void }) {
+function PersonEditor({ member, legacy, branches, isAdmin, onDone, onInvited }: { member: Member | null; legacy: LegacyStaff | null; branches: Branch[]; isAdmin: boolean; onDone: () => void; onInvited: (link: InviteLink) => void }) {
   const invite = useInvite();
   const update = useUpdateMember();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(legacy?.name ?? '');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<number>(member?.role ?? MembershipRole.Staff);
-  const [duties, setDuties] = useState<number>(member?.duties ?? StaffDuty.Cashier);
-  const [branchIds, setBranchIds] = useState<string[]>(member?.branchIds ?? (branches.length === 1 ? [branches[0].id] : []));
+  // An Admin's old account can only come back as an Admin; a Manager can only invite staff.
+  const [role, setRole] = useState<number>(member?.role ?? (legacy && isAdmin ? legacy.suggestedRole : MembershipRole.Staff));
+  const [duties, setDuties] = useState<number>(member?.duties ?? (legacy && legacy.suggestedDuties !== 0 ? legacy.suggestedDuties : StaffDuty.Cashier));
+  const [branchIds, setBranchIds] = useState<string[]>(member?.branchIds ?? (legacy?.branchId ? [legacy.branchId] : branches.length === 1 ? [branches[0].id] : []));
   const [isActive, setIsActive] = useState(member?.isActive ?? true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -147,13 +169,13 @@ function PersonEditor({ member, branches, isAdmin, onDone, onInvited }: { member
       update.mutate({ id: member.id, body: { ...access, isActive } }, { onSuccess: () => { toast.success('Saved'); onDone(); } });
       return;
     }
-    invite.mutate({ name: name.trim(), email: email.trim(), ...access }, { onSuccess: onInvited });
+    invite.mutate({ name: name.trim(), email: email.trim(), ...access, legacyUserId: legacy?.id ?? null }, { onSuccess: onInvited });
     setName('');
     setEmail('');
   }
 
   return (
-    <EditorCard title="person" editing={!!member} heading={member ? `Edit ${member.name}` : 'Invite someone'} submitLabel={member ? 'Save' : 'Invite'} busy={invite.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
+    <EditorCard title="person" editing={!!member} heading={member ? `Edit ${member.name}` : legacy ? `Invite ${legacy.name}` : 'Invite someone'} submitLabel={member ? 'Save' : 'Invite'} busy={invite.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
       {!member && (
         <>
           <FormField label="Name" error={errors.name}>

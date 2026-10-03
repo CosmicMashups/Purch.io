@@ -9,6 +9,10 @@ public interface IIdentityProvider
     /// ConflictException when the email already has one.</summary>
     Task<Guid> CreateUserAsync(string email, string password, CancellationToken cancellationToken = default);
 
+    /// <summary>Creates a login whose password is already a bcrypt hash, so a password hashed elsewhere (the old back-office
+    /// login) carries over without anyone choosing it again. Used once, by the move off the old sign-in.</summary>
+    Task<Guid> CreateUserWithPasswordHashAsync(string email, string bcryptHash, CancellationToken cancellationToken = default);
+
     /// <summary>The provider's user id when the email and password match, otherwise null. Never says which part was wrong.</summary>
     Task<Guid?> VerifyPasswordAsync(string email, string password, CancellationToken cancellationToken = default);
 

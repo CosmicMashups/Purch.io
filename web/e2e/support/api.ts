@@ -1,3 +1,5 @@
+import type { Seed } from './seed';
+
 const API_PORT = process.env.E2E_API_PORT ?? '5099';
 export const API_URL = `http://127.0.0.1:${API_PORT}`;
 
@@ -47,18 +49,28 @@ export interface Tokens {
   refreshToken: string;
 }
 
-export const pinLogin = (devicePairingCode: string, pin: string, ip?: string) => call<Tokens>('POST', '/auth/login', { body: { devicePairingCode, pin }, ip });
-export const adminLogin = (email: string, password: string, ip?: string) => call<Tokens>('POST', '/auth/admin-login', { body: { email, password }, ip });
-export const devicePair = (path: '/kiosk/session' | '/kitchen-display/session' | '/order-board/session', devicePairingCode: string, pairingPin: string, ip?: string) =>
-  call<Tokens>('POST', path, { body: { devicePairingCode, pairingPin }, ip });
+/** The owner or anyone with an account, signing in with email and password on a personal device. */
+export const signIn = (email: string, password: string, ip?: string) => call<Tokens>('POST', '/auth/sign-in', { body: { email, password }, ip });
+
+/** A person unlocking a paired till or warehouse device with their own PIN. */
+export const unlock = (deviceCredential: string, membershipId: string, pin: string, ip?: string) =>
+  call<Tokens>('POST', '/devices/unlock', { body: { deviceCredential, membershipId, pin }, ip });
+
+/** An unattended device (kiosk, kitchen display, order board) starting its session from its own credential. */
+export const deviceSession = (deviceCredential: string, ip?: string) =>
+  call<Tokens & { accessToken: string }>('POST', '/devices/session', { body: { deviceCredential }, ip });
+
+/** Someone on the shop's till, by who they are. */
+export const unlockOnTill = (seed: Seed, person: keyof Seed['members'], ip?: string) =>
+  unlock(person === 'warehouse' ? seed.warehouse.credential : seed.register.credential, seed.members[person], seed.pins[person], ip);
 
 /**
  * Leaves the register with no open lines. A cart is created on first read, so this reads it (as a manager,
  * the only role that may clear one) and clears it only if something is in it.
  * Pass `removeCart` to remove the open cart itself, which a kiosk order needs before a till can take it.
  */
-export async function resetRegister(registerCode: string, managerPin: string, ip: string, { removeCart = false } = {}): Promise<void> {
-  const boss = await pinLogin(registerCode, managerPin, ip);
+export async function resetRegister(seed: Seed, ip: string, { removeCart = false } = {}): Promise<void> {
+  const boss = await unlockOnTill(seed, 'manager', ip);
   const cart = await call<{ lines: unknown[] }>('GET', '/transactions/cart', { token: boss.accessToken, ip });
   if (cart.lines.length > 0 || removeCart) await call('POST', '/transactions/cart/void', { token: boss.accessToken, ip });
 }
