@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../onboarding/presentation/screens/bootstrap_screen.dart';
 import '../../../onboarding/presentation/screens/server_connection_screen.dart';
+import '../../domain/auth_models.dart';
 import '../providers/auth_providers.dart';
-import 'admin_login_screen.dart';
 
-/// The first screen any staff member sees on a paired device.
-/// Designed for fast, distraction-free terminal sign-in:
-/// - Compact brand header with direct access to local server network settings.
-/// - Focused tactile card for Device Pairing Code + PIN and prominent Log In action.
-/// - Secondary "Sign in as admin instead" for store owners.
-/// - Footer link for first-time business onboarding.
-/// - Completely fits above the fold in standard 9:16 mobile and tablet viewports.
+/// Where a person signs in with their email and password. A person in several
+/// businesses is then asked which one to open. A device is paired from here too
+/// (the "Pair this device" link), and a brand-new business is set up from here.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, required this.onLoggedIn});
 
@@ -27,42 +24,43 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _pairingCodeController = TextEditingController();
-  final _pinController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _pairingCodeController.dispose();
-    _pinController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
+  Future<void> _submit({String? tenantId}) async {
+    if (!(_formKey.currentState?.validate() ?? false) && tenantId == null) {
       return;
     }
 
-    final controller = ref.read(loginControllerProvider.notifier);
-    await controller.login(
-      devicePairingCode: _pairingCodeController.text.trim(),
-      pin: _pinController.text.trim(),
+    final controller = ref.read(signInControllerProvider.notifier);
+    final signedIn = await controller.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      tenantId: tenantId,
     );
 
     if (!mounted) {
       return;
     }
 
-    final succeeded = !ref.read(loginControllerProvider).hasError;
-    if (succeeded) {
+    if (signedIn) {
       widget.onLoggedIn();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final loginState = ref.watch(loginControllerProvider);
+    final loginState = ref.watch(signInControllerProvider);
     final isLoading = loginState.isLoading;
-    final failure = ref.read(loginControllerProvider.notifier).currentFailure;
+    final failure = ref.read(signInControllerProvider.notifier).currentFailure;
+    final businesses = loginState.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -106,20 +104,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                                 child: _LoginFormCard(
                                   formKey: _formKey,
-                                  pairingCodeController: _pairingCodeController,
-                                  pinController: _pinController,
+                                  emailController: _emailController,
+                                  passwordController: _passwordController,
                                   isLoading: isLoading,
                                   failure: failure,
+                                  businesses: businesses,
                                   onSubmit: _submit,
-                                  onAdminLogin:
-                                      () => Navigator.of(context).push<void>(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => AdminLoginScreen(
-                                                onLoggedIn: widget.onLoggedIn,
-                                              ),
-                                        ),
-                                      ),
+                                  onChooseBusiness:
+                                      (tenantId) => _submit(tenantId: tenantId),
+                                  onPairDevice: () => context.go('/pair'),
                                   onBootstrap:
                                       () => Navigator.of(context).push<void>(
                                         MaterialPageRoute(
@@ -142,7 +135,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             // Compact View (e.g. mobile 360x640)
             return Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Column(
@@ -164,20 +160,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         padding: const EdgeInsets.all(24),
                         child: _LoginFormCard(
                           formKey: _formKey,
-                          pairingCodeController: _pairingCodeController,
-                          pinController: _pinController,
+                          emailController: _emailController,
+                          passwordController: _passwordController,
                           isLoading: isLoading,
                           failure: failure,
+                          businesses: businesses,
                           onSubmit: _submit,
-                          onAdminLogin:
-                              () => Navigator.of(context).push<void>(
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => AdminLoginScreen(
-                                        onLoggedIn: widget.onLoggedIn,
-                                      ),
-                                ),
-                              ),
+                          onChooseBusiness:
+                              (tenantId) => _submit(tenantId: tenantId),
+                          onPairDevice: () => context.go('/pair'),
                           onBootstrap:
                               () => Navigator.of(context).push<void>(
                                 MaterialPageRoute(
@@ -255,10 +246,7 @@ class _HeroBannerPane extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Hero Photo
-        Image.asset(
-          'assets/images/login_hero.jpg',
-          fit: BoxFit.cover,
-        ),
+        Image.asset('assets/images/login_hero.jpg', fit: BoxFit.cover),
         // Tint & Vignette Gradient
         DecoratedBox(
           decoration: BoxDecoration(
@@ -295,10 +283,7 @@ class _HeroBannerPane extends StatelessWidget {
                     padding: const EdgeInsets.all(6),
                     child: ClipRRect(
                       borderRadius: AppRadius.smBorder,
-                      child: Image.asset(
-                        'assets/logo.jpg',
-                        fit: BoxFit.cover,
-                      ),
+                      child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -417,10 +402,7 @@ class _CompactHeroHeader extends StatelessWidget {
                   padding: const EdgeInsets.all(7),
                   child: ClipRRect(
                     borderRadius: AppRadius.smBorder,
-                    child: Image.asset(
-                      'assets/logo.jpg',
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -488,28 +470,36 @@ class _CompactHeroHeader extends StatelessWidget {
 class _LoginFormCard extends StatelessWidget {
   const _LoginFormCard({
     required this.formKey,
-    required this.pairingCodeController,
-    required this.pinController,
+    required this.emailController,
+    required this.passwordController,
     required this.isLoading,
     required this.failure,
+    required this.businesses,
     required this.onSubmit,
-    required this.onAdminLogin,
+    required this.onChooseBusiness,
+    required this.onPairDevice,
     required this.onBootstrap,
     this.showBottomLinks = true,
   });
 
   final GlobalKey<FormState> formKey;
-  final TextEditingController pairingCodeController;
-  final TextEditingController pinController;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
   final bool isLoading;
   final Failure? failure;
+
+  /// Non-null once the person's email belongs to several businesses.
+  final List<BusinessChoice>? businesses;
   final VoidCallback onSubmit;
-  final VoidCallback onAdminLogin;
+  final ValueChanged<String> onChooseBusiness;
+  final VoidCallback onPairDevice;
   final VoidCallback onBootstrap;
   final bool showBottomLinks;
 
   @override
   Widget build(BuildContext context) {
+    final choices = businesses;
+
     return Form(
       key: formKey,
       child: Column(
@@ -532,12 +522,12 @@ class _LoginFormCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Device Sign In',
+                    const Text(
+                      'Sign in',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -546,8 +536,10 @@ class _LoginFormCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Enter terminal pairing code and PIN',
-                      style: TextStyle(
+                      choices == null
+                          ? 'Use your email and password'
+                          : 'Which business do you want to open?',
+                      style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -559,224 +551,123 @@ class _LoginFormCard extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Device pairing code
-          TextFormField(
-            controller: pairingCodeController,
-            enabled: !isLoading,
-            decoration: InputDecoration(
-              labelText: 'Device pairing code',
-              hintText: 'e.g. POS-01-REG',
-              prefixIcon: const Icon(
-                Icons.tablet_mac_rounded,
-                size: 20,
-                color: AppColors.textSecondary,
-              ),
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(
-                  color: AppColors.brandPrimary,
-                  width: 1.5,
+          if (choices != null) ...[
+            for (final business in choices)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton(
+                  onPressed:
+                      isLoading
+                          ? null
+                          : () => onChooseBusiness(business.tenantId),
+                  child: Text(business.name),
                 ),
               ),
+          ] else ...[
+            TextFormField(
+              controller: emailController,
+              enabled: !isLoading,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined, size: 20),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+              validator:
+                  (value) =>
+                      (value == null || value.trim().isEmpty)
+                          ? 'Required'
+                          : null,
             ),
-            textInputAction: TextInputAction.next,
-            validator:
-                (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Required' : null,
-          ),
-          const SizedBox(height: 14),
-
-          // PIN field
-          TextFormField(
-            controller: pinController,
-            enabled: !isLoading,
-            decoration: InputDecoration(
-              labelText: 'PIN',
-              hintText: '4-digit staff PIN',
-              prefixIcon: const Icon(
-                Icons.lock_outline_rounded,
-                size: 20,
-                color: AppColors.textSecondary,
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: passwordController,
+              enabled: !isLoading,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                prefixIcon: Icon(Icons.lock_outline_rounded, size: 20),
               ),
-              filled: true,
-              fillColor: AppColors.background,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: AppRadius.mdBorder,
-                borderSide: const BorderSide(
-                  color: AppColors.brandPrimary,
-                  width: 1.5,
-                ),
-              ),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.password],
+              onFieldSubmitted: (_) => isLoading ? null : onSubmit(),
+              validator:
+                  (value) =>
+                      (value == null || value.isEmpty) ? 'Required' : null,
             ),
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => onSubmit(),
-            validator:
-                (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Required' : null,
-          ),
+          ],
 
-          // Failure banner
           if (failure != null) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.errorContainer,
                 borderRadius: AppRadius.smBorder,
-                border: Border.all(color: AppColors.errorBorder),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    size: 18,
-                    color: AppColors.error,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      failure!.message,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onErrorContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                failure!.message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
 
-          const SizedBox(height: 18),
-
-          // Primary Log In Button
-          SizedBox(
-            height: 48,
-            child: FilledButton(
+          if (choices == null) ...[
+            const SizedBox(height: 20),
+            FilledButton(
               onPressed: isLoading ? null : onSubmit,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.brandPrimary,
-                foregroundColor: AppColors.onBrandPrimary,
-                elevation: 0,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: AppRadius.mdBorder,
-                ),
-              ),
               child:
                   isLoading
                       ? const SizedBox(
-                        height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: AppColors.onBrandPrimary,
-                        ),
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                      : const Text(
-                        'Log In',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      : const Text('Sign in'),
             ),
-          ),
+          ],
 
           const SizedBox(height: 12),
-
-          // Secondary Admin Sign In
-          Center(
-            child: TextButton.icon(
-              onPressed: isLoading ? null : onAdminLogin,
-              icon: const Icon(
-                Icons.admin_panel_settings_outlined,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              label: const Text(
-                'Sign in as admin instead',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-            ),
+          TextButton.icon(
+            onPressed: isLoading ? null : onPairDevice,
+            icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+            label: const Text('Pair this device with a code'),
           ),
 
-          // In wide split mode, show onboarding setup within the card bottom
           if (showBottomLinks) ...[
-            const SizedBox(height: 12),
-            const Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 12),
-            Center(
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  const Text(
-                    'New to Purch.io? ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
+            const SizedBox(height: 4),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'New to Purch.io? ',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
                   ),
-                  InkWell(
-                    onTap: isLoading ? null : onBootstrap,
-                    borderRadius: AppRadius.smBorder,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      child: Text(
-                        'Set up a new business',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.brandPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                ),
+                InkWell(
+                  onTap: isLoading ? null : onBootstrap,
+                  borderRadius: AppRadius.smBorder,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(
+                      'Set up a new business',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.brandPrimary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ],
@@ -784,4 +675,3 @@ class _LoginFormCard extends StatelessWidget {
     );
   }
 }
-

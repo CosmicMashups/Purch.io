@@ -1,15 +1,12 @@
-import '../../../../core/validation/pin_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theming/app_tokens.dart';
-import '../../domain/onboarding_enums.dart';
 import '../../domain/staff_models.dart';
 import '../providers/onboarding_providers.dart';
 
-/// Creates a tenant-wide staff account (A4). Branch-scoped staff creation
-/// (assigning a specific branch/ScopeType.branch) is added once the branch
-/// management screen exists to pick a branch from.
+/// Invites a person. Nothing is emailed: the admin gets a single-use link to hand
+/// over, and the person opens it on their own phone to choose a password and PIN.
 class AddStaffScreen extends ConsumerStatefulWidget {
   const AddStaffScreen({super.key});
 
@@ -20,13 +17,16 @@ class AddStaffScreen extends ConsumerStatefulWidget {
 class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _pinController = TextEditingController();
-  StaffRole _role = StaffRole.cashier;
+  final _emailController = TextEditingController();
+  MemberRole _role = MemberRole.staff;
+  int _duties = StaffDuties.cashier;
+  final Set<String> _branchIds = {};
+  String? _selectionError;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _pinController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -35,20 +35,35 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
       return;
     }
 
-    final controller = ref.read(createStaffControllerProvider.notifier);
-    final succeeded = await controller.create(
-      CreateStaffRequest(
-        name: _nameController.text.trim(),
-        role: _role,
-        pin: _pinController.text.trim(),
-      ),
-    );
+    if (_role == MemberRole.staff) {
+      if (_duties == StaffDuties.none) {
+        setState(() => _selectionError = 'Choose at least one duty.');
+        return;
+      }
+      if (_branchIds.isEmpty) {
+        setState(() => _selectionError = 'Choose at least one branch.');
+        return;
+      }
+    }
+    setState(() => _selectionError = null);
 
-    if (!mounted) {
+    final link = await ref
+        .read(createStaffControllerProvider.notifier)
+        .create(
+          InviteStaffRequest(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            role: _role,
+            duties: _duties,
+            branchIds: _branchIds.toList(),
+          ),
+        );
+
+    if (!mounted || link == null) {
       return;
     }
-
-    if (succeeded) {
+    await showInviteLinkDialog(context, link);
+    if (mounted) {
       Navigator.of(context).pop();
     }
   }
@@ -59,22 +74,17 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
     final isLoading = createState.isLoading;
     final failure =
         ref.read(createStaffControllerProvider.notifier).currentFailure;
+    final branches = ref.watch(branchListProvider).valueOrNull ?? const [];
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Add Staff'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Invite a person'), elevation: 0),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.md,
-              ),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Form(
                 key: _formKey,
                 child: Container(
@@ -94,8 +104,6 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                           labelText: 'Full name',
                           hintText: 'e.g. Juan dela Cruz',
                           prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                          isDense: true,
                         ),
                         validator:
                             (value) =>
@@ -104,20 +112,35 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                                     : null,
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      DropdownButtonFormField<StaffRole>(
+                      TextFormField(
+                        controller: _emailController,
+                        enabled: !isLoading,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                        ),
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isEmpty) return 'Required';
+                          return RegExp(r'^\S+@\S+\.\S+$').hasMatch(text)
+                              ? null
+                              : 'Enter a valid email address';
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<MemberRole>(
                         value: _role,
                         decoration: const InputDecoration(
                           labelText: 'Role',
                           prefixIcon: Icon(Icons.badge_outlined),
-                          border: OutlineInputBorder(),
-                          isDense: true,
                         ),
                         items:
-                            StaffRole.values
+                            MemberRole.values
                                 .map(
                                   (role) => DropdownMenuItem(
                                     value: role,
-                                    child: Text(_label(role)),
+                                    child: Text(_roleLabel(role)),
                                   ),
                                 )
                                 .toList(),
@@ -127,40 +150,70 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                                 : (value) =>
                                     setState(() => _role = value ?? _role),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        controller: _pinController,
-                        enabled: !isLoading,
-                        decoration: const InputDecoration(
-                          labelText: 'PIN',
-                          hintText: '4-8 digit passcode',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        obscureText: true,
-                        validator: validatePin,
-                      ),
-                      if (failure != null) ...[
+                      if (_role == MemberRole.staff) ...[
                         const SizedBox(height: AppSpacing.sm),
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.08),
-                            borderRadius: AppRadius.smBorder,
-                            border: Border.all(
-                              color: AppColors.error.withValues(alpha: 0.2),
-                            ),
-                          ),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Cashier'),
+                          value: StaffDuties.has(_duties, StaffDuties.cashier),
+                          onChanged:
+                              isLoading
+                                  ? null
+                                  : (on) => setState(
+                                    () => _duties ^= StaffDuties.cashier,
+                                  ),
+                        ),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Warehouse'),
+                          value: StaffDuties.has(_duties, StaffDuties.warehouse),
+                          onChanged:
+                              isLoading
+                                  ? null
+                                  : (on) => setState(
+                                    () => _duties ^= StaffDuties.warehouse,
+                                  ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
                           child: Text(
-                            failure.message,
-                            style: const TextStyle(
-                              color: AppColors.error,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
+                            'Branches they work at',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        for (final branch in branches)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(branch.name),
+                            value: _branchIds.contains(branch.id),
+                            onChanged:
+                                isLoading
+                                    ? null
+                                    : (on) => setState(() {
+                                      if (on ?? false) {
+                                        _branchIds.add(branch.id);
+                                      } else {
+                                        _branchIds.remove(branch.id);
+                                      }
+                                    }),
+                          ),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Admins and Managers work at every branch.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                      if (_selectionError != null || failure != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          _selectionError ?? failure!.message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -169,12 +222,6 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                         height: 48,
                         child: FilledButton(
                           onPressed: isLoading ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.brandPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadius.smBorder,
-                            ),
-                          ),
                           child:
                               isLoading
                                   ? const SizedBox(
@@ -182,15 +229,9 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
                                     ),
                                   )
-                                  : const Text(
-                                    'Add Staff Member',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  : const Text('Make invitation link'),
                         ),
                       ),
                     ],
@@ -203,12 +244,46 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
       ),
     );
   }
-
-  String _label(StaffRole role) => switch (role) {
-    StaffRole.admin => 'Admin',
-    StaffRole.manager => 'Manager',
-    StaffRole.cashier => 'Cashier',
-    StaffRole.warehouse => 'Warehouse',
-  };
 }
 
+String _roleLabel(MemberRole role) => switch (role) {
+  MemberRole.admin => 'Admin',
+  MemberRole.manager => 'Manager',
+  MemberRole.staff => 'Staff',
+};
+
+/// Shows the single-use link once. Nothing is emailed; the admin hands it over.
+Future<void> showInviteLinkDialog(BuildContext context, StaffInviteLink link) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: Text('Invitation for ${link.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'No email is sent. Give them this link: open it in the Purch.io web app on their own phone, behind the web app address. It works once and expires in a few days.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                link.path,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+  );
+}

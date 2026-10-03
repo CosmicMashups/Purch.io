@@ -116,6 +116,8 @@ const api = spawn(process.env.DOTNET ?? 'dotnet', ['run', '--project', backendPr
   env: {
     ...process.env,
     PURCH_DEPLOYMENT_MODE: 'Cloud',
+    // No Supabase project here, so passwords live in the app's own database.
+    PURCH_IDENTITY_PROVIDER: 'Local',
     SUPABASE_DB_CONNECTION_STRING: CONNECTION,
     SUPABASE_STORAGE_URL: 'http://127.0.0.1:1/unused',
     SUPABASE_STORAGE_KEY: 'unused',

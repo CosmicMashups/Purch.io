@@ -57,24 +57,22 @@ class StaffList extends _$StaffList {
   }
 }
 
-/// Drives the "add staff" form as its own in-flight state, separate from the
-/// list itself — the list only needs to know when to refresh, not track the
-/// creation request's loading/error state.
+/// Drives the "invite staff" form as its own in-flight state, separate from the
+/// list itself. The data is the single-use link made by the last invitation.
 @riverpod
 class CreateStaffController extends _$CreateStaffController {
   @override
-  FutureOr<void> build() {}
+  FutureOr<StaffInviteLink?> build() => null;
 
-  Future<bool> create(CreateStaffRequest request) async {
+  Future<StaffInviteLink?> create(InviteStaffRequest request) async {
     state = const AsyncLoading();
     final repository = ref.read(onboardingRepositoryProvider);
 
     state = await AsyncValue.guard(() => repository.createStaff(request));
-    final succeeded = !state.hasError;
-    if (succeeded) {
+    if (!state.hasError) {
       await ref.read(staffListProvider.notifier).refresh();
     }
-    return succeeded;
+    return state.valueOrNull;
   }
 
   Failure? get currentFailure {
@@ -197,18 +195,18 @@ class DeviceList extends _$DeviceList {
 @riverpod
 class CreateDeviceController extends _$CreateDeviceController {
   @override
-  FutureOr<void> build() {}
+  FutureOr<DevicePairingCode?> build() => null;
 
-  Future<bool> create(CreateDeviceRequest request) async {
+  /// Makes the device and returns its one-time pairing code, shown once.
+  Future<DevicePairingCode?> create(CreateDeviceRequest request) async {
     state = const AsyncLoading();
     final repository = ref.read(onboardingRepositoryProvider);
 
     state = await AsyncValue.guard(() => repository.createDevice(request));
-    final succeeded = !state.hasError;
-    if (succeeded) {
+    if (!state.hasError) {
       await ref.read(deviceListProvider.notifier).refresh();
     }
-    return succeeded;
+    return state.valueOrNull;
   }
 
   Failure? get currentFailure {

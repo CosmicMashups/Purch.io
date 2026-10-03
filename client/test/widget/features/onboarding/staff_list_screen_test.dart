@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:purch_client/features/onboarding/domain/onboarding_enums.dart';
 import 'package:purch_client/features/onboarding/domain/staff_models.dart';
 import 'package:purch_client/features/onboarding/presentation/providers/onboarding_providers.dart';
 import 'package:purch_client/features/onboarding/presentation/screens/staff_list_screen.dart';
@@ -29,17 +28,18 @@ void main() {
     );
   });
 
-  testWidgets('lists existing staff with their role', (tester) async {
+  testWidgets('lists existing staff with their duties', (tester) async {
     final repository = FakeOnboardingRepository(
       initialStaff: [
         const StaffMember(
           id: 's1',
           name: 'Ben Cashier',
-          role: StaffRole.cashier,
-          scopeType: ScopeType.tenant,
-          scopeId: null,
-          branchId: null,
+          email: 'ben@example.com',
+          role: MemberRole.staff,
+          duties: StaffDuties.cashier,
+          branchIds: ['branch-1'],
           isActive: true,
+          hasPin: true,
         ),
       ],
     );
@@ -47,12 +47,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ben Cashier'), findsOneWidget);
-    expect(find.text('Cashier'), findsOneWidget);
+    expect(find.text('Cashier · ben@example.com'), findsOneWidget);
   });
 
-  testWidgets('adding a staff member from the + button refreshes the list', (
-    tester,
-  ) async {
+  testWidgets('inviting a person shows the single-use link once', (tester) async {
     final repository = FakeOnboardingRepository();
     await tester.pumpWidget(_wrap(repository));
     await tester.pumpAndSettle();
@@ -64,10 +62,20 @@ void main() {
       find.widgetWithText(TextFormField, 'Full name'),
       'New Hire',
     );
-    await tester.enterText(find.widgetWithText(TextFormField, 'PIN'), '4321');
-    await tester.tap(find.text('Add Staff Member'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'hire@example.com',
+    );
+    // Managers and Admins need no branch; a Staff member does, so pick Manager.
+    await tester.tap(find.byType(DropdownButtonFormField<MemberRole>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manager').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make invitation link'));
     await tester.pumpAndSettle();
 
-    expect(find.text('New Hire'), findsOneWidget);
+    expect(find.text('/enrol/invite-token-1'), findsOneWidget);
+    expect(repository.lastCreateStaffRequest?.email, 'hire@example.com');
+    expect(repository.lastCreateStaffRequest?.role, MemberRole.manager);
   });
 }

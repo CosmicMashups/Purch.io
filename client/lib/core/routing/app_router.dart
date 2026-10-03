@@ -6,6 +6,9 @@ import '../session/session_scope.dart';
 import '../auth/role_nav_policy.dart';
 import 'auth_gate.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/pair_device_screen.dart';
+import '../../features/auth/presentation/screens/unlock_screen.dart';
+import '../../features/auth/presentation/screens/unsupported_device_screen.dart';
 import '../../features/catalog/presentation/screens/category_list_screen.dart';
 import '../../features/catalog/presentation/screens/item_list_screen.dart';
 import '../../features/catalog/presentation/screens/modifier_group_list_screen.dart';
@@ -75,7 +78,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         data: (value) {
           switch (value) {
             case AuthGateState.loggedOut:
-              return location == '/login' ? null : '/login';
+              // Signing in, or pairing this device with its one-time code.
+              return location == '/login' || location == '/pair' ? null : '/login';
+            case AuthGateState.locked:
+              // A paired till waits for a person to unlock it; it can also be paired again.
+              return location == '/unlock' || location == '/pair' ? null : '/unlock';
+            case AuthGateState.unsupportedDevice:
+              return location == '/unsupported-device' ? null : '/unsupported-device';
             case AuthGateState.kiosk:
               return location.startsWith('/kiosk') ? null : '/kiosk';
             case AuthGateState.orderBoard:
@@ -114,6 +123,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               // data (possibly another tenant's), so rebuild every provider.
               onLoggedIn: resetSessionScope,
             ),
+      ),
+      GoRoute(
+        path: '/pair',
+        builder: (context, state) => PairDeviceScreen(onPaired: resetSessionScope),
+      ),
+      GoRoute(
+        path: '/unlock',
+        builder: (context, state) => UnlockScreen(onUnlocked: resetSessionScope),
+      ),
+      GoRoute(
+        path: '/unsupported-device',
+        builder: (context, state) => const UnsupportedDeviceScreen(),
       ),
       GoRoute(
         path: '/kiosk',

@@ -28,17 +28,12 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
 
   @override
   Future<List<StaffMember>> listStaff() {
-    return _getList('/staff', StaffMember.fromJson);
+    return _getList('/staff/members', StaffMember.fromJson);
   }
 
   @override
-  Future<StaffMember> createStaff(CreateStaffRequest request) {
-    return _post('/staff', request.toJson(), StaffMember.fromJson);
-  }
-
-  @override
-  Future<StaffMember> updateStaff(String staffId, UpdateStaffRequest request) {
-    return _put('/staff/$staffId', request.toJson(), StaffMember.fromJson);
+  Future<StaffInviteLink> createStaff(InviteStaffRequest request) {
+    return _post('/staff/invites', request.toJson(), StaffInviteLink.fromJson);
   }
 
   @override
@@ -81,8 +76,30 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   }
 
   @override
-  Future<Device> createDevice(CreateDeviceRequest request) {
-    return _post('/devices', request.toJson(), Device.fromJson);
+  Future<DevicePairingCode> createDevice(CreateDeviceRequest request) {
+    return _post(
+      '/devices/pairing-requests',
+      request.toJson(),
+      DevicePairingCode.fromJson,
+    );
+  }
+
+  @override
+  Future<DevicePairingCode> newPairingCode(String deviceId) {
+    return _post(
+      '/devices/$deviceId/pairing-code',
+      const <String, dynamic>{},
+      DevicePairingCode.fromJson,
+    );
+  }
+
+  @override
+  Future<Device> revokeDevice(String deviceId) {
+    return _post(
+      '/devices/$deviceId/revoke',
+      const <String, dynamic>{},
+      Device.fromJson,
+    );
   }
 
   @override

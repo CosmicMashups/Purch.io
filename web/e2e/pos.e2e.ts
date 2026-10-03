@@ -37,9 +37,8 @@ test.describe('the register', () => {
 
   test('an admin who signed in with email is told selling needs a device sign-in', async ({ page, seed }) => {
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
-    await page.getByLabel(/email/i).fill(seed.owner.email);
-    await page.getByLabel(/password/i).fill(seed.owner.password);
+    await page.getByLabel('Email').fill(seed.owner.email);
+    await page.getByLabel('Password', { exact: true }).fill(seed.owner.password);
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page.getByText('Signed in as Admin')).toBeVisible();
     await page.goto('/sell');

@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_state_view.dart';
-import '../../domain/onboarding_enums.dart';
+import '../../domain/staff_models.dart';
 import '../providers/onboarding_providers.dart';
 import 'add_staff_screen.dart';
 
-/// A4's staff list — one entry per staff member, role and active status
-/// visible at a glance, per the design brief's "icon-forward, minimal text"
-/// direction. Deactivating/reactivating (not deleting) matches Purch.LoginService's
-/// active-users-only PIN check without needing a separate delete concept.
+/// The staff list — one entry per person, with their role, duties and active
+/// status visible at a glance. People are added by invitation (a single-use link).
 class StaffListScreen extends ConsumerWidget {
   const StaffListScreen({super.key});
 
@@ -81,7 +79,7 @@ class StaffListScreen extends ConsumerWidget {
                       ),
                     ),
                     subtitle: Text(
-                      _roleLabel(member.role),
+                      _subtitle(member),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                     ),
                     trailing:
@@ -124,10 +122,12 @@ class StaffListScreen extends ConsumerWidget {
     );
   }
 
-  String _roleLabel(StaffRole role) => switch (role) {
-    StaffRole.admin => 'Admin',
-    StaffRole.manager => 'Manager',
-    StaffRole.cashier => 'Cashier',
-    StaffRole.warehouse => 'Warehouse',
-  };
+  String _subtitle(StaffMember member) {
+    final role = switch (member.role) {
+      MemberRole.admin => 'Admin',
+      MemberRole.manager => 'Manager',
+      MemberRole.staff => StaffDuties.describe(member.duties),
+    };
+    return member.email.isEmpty ? role : '$role · ${member.email}';
+  }
 }

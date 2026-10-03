@@ -11,6 +11,7 @@ class SecureTokenStorage {
 
   static const _accessTokenKey = 'purch_access_token';
   static const _refreshTokenKey = 'purch_refresh_token';
+  static const _deviceCredentialKey = 'purch_device_credential';
 
   final FlutterSecureStorage _storage;
 
@@ -38,6 +39,21 @@ class SecureTokenStorage {
   }) async {
     await saveAccessToken(accessToken);
     await saveRefreshToken(refreshToken);
+  }
+
+  /// The long-lived credential a paired device keeps (the one-time pairing code
+  /// is exchanged for it and then discarded). It outlives sign-outs and locks:
+  /// only unpairing, or an admin revoking the device, removes it.
+  Future<void> saveDeviceCredential(String credential) {
+    return _storage.write(key: _deviceCredentialKey, value: credential);
+  }
+
+  Future<String?> readDeviceCredential() {
+    return _storage.read(key: _deviceCredentialKey);
+  }
+
+  Future<void> clearDeviceCredential() {
+    return _storage.delete(key: _deviceCredentialKey);
   }
 
   Future<void> clear() async {

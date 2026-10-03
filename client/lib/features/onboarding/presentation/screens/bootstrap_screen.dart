@@ -31,6 +31,8 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
   final _branchNameController = TextEditingController(text: 'Main Branch');
   final _adminNameController = TextEditingController();
   final _adminPinController = TextEditingController();
+  final _adminEmailController = TextEditingController();
+  final _adminPasswordController = TextEditingController();
   BusinessType _businessType = BusinessType.convenienceStore;
   int _currentStep = 0;
   bool _agreedToLegalTerms = false;
@@ -42,6 +44,8 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
     _branchNameController.dispose();
     _adminNameController.dispose();
     _adminPinController.dispose();
+    _adminEmailController.dispose();
+    _adminPasswordController.dispose();
     super.dispose();
   }
 
@@ -87,6 +91,8 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
         branchName: _branchNameController.text.trim(),
         adminName: _adminNameController.text.trim(),
         adminPin: _adminPinController.text.trim(),
+        adminEmail: _adminEmailController.text.trim(),
+        adminPassword: _adminPasswordController.text,
       ),
     );
 
@@ -96,11 +102,11 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
 
     final result = ref.read(bootstrapControllerProvider).valueOrNull;
     if (result != null) {
-      await _showPairingCodeDialog(result);
+      await _showDoneDialog();
     }
   }
 
-  Future<void> _showPairingCodeDialog(BootstrapResult result) {
+  Future<void> _showDoneDialog() {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -126,44 +132,9 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
                 ),
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'This device\'s pairing code — write it down, you\'ll need it to log in:',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.brandPrimaryContainer,
-                    borderRadius: AppRadius.mdBorder,
-                    border: Border.all(
-                      color: AppColors.brandPrimary.withAlpha(60),
-                    ),
-                  ),
-                  child: Center(
-                    child: SelectableText(
-                      result.devicePairingCode,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3.0,
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            content: const Text(
+              'Sign in with the email and password you just chose. Then open Business, Devices to pair this and your other devices, and Staff to invite your team.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
             actions: [
               FilledButton(
@@ -178,7 +149,7 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
                   Navigator.of(dialogContext).pop();
                   Navigator.of(context).pop(); // back to the login screen
                 },
-                child: const Text('Continue to Log In'),
+                child: const Text('Continue to sign in'),
               ),
             ],
           ),
@@ -256,6 +227,8 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
                             isLoading: isLoading,
                             adminNameController: _adminNameController,
                             adminPinController: _adminPinController,
+                            adminEmailController: _adminEmailController,
+                            adminPasswordController: _adminPasswordController,
                             agreedToLegalTerms: _agreedToLegalTerms,
                             showAgreementError: _showAgreementError,
                             onAgreementChanged:
@@ -515,6 +488,8 @@ class _AdminStep extends StatelessWidget {
     required this.isLoading,
     required this.adminNameController,
     required this.adminPinController,
+    required this.adminEmailController,
+    required this.adminPasswordController,
     required this.agreedToLegalTerms,
     required this.showAgreementError,
     required this.onAgreementChanged,
@@ -524,6 +499,8 @@ class _AdminStep extends StatelessWidget {
   final bool isLoading;
   final TextEditingController adminNameController;
   final TextEditingController adminPinController;
+  final TextEditingController adminEmailController;
+  final TextEditingController adminPasswordController;
   final bool agreedToLegalTerms;
   final bool showAgreementError;
   final ValueChanged<bool> onAgreementChanged;
@@ -538,7 +515,7 @@ class _AdminStep extends StatelessWidget {
           const _StepHeader(
             icon: Icons.admin_panel_settings_rounded,
             title: 'Create your admin account',
-            subtitle: 'This PIN logs you in on this and future devices',
+            subtitle: 'You sign in with your email and password; the PIN unlocks tills',
           ),
           const SizedBox(height: 20),
           TextFormField(
@@ -549,6 +526,39 @@ class _AdminStep extends StatelessWidget {
               prefixIcon: Icon(Icons.person_rounded, size: 20),
             ),
             validator: _requiredValidator,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: adminEmailController,
+            enabled: !isLoading,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email_outlined, size: 20),
+            ),
+            keyboardType: TextInputType.emailAddress,
+            validator: (value) {
+              final text = value?.trim() ?? '';
+              if (text.isEmpty) return 'Required';
+              return RegExp(r'^\S+@\S+\.\S+$').hasMatch(text)
+                  ? null
+                  : 'Enter a valid email address';
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: adminPasswordController,
+            enabled: !isLoading,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              helperText: 'At least 8 characters',
+              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20),
+            ),
+            obscureText: true,
+            validator:
+                (value) =>
+                    (value == null || value.length < 8)
+                        ? 'Use at least 8 characters'
+                        : null,
           ),
           const SizedBox(height: 12),
           TextFormField(

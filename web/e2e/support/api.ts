@@ -65,12 +65,12 @@ export const unlockOnTill = (seed: Seed, person: keyof Seed['members'], ip?: str
   unlock(person === 'warehouse' ? seed.warehouse.credential : seed.register.credential, seed.members[person], seed.pins[person], ip);
 
 /**
- * Leaves the register with no open lines. A cart is created on first read, so this reads it (as a manager,
- * the only role that may clear one) and clears it only if something is in it.
+ * Leaves the register with no open lines. A cart is created on first read, so this reads it (as a manager)
+ * and clears it only if something is in it. Clearing a cart needs another Admin or Manager's PIN, so the admin gives it.
  * Pass `removeCart` to remove the open cart itself, which a kiosk order needs before a till can take it.
  */
 export async function resetRegister(seed: Seed, ip: string, { removeCart = false } = {}): Promise<void> {
   const boss = await unlockOnTill(seed, 'manager', ip);
   const cart = await call<{ lines: unknown[] }>('GET', '/transactions/cart', { token: boss.accessToken, ip });
-  if (cart.lines.length > 0 || removeCart) await call('POST', '/transactions/cart/void', { token: boss.accessToken, ip });
+  if (cart.lines.length > 0 || removeCart) await call('POST', '/transactions/cart/void', { token: boss.accessToken, ip, body: { approverPin: seed.pins.admin } });
 }

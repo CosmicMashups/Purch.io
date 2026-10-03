@@ -4,8 +4,6 @@ import '../../pos/domain/transaction_models.dart';
 /// kiosk orders (with their line items) for kitchen staff to prepare food
 /// against, branch-wide.
 abstract class KitchenDisplayRepository {
-  Future<void> pair({required String devicePairingCode, required String pairingPin});
-
   /// This device's own branch, decoded from its stored session token — null
   /// if no session is stored yet.
   Future<String?> currentBranchId();

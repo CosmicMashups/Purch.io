@@ -83,7 +83,7 @@ Built for mission-critical operations, Purch.io features offline-resilient local
   - `src/Purch.Api`: Minimal API endpoints, middleware, upload endpoints, and static file hosting.
   - `tests/`: Comprehensive unit test and Testcontainers integration test suites.
 - **`web/`**: React + TypeScript + Vite web client (the supported client): cashier, inventory, business admin, kiosk, kitchen and order-board screens, device pairing and lock screen. Vitest unit tests and Playwright end-to-end tests.
-- **`client/`**: Cross-platform Flutter client (not yet ported to the new sign-in; see [Flutter client status](#flutter-client-status)):
+- **`client/`**: Cross-platform Flutter client (see [Flutter client status](#flutter-client-status)):
   - `lib/core/`: Theming tokens, network clients, Drift database, and shared UI components (`PurchImage`, `EmptyStateView`, `ErrorStateView`).
   - `lib/features/`: Feature modules for Auth, Catalog, POS, Kiosk, Inventory, Credit Ledger, and Reports.
   - `test/`: 230+ automated unit and widget regression tests.
@@ -237,7 +237,7 @@ npm run lint
 npm run build
 ```
 
-**Web end-to-end (Playwright)** drives a real browser against the real backend and a throwaway Postgres. It needs the .NET SDK and either Docker or a local PostgreSQL install (set `PG_BIN` to its `bin` folder):
+**Web end-to-end (Playwright)** drives a real browser against the real backend and a throwaway Postgres. It needs the .NET SDK (on your `PATH`) and either Docker or a local PostgreSQL install (set `PG_BIN` to its `bin` folder, and `E2E_DB=local` to skip Docker). The test backend sets `PURCH_IDENTITY_PROVIDER=Local` so passwords live in its own database instead of Supabase; never set that in a real Cloud deployment:
 
 ```bash
 cd web
@@ -249,7 +249,7 @@ npm run e2e
 
 ### Flutter client status
 
-The Flutter app in `client/` has **not yet been ported** to the new email sign-in, one-time device pairing, lock screen, and staff-enrolment flows above. Until it is, it cannot sign in to a current backend. The web app is the supported client for now. For reference, the Flutter setup is:
+The Flutter app in `client/` uses the same sign-in model as the web app: email and password (`/login`), one-time device pairing (`/pair`), and a PIN lock screen for paired Register and Warehouse devices (`/unlock`). Business setup, Devices (make a pairing code, new code, revoke) and Staff (invite by single-use link) screens use the new endpoints. Two things are web-only for now: opening an invitation link (people open it in the web app) and the Customer Display (a device paired as one shows a notice and can be unpaired). Flutter setup:
 
 ```bash
 cd client

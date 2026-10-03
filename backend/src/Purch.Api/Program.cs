@@ -114,10 +114,13 @@ builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
 // Email and password sign-in. Cloud mode checks the password with Supabase Auth; Local mode keeps a credential table in
-// our own database. Permissions always come from our own Membership rows, never from the provider.
+// our own database. Permissions always come from our own Membership rows, never from the provider. Setting
+// PURCH_IDENTITY_PROVIDER=Local keeps passwords in our own database in Cloud mode too; that is for the end-to-end test
+// stack, which has no Supabase project, and is never set in a real deployment.
+var useLocalIdentity = string.Equals(builder.Configuration["PURCH_IDENTITY_PROVIDER"], "Local", StringComparison.OrdinalIgnoreCase);
 builder.Services.AddHttpClient(SupabaseIdentityProvider.HttpClientName);
 builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
-    serviceProvider.GetRequiredService<IDeploymentContext>().Mode == DeploymentMode.Local
+    useLocalIdentity || serviceProvider.GetRequiredService<IDeploymentContext>().Mode == DeploymentMode.Local
         ? ActivatorUtilities.CreateInstance<LocalIdentityProvider>(serviceProvider)
         : new SupabaseIdentityProvider(
             serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(SupabaseIdentityProvider.HttpClientName),

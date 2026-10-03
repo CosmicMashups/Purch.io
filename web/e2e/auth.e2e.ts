@@ -39,7 +39,7 @@ test.describe('signing in', () => {
   test('the owner signs in with email and password', async ({ page, seed }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill(seed.owner.email);
-    await page.getByLabel('Password').fill(seed.owner.password);
+    await page.getByLabel('Password', { exact: true }).fill(seed.owner.password);
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page.getByText('Signed in as Admin')).toBeVisible();
   });

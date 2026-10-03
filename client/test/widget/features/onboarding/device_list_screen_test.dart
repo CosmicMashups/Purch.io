@@ -41,30 +41,32 @@ void main() {
     );
   });
 
-  testWidgets(
-    'pairing a device from the + button refreshes the list with its pairing code',
-    (tester) async {
-      final repository = FakeOnboardingRepository(
-        initialBranches: [_mainBranch],
-      );
-      await tester.pumpWidget(_wrap(repository));
-      await tester.pumpAndSettle();
+  testWidgets('making a device shows its one-time pairing code', (tester) async {
+    final repository = FakeOnboardingRepository(initialBranches: [_mainBranch]);
+    await tester.pumpWidget(_wrap(repository));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.add));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.widgetWithText(
-          TextFormField,
-          'Device label (optional, e.g. "Tablet 2")',
-        ),
-        'Front Counter',
-      );
-      await tester.tap(find.text('Pair Device'));
-      await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Device name'),
+      'Front Counter',
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<Branch>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Branch').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make pairing code'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Front Counter'), findsOneWidget);
-      expect(repository.lastCreateDeviceRequest?.branchId, 'branch-1');
-    },
-  );
+    expect(find.text('CODE1'), findsOneWidget);
+    expect(repository.lastCreateDeviceRequest?.branchId, 'branch-1');
+    expect(repository.lastCreateDeviceRequest?.name, 'Front Counter');
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Front Counter'), findsOneWidget);
+    expect(find.text('Waiting for its code'), findsOneWidget);
+  });
 }

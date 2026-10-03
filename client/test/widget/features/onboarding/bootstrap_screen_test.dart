@@ -30,6 +30,15 @@ Future<void> _advanceToAdminStep(
 
   await tester.tap(find.text('Continue'));
   await tester.pumpAndSettle();
+
+  // The admin step now has email and password too, so give it room to show every field.
+  tester.view.physicalSize = const Size(800, 1800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -47,7 +56,7 @@ void main() {
     },
   );
 
-  testWidgets('a successful bootstrap shows the device pairing code', (
+  testWidgets('a successful bootstrap tells the owner to sign in with the email and password', (
     tester,
   ) async {
     final repository = FakeOnboardingRepository();
@@ -60,6 +69,14 @@ void main() {
       'Ana Reyes',
     );
     await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'ana@example.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'correct horse battery',
+    );
+    await tester.enterText(
       find.widgetWithText(TextFormField, 'Choose a PIN'),
       '1234',
     );
@@ -68,8 +85,10 @@ void main() {
     await tester.tap(find.text('Create Business'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ABCD1234'), findsOneWidget);
+    expect(find.text('Setup complete'), findsOneWidget);
     expect(repository.lastBootstrapRequest?.tenantName, "Ana's Store");
+    expect(repository.lastBootstrapRequest?.adminEmail, 'ana@example.com');
+    expect(repository.lastBootstrapRequest?.adminPassword, 'correct horse battery');
   });
 
   testWidgets('a rejected bootstrap shows the failure message', (tester) async {
@@ -85,6 +104,14 @@ void main() {
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Your name'),
       'Ana Reyes',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'ana@example.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'correct horse battery',
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Choose a PIN'),
@@ -109,6 +136,14 @@ void main() {
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Your name'),
         'Ana Reyes',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'),
+        'ana@example.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'correct horse battery',
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Choose a PIN'),

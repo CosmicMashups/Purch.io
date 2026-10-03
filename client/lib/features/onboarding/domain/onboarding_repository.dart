@@ -11,9 +11,8 @@ abstract class OnboardingRepository {
 
   Future<List<StaffMember>> listStaff();
 
-  Future<StaffMember> createStaff(CreateStaffRequest request);
-
-  Future<StaffMember> updateStaff(String staffId, UpdateStaffRequest request);
+  /// Invites a person: makes a single-use link (no email is sent) that the admin hands over.
+  Future<StaffInviteLink> createStaff(InviteStaffRequest request);
 
   Future<List<Branch>> listBranches();
 
@@ -31,7 +30,13 @@ abstract class OnboardingRepository {
 
   Future<List<Device>> listDevices();
 
-  Future<Device> createDevice(CreateDeviceRequest request);
+  /// Makes a device and its one-time pairing code.
+  Future<DevicePairingCode> createDevice(CreateDeviceRequest request);
+
+  /// A fresh one-time code for a device that is waiting to be paired.
+  Future<DevicePairingCode> newPairingCode(String deviceId);
+
+  Future<Device> revokeDevice(String deviceId);
 
   Future<TenantSettings> getTenantSettings();
 

@@ -5,8 +5,18 @@ import '../../../../core/theming/app_tokens.dart';
 import '../../domain/branch_models.dart';
 import '../../domain/device_models.dart';
 import '../providers/onboarding_providers.dart';
-import '../../../../core/errors/failure.dart';
 
+String deviceTypeLabel(DeviceType type) => switch (type) {
+  DeviceType.register => 'Register',
+  DeviceType.kiosk => 'Self-Order Kiosk',
+  DeviceType.orderBoard => 'Order Number Board',
+  DeviceType.kitchenDisplay => 'Kitchen Display',
+  DeviceType.warehouseOfficer => 'Warehouse Officer',
+  DeviceType.customerDisplay => 'Customer Display',
+};
+
+/// Makes a device and its one-time pairing code. The code works once and expires
+/// in minutes; the device is then paired by entering it (see PairDeviceScreen).
 class AddDeviceScreen extends ConsumerStatefulWidget {
   const AddDeviceScreen({super.key});
 
@@ -16,15 +26,14 @@ class AddDeviceScreen extends ConsumerStatefulWidget {
 
 class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _identifierController = TextEditingController();
-  final _pairingPinController = TextEditingController();
+  final _nameController = TextEditingController();
   Branch? _selectedBranch;
+  Device? _linkedRegister;
   DeviceType _deviceType = DeviceType.register;
 
   @override
   void dispose() {
-    _identifierController.dispose();
-    _pairingPinController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -34,27 +43,27 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       return;
     }
 
-    final controller = ref.read(createDeviceControllerProvider.notifier);
-    final succeeded = await controller.create(
-      CreateDeviceRequest(
-        branchId: _selectedBranch!.id,
-        deviceIdentifier:
-            _identifierController.text.trim().isEmpty
-                ? null
-                : _identifierController.text.trim(),
-        deviceType: _deviceType,
-        pairingPin:
-            _deviceType == DeviceType.register
-                ? null
-                : _pairingPinController.text.trim(),
-      ),
-    );
-
-    if (!mounted) {
+    final needsRegister = _deviceType == DeviceType.customerDisplay;
+    if (needsRegister && _linkedRegister == null) {
       return;
     }
 
-    if (succeeded) {
+    final code = await ref
+        .read(createDeviceControllerProvider.notifier)
+        .create(
+          CreateDeviceRequest(
+            name: _nameController.text.trim(),
+            branchId: _selectedBranch!.id,
+            deviceType: _deviceType,
+            linkedRegisterDeviceId: needsRegister ? _linkedRegister!.id : null,
+          ),
+        );
+
+    if (!mounted || code == null) {
+      return;
+    }
+    await showPairingCodeDialog(context, code);
+    if (mounted) {
       Navigator.of(context).pop();
     }
   }
@@ -62,17 +71,25 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   @override
   Widget build(BuildContext context) {
     final branchesAsync = ref.watch(branchListProvider);
+    final devices = ref.watch(deviceListProvider).valueOrNull ?? const [];
     final createState = ref.watch(createDeviceControllerProvider);
     final isLoading = createState.isLoading;
     final failure =
         ref.read(createDeviceControllerProvider.notifier).currentFailure;
 
+    final registers =
+        devices
+            .where(
+              (d) =>
+                  d.deviceType == DeviceType.register &&
+                  d.branchId == _selectedBranch?.id &&
+                  d.status != DeviceStatus.revoked,
+            )
+            .toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Set Up This Device'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Add a device'), elevation: 0),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -95,159 +112,120 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.brandPrimaryContainer,
-                              borderRadius: AppRadius.mdBorder,
-                            ),
-                            child: const Icon(
-                              Icons.tablet_mac_rounded,
-                              color: AppColors.brandPrimary,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Pair this device',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  'Choose a branch to get a pairing code for the login screen',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Get a pairing code',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const Text(
+                        'Enter the code on the device. It works once and expires in a few minutes.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      branchesAsync.when(
-                        loading:
-                            () => const Center(
-                              child: CircularProgressIndicator(
-                                color: AppColors.brandPrimary,
-                              ),
-                            ),
-                        error:
-                            (error, stackTrace) => Text(
-                              'Could not load branches: ${describeError(error)}',
-                              style: const TextStyle(color: AppColors.error),
-                            ),
-                        data: (branches) {
-                          _selectedBranch ??=
-                              branches.isNotEmpty ? branches.first : null;
-                          return DropdownButtonFormField<Branch>(
-                            value: _selectedBranch,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Branch',
-                              prefixIcon: Icon(Icons.storefront_outlined),
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            items:
-                                branches
-                                    .map(
-                                      (branch) => DropdownMenuItem(
-                                        value: branch,
-                                        child: Text(branch.name),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged:
-                                isLoading
-                                    ? null
-                                    : (value) =>
-                                        setState(() => _selectedBranch = value),
-                            validator:
-                                (value) => value == null ? 'Required' : null,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
                       TextFormField(
-                        controller: _identifierController,
+                        controller: _nameController,
                         enabled: !isLoading,
                         decoration: const InputDecoration(
-                          labelText: 'Device label (optional, e.g. "Tablet 2")',
-                          hintText: 'e.g. Counter 1 Tablet',
-                          prefixIcon: Icon(Icons.tablet_mac_outlined),
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                          labelText: 'Device name',
+                          hintText: 'e.g. Front counter',
+                          prefixIcon: Icon(Icons.label_outline),
                         ),
+                        validator:
+                            (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? 'Required'
+                                    : null,
                       ),
                       const SizedBox(height: AppSpacing.md),
                       DropdownButtonFormField<DeviceType>(
                         value: _deviceType,
-                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Device type',
-                          prefixIcon: Icon(Icons.devices_other_outlined),
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                          prefixIcon: Icon(Icons.devices_other_rounded),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: DeviceType.register,
-                            child: Text('Register (staff login)'),
-                          ),
-                          DropdownMenuItem(
-                            value: DeviceType.kiosk,
-                            child: Text('Self-Order Kiosk'),
-                          ),
-                          DropdownMenuItem(
-                            value: DeviceType.orderBoard,
-                            child: Text('Order Number Board'),
-                          ),
-                          DropdownMenuItem(
-                            value: DeviceType.kitchenDisplay,
-                            child: Text('Kitchen Display'),
-                          ),
-                          DropdownMenuItem(
-                            value: DeviceType.warehouseOfficer,
-                            child: Text('Warehouse Officer (Home + Inventory)'),
-                          ),
-                        ],
+                        items:
+                            DeviceType.values
+                                .map(
+                                  (type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(deviceTypeLabel(type)),
+                                  ),
+                                )
+                                .toList(),
                         onChanged:
                             isLoading
                                 ? null
-                                : (value) => setState(
-                                  () => _deviceType = value ?? DeviceType.register,
-                                ),
+                                : (value) => setState(() {
+                                  _deviceType = value ?? _deviceType;
+                                  _linkedRegister = null;
+                                }),
                       ),
-                      if (_deviceType != DeviceType.register) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      branchesAsync.when(
+                        loading:
+                            () => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                        error: (error, _) => Text(error.toString()),
+                        data:
+                            (branches) => DropdownButtonFormField<Branch>(
+                              value: _selectedBranch,
+                              decoration: const InputDecoration(
+                                labelText: 'Branch',
+                                prefixIcon: Icon(Icons.location_on_outlined),
+                              ),
+                              items:
+                                  branches
+                                      .map(
+                                        (branch) => DropdownMenuItem(
+                                          value: branch,
+                                          child: Text(branch.name),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged:
+                                  isLoading
+                                      ? null
+                                      : (value) => setState(() {
+                                        _selectedBranch = value;
+                                        _linkedRegister = null;
+                                      }),
+                              validator:
+                                  (value) =>
+                                      value == null ? 'Choose a branch' : null,
+                            ),
+                      ),
+                      if (_deviceType == DeviceType.customerDisplay) ...[
                         const SizedBox(height: AppSpacing.md),
-                        TextFormField(
-                          controller: _pairingPinController,
-                          enabled: !isLoading,
+                        DropdownButtonFormField<Device>(
+                          value: _linkedRegister,
                           decoration: const InputDecoration(
-                            labelText: 'Pairing PIN',
-                            helperText: 'Given to whoever sets up this device — required alongside the pairing code above.',
-                            prefixIcon: Icon(Icons.pin_outlined),
-                            border: OutlineInputBorder(),
-                            isDense: true,
+                            labelText: 'Register it shows',
+                            prefixIcon: Icon(Icons.tablet_mac_rounded),
                           ),
-                          keyboardType: TextInputType.number,
+                          items:
+                              registers
+                                  .map(
+                                    (register) => DropdownMenuItem(
+                                      value: register,
+                                      child: Text(register.displayName),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged:
+                              isLoading
+                                  ? null
+                                  : (value) =>
+                                      setState(() => _linkedRegister = value),
                           validator:
                               (value) =>
-                                  (value == null || value.trim().isEmpty)
-                                      ? 'Required for this device type'
-                                      : null,
+                                  value == null ? 'Choose a Register' : null,
                         ),
                       ],
                       if (failure != null) ...[
@@ -257,32 +235,23 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.error.withValues(alpha: 0.08),
                             borderRadius: AppRadius.smBorder,
-                            border: Border.all(
-                              color: AppColors.error.withValues(alpha: 0.2),
-                            ),
                           ),
                           child: Text(
                             failure.message,
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: AppColors.error,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.lg),
                       SizedBox(
                         height: 48,
                         child: FilledButton(
                           onPressed: isLoading ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.brandPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadius.smBorder,
-                            ),
-                          ),
                           child:
                               isLoading
                                   ? const SizedBox(
@@ -290,15 +259,9 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
                                     ),
                                   )
-                                  : const Text(
-                                    'Pair Device',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  : const Text('Make pairing code'),
                         ),
                       ),
                     ],
@@ -313,3 +276,51 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   }
 }
 
+/// Shows a device's one-time pairing code. It is shown once; closing the dialog
+/// means asking for a new code if it was not written down.
+Future<void> showPairingCodeDialog(BuildContext context, DevicePairingCode code) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: Text('Pairing code for ${code.device.displayName}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter this on the device. It works once and expires soon.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.brandPrimaryContainer,
+                  borderRadius: AppRadius.mdBorder,
+                ),
+                child: Center(
+                  child: SelectableText(
+                    code.pairingCode,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 3.0,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+  );
+}

@@ -63,7 +63,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
   final Map<String, List<Department>> departmentsByBranch;
 
   BootstrapRequest? lastBootstrapRequest;
-  CreateStaffRequest? lastCreateStaffRequest;
+  InviteStaffRequest? lastCreateStaffRequest;
   CreateBranchRequest? lastCreateBranchRequest;
   CreateDeviceRequest? lastCreateDeviceRequest;
 
@@ -76,9 +76,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
     return const BootstrapResult(
       tenantId: 'tenant-1',
       branchId: 'branch-1',
-      deviceId: 'device-1',
-      devicePairingCode: 'ABCD1234',
-      adminUserId: 'admin-1',
+      adminMembershipId: 'admin-1',
     );
   }
 
@@ -86,30 +84,17 @@ class FakeOnboardingRepository implements OnboardingRepository {
   Future<List<StaffMember>> listStaff() async => staff;
 
   @override
-  Future<StaffMember> createStaff(CreateStaffRequest request) async {
+  Future<StaffInviteLink> createStaff(InviteStaffRequest request) async {
     lastCreateStaffRequest = request;
     if (createStaffFailure != null) {
       throw createStaffFailure!;
     }
-    final created = StaffMember(
-      id: 'staff-${staff.length + 1}',
+    return StaffInviteLink(
       name: request.name,
-      role: request.role,
-      scopeType: ScopeType.tenant,
-      scopeId: null,
-      branchId: null,
-      isActive: true,
+      email: request.email,
+      token: 'invite-token-${staff.length + 1}',
+      expiresAt: DateTime.utc(2026, 10, 6),
     );
-    staff.add(created);
-    return created;
-  }
-
-  @override
-  Future<StaffMember> updateStaff(
-    String staffId,
-    UpdateStaffRequest request,
-  ) async {
-    throw UnimplementedError();
   }
 
   @override
@@ -173,7 +158,7 @@ class FakeOnboardingRepository implements OnboardingRepository {
   Future<List<Device>> listDevices() async => devices;
 
   @override
-  Future<Device> createDevice(CreateDeviceRequest request) async {
+  Future<DevicePairingCode> createDevice(CreateDeviceRequest request) async {
     lastCreateDeviceRequest = request;
     if (createDeviceFailure != null) {
       throw createDeviceFailure!;
@@ -181,13 +166,44 @@ class FakeOnboardingRepository implements OnboardingRepository {
     final created = Device(
       id: 'device-${devices.length + 1}',
       branchId: request.branchId,
-      pairingCode: 'CODE${devices.length + 1}',
-      deviceIdentifier: request.deviceIdentifier,
+      deviceIdentifier: null,
       deviceType: request.deviceType,
       lastSeenAt: null,
+      name: request.name,
+      status: DeviceStatus.pending,
     );
     devices.add(created);
-    return created;
+    return DevicePairingCode(
+      device: created,
+      pairingCode: 'CODE${devices.length}',
+      expiresAt: DateTime.utc(2026, 10, 3, 12),
+    );
+  }
+
+  @override
+  Future<DevicePairingCode> newPairingCode(String deviceId) async {
+    final device = devices.firstWhere((d) => d.id == deviceId);
+    return DevicePairingCode(
+      device: device,
+      pairingCode: 'NEWCODE',
+      expiresAt: DateTime.utc(2026, 10, 3, 12),
+    );
+  }
+
+  @override
+  Future<Device> revokeDevice(String deviceId) async {
+    final index = devices.indexWhere((d) => d.id == deviceId);
+    final revoked = Device(
+      id: devices[index].id,
+      branchId: devices[index].branchId,
+      deviceIdentifier: devices[index].deviceIdentifier,
+      deviceType: devices[index].deviceType,
+      lastSeenAt: devices[index].lastSeenAt,
+      name: devices[index].name,
+      status: DeviceStatus.revoked,
+    );
+    devices[index] = revoked;
+    return revoked;
   }
 
   @override

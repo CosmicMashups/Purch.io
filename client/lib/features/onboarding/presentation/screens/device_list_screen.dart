@@ -14,11 +14,11 @@ import 'add_device_screen.dart';
   DeviceType.orderBoard => (Icons.confirmation_number_rounded, 'Order Number Board'),
   DeviceType.kitchenDisplay => (Icons.soup_kitchen_rounded, 'Kitchen Display'),
   DeviceType.warehouseOfficer => (Icons.warehouse_rounded, 'Warehouse Officer'),
+  DeviceType.customerDisplay => (Icons.desktop_windows_rounded, 'Customer Display'),
 };
 
-/// A3's device list. Each device's pairing code is shown plainly — the admin
-/// needs to be able to read it back off-screen to type into a new tablet,
-/// same as the one shown once at bootstrap time.
+/// The device list. A device waiting to be paired can be given a fresh one-time
+/// code; a paired one can be revoked, after which it must be paired again.
 class DeviceListScreen extends ConsumerWidget {
   const DeviceListScreen({super.key});
 
@@ -86,13 +86,14 @@ class DeviceListScreen extends ConsumerWidget {
                       child: Icon(typeIcon, color: AppColors.brandPrimary),
                     ),
                     title: Text(
-                      device.deviceIdentifier ?? 'Unlabeled device',
+                      device.displayName,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
                     ),
+                    trailing: _DeviceAction(device: device),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.xs),
                       child: Wrap(
@@ -108,24 +109,15 @@ class DeviceListScreen extends ConsumerWidget {
                               color: AppColors.textSecondary,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xs,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: AppRadius.smBorder,
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: SelectableText(
-                              'Pairing code: ${device.pairingCode}',
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
+                          Text(
+                            _statusLabel(device.status),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  device.status == DeviceStatus.active
+                                      ? AppColors.accentEmerald
+                                      : AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -151,3 +143,65 @@ class DeviceListScreen extends ConsumerWidget {
   }
 }
 
+
+String _statusLabel(DeviceStatus status) => switch (status) {
+  DeviceStatus.active => 'Paired',
+  DeviceStatus.pending => 'Waiting for its code',
+  DeviceStatus.revoked => 'Revoked',
+};
+
+class _DeviceAction extends ConsumerWidget {
+  const _DeviceAction({required this.device});
+
+  final Device device;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    switch (device.status) {
+      case DeviceStatus.revoked:
+        return const SizedBox.shrink();
+      case DeviceStatus.pending:
+        return TextButton(
+          onPressed: () async {
+            final repository = ref.read(onboardingRepositoryProvider);
+            final code = await repository.newPairingCode(device.id);
+            await ref.read(deviceListProvider.notifier).refresh();
+            if (context.mounted) {
+              await showPairingCodeDialog(context, code);
+            }
+          },
+          child: const Text('New code'),
+        );
+      case DeviceStatus.active:
+        return TextButton(
+          onPressed: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder:
+                  (dialogContext) => AlertDialog(
+                    title: Text('Revoke ${device.displayName}?'),
+                    content: const Text(
+                      'It stops working at once and must be paired again with a new code.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('Revoke'),
+                      ),
+                    ],
+                  ),
+            );
+            if (confirmed ?? false) {
+              await ref.read(onboardingRepositoryProvider).revokeDevice(device.id);
+              await ref.read(deviceListProvider.notifier).refresh();
+            }
+          },
+          child: const Text('Revoke'),
+        );
+    }
+  }
+}

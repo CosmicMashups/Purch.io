@@ -10,22 +10,11 @@ import '../../../pos/data/local_first_pos_repository.dart' show CartIdentity;
 import '../../../pos/domain/transaction_models.dart';
 import '../../data/kiosk_branding_repository_impl.dart';
 import '../../data/kiosk_order_remote.dart';
-import '../../data/kiosk_session_repository_impl.dart';
 import '../../data/local_first_kiosk_cart_repository.dart';
 import '../../domain/kiosk_branding_repository.dart';
 import '../../domain/kiosk_cart_repository.dart';
-import '../../domain/kiosk_session_repository.dart';
 
 part 'kiosk_providers.g.dart';
-
-@Riverpod(keepAlive: true)
-KioskSessionRepository kioskSessionRepository(Ref ref) {
-  return KioskSessionRepositoryImpl(
-    apiClient: ref.watch(apiClientProvider),
-    tokenStorage: ref.watch(secureTokenStorageProvider),
-    deviceIdentityDao: ref.watch(deviceIdentityDaoProvider),
-  );
-}
 
 /// The kiosk's cart is local-first (see [LocalFirstKioskCartRepository]):
 /// everything lives on-device until [KioskCartRepository.submitOrder], which
@@ -71,31 +60,6 @@ KioskBrandingRepository kioskBrandingRepository(Ref ref) {
 @riverpod
 Future<KioskBranding> kioskBranding(Ref ref) {
   return ref.watch(kioskBrandingRepositoryProvider).getBranding();
-}
-
-/// Drives the pairing screen: call `pair(...)`, watch this provider's
-/// AsyncValue for loading/error state. Mirrors LoginController's shape.
-@riverpod
-class KioskPairingController extends _$KioskPairingController {
-  @override
-  FutureOr<void> build() {}
-
-  Future<void> pair(String devicePairingCode, String pairingPin) async {
-    state = const AsyncLoading();
-    final repository = ref.read(kioskSessionRepositoryProvider);
-
-    state = await AsyncValue.guard(
-      () => repository.pair(
-        devicePairingCode: devicePairingCode,
-        pairingPin: pairingPin,
-      ),
-    );
-  }
-
-  Failure? get currentFailure {
-    final error = state.error;
-    return error is Failure ? error : null;
-  }
 }
 
 /// The kiosk terminal's single in-progress order — same shape as CartNotifier

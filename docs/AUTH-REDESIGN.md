@@ -234,4 +234,6 @@ single-use link to set an email, password and new PIN; each device is re-paired 
 
 **Staff who only had a PIN** appear under `GET /staff/legacy` and on the Staff page. Inviting one of them passes `legacyUserId`, so their earlier sales and shifts stay linked to them.
 
-**Known gaps:** Flutter cannot sign in until it is ported to the new flows. The offline PIN cache is still deferred.
+**Flutter:** the Flutter client now follows the new model (email sign-in, one-time pairing, PIN unlock, new Devices and Staff screens). Opening an invitation link and the Customer Display stay in the web app.
+
+**Known gaps:** the offline PIN cache is still deferred, and the Flutter app does not run the Customer Display feed.
