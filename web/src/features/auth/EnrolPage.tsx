@@ -17,8 +17,8 @@ interface Preview {
 
 export const enrolApi = {
   preview: (token: string) => apiClient.post<Preview>('/enrol/preview', { token }).then((r) => r.data),
-  redeem: (token: string, password: string, pin: string | null) =>
-    apiClient.post<{ accessToken: string; refreshToken: string }>('/enrol/redeem', { token, password, pin }).then((r) => r.data),
+  redeem: (token: string, password: string, pin: string | null, email: string | null = null) =>
+    apiClient.post<{ accessToken: string; refreshToken: string }>('/enrol/redeem', { token, password, pin, email }).then((r) => r.data),
 };
 
 const inputClass = 'h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-lg text-ink focus:border-brand';
@@ -36,6 +36,7 @@ export function EnrolPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -58,9 +59,12 @@ export function EnrolPage() {
 
   const reset = preview.purpose === 1;
   const newAccount = !reset && !preview.hasAccount;
+  // An owner from the old PIN-only sign-in has no email on file yet, so they give one here.
+  const needsEmail = !reset && !preview.email;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (needsEmail && !/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.');
     if (newAccount || reset) {
       if (password.length < 8) return setError('Use at least 8 characters for the password.');
       if (password !== confirm) return setError('The two passwords do not match.');
@@ -73,7 +77,7 @@ export function EnrolPage() {
     setError(null);
     setBusy(true);
     try {
-      const session = await enrolApi.redeem(token, password, pin || null);
+      const session = await enrolApi.redeem(token, password, pin || null, needsEmail ? email.trim() : null);
       setTokens(session.accessToken, session.refreshToken);
       navigate('/', { replace: true });
     } catch (failure) {
@@ -88,7 +92,7 @@ export function EnrolPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{reset ? 'Choose a new password' : `Join ${preview.businessName}`}</h1>
         <p className="mt-2 text-base text-ink-soft">
-          {preview.name || preview.email} · {preview.email}
+          {preview.name}{preview.email ? ` · ${preview.email}` : ''}
           {!reset && (
             <>
               <br />
@@ -99,6 +103,13 @@ export function EnrolPage() {
         </p>
       </div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
+        {needsEmail && (
+          <label className="flex flex-col gap-1 text-base font-semibold">
+            Your email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={inputClass} />
+            <span className="text-sm font-normal text-ink-soft">You will sign in with this from now on.</span>
+          </label>
+        )}
         <label className="flex flex-col gap-1 text-base font-semibold">
           {newAccount || reset ? (reset ? 'New password' : 'Choose a password') : 'Your existing password'}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={newAccount || reset ? 'new-password' : 'current-password'} className={inputClass} />

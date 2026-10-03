@@ -162,4 +162,42 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
         Assert.True(report.StaffToInvite >= 1);
         Assert.True(report.DevicesToPairAgain >= 1);
     }
+
+    [Fact]
+    public async Task An_owner_who_only_had_a_pin_claims_the_business_with_a_link_and_keeps_their_history()
+    {
+        var tenantId = Guid.NewGuid();
+        Guid ownerId;
+        await using (var db = NewContext(tenantId))
+        {
+            _ = db.Tenants.Add(new Tenant { Id = tenantId, Name = $"Pin Shop {tenantId:N}", BusinessType = BusinessType.ConvenienceStore });
+            var owner = new User { TenantId = tenantId, Name = "Pin Owner", Role = Role.Admin, ScopeType = ScopeType.Tenant, PinHash = new BCryptPinHasher().Hash("1234") };
+            ownerId = owner.Id;
+            _ = db.Users.Add(owner);
+            _ = await db.SaveChangesAsync();
+        }
+
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var report = await MigrateAsync(factory);
+        var link = Assert.Single(report.OwnerLinks, l => l.Business == $"Pin Shop {tenantId:N}");
+
+        using var client = factory.CreateClient();
+        var preview = await client.PostAsJsonAsync("/enrol/preview", new { token = link.Token });
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+
+        // The link needs an email, since none was ever on file.
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "4821"))).StatusCode);
+
+        var email = $"{Guid.NewGuid():N}@example.com";
+        var redeemed = await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "4821", email));
+        Assert.Equal(HttpStatusCode.OK, redeemed.StatusCode);
+
+        await using var check = NewContext(tenantId);
+        var membership = await check.Memberships.SingleAsync();
+        Assert.Equal(MembershipRole.Admin, membership.Role);
+        Assert.Equal(ownerId, membership.LegacyUserId);
+
+        // Single use.
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/enrol/preview", new { token = link.Token })).StatusCode);
+    }
 }

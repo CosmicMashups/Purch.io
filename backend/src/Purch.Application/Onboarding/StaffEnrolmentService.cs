@@ -208,6 +208,18 @@ public sealed class StaffEnrolmentService(
         }
 
         var tenantId = invite.TenantId;
+        // An owner moved over from the old sign-in may have no email on file yet; they give one when they claim the link.
+        if (invite.Purpose == InvitePurpose.Enrolment && string.IsNullOrEmpty(invite.Email))
+        {
+            var given = AccountService.NormalizeEmail(request.Email ?? string.Empty);
+            if (!given.Contains('@') || given.Length < 3)
+            {
+                throw new ValidationException(nameof(request.Email), "Enter a valid email address.");
+            }
+
+            invite.Email = given;
+        }
+
         var email = invite.Email;
 
         if (invite.Purpose == InvitePurpose.PasswordReset)
@@ -357,11 +369,12 @@ public sealed class StaffEnrolmentService(
         return currentActorProvider.UserId is { } id && await membershipRepository.GetByIdAsync(id, cancellationToken) is not null ? id : null;
     }
 
-    private static string StageToken(EnrolmentInvite invite)
+    /// <summary>Fills in the token hash and expiry, and returns the raw token to show once.</summary>
+    public static string StageToken(EnrolmentInvite invite, TimeSpan? lifetime = null)
     {
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         invite.TokenHash = Hash(token);
-        invite.ExpiresAt = DateTimeOffset.UtcNow.Add(InviteLifetime);
+        invite.ExpiresAt = DateTimeOffset.UtcNow.Add(lifetime ?? InviteLifetime);
         return token;
     }
 

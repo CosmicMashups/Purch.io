@@ -338,6 +338,11 @@ if (args is ["migrate-legacy"])
     using var legacyScope = app.Services.CreateScope();
     var report = await legacyScope.ServiceProvider.GetRequiredService<LegacyMigration>().RunAsync();
     Console.WriteLine($"{report.OwnersMoved} owner(s) moved, {report.OwnersAlreadyMoved} already moved, {report.SessionsEnded} session(s) ended, {report.DevicesToPairAgain} device(s) to pair again, {report.StaffToInvite} staff member(s) to invite.");
+    foreach (var link in report.OwnerLinks)
+    {
+        Console.WriteLine($"Owner link for {link.OwnerName} ({link.Business}), valid 30 days, shown once: /enrol/{link.Token}");
+    }
+
     return;
 }
 

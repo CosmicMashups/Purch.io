@@ -24,7 +24,7 @@ public sealed record InvitePreviewDto(string BusinessName, string Name, string E
 
 /// <summary>Password is a new one for a new account or a reset; for a person who already has an account (another business)
 /// it is their existing password, which proves the account is theirs. Pin is required for an enrolment.</summary>
-public sealed record RedeemInviteRequest(string Token, string Password, string? Pin);
+public sealed record RedeemInviteRequest(string Token, string Password, string? Pin, string? Email = null);
 
 public abstract record RedeemInviteResult
 {

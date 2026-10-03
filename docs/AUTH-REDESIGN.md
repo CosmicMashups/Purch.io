@@ -227,6 +227,7 @@ single-use link to set an email, password and new PIN; each device is re-paired 
 
 `migrate-legacy` is safe to repeat. It:
 - moves each old owner (email + password) to an Account with an Admin Membership, keeping their password and PIN;
+- for each owner who never set an email and password (PIN-only), prints a single-use claim link (`/enrol/<token>`, valid 30 days, shown once). The owner opens it, chooses an email, password and PIN, and becomes Admin again with their history linked. Running `migrate-legacy` again replaces a lost link;
 - ends every old-style session;
 - sets devices paired the old way back to Pending so they wait for a one-time code (devices already paired the new way are untouched);
 - prints how many owners moved, sessions ended, devices to pair again and staff to invite.

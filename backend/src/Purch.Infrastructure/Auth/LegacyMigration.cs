@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Purch.Application.Auth;
+using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 using Purch.Infrastructure.Persistence;
@@ -7,7 +8,10 @@ using Purch.Infrastructure.Persistence;
 namespace Purch.Infrastructure.Auth;
 
 /// <summary>What the one-time move off the old sign-in did.</summary>
-public sealed record LegacyMigrationReport(int OwnersMoved, int OwnersAlreadyMoved, int SessionsEnded, int DevicesToPairAgain, int StaffToInvite);
+public sealed record LegacyMigrationReport(int OwnersMoved, int OwnersAlreadyMoved, int SessionsEnded, int DevicesToPairAgain, int StaffToInvite, IReadOnlyList<OwnerClaimLink> OwnerLinks);
+
+/// <summary>A single-use link for an owner who never set an email and password. Shown once, to be handed to them.</summary>
+public sealed record OwnerClaimLink(string Business, string OwnerName, string Token);
 
 /// <summary>
 /// Run once when the PIN-at-a-pairing-code sign-in is retired (<c>migrate-legacy</c> on the command line). It is safe to run
@@ -67,6 +71,8 @@ public sealed class LegacyMigration(PurchDbContext dbContext, IIdentityProvider 
             moved++;
         }
 
+        var links = await IssueOwnerClaimLinksAsync(cancellationToken);
+
         var now = DateTimeOffset.UtcNow;
 
         // Devices paired the old way: no credential, and a permanent code. They wait for a one-time code now.
@@ -101,7 +107,48 @@ public sealed class LegacyMigration(PurchDbContext dbContext, IIdentityProvider 
             .Where(u => u.IsActive && !dbContext.Memberships.IgnoreQueryFilters().Any(m => m.LegacyUserId == u.Id))
             .CountAsync(cancellationToken);
 
-        var report = new LegacyMigrationReport(moved, already, oldTokens.Count, legacyDevices.Count, staffToInvite);
+        var report = new LegacyMigrationReport(moved, already, oldTokens.Count, legacyDevices.Count, staffToInvite, links);
         return report;
+    }
+
+    /// <summary>Owners who only had a PIN have no email or password to carry over, so nobody could sign in to invite them. Each gets
+    /// a single-use link that lets them choose an email, password and PIN and become the Admin again, with their history intact.
+    /// Running it again replaces a link that was lost.</summary>
+    private async Task<IReadOnlyList<OwnerClaimLink>> IssueOwnerClaimLinksAsync(CancellationToken cancellationToken)
+    {
+        var owners = await dbContext.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.Role == Role.Admin && u.IsActive && (u.Email == null || u.PasswordHash == null)
+                && !dbContext.Memberships.IgnoreQueryFilters().Any(m => m.LegacyUserId == u.Id))
+            .ToListAsync(cancellationToken);
+
+        var links = new List<OwnerClaimLink>();
+        foreach (var owner in owners)
+        {
+            var stale = await dbContext.EnrolmentInvites.IgnoreQueryFilters()
+                .Where(i => i.LegacyUserId == owner.Id && i.RedeemedAt == null && i.RevokedAt == null)
+                .ToListAsync(cancellationToken);
+            foreach (var old in stale)
+            {
+                old.RevokedAt = DateTimeOffset.UtcNow;
+            }
+
+            var invite = new EnrolmentInvite
+            {
+                TenantId = owner.TenantId,
+                Purpose = InvitePurpose.Enrolment,
+                LegacyUserId = owner.Id,
+                Name = owner.Name,
+                Email = owner.Email?.Trim().ToLowerInvariant() ?? string.Empty,
+                Role = MembershipRole.Admin,
+            };
+            var token = StaffEnrolmentService.StageToken(invite, TimeSpan.FromDays(30));
+            _ = dbContext.EnrolmentInvites.Add(invite);
+            var business = await dbContext.Tenants.IgnoreQueryFilters().Where(t => t.Id == owner.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            links.Add(new OwnerClaimLink(business, owner.Name, token));
+        }
+
+        _ = await dbContext.SaveChangesAsync(cancellationToken);
+        return links;
     }
 }
