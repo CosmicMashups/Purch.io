@@ -82,7 +82,8 @@ Built for mission-critical operations, Purch.io features offline-resilient local
   - `src/Purch.Infrastructure`: EF Core PostgreSQL persistence, authentication, and file storage.
   - `src/Purch.Api`: Minimal API endpoints, middleware, upload endpoints, and static file hosting.
   - `tests/`: Comprehensive unit test and Testcontainers integration test suites.
-- **`client/`**: Cross-platform Flutter client:
+- **`web/`**: React + TypeScript + Vite web client (the supported client): cashier, inventory, business admin, kiosk, kitchen and order-board screens, device pairing and lock screen. Vitest unit tests and Playwright end-to-end tests.
+- **`client/`**: Cross-platform Flutter client (not yet ported to the new sign-in; see [Flutter client status](#flutter-client-status)):
   - `lib/core/`: Theming tokens, network clients, Drift database, and shared UI components (`PurchImage`, `EmptyStateView`, `ErrorStateView`).
   - `lib/features/`: Feature modules for Auth, Catalog, POS, Kiosk, Inventory, Credit Ledger, and Reports.
   - `test/`: 230+ automated unit and widget regression tests.
@@ -106,58 +107,180 @@ Every installation operates in one of two deployment modes, controlled by the `P
 
 ## Getting Started
 
+The fastest way to a working system is the **web app + backend in Local mode** against a Postgres you run yourself. No Supabase account or cloud service is needed.
+
 ### Prerequisites
-- **.NET 9 SDK** (64-bit)
-- **Flutter SDK** (3.24+ recommended)
-- **PostgreSQL 16+** (or Docker for running integration tests)
+
+| Tool | Version | Needed for |
+|------|---------|-----------|
+| .NET SDK | 9.0 (64-bit) | Backend and its tests |
+| Node.js | 22 (npm 10+) | Web app |
+| PostgreSQL | 16+ (a local install or Docker) | The database |
+| Docker | any recent | Backend integration tests (Testcontainers) and the optional Postgres container below |
+| Flutter SDK | 3.24+ | Only the `client/` app (see [Flutter client status](#flutter-client-status)) |
 
 ---
 
-### Backend Setup
+### Quick start (web + backend, Local mode)
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Restore dependencies and compile the solution:
-   ```bash
-   dotnet build
-   ```
-3. Run the unit test suite:
-   ```bash
-   dotnet test tests/Purch.UnitTests
-   ```
-4. Run the API locally:
-   ```bash
-   dotnet run --project src/Purch.Api
-   ```
-   *Note: Ensure environment variables for database connection and deployment mode are configured (refer to `.env.example`).*
+**1. Start a Postgres 16 database.** With Docker:
+
+```bash
+docker run -d --name purch-db -e POSTGRES_DB=purch -e POSTGRES_USER=purch -e POSTGRES_PASSWORD=purch_dev_password -p 5432:5432 postgres:16
+```
+
+Or create an empty database and a superuser in a Postgres you already have. The user must be a superuser (or have `BYPASSRLS`): the API checks this at startup because tenant isolation uses row-level security.
+
+**2. Run the API.** From the repository root, set the variables for your shell and start it. In Local mode it creates and migrates the database itself on first start.
+
+Bash / Git Bash:
+
+```bash
+export PURCH_DEPLOYMENT_MODE=Local
+export LOCAL_DB_CONNECTION_STRING="Host=localhost;Port=5432;Database=purch;Username=purch;Password=purch_dev_password"
+export LOCAL_STORAGE_PATH="$PWD/.local-storage"
+export JWT_SIGNING_KEY="any-long-random-string-of-at-least-32-characters"
+export JWT_ISSUER=purch.io
+export ASPNETCORE_ENVIRONMENT=Development
+mkdir -p "$LOCAL_STORAGE_PATH"
+dotnet run --project backend/src/Purch.Api --no-launch-profile -- --urls http://localhost:5062
+```
+
+PowerShell:
+
+```powershell
+$env:PURCH_DEPLOYMENT_MODE = "Local"
+$env:LOCAL_DB_CONNECTION_STRING = "Host=localhost;Port=5432;Database=purch;Username=purch;Password=purch_dev_password"
+$env:LOCAL_STORAGE_PATH = "$PWD\.local-storage"
+$env:JWT_SIGNING_KEY = "any-long-random-string-of-at-least-32-characters"
+$env:JWT_ISSUER = "purch.io"
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+New-Item -ItemType Directory -Force $env:LOCAL_STORAGE_PATH | Out-Null
+dotnet run --project backend/src/Purch.Api --no-launch-profile -- --urls http://localhost:5062
+```
+
+`JWT_SIGNING_KEY` is required and has no default. Use any long random string, and keep it the same between restarts if you want existing sessions to stay valid. `scripts/run-backend-local.sh` does the same interactively (it prompts for the connection string and hides it).
+
+The API is ready when `http://localhost:5062/health/ready` answers.
+
+**3. Run the web app** in a second terminal:
+
+```bash
+cd web
+npm install
+echo "VITE_DEV_PROXY_TARGET=http://localhost:5062" > .env.local
+npm run dev
+```
+
+Open <http://localhost:5173>. In development the web app calls `/api`, which Vite forwards to `VITE_DEV_PROXY_TARGET`. Without that variable it forwards to the hosted demo backend instead of your local one, so do not skip `.env.local`.
+
+**4. Create your first business.** Open <http://localhost:5173/onboarding> and enter the business name, type, branch, and the owner's name, **email, password, and PIN**. You are then signed in as the Admin. (Over HTTP this is `POST /onboarding/bootstrap`.)
+
+**5. Set up people and devices** from the web app as the Admin:
+- **Business → Staff**: invite a person. You get a single-use link and QR code (no email is sent). They open it, choose a password and a PIN, and are enrolled.
+- **Business → Devices**: add a device (Register, Kiosk, Order Board, Kitchen Display, Warehouse, or Customer Display). You get a one-time pairing code. Open `/pair` in that device's browser and enter it. The device then keeps its own revocable credential.
+- Registers and Warehouse devices lock themselves; staff unlock them at `/unlock` with their own PIN.
+
+How sign-in works, in short: **people** sign in with email and password, or unlock a paired till with their PIN; **devices** are paired once with a short-lived code and never hold a person's password. The full design is in [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md).
 
 ---
 
-### Client Setup
+### Configuration reference
 
-1. Navigate to the client directory:
-   ```bash
-   cd client
-   ```
-2. Install package dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. Run code generation for Drift and Riverpod:
-   ```bash
-   dart run build_runner build --delete-conflicting-outputs
-   ```
-4. Execute the test suite:
-   ```bash
-   flutter test
-   ```
-5. Launch the application:
-   ```bash
-   flutter run -d windows --dart-define=PURCH_API_BASE_URL=https://localhost:5001
-   ```
-   *(Replace target with `android` or macOS as required. The API endpoint can also be reconfigured on the fly within the application's connection settings. Note: Chrome/web is **not** a supported target — `sqlite3_flutter_libs`, used for the offline Drift database, isn't web-compatible. The Windows desktop target additionally requires the "C++ ATL for latest v14x build tools" component installed alongside Visual Studio's Desktop development with C++ workload, for `flutter_secure_storage`.)*
+`.env.example` lists the same names as a checklist. The backend reads plain environment variables.
+
+| Variable | Mode | Purpose |
+|----------|------|---------|
+| `PURCH_DEPLOYMENT_MODE` | both | `Cloud` or `Local` |
+| `JWT_SIGNING_KEY` | both | **Required.** Signs access tokens |
+| `JWT_ISSUER` | both | Token issuer; defaults to `purch.io` |
+| `LOCAL_DB_CONNECTION_STRING` | Local | Npgsql keyword string (`Host=...;Username=...`) |
+| `LOCAL_STORAGE_PATH` | Local | Folder for uploaded images |
+| `SUPABASE_DB_CONNECTION_STRING` | Cloud | Supabase Postgres in Npgsql format, session pooler or direct (not the transaction pooler) |
+| `SUPABASE_AUTH_URL`, `SUPABASE_AUTH_SERVICE_KEY`, `SUPABASE_AUTH_ANON_KEY` | Cloud | Supabase Auth, which checks passwords in Cloud mode. Local mode keeps passwords in its own table |
+| `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_KEY` | Cloud | Image storage |
+| `CORS_ALLOWED_ORIGINS` | both | Comma-separated web origins allowed to call the API |
+| `PORT` | both | Listening port when `--urls` is not given; defaults to 8080 |
+| `VITE_API_BASE_URL` | web build | API address baked into a production web build |
+| `VITE_DEV_PROXY_TARGET` | web dev | Where the dev server forwards `/api` |
+
+Never commit real keys. `.env`, `.env.local`, and `.local-storage/` are git-ignored.
+
+---
+
+### Database migrations
+
+- **Local mode** migrates automatically at startup.
+- **Cloud mode** does not. Run `scripts/migrate-production.sh` (or the `.ps1` / `.bat` version) against the target database before deploying, or call the CLI directly: `dotnet run --project backend/src/Purch.Api -- migrate`.
+- **Upgrading an installation that used the old PIN-at-a-pairing-code sign-in:** after `migrate`, run `dotnet run --project backend/src/Purch.Api -- migrate-legacy` once. It carries owners over, ends old sessions, sets old devices back to waiting for a one-time code, and prints a **single-use claim link** for any owner who never had an email and password. Those links appear only in that command's output. See [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md). A brand-new database does not need this.
+
+---
+
+### Running the tests
+
+**Backend** (integration tests start their own throwaway Postgres through Docker, so Docker must be running):
+
+```bash
+cd backend
+dotnet build
+dotnet test tests/Purch.UnitTests
+dotnet test tests/Purch.IntegrationTests   # slow; needs Docker
+```
+
+**Web:**
+
+```bash
+cd web
+npm test              # unit and component tests (Vitest)
+npx tsc --noEmit      # type-check
+npm run lint
+npm run build
+```
+
+**Web end-to-end (Playwright)** drives a real browser against the real backend and a throwaway Postgres. It needs the .NET SDK and either Docker or a local PostgreSQL install (set `PG_BIN` to its `bin` folder):
+
+```bash
+cd web
+npx playwright install chromium   # once; or set PW_CHANNEL=chrome to use installed Chrome
+npm run e2e
+```
+
+---
+
+### Flutter client status
+
+The Flutter app in `client/` has **not yet been ported** to the new email sign-in, one-time device pairing, lock screen, and staff-enrolment flows above. Until it is, it cannot sign in to a current backend. The web app is the supported client for now. For reference, the Flutter setup is:
+
+```bash
+cd client
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter test
+flutter run -d windows --dart-define=PURCH_API_BASE_URL=http://localhost:5062
+```
+
+Chrome/web is not a supported Flutter target (the offline Drift database is not web-compatible). The Windows target also needs the "C++ ATL for latest v14x build tools" component alongside Visual Studio's Desktop development with C++ workload.
+
+---
+
+### Troubleshooting
+
+- **API exits at startup with a database error:** the connection string is wrong or Postgres is not running. Use the `Host=...;Username=...;Password=...` form, not a `postgres://` URI.
+- **API exits mentioning BYPASSRLS:** connect as the Postgres superuser, or grant the role `BYPASSRLS`.
+- **`JWT_SIGNING_KEY is not configured`:** set it to any long random string.
+- **Web app shows network errors or talks to the wrong server:** check `web/.env.local` contains `VITE_DEV_PROXY_TARGET=http://localhost:5062`, then restart `npm run dev`.
+- **Browser blocks calls to the API (CORS):** add the web origin to `CORS_ALLOWED_ORIGINS`. This only matters when the web app calls the API directly, not through the dev proxy.
+- **Sign-in says too many attempts:** sign-in is rate limited; wait for the window to pass.
+- **Integration tests cannot start a database:** start Docker and check that `docker ps` works.
+
+---
+
+### Deployment
+
+- **Cloud:** backend on Vercel (`backend/vercel.json`, `backend/Dockerfile.vercel`) or Render (`render.yaml`), with Supabase for Postgres, Auth, and storage; web app on Cloudflare ([docs/CLOUDFLARE-DEPLOYMENT.md](docs/CLOUDFLARE-DEPLOYMENT.md)) or Vercel (`web/vercel.json`). CI workflows are in `.github/workflows/`.
+- **On-premises:** see [installer/README.md](installer/README.md) (Docker Compose or a Windows service).
+
+Further reading: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/WEB-ARCHITECTURE.md](docs/WEB-ARCHITECTURE.md), [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md), [docs/BACKUPS.md](docs/BACKUPS.md).
 
 ---
 
@@ -165,5 +288,6 @@ Every installation operates in one of two deployment modes, controlled by the `P
 
 - **Backend Solution**: Clean compilation with 0 warnings/errors across all projects.
 - **Integration Tests**: Tested with Dockerized PostgreSQL testcontainers for authentication, tenant onboarding, catalog operations, inventory reconciliation, and multipart image uploads.
-- **Client Test Suite**: 100% green test suite (233/233 passing tests) validating state management, user flows, tabular financial calculations, and edge-case error recovery.
-- **Zero-warning static analysis**: `flutter analyze` reports 0 issues across the entire client codebase.
+- **Web Test Suite**: Vitest unit and component tests plus Playwright end-to-end tests against the real backend.
+- **Client Test Suite**: Flutter unit and widget tests (`flutter test` in `client/`).
+- **Static analysis**: `tsc --noEmit` and `oxlint` for the web app; `flutter analyze` for the client.
