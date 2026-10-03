@@ -22,4 +22,8 @@ public enum Role
     /// <summary>An unattended display showing pending orders with line items,
     /// for kitchen staff. Same read-only scoping as OrderBoard.</summary>
     KitchenDisplay,
+
+    /// <summary>An unattended customer-facing screen paired to one Register. Read-only: it can only follow that
+    /// Register's cart, never change anything.</summary>
+    CustomerDisplay,
 }

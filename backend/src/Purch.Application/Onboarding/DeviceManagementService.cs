@@ -100,6 +100,17 @@ public sealed class DeviceManagementService(
 
     private static DeviceDto ToDto(Device device)
     {
-        return new(device.Id, device.BranchId, device.PairingCode, device.DeviceIdentifier, device.DeviceType, device.LastSeenAt);
+        return new(
+            device.Id,
+            device.BranchId,
+            device.PairingCode,
+            device.DeviceIdentifier,
+            device.DeviceType,
+            device.LastSeenAt,
+            device.Name,
+            device.Status,
+            device.PairedAt,
+            device.PairingCodeExpiresAt,
+            device.LinkedRegisterDeviceId);
     }
 }

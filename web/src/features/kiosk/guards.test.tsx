@@ -12,16 +12,15 @@ function guardedDevice(role: 'Kiosk' | 'KitchenDisplay') {
     route: '/screen',
     path: '/screen',
     otherRoutes: [
-      { path: '/kiosk/pair', element: <p>Kiosk pairing</p> },
-      { path: '/kitchen/pair', element: <p>Kitchen pairing</p> },
+      { path: '/pair', element: <p>Pairing</p> },
     ],
   });
 }
 
 describe('RequireDevice', () => {
-  it('sends an unpaired browser to that device pairing screen', () => {
+  it('sends an unpaired browser to the pairing screen', () => {
     guardedDevice('Kiosk');
-    expect(screen.getByText('Kiosk pairing')).toBeInTheDocument();
+    expect(screen.getByText('Pairing')).toBeInTheDocument();
   });
 
   it('never shows a screen to a browser paired as something else, and says so', () => {

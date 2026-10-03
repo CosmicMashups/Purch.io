@@ -125,6 +125,8 @@ builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
 builder.Services.AddScoped<IAccountRepository, EfAccountRepository>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
+builder.Services.AddScoped<IDeviceCredentialRepository, EfDeviceCredentialRepository>();
+builder.Services.AddScoped<IDevicePairingService, DevicePairingService>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();

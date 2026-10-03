@@ -43,6 +43,21 @@ Known stopgaps: a personal-device session gets the single API role the existing 
 person has that duty, otherwise Cashier; none means no sign-in), and a staff member with several branches gets tenant
 scope because a token carries one scope id. Both are replaced when sessions are tied to devices (step 6).
 
+## Device pairing (step 3)
+
+- Admin: `POST /devices/pairing-requests` (name, type, branch, and the Register for a customer display) creates a
+  Pending device and returns its one-time code once. `POST /devices/{id}/pairing-code` makes a fresh code (and, on a
+  paired device, ends everything it holds). `POST /devices/{id}/revoke` takes it out of service.
+- Device: `POST /devices/pair` exchanges the code for a long-lived credential (kept in `localStorage` on the web).
+  `POST /devices/session` starts a session from that credential: Kiosk, Order board, Kitchen display and Customer
+  display get an access token and a refresh token (renewed by the ordinary `/auth/refresh`); a Register or Warehouse
+  device is recognised but gets no token until a person signs in (step 5).
+- Revoking or pairing again bumps the device's session version, revokes its credential and refresh tokens, and the
+  middleware also refuses any token of a revoked device, so a session already issued stops at once.
+- Web: Business, Devices creates devices and shows the code in a dialog; `/pair` is the one pairing screen for every
+  kind of device. The old per-device pairing PIN screens redirect there. The Flutter client still uses the old pairing.
+- The old permanent pairing code, pairing PIN and `/kiosk/session` style endpoints still exist until step 8.
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.

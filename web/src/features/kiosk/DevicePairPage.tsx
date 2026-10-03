@@ -1,71 +1,106 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { ApiError, userMessage } from '../../lib/apiError';
 import { useAuthStore } from '../../lib/authStore';
+import { DeviceType, deviceTypeLabels, labelOf } from '../business/types';
 import { useSession } from '../auth/useSession';
-import { deviceApi } from './api';
+import { deviceApi, type DeviceSession } from './api';
+import { clearDeviceCredential, readDeviceCredential, saveDeviceCredential } from './deviceCredential';
 import { DEVICE_HOME, deviceRoleFromClaim, type DeviceRole } from './deviceRoles';
 
-const schema = z.object({
-  devicePairingCode: z.string().trim().min(1, 'Enter the device code'),
-  pairingPin: z.string().min(1, 'Enter the PIN'),
-});
-type Form = z.infer<typeof schema>;
-
-const COPY: Record<DeviceRole, { title: string; hint: string }> = {
-  Kiosk: { title: 'Set up this kiosk', hint: 'Use the code and PIN of a kiosk device from Business, Devices.' },
-  KitchenDisplay: { title: 'Set up this kitchen display', hint: 'Use the code and PIN of a kitchen display device from Business, Devices.' },
-  OrderBoard: { title: 'Set up this order board', hint: 'Use the code and PIN of an order board device from Business, Devices.' },
+const ROLE_OF_TYPE: Record<number, DeviceRole | undefined> = {
+  [DeviceType.Kiosk]: 'Kiosk',
+  [DeviceType.KitchenDisplay]: 'KitchenDisplay',
+  [DeviceType.OrderBoard]: 'OrderBoard',
 };
 
-const inputClass = 'h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-lg text-ink focus:border-brand';
+const inputClass = 'h-16 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-center font-mono text-3xl font-bold uppercase tracking-widest text-ink focus:border-brand';
 
-export function DevicePairPage({ role }: { role: DeviceRole }) {
+/**
+ * Pairs this browser as a device with the one-time code an Admin made on the Devices page. The code works once and expires,
+ * and in exchange the device keeps its own credential, so nothing has to be typed again.
+ */
+export function DevicePairPage() {
   const navigate = useNavigate();
   const { claims } = useSession();
   const setTokens = useAuthStore((s) => s.setTokens);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const { register, handleSubmit, formState } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: { devicePairingCode: '', pairingPin: '' } });
+  const [paired, setPaired] = useState<DeviceSession | null>(null);
 
-  if (deviceRoleFromClaim(claims?.role) === role) return <Navigate to={DEVICE_HOME[role]} replace />;
-
-  function onSubmit(values: Form) {
-    setFormError(null);
-    deviceApi
-      .pair(role, values.devicePairingCode.trim(), values.pairingPin)
-      .then(({ accessToken, refreshToken }) => {
-        setTokens(accessToken, refreshToken);
-        navigate(DEVICE_HOME[role], { replace: true });
-      })
-      .catch((error: unknown) =>
-        setFormError(error instanceof ApiError && error.kind === 'unauthorized' ? 'That code and PIN were not recognised, or belong to a different kind of device.' : userMessage(error)),
-      );
+  function begin(session: DeviceSession) {
+    const role = ROLE_OF_TYPE[session.deviceType];
+    if (role && session.accessToken && session.refreshToken) {
+      setTokens(session.accessToken, session.refreshToken);
+      navigate(DEVICE_HOME[role], { replace: true });
+      return;
+    }
+    setPaired(session);
   }
 
-  const errors = formState.errors;
+  // A device that was paired before and lost its session picks up where it left off, without a new code.
+  useEffect(() => {
+    const credential = readDeviceCredential();
+    if (!credential || accessToken) return;
+    deviceApi
+      .startSession(credential)
+      .then(begin)
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.kind === 'unauthorized') clearDeviceCredential();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (deviceRoleFromClaim(claims?.role)) return <Navigate to={DEVICE_HOME[deviceRoleFromClaim(claims?.role)!]} replace />;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!code.trim()) return setFormError('Enter the pairing code');
+    setFormError(null);
+    setBusy(true);
+    try {
+      const device = await deviceApi.pair(code.trim());
+      saveDeviceCredential(device.deviceCredential);
+      begin(await deviceApi.startSession(device.deviceCredential));
+    } catch (error) {
+      setFormError(error instanceof ApiError && error.kind === 'unauthorized' ? 'That code was not recognised, has already been used, or has expired. Ask an Admin for a new one.' : userMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (paired) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 p-6">
+        <h1 className="text-3xl font-bold tracking-tight">This device is paired</h1>
+        <p className="text-base">
+          {paired.name ?? labelOf(deviceTypeLabels, paired.deviceType)} is set up as a {labelOf(deviceTypeLabels, paired.deviceType).toLowerCase()}.
+        </p>
+        <p className="text-base text-ink-soft">Staff sign-in on paired devices, and the customer display feed, are not switched on yet.</p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{COPY[role].title}</h1>
-        <p className="mt-2 text-base text-ink-soft">{COPY[role].hint}</p>
+        <h1 className="text-3xl font-bold tracking-tight">Pair this device</h1>
+        <p className="mt-2 text-base text-ink-soft">Ask an Admin to add this device under Business, Devices, then type the code they see.</p>
       </div>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-base font-semibold">
-          Device code
-          <input {...register('devicePairingCode')} autoComplete="off" autoCapitalize="characters" className={inputClass} aria-invalid={errors.devicePairingCode ? true : undefined} />
-          {errors.devicePairingCode && <span role="alert" className="text-sm font-medium text-danger">{errors.devicePairingCode.message}</span>}
+          Pairing code
+          <input value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={12} className={inputClass} />
         </label>
-        <label className="flex flex-col gap-1 text-base font-semibold">
-          PIN
-          <input {...register('pairingPin')} type="password" inputMode="numeric" autoComplete="off" className={inputClass} aria-invalid={errors.pairingPin ? true : undefined} />
-          {errors.pairingPin && <span role="alert" className="text-sm font-medium text-danger">{errors.pairingPin.message}</span>}
-        </label>
-        {formError && <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-base font-medium text-danger">{formError}</p>}
-        <button type="submit" disabled={formState.isSubmitting} className="h-14 rounded-control bg-brand text-lg font-bold text-on-brand disabled:opacity-60">
-          {formState.isSubmitting ? 'Pairing…' : 'Pair this device'}
+        {formError && (
+          <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-base font-medium text-danger">
+            {formError}
+          </p>
+        )}
+        <button type="submit" disabled={busy} className="h-14 rounded-control bg-brand text-lg font-bold text-on-brand disabled:opacity-60">
+          {busy ? 'Pairing…' : 'Pair this device'}
         </button>
       </form>
     </main>

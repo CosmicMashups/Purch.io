@@ -1,4 +1,5 @@
 using Purch.Api.RateLimiting;
+using Purch.Application.Devices;
 using Purch.Application.Onboarding;
 using Purch.Domain.Enums;
 
@@ -103,6 +104,61 @@ public static class OnboardingEndpoints
             IDeviceManagementService deviceService,
             CancellationToken cancellationToken) =>
             Results.Ok(await deviceService.ResetPairingPinAsync(deviceId, request.NewPin, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        // --- One-time device pairing (replaces the permanent pairing code and PIN above) ---
+        // The Admin creates the device and is shown a code valid for ten minutes; the device exchanges it for its own
+        // revocable credential. Revoking, or pairing again, ends every session the device holds.
+        _ = app.MapPost("/devices/pairing-requests", async (
+            CreateDevicePairingRequest request,
+            IDevicePairingService pairingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await pairingService.CreateAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        _ = app.MapPost("/devices/{deviceId:guid}/pairing-code", async (
+            Guid deviceId,
+            IDevicePairingService pairingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await pairingService.NewPairingCodeAsync(deviceId, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        _ = app.MapPost("/devices/{deviceId:guid}/revoke", async (
+            Guid deviceId,
+            IDevicePairingService pairingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await pairingService.RevokeAsync(deviceId, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        _ = app.MapPost("/devices/pair", async (
+            PairDeviceRequest request,
+            IDevicePairingService pairingService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await pairingService.PairAsync(request, cancellationToken);
+            return result switch
+            {
+                DevicePairResult.Success success => Results.Ok(success.Device),
+                DevicePairResult.InvalidCode => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Invalid pairing code.",
+                    detail: "The code was not recognized, has already been used, or has expired."),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(DevicePairResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
+
+        _ = app.MapPost("/devices/session", async (
+            DeviceSessionRequest request,
+            IDevicePairingService pairingService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await pairingService.StartSessionAsync(request, cancellationToken);
+            return result switch
+            {
+                DeviceSessionResult.Success success => Results.Ok(success.Session),
+                DeviceSessionResult.Invalid => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Device not recognized.",
+                    detail: "This device was revoked or needs to be paired again."),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(DeviceSessionResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
 
         // --- Tenant settings: branding (A2), BIR/compliance (A5), barcode requirement ---
         // Read-only for every signed-in user and device (a till prints the registered business details on receipts and

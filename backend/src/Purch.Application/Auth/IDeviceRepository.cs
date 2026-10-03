@@ -6,6 +6,10 @@ public interface IDeviceRepository
 {
     Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default);
 
+    /// <summary>For a one-time pairing code, which is stored only as a hash. Tracked, and not tenant-filtered: the device
+    /// has no session yet.</summary>
+    Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default);
+
     Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>One of the few deliberately unscoped reads: used before a tenant is known (anonymous refresh

@@ -26,6 +26,8 @@ public sealed class ApproverAuthorizationServiceTests
 
     private sealed class FakeDeviceRepository(Device device) : IDeviceRepository
     {
+        public Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>

@@ -7,10 +7,13 @@ export const DEVICE_HOME: Record<DeviceRole, string> = {
   OrderBoard: '/order-board',
 };
 
+/** One pairing screen for every kind of device: the code says which kind it is. */
+export const PAIR_PATH = '/pair';
+
 export const DEVICE_PAIR: Record<DeviceRole, string> = {
-  Kiosk: '/kiosk/pair',
-  KitchenDisplay: '/kitchen/pair',
-  OrderBoard: '/order-board/pair',
+  Kiosk: PAIR_PATH,
+  KitchenDisplay: PAIR_PATH,
+  OrderBoard: PAIR_PATH,
 };
 
 export const DEVICE_LABEL: Record<DeviceRole, string> = {

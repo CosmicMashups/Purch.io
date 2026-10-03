@@ -1,25 +1,32 @@
 import { apiClient } from '../../lib/apiClient';
 import type { AddLineRequest, KitchenStatus, Transaction } from '../pos/types';
-import type { DeviceRole } from './deviceRoles';
 import type { KioskPromoRulesResponse } from './promoRules';
-
-interface SessionResponse {
-  accessToken: string;
-  refreshToken: string;
-}
-
-const SESSION_PATH: Record<DeviceRole, string> = {
-  Kiosk: '/kiosk/session',
-  KitchenDisplay: '/kitchen-display/session',
-  OrderBoard: '/order-board/session',
-};
 
 const PENDING_PATH = { KitchenDisplay: '/kitchen-display/pending', OrderBoard: '/order-board/pending' } as const;
 
-/** Pairing is anonymous: the device code and its PIN are the credentials. */
+/** What a device keeps after pairing. The credential is shown once and identifies the device from then on. */
+export interface PairedDevice {
+  deviceCredential: string;
+  deviceId: string;
+  tenantId: string;
+  branchId: string;
+  deviceType: number;
+  name: string | null;
+}
+
+export interface DeviceSession {
+  accessToken: string | null;
+  refreshToken: string | null;
+  requiresStaff: boolean;
+  deviceId: string;
+  deviceType: number;
+  name: string | null;
+}
+
+/** Both calls are anonymous: the one-time code pairs the device, and its own credential starts every session after that. */
 export const deviceApi = {
-  pair: (role: DeviceRole, devicePairingCode: string, pairingPin: string) =>
-    apiClient.post<SessionResponse>(SESSION_PATH[role], { devicePairingCode, pairingPin }).then((r) => r.data),
+  pair: (pairingCode: string) => apiClient.post<PairedDevice>('/devices/pair', { pairingCode }).then((r) => r.data),
+  startSession: (deviceCredential: string) => apiClient.post<DeviceSession>('/devices/session', { deviceCredential }).then((r) => r.data),
 };
 
 export interface PlaceKioskOrderRequest {

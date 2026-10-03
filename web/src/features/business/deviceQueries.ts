@@ -1,26 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deviceApi, type CreateDeviceBody } from './deviceApi';
+import { deviceApi, type CreatePairingBody } from './deviceApi';
 
 export const deviceKeys = { all: ['devices'] as const };
 
 export const useDevices = (enabled = true) => useQuery({ queryKey: deviceKeys.all, queryFn: () => deviceApi.list(), enabled });
 
-export function useCreateDevice() {
+export function useCreatePairing() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateDeviceBody) => deviceApi.create(body),
+    mutationFn: (body: CreatePairingBody) => deviceApi.createPairing(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: deviceKeys.all }),
   });
 }
 
-export function useResetPairingCode() {
+export function useNewPairingCode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deviceApi.resetPairingCode(id),
+    mutationFn: (id: string) => deviceApi.newPairingCode(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: deviceKeys.all }),
   });
 }
 
-export function useResetPairingPin() {
-  return useMutation({ mutationFn: ({ id, newPin }: { id: string; newPin: string }) => deviceApi.resetPairingPin(id, newPin) });
+export function useRevokeDevice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deviceApi.revoke(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: deviceKeys.all }),
+  });
 }

@@ -64,6 +64,7 @@ public sealed class TokenRefreshService(
                 DeviceType.OrderBoard => jwtTokenService.IssueUnattendedAccessToken(device, Role.OrderBoard),
                 DeviceType.KitchenDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.KitchenDisplay),
                 DeviceType.WarehouseOfficer => jwtTokenService.IssueUnattendedAccessToken(device, Role.Warehouse),
+                DeviceType.CustomerDisplay => jwtTokenService.IssueUnattendedAccessToken(device, Role.CustomerDisplay),
                 DeviceType.Kiosk or DeviceType.Register => jwtTokenService.IssueKioskAccessToken(device),
                 _ => throw new InvalidOperationException($"Unhandled {nameof(DeviceType)}: {device.DeviceType}"),
             };

@@ -158,6 +158,8 @@ public sealed class TenantResolutionMiddlewareTests
 
     private sealed class FakeDeviceRepository(Device? device = null) : IDeviceRepository
     {
+        public Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<Device?>(null);

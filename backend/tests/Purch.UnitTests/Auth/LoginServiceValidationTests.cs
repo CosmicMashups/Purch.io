@@ -32,6 +32,8 @@ public sealed class LoginServiceValidationTests
     // repository/hasher/token work happens, not just that an exception is eventually thrown.
     private sealed class NeverCalledDeviceRepository : IDeviceRepository
     {
+        public Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");

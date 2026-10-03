@@ -8,4 +8,9 @@ public sealed record DeviceDto(
     string PairingCode,
     string? DeviceIdentifier,
     DeviceType DeviceType,
-    DateTimeOffset? LastSeenAt);
+    DateTimeOffset? LastSeenAt,
+    string? Name = null,
+    DeviceStatus Status = DeviceStatus.Active,
+    DateTimeOffset? PairedAt = null,
+    DateTimeOffset? PairingCodeExpiresAt = null,
+    Guid? LinkedRegisterDeviceId = null);

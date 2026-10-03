@@ -67,9 +67,10 @@ export function App() {
       <Route path="/legal/:document" element={<LegalPage />} />
 
       <Route path="/customer-display" element={<CustomerDisplayPage />} />
-      <Route path="/kiosk/pair" element={<DevicePairPage role="Kiosk" />} />
-      <Route path="/kitchen/pair" element={<DevicePairPage role="KitchenDisplay" />} />
-      <Route path="/order-board/pair" element={<DevicePairPage role="OrderBoard" />} />
+      <Route path="/pair" element={<DevicePairPage />} />
+      <Route path="/kiosk/pair" element={<Navigate to="/pair" replace />} />
+      <Route path="/kitchen/pair" element={<Navigate to="/pair" replace />} />
+      <Route path="/order-board/pair" element={<Navigate to="/pair" replace />} />
 
       <Route element={<RequireDevice role="Kiosk" />}>
         <Route element={<KioskLayout />}>

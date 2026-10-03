@@ -1,12 +1,16 @@
 /** Integer enums from Purch.Domain.Enums, as the API serializes them. */
-export const Role = { Admin: 0, Manager: 1, Cashier: 2, Warehouse: 3, Kiosk: 4, OrderBoard: 5, KitchenDisplay: 6 } as const;
+export const Role = { Admin: 0, Manager: 1, Cashier: 2, Warehouse: 3, Kiosk: 4, OrderBoard: 5, KitchenDisplay: 6, CustomerDisplay: 7 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
 export const ScopeType = { Tenant: 0, Branch: 1, Department: 2 } as const;
 export type ScopeType = (typeof ScopeType)[keyof typeof ScopeType];
 
-export const DeviceType = { Register: 0, Kiosk: 1, OrderBoard: 2, KitchenDisplay: 3, WarehouseOfficer: 4 } as const;
+export const DeviceType = { Register: 0, Kiosk: 1, OrderBoard: 2, KitchenDisplay: 3, WarehouseOfficer: 4, CustomerDisplay: 5 } as const;
 export type DeviceType = (typeof DeviceType)[keyof typeof DeviceType];
+
+/** Where a device is in its life: paired and working, waiting for its one-time code, or taken out of service. */
+export const DeviceStatus = { Active: 0, Pending: 1, Revoked: 2 } as const;
+export type DeviceStatus = (typeof DeviceStatus)[keyof typeof DeviceStatus];
 
 export const ReceiptPrinterProfile = { None: 0, ThermalEscPos: 1 } as const;
 export type ReceiptPrinterProfile = (typeof ReceiptPrinterProfile)[keyof typeof ReceiptPrinterProfile];
@@ -50,6 +54,7 @@ export const roleLabels: Record<number, string> = {
   [Role.Kiosk]: 'Kiosk',
   [Role.OrderBoard]: 'Order board',
   [Role.KitchenDisplay]: 'Kitchen display',
+  [Role.CustomerDisplay]: 'Customer display',
 };
 
 /** Roles a person can hold. Kiosk, order board and kitchen display are device roles, never staff. */
@@ -67,6 +72,7 @@ export const deviceTypeLabels: Record<number, string> = {
   [DeviceType.OrderBoard]: 'Order board',
   [DeviceType.KitchenDisplay]: 'Kitchen display',
   [DeviceType.WarehouseOfficer]: 'Warehouse officer',
+  [DeviceType.CustomerDisplay]: 'Customer display',
 };
 
 export const businessTypeLabels: Record<number, string> = {

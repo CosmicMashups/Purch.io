@@ -2,34 +2,42 @@ import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { Modal } from '../../components/Modal';
+import { StatusBadge } from '../../components/StatusBadge';
 import { toast } from '../../components/feedback/toastStore';
 import { EditorCard } from '../../components/forms/EditorCard';
-import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
+import { FormField, controlClass } from '../../components/forms/FormField';
 import { FormLoader } from '../../components/forms/FormLoader';
 import { ListCard, QueryList } from '../../components/lists/QueryList';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/dates';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
-import type { Device } from './deviceApi';
-import { devicePinProblem, pinRequiredFor } from './deviceRules';
-import { useCreateDevice, useDevices, useResetPairingCode, useResetPairingPin } from './deviceQueries';
-import { DeviceType, deviceTypeLabels, labelOf } from './types';
+import type { Device, PairingCode } from './deviceApi';
+import { useCreatePairing, useDevices, useNewPairingCode, useRevokeDevice } from './deviceQueries';
+import { DeviceStatus, DeviceType, deviceTypeLabels, labelOf } from './types';
 
 const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
+const dangerLink = 'h-12 text-base font-semibold text-danger underline';
 
 export function DevicesPage() {
   const devices = useDevices();
   const branches = useBranches();
-  const resetCode = useResetPairingCode();
+  const newCode = useNewPairingCode();
+  const revoke = useRevokeDevice();
   const [codeFor, setCodeFor] = useState<Device | null>(null);
-  const [pinFor, setPinFor] = useState<Device | null>(null);
+  const [revokeFor, setRevokeFor] = useState<Device | null>(null);
+  const [shown, setShown] = useState<PairingCode | null>(null);
 
-  function confirmResetCode() {
-    if (!codeFor) return;
-    const device = codeFor;
+  function pairAgain(device: Device) {
     setCodeFor(null);
-    resetCode.mutate(device.id, { onSuccess: (updated) => toast.success(`New pairing code: ${updated.pairingCode}`) });
+    newCode.mutate(device.id, { onSuccess: setShown });
+  }
+
+  function confirmRevoke() {
+    if (!revokeFor) return;
+    const device = revokeFor;
+    setRevokeFor(null);
+    revoke.mutate(device.id, { onSuccess: () => toast.success(`${nameOf(device)} was revoked and signed out`) });
   }
 
   return (
@@ -43,28 +51,33 @@ export function DevicesPage() {
           renderRow={(device) => (
             <ListCard key={device.id}>
               <div className="min-w-0">
-                <p className="text-base font-semibold">{device.deviceIdentifier ?? labelOf(deviceTypeLabels, device.deviceType)}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold">{nameOf(device)}</p>
+                  <StatusBadge {...statusOf(device)} />
+                </div>
                 <p className="text-base">
                   {labelOf(deviceTypeLabels, device.deviceType)}, {branches.data?.find((b) => b.id === device.branchId)?.name ?? 'branch'}
                 </p>
-                <p className="mt-1 font-mono text-2xl font-bold tracking-widest" aria-label={`Pairing code ${device.pairingCode}`}>
-                  {device.pairingCode}
-                </p>
+                {device.linkedRegisterDeviceId && (
+                  <p className="text-sm text-ink-soft">Shows {nameOf(devices.data?.find((d) => d.id === device.linkedRegisterDeviceId))}</p>
+                )}
                 <p className="text-sm text-ink-soft">{device.lastSeenAt ? `Last seen ${formatDateTime(device.lastSeenAt)}` : 'Never seen'}</p>
                 <div className="mt-2 flex flex-wrap gap-x-5">
-                  <button type="button" className={linkButton} onClick={() => setCodeFor(device)}>
+                  <button type="button" className={linkButton} onClick={() => (device.status === DeviceStatus.Pending ? pairAgain(device) : setCodeFor(device))}>
                     New pairing code
                   </button>
-                  <button type="button" className={linkButton} onClick={() => setPinFor(device)}>
-                    Change PIN
-                  </button>
+                  {device.status !== DeviceStatus.Revoked && (
+                    <button type="button" className={dangerLink} onClick={() => setRevokeFor(device)}>
+                      Revoke
+                    </button>
+                  )}
                 </div>
               </div>
             </ListCard>
           )}
         />
         <FormLoader failed={branches.isError ? branches : null} ready={!!branches.data}>
-          {branches.data && <DeviceForm branches={branches.data} />}
+          {branches.data && <DeviceForm branches={branches.data} registers={(devices.data ?? []).filter((d) => d.deviceType === DeviceType.Register && d.status !== DeviceStatus.Revoked)} onCreated={setShown} />}
         </FormLoader>
       </div>
 
@@ -72,30 +85,58 @@ export function DevicesPage() {
         open={codeFor !== null}
         destructive
         title="Make a new pairing code?"
-        description="The old code stops working and this device is signed out. Enter the new code on the device to use it again."
+        description="This device is signed out and stops working until the new code is entered on it."
         confirmLabel="Make new code"
-        onConfirm={confirmResetCode}
+        onConfirm={() => codeFor && pairAgain(codeFor)}
         onCancel={() => setCodeFor(null)}
       />
-      {pinFor && <ResetPinDialog device={pinFor} onClose={() => setPinFor(null)} />}
+      <ConfirmModal
+        open={revokeFor !== null}
+        destructive
+        title="Revoke this device?"
+        description="It is signed out at once and cannot be used again unless you make it a new pairing code."
+        confirmLabel="Revoke"
+        onConfirm={confirmRevoke}
+        onCancel={() => setRevokeFor(null)}
+      />
+      {shown && <PairingCodeDialog pairing={shown} onClose={() => setShown(null)} />}
     </div>
   );
 }
 
-function DeviceForm({ branches }: { branches: Branch[] }) {
-  const create = useCreateDevice();
+function nameOf(device: Device | undefined): string {
+  if (!device) return 'a Register';
+  return device.name ?? device.deviceIdentifier ?? labelOf(deviceTypeLabels, device.deviceType);
+}
+
+function statusOf(device: Device): { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' } {
+  if (device.status === DeviceStatus.Revoked) return { label: 'Revoked', tone: 'danger' };
+  if (device.status === DeviceStatus.Pending) return { label: 'Waiting for its code', tone: 'warning' };
+  return { label: 'Paired', tone: 'success' };
+}
+
+function DeviceForm({ branches, registers, onCreated }: { branches: Branch[]; registers: Device[]; onCreated: (pairing: PairingCode) => void }) {
+  const create = useCreatePairing();
   const { register, control, handleSubmit, reset, setError, formState: { errors } } = useForm({
-    defaultValues: { branchId: branches.length === 1 ? branches[0].id : '', deviceIdentifier: '', deviceType: DeviceType.Register as number, pairingPin: '' },
+    defaultValues: { branchId: branches.length === 1 ? branches[0].id : '', name: '', deviceType: DeviceType.Register as number, linkedRegisterDeviceId: '' },
   });
   const type = Number(useWatch({ control, name: 'deviceType' }));
+  const branchId = useWatch({ control, name: 'branchId' });
+  const sameBranchRegisters = registers.filter((r) => r.branchId === branchId);
 
   const submit = handleSubmit((v) => {
     if (!v.branchId) return setError('branchId', { message: 'Choose a branch' });
-    const problem = devicePinProblem(Number(v.deviceType), v.pairingPin);
-    if (problem) return setError('pairingPin', { message: problem });
+    if (!v.name.trim()) return setError('name', { message: 'Give the device a name' });
+    const linksToRegister = Number(v.deviceType) === DeviceType.CustomerDisplay;
+    if (linksToRegister && !v.linkedRegisterDeviceId) return setError('linkedRegisterDeviceId', { message: 'Choose the Register this screen shows' });
     create.mutate(
-      { branchId: v.branchId, deviceIdentifier: v.deviceIdentifier.trim() || null, deviceType: Number(v.deviceType), pairingPin: v.pairingPin.trim() || null },
-      { onSuccess: (device) => { toast.success(`Device added. Pairing code: ${device.pairingCode}`); reset({ branchId: v.branchId, deviceIdentifier: '', deviceType: DeviceType.Register, pairingPin: '' }); } },
+      { branchId: v.branchId, name: v.name.trim(), deviceType: Number(v.deviceType), linkedRegisterDeviceId: linksToRegister ? v.linkedRegisterDeviceId : null },
+      {
+        onSuccess: (pairing) => {
+          onCreated(pairing);
+          reset({ branchId: v.branchId, name: '', deviceType: DeviceType.Register, linkedRegisterDeviceId: '' });
+        },
+      },
     );
   });
 
@@ -120,49 +161,38 @@ function DeviceForm({ branches }: { branches: Branch[] }) {
           ))}
         </select>
       </FormField>
-      <FormField label="Name (optional)" hint="For example: Front counter tablet">
-        <input {...register('deviceIdentifier')} className={controlClass} />
+      <FormField label="Name" hint="For example: Front counter till" error={errors.name?.message}>
+        <input {...register('name')} className={controlClass} />
       </FormField>
-      <FormField
-        label={pinRequiredFor(type) ? 'Pairing PIN' : 'Pairing PIN (optional)'}
-        hint={pinRequiredFor(type) ? 'This device signs in with the code and this PIN' : 'Registers sign in with staff PINs instead'}
-        error={errors.pairingPin?.message}
-      >
-        <input type="password" inputMode="numeric" autoComplete="new-password" {...register('pairingPin')} className={controlClass} />
-      </FormField>
+      {type === DeviceType.CustomerDisplay && (
+        <FormField label="Shows which Register" hint="The screen follows that Register's order" error={errors.linkedRegisterDeviceId?.message}>
+          <select {...register('linkedRegisterDeviceId')} className={controlClass}>
+            <option value="">Choose a Register</option>
+            {sameBranchRegisters.map((r) => (
+              <option key={r.id} value={r.id}>
+                {nameOf(r)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      )}
     </EditorCard>
   );
 }
 
-function ResetPinDialog({ device, onClose }: { device: Device; onClose: () => void }) {
-  const reset = useResetPairingPin();
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState<string | undefined>();
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    const problem = devicePinProblem(device.deviceType, pin);
-    if (problem) return setError(problem);
-    setError(undefined);
-    reset.mutate({ id: device.id, newPin: pin.trim() }, { onSuccess: () => { toast.success('PIN changed. The device is signed out.'); onClose(); } });
-  }
-
+/** Shown once: the server keeps only a hash, so closing this loses the code (a new one is one click away). */
+function PairingCodeDialog({ pairing, onClose }: { pairing: PairingCode; onClose: () => void }) {
   return (
-    <Modal
-      open
-      title="Change device PIN"
-      onClose={onClose}
-      footer={
-        <PrimaryButton type="submit" form="reset-pin-form" busy={reset.isPending}>
-          {reset.isPending ? 'Saving...' : 'Change PIN'}
-        </PrimaryButton>
-      }
-    >
-      <form id="reset-pin-form" onSubmit={submit} noValidate>
-        <FormField label="New PIN" hint="The device is signed out and must sign in again with it" error={error}>
-          <input type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={(e) => setPin(e.target.value)} className={controlClass} />
-        </FormField>
-      </form>
+    <Modal open title="Enter this code on the device" onClose={onClose} footer={<button type="button" onClick={onClose} className="h-12 rounded-control bg-brand px-6 text-base font-bold text-on-brand">Done</button>}>
+      <div className="flex flex-col gap-3">
+        <p className="text-base">
+          On {nameOf(pairing.device)}, open this app at <span className="font-mono font-semibold">/pair</span> and type the code below.
+        </p>
+        <p className="font-mono text-4xl font-bold tracking-widest" aria-label={`Pairing code ${pairing.pairingCode}`}>
+          {pairing.pairingCode}
+        </p>
+        <p className="text-sm text-ink-soft">It works once and expires at {formatDateTime(pairing.expiresAt)}. It is not shown again.</p>
+      </div>
     </Modal>
   );
 }

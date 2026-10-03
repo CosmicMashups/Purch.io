@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Purch.Application.Auth;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 using Purch.Infrastructure.Persistence;
 
 namespace Purch.Infrastructure.Repositories;
@@ -13,7 +14,14 @@ public sealed class EfDeviceRepository(PurchDbContext dbContext) : IDeviceReposi
         return dbContext.Devices
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .FirstOrDefaultAsync(device => device.PairingCode == pairingCode, cancellationToken);
+            .FirstOrDefaultAsync(device => device.PairingCode == pairingCode && device.Status == DeviceStatus.Active, cancellationToken);
+    }
+
+    public Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Devices
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(device => device.PairingCodeHash == pairingCodeHash, cancellationToken);
     }
 
     public Task<Device?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
