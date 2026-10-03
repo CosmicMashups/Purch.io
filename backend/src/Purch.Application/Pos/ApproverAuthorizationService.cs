@@ -43,7 +43,7 @@ public sealed class ApproverAuthorizationService(
         }
 
         var requesterId = currentActorProvider.UserId;
-        var activeUsers = await userRepository.GetActiveUsersByTenantAsync(currentTenantProvider.TenantId!.Value, cancellationToken);
+        var activeUsers = await userRepository.GetActiveActorsAsync(currentTenantProvider.TenantId!.Value, cancellationToken);
         var eligibleApprovers = activeUsers.Where(user => ApproverRoles.Contains(user.Role)).ToList();
 
         // A different account approves whenever one exists — that is the whole point of requiring a PIN at

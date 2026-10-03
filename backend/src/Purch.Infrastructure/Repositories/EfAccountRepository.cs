@@ -33,7 +33,7 @@ public sealed class EfAccountRepository(PurchDbContext dbContext) : IAccountRepo
 
     public Task<Membership?> GetMembershipAsync(Guid membershipId, CancellationToken cancellationToken = default)
     {
-        return dbContext.Memberships.IgnoreQueryFilters().Include(m => m.Branches).FirstOrDefaultAsync(m => m.Id == membershipId, cancellationToken);
+        return dbContext.Memberships.IgnoreQueryFilters().Include(m => m.Account).Include(m => m.Branches).FirstOrDefaultAsync(m => m.Id == membershipId, cancellationToken);
     }
 
     public void Add(Account account) => dbContext.Accounts.Add(account);

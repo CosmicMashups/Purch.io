@@ -130,6 +130,7 @@ builder.Services.AddScoped<IStaffEnrolmentService, StaffEnrolmentService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IDeviceCredentialRepository, EfDeviceCredentialRepository>();
 builder.Services.AddScoped<IDevicePairingService, DevicePairingService>();
+builder.Services.AddScoped<IDeviceUnlockService, DeviceUnlockService>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();

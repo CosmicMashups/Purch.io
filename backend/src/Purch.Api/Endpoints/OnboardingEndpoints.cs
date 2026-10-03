@@ -1,4 +1,4 @@
-using Purch.Api.RateLimiting;
+﻿using Purch.Api.RateLimiting;
 using Purch.Application.Devices;
 using Purch.Application.Onboarding;
 using Purch.Domain.Enums;
@@ -228,6 +228,55 @@ public static class OnboardingEndpoints
                     detail: "This device was revoked or needs to be paired again."),
                 _ => throw new InvalidOperationException($"Unhandled {nameof(DeviceSessionResult)} case: {result.GetType().Name}"),
             };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
+
+        // --- A paired Register or Warehouse device: a person picks their name and types their own PIN to unlock it.
+        // The device proves itself with its credential (in the body, never in a URL). A PIN is checked against that one
+        // person, a few wrong ones lock that person out for a while, and the wrong-PIN answer says how many tries are left. ---
+        _ = app.MapPost("/devices/roster", async (
+            RosterRequest request,
+            IDeviceUnlockService unlockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await unlockService.GetRosterAsync(request, cancellationToken);
+            return result switch
+            {
+                RosterResult.Success success => Results.Ok(success.Roster),
+                RosterResult.Invalid => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Device not recognized.",
+                    detail: "This device was revoked, needs to be paired again, or does not take staff sign-in."),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(RosterResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
+
+        _ = app.MapPost("/devices/unlock", async (
+            UnlockRequest request,
+            IDeviceUnlockService unlockService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await unlockService.UnlockAsync(request, cancellationToken);
+            return result switch
+            {
+                UnlockResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken, person = success.Person }),
+                UnlockResult.Invalid => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Cannot sign in here.",
+                    detail: "This person is not set up to work on this device."),
+                UnlockResult.WrongPin wrong => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Incorrect PIN.",
+                    detail: wrong.AttemptsLeft == 1 ? "That PIN is not right. One try left." : $"That PIN is not right. {wrong.AttemptsLeft} tries left.",
+                    extensions: new Dictionary<string, object?> { ["attemptsLeft"] = wrong.AttemptsLeft }),
+                UnlockResult.Locked locked => Results.Problem(
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Too many wrong PINs.",
+                    detail: "This person is locked out for a few minutes. Ask a manager, or try again later.",
+                    extensions: new Dictionary<string, object?> { ["lockedUntil"] = locked.Until }),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(UnlockResult)} case: {result.GetType().Name}"),
+            };
+        // Not the tight per-IP login limit: every till in a shop shares one address and staff unlock them all day. What
+        // stops guessing is the lockout on the person (five wrong PINs), which counts however the tries arrive.
         }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
 
         // --- Tenant settings: branding (A2), BIR/compliance (A5), barcode requirement ---

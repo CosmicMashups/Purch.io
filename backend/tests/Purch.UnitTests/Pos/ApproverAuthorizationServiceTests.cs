@@ -45,6 +45,13 @@ public sealed class ApproverAuthorizationServiceTests
         public Task<IReadOnlyList<User>> GetActiveUsersByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult(users);
 
+        public Task<IReadOnlyList<User>> GetActiveActorsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(users);
+
+        public Task<User?> FindActorAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<User>> ListActorsAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<IReadOnlyList<User>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

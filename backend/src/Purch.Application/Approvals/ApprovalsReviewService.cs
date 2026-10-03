@@ -27,7 +27,7 @@ public sealed class ApprovalsReviewService(
 
         // Every staff member, active or not — an approval by someone since deactivated should still show
         // their name, not "(former staff)" for no reason.
-        var users = await userRepository.ListByTenantAsync(tenantId, cancellationToken);
+        var users = await userRepository.ListActorsAsync(tenantId, cancellationToken);
         var usersById = users.ToDictionary(user => user.Id, user => new ApprovalsReviewCalculator.UserInfo(user.Name, user.Role));
 
         return ApprovalsReviewCalculator.Build(day, ReportTimeZone.Offset, records, usersById);

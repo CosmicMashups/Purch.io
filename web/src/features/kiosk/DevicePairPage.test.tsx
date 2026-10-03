@@ -30,6 +30,7 @@ function renderPair() {
     otherRoutes: [
       { path: '/kiosk', element: <p>Kiosk home</p> },
       { path: '/order-board', element: <p>Board home</p> },
+      { path: '/unlock', element: <p>Lock screen</p> },
     ],
   });
 }
@@ -68,13 +69,22 @@ describe('DevicePairPage', () => {
     expect(readDeviceCredential()).toBeNull();
   });
 
-  it('confirms a register or other staff-operated device is paired instead of opening a screen', async () => {
+  it('hands a register or warehouse device to its lock screen, since a person operates it', async () => {
     vi.mocked(deviceApi.pair).mockResolvedValue({ ...paired, deviceType: 0, name: 'Front till' });
     vi.mocked(deviceApi.startSession).mockResolvedValue({ accessToken: null, refreshToken: null, requiresStaff: true, deviceId: 'd1', deviceType: 0, name: 'Front till' });
     renderPair();
     enter('AB12CD34');
-    expect(await screen.findByRole('heading', { name: 'This device is paired' })).toBeInTheDocument();
+    expect(await screen.findByText('Lock screen')).toBeInTheDocument();
     expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(readDeviceCredential()).toBe('secret-1');
+  });
+
+  it('confirms a customer display is paired, since it has no screen to open yet', async () => {
+    vi.mocked(deviceApi.pair).mockResolvedValue({ ...paired, deviceType: 5, name: 'Counter screen' });
+    vi.mocked(deviceApi.startSession).mockResolvedValue({ accessToken: 'x', refreshToken: 'y', requiresStaff: false, deviceId: 'd1', deviceType: 5, name: 'Counter screen' });
+    renderPair();
+    enter('AB12CD34');
+    expect(await screen.findByRole('heading', { name: 'This device is paired' })).toBeInTheDocument();
   });
 
   it('starts a session by itself when it was paired before and lost its sign-in', async () => {

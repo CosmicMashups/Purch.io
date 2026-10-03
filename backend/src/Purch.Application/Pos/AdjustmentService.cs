@@ -303,7 +303,7 @@ public sealed class AdjustmentService(
     {
         var itemIds = returnLines.Select(l => l.ItemId).Concat(replacementLines.Select(l => l.ItemId)).Distinct().ToList();
         var itemsById = (await itemRepository.ListByIdsAsync(itemIds, cancellationToken)).ToDictionary(item => item.Id);
-        var approver = await userRepository.GetByIdAsync(adjustment.ApprovedByUserId, cancellationToken);
+        var approver = await userRepository.FindActorAsync(adjustment.ApprovedByUserId, cancellationToken);
 
         AdjustmentLineDto ToLineDto(Guid itemId, Guid? variantId, decimal quantity, decimal unitPrice, decimal lineTotal) =>
             new(itemId, itemsById.TryGetValue(itemId, out var item) ? item.Name : "(deleted item)", variantId, quantity, unitPrice, lineTotal);

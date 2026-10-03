@@ -19,7 +19,7 @@ public sealed class StaffPerformanceService(
 
         var staffSales = await reportingRepository.GetStaffSalesAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
         var attendance = await reportingRepository.GetStaffShiftAttendanceAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
-        var staff = await userRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+        var staff = await userRepository.ListActorsAsync(CurrentTenantId, cancellationToken);
         var staffNamesById = staff.ToDictionary(user => user.Id, user => user.Name);
 
         var sales = staffSales

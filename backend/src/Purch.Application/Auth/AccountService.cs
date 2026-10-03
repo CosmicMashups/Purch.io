@@ -122,7 +122,7 @@ public sealed class AccountService(
         }
 
         var accessToken = jwtTokenService.IssueMembershipAccessToken(chosen.Membership);
-        var refreshToken = await refreshTokenService.IssueForMembershipAsync(chosen.Membership.TenantId, chosen.Membership.Id, cancellationToken);
+        var refreshToken = await refreshTokenService.IssueForMembershipAsync(chosen.Membership.TenantId, chosen.Membership.Id, null, cancellationToken);
         return new SignInResult.Success(accessToken, refreshToken);
     }
 }

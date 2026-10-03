@@ -1,3 +1,4 @@
+using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
 namespace Purch.Application.Auth;
@@ -27,8 +28,20 @@ public sealed class TokenRefreshService(
                 return new TokenRefreshResult.InvalidToken();
             }
 
-            var membershipAccess = jwtTokenService.IssueMembershipAccessToken(membership);
-            var membershipRefresh = await refreshTokenService.IssueForMembershipAsync(owner.TenantId, membership.Id, cancellationToken);
+            Device? sessionDevice = null;
+            if (owner.DeviceId is { } sessionDeviceId)
+            {
+                sessionDevice = await deviceRepository.GetByIdUnscopedAsync(sessionDeviceId, cancellationToken);
+                if (sessionDevice is null || !MembershipRoleMapper.CanWorkOn(membership, sessionDevice))
+                {
+                    return new TokenRefreshResult.InvalidToken();
+                }
+            }
+
+            var membershipAccess = sessionDevice is null
+                ? jwtTokenService.IssueMembershipAccessToken(membership)
+                : jwtTokenService.IssueMembershipAccessToken(membership, sessionDevice);
+            var membershipRefresh = await refreshTokenService.IssueForMembershipAsync(owner.TenantId, membership.Id, sessionDevice?.Id, cancellationToken);
             return new TokenRefreshResult.Success(membershipAccess, membershipRefresh);
         }
 

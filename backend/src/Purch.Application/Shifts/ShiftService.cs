@@ -85,7 +85,7 @@ public sealed class ShiftService(
                     "The cash count doesn't match the expected amount — a manager's PIN is required to approve the discrepancy.");
             }
 
-            var activeUsers = await userRepository.GetActiveUsersByTenantAsync(CurrentTenantId, cancellationToken);
+            var activeUsers = await userRepository.GetActiveActorsAsync(CurrentTenantId, cancellationToken);
             var approver = activeUsers.FirstOrDefault(user => ApproverRoles.Contains(user.Role) && pinHasher.Verify(request.ApproverPin, user.PinHash))
                 ?? throw new ValidationException(nameof(request.ApproverPin), "That PIN doesn't match an active manager or admin.");
 
@@ -118,7 +118,7 @@ public sealed class ShiftService(
             ?? throw new NotFoundException("Open shift", deviceId);
 
         Guid? approvedByUserId = null;
-        var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+        var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
         var callerIsApprover = caller is not null && ApproverRoles.Contains(caller.Role);
         if (!callerIsApprover)
         {
@@ -127,7 +127,7 @@ public sealed class ShiftService(
                 throw new ValidationException(nameof(request.SupervisorPin), "A supervisor PIN is required to manually open the cash drawer.");
             }
 
-            var activeUsers = await userRepository.GetActiveUsersByTenantAsync(CurrentTenantId, cancellationToken);
+            var activeUsers = await userRepository.GetActiveActorsAsync(CurrentTenantId, cancellationToken);
             var approver = activeUsers.FirstOrDefault(user => ApproverRoles.Contains(user.Role) && pinHasher.Verify(request.SupervisorPin, user.PinHash))
                 ?? throw new ValidationException(nameof(request.SupervisorPin), "That PIN doesn't match an active manager or admin.");
 
@@ -152,12 +152,12 @@ public sealed class ShiftService(
 
     private async Task<ShiftDto> ToDtoAsync(Shift shift, CancellationToken cancellationToken)
     {
-        var openedByUser = await userRepository.GetByIdAsync(shift.OpenedByUserId, cancellationToken);
+        var openedByUser = await userRepository.FindActorAsync(shift.OpenedByUserId, cancellationToken);
         var closedByUser = shift.ClosedByUserId is { } closedByUserId
-            ? await userRepository.GetByIdAsync(closedByUserId, cancellationToken)
+            ? await userRepository.FindActorAsync(closedByUserId, cancellationToken)
             : null;
         var approvedByUser = shift.ApprovedByUserId is { } approvedByUserId
-            ? await userRepository.GetByIdAsync(approvedByUserId, cancellationToken)
+            ? await userRepository.FindActorAsync(approvedByUserId, cancellationToken)
             : null;
 
         return new ShiftDto(

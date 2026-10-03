@@ -208,7 +208,7 @@ public sealed class DevicePairingService(
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }
 
-    private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    public static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Device management requires an authenticated tenant context.");

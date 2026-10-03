@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Cube, House, CashRegister, List, SignOut, Storefront, WifiSlash, X } from '@phosphor-icons/react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Cube, House, CashRegister, List, LockSimple, SignOut, Storefront, WifiSlash, X } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { BrandMark } from '../../components/brand/Brand';
 import { signOut } from '../../features/auth/signOut';
 import { useSession } from '../../features/auth/useSession';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useAutoLock } from '../../hooks/useAutoLock';
+import { readDeviceCredential } from '../../features/kiosk/deviceCredential';
 import { tabPath, tabsForRole, type AppTab } from '../../permissions/navPolicy';
 
 const TAB_META: Record<AppTab, { label: string; icon: Icon; matches: (path: string) => boolean }> = {
@@ -28,10 +30,18 @@ function tabClass(active: boolean): string {
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const { role } = useSession();
+  const { role, claims } = useSession();
+  const navigate = useNavigate();
   const online = useOnlineStatus();
   const tabs = tabsForRole(role);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // On a paired till or warehouse device the session belongs to whoever unlocked it, so it locks itself when left alone.
+  const onPairedDevice = !!claims?.deviceId && !!readDeviceCredential();
+  function lock() {
+    void signOut().then(() => navigate('/unlock', { replace: true }));
+  }
+  useAutoLock(onPairedDevice, lock);
 
   // Phones keep the navigation in a drawer: it closes when a page is chosen or Escape is pressed.
   useEffect(() => setMenuOpen(false), [pathname]);
@@ -81,10 +91,20 @@ export function AppShell() {
             </Link>
           );
         })}
+        {onPairedDevice && (
+          <button
+            type="button"
+            onClick={lock}
+            className="mt-auto flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control bg-brand px-2 py-2 text-sm font-semibold text-on-brand hover:bg-brand-strong md:min-h-20"
+          >
+            <LockSimple size={28} aria-hidden="true" />
+            Lock
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void signOut()}
-          className="mt-auto flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink md:min-h-20"
+          className={`${onPairedDevice ? '' : 'mt-auto'} flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink md:min-h-20`}
         >
           <SignOut size={28} aria-hidden="true" />
           Sign out

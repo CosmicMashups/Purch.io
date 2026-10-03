@@ -116,6 +116,31 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         return WriteToken(claims, TimeSpan.FromMinutes(30));
     }
 
+    public string IssueMembershipAccessToken(Membership membership, Device device)
+    {
+        var role = MembershipRoleMapper.ToApiRole(membership, device.DeviceType)
+            ?? throw new InvalidOperationException("This person may not work on this kind of device.");
+        var (scope, scopeId) = MembershipRoleMapper.ToScope(membership, device);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, membership.Id.ToString()),
+            new(JwtClaimTypes.TenantId, membership.TenantId.ToString()),
+            new(JwtClaimTypes.Role, role.ToString()),
+            new(JwtClaimTypes.ScopeType, scope.ToString()),
+            new(JwtClaimTypes.DeviceId, device.Id.ToString()),
+            new(JwtClaimTypes.BranchId, device.BranchId.ToString()),
+            new(JwtClaimTypes.DeviceSessionVersion, device.SessionVersion.ToString(CultureInfo.InvariantCulture)),
+        };
+
+        if (scopeId is { } id)
+        {
+            claims.Add(new Claim(JwtClaimTypes.ScopeId, id.ToString()));
+        }
+
+        return WriteToken(claims, TimeSpan.FromMinutes(30));
+    }
+
     private string WriteToken(IReadOnlyList<Claim> claims, TimeSpan validFor)
     {
         var signingKey = _configuration["JWT_SIGNING_KEY"]

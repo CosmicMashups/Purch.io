@@ -26,7 +26,7 @@ public sealed class TransactionExportService(
             ?? throw new InvalidOperationException("The transaction export requires an authenticated tenant context.");
         var branchNamesById = (await branchRepository.ListByTenantAsync(tenantId, cancellationToken))
             .ToDictionary(branch => branch.Id, branch => branch.Name);
-        var staffNamesById = (await userRepository.ListByTenantAsync(tenantId, cancellationToken))
+        var staffNamesById = (await userRepository.ListActorsAsync(tenantId, cancellationToken))
             .ToDictionary(user => user.Id, user => user.Name);
 
         var csv = new StringBuilder();

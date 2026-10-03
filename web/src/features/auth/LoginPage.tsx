@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { gsap } from 'gsap';
 import { DeviceMobile, Key, EnvelopeSimple, LockKey, Eye, EyeSlash } from '@phosphor-icons/react';
-import { authApi } from './api';
+import { authApi, type BusinessChoice } from './api';
 import { useSession } from './useSession';
 import { useAuthStore } from '../../lib/authStore';
 import { ApiError, userMessage } from '../../lib/apiError';
@@ -115,6 +115,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<Mode>('staff');
   const [formError, setFormError] = useState<string | null>(null);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [choices, setChoices] = useState<{ email: string; password: string; businesses: BusinessChoice[] } | null>(null);
 
   const formContainerRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -177,7 +178,31 @@ export function LoginPage() {
     rememberPairingCode(v.devicePairingCode);
     return finish(authApi.pinLogin(v.devicePairingCode, v.pin));
   });
-  const submitAdmin = admin.handleSubmit((v) => finish(authApi.adminLogin(v.email, v.password)));
+  /**
+   * Email and password. The new account sign-in is tried first; an owner who only has the older back-office login (set up
+   * before accounts existed) is still let in by it until that is retired.
+   */
+  async function emailSignIn(email: string, password: string, tenantId?: string) {
+    setFormError(null);
+    try {
+      const result = await authApi.signIn(email, password, tenantId).catch(async (error: unknown) => {
+        if (!(error instanceof ApiError && error.kind === 'unauthorized')) throw error;
+        return authApi.adminLogin(email, password);
+      });
+      if ('chooseBusiness' in result && result.chooseBusiness) {
+        setChoices({ email, password, businesses: result.businesses });
+        return;
+      }
+      const { accessToken, refreshToken } = result as { accessToken: string; refreshToken: string };
+      setTokens(accessToken, refreshToken);
+      navigate('/', { replace: true });
+    } catch (error) {
+      setChoices(null);
+      setFormError(loginMessage(error));
+    }
+  }
+
+  const submitAdmin = admin.handleSubmit((v) => emailSignIn(v.email, v.password));
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -243,7 +268,7 @@ export function LoginPage() {
               Staff PIN
             </button>
             <button type="button" aria-pressed={mode === 'admin'} onClick={() => switchMode('admin')} className={tabClass(mode === 'admin')}>
-              Admin
+              Email
             </button>
           </div>
 
@@ -302,10 +327,25 @@ export function LoginPage() {
                 </div>
               </form>
             ) : (
+              choices ? (
+                <div className="flex flex-col gap-3" role="group" aria-label="Choose a business">
+                  <p className="text-base font-semibold">Which business?</p>
+                  {choices.businesses.map((b) => (
+                    <button
+                      key={b.tenantId}
+                      type="button"
+                      onClick={() => void emailSignIn(choices.email, choices.password, b.tenantId)}
+                      className="h-14 rounded-control border border-line bg-surface px-4 text-left text-lg font-semibold hover:border-brand"
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
               <form onSubmit={submitAdmin} noValidate className="flex flex-col gap-5">
                 <FormFieldWrapper
                   id="email"
-                  label="Admin email"
+                  label="Email"
                   icon={<EnvelopeSimple size={18} weight="bold" />}
                   error={admin.formState.errors.email?.message}
                 >
@@ -332,7 +372,7 @@ export function LoginPage() {
                       id="password"
                       type={showAdminPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder="Enter admin password"
+                      placeholder="Enter your password"
                       aria-invalid={!!admin.formState.errors.password}
                       aria-describedby="password-error"
                       className="h-13 w-full rounded-control bg-transparent pl-4 pr-11 text-base font-medium text-ink placeholder:text-ink-soft/45 focus:outline-none"
@@ -353,6 +393,7 @@ export function LoginPage() {
                   <SubmitButton busy={admin.formState.isSubmitting} />
                 </div>
               </form>
+              )
             )}
           </div>
 

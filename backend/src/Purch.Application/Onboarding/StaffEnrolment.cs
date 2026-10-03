@@ -46,6 +46,10 @@ public interface IMembershipRepository
 
     /// <summary>Not tenant-filtered: used while redeeming a link, when nobody is signed in.</summary>
     Task<Membership?> GetUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Every person of a business with their account and branches, without needing a signed-in tenant: a till asks
+    /// for its roster using only its own device credential.</summary>
+    Task<IReadOnlyList<Membership>> ListByTenantUnscopedAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }
 
 public interface IEnrolmentInviteRepository

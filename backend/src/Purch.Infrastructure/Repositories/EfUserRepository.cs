@@ -7,6 +7,42 @@ namespace Purch.Infrastructure.Repositories;
 
 public sealed class EfUserRepository(PurchDbContext dbContext) : IUserRepository
 {
+    public async Task<User?> FindActorAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is not null)
+        {
+            return user;
+        }
+
+        var membership = await dbContext.Memberships.AsNoTracking().Include(m => m.Account).Include(m => m.Branches).FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+        return membership is null ? null : MembershipUserProjection.ToUser(membership);
+    }
+
+    public async Task<IReadOnlyList<User>> ListActorsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var users = await dbContext.Users.AsNoTracking().Where(u => u.TenantId == tenantId).ToListAsync(cancellationToken);
+        return [.. users, .. await ProjectedMembershipsAsync(tenantId, activeOnly: false, cancellationToken)];
+    }
+
+    public async Task<IReadOnlyList<User>> GetActiveActorsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var users = await dbContext.Users.AsNoTracking().Where(u => u.TenantId == tenantId && u.IsActive).ToListAsync(cancellationToken);
+        return [.. users, .. await ProjectedMembershipsAsync(tenantId, activeOnly: true, cancellationToken)];
+    }
+
+    private async Task<List<User>> ProjectedMembershipsAsync(Guid tenantId, bool activeOnly, CancellationToken cancellationToken)
+    {
+        var memberships = await dbContext.Memberships
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(m => m.Account)
+            .Include(m => m.Branches)
+            .Where(m => m.TenantId == tenantId && (!activeOnly || m.IsActive))
+            .ToListAsync(cancellationToken);
+        return [.. memberships.Select(MembershipUserProjection.ToUser)];
+    }
+
     public async Task<IReadOnlyList<User>> GetActiveUsersByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         // The tenant is an explicit argument (login resolves it from the device's pairing code), so

@@ -154,7 +154,7 @@ public sealed class InventoryMovementService(
             ? await inventoryItemRepository.GetByIdAsync(inventoryItemId, cancellationToken)
             : null;
         var branch = await branchRepository.GetByIdAsync(movement.BranchId, cancellationToken);
-        var staffUser = await userRepository.GetByIdAsync(movement.StaffUserId, cancellationToken);
+        var staffUser = await userRepository.FindActorAsync(movement.StaffUserId, cancellationToken);
 
         return new InventoryMovementDto(
             movement.Id,

@@ -41,6 +41,17 @@ public sealed class EfMembershipRepository(PurchDbContext dbContext) : IMembersh
         return dbContext.Memberships.IgnoreQueryFilters().AnyAsync(m => m.TenantId == tenantId && m.AccountId == accountId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Membership>> ListByTenantUnscopedAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Memberships
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(m => m.Account)
+            .Include(m => m.Branches)
+            .Where(m => m.TenantId == tenantId && m.IsActive)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<Membership?> GetUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.Memberships.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.Id == id, cancellationToken);

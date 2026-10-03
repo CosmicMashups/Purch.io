@@ -37,6 +37,11 @@ export function DevicePairPage() {
       navigate(DEVICE_HOME[role], { replace: true });
       return;
     }
+    // A till or warehouse device is operated by a person: its own lock screen takes it from here.
+    if (session.requiresStaff) {
+      navigate('/unlock', { replace: true });
+      return;
+    }
     setPaired(session);
   }
 

@@ -72,6 +72,21 @@ public sealed class LoginServiceValidationTests
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
 
+        public Task<User?> FindActorAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<IReadOnlyList<User>> ListActorsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<IReadOnlyList<User>> GetActiveActorsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
         public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
@@ -145,6 +160,11 @@ public sealed class LoginServiceValidationTests
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
+
+        public string IssueMembershipAccessToken(Membership membership, Device device)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
     }
 
     private sealed class NeverCalledRefreshTokenService : IRefreshTokenService
@@ -154,7 +174,7 @@ public sealed class LoginServiceValidationTests
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
 
-        public Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default)
+        public Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, Guid? deviceId, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

@@ -13,7 +13,7 @@ public interface IRefreshTokenService
     Task<string> IssueAsync(Guid tenantId, Guid? userId, Guid? deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>Same, for a session that came from signing in with email and password.</summary>
-    Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default);
+    Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, Guid? deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes every outstanding refresh token of this membership, for example when it is deactivated.</summary>
     Task RevokeAllForMembershipAsync(Guid membershipId, CancellationToken cancellationToken = default);

@@ -73,6 +73,26 @@ scope because a token carries one scope id. Both are replaced when sessions are 
   link. `/enrol/:token` is the public page the person opens. The old PIN-only staff list is no longer shown (the rows
   remain until step 8).
 
+## Locking and unlocking a till (step 5)
+
+- A paired Register or Warehouse device shows its roster: `POST /devices/roster` (body: the device credential) lists the active
+  people who may work on it (Admin and Manager always; staff only with the device's duty and its branch).
+- `POST /devices/unlock` (credential, person, PIN) checks the PIN against that one person. Five wrong PINs lock that person
+  out for five minutes (counted on the person, not the device); the answer says how many tries are left. A correct PIN
+  issues a device-bound session: the device's id, branch and session version are in the token, so revoking the device ends
+  it, and the device's duty decides a staff member's role (Register: Cashier, Warehouse device: Warehouse; Admin and
+  Manager keep theirs). It renews through `/auth/refresh` and stays on the device.
+- The web has `/unlock` (names, then a PIN pad), a Lock button on paired devices, and locks itself after five idle minutes
+  (taps and key presses keep it awake). A signed-out paired device returns to the lock screen instead of the email login.
+- The email login page now signs in with `/auth/sign-in` (asking which business when there are several) and falls back to
+  the older back-office login for owners who only have that, until step 8.
+- Much of the till still looks a person up as a `User`. A membership is shown to that code as a User built on the fly
+  (`MembershipUserProjection`, never saved), so shifts, approvals, discounts and reports work for people who signed in this
+  way; manager approval PINs are checked against memberships too. The older PIN sign-in never sees a membership.
+- Not done: the offline PIN cache. The web has no offline selling, and storing PIN hashes on a device lets anyone holding it
+  guess four-digit PINs offline, so it belongs with the Flutter client, which does sell offline, and needs a deliberate
+  design there. The idle time is fixed at five minutes; making it an Admin setting is a later change.
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.

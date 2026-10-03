@@ -34,7 +34,7 @@ public sealed class RefreshTokenService(
         return rawToken;
     }
 
-    public async Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default)
+    public async Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, Guid? deviceId, CancellationToken cancellationToken = default)
     {
         var rawToken = GenerateRawToken();
 
@@ -42,6 +42,7 @@ public sealed class RefreshTokenService(
         {
             TenantId = tenantId,
             MembershipId = membershipId,
+            DeviceId = deviceId,
             TokenHash = Hash(rawToken),
             ExpiresAt = DateTimeOffset.UtcNow.Add(Lifetime),
         });

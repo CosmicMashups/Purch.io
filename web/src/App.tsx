@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './layouts/AppShell/AppShell';
 import { EnrolPage } from './features/auth/EnrolPage';
 import { RequireAuth } from './features/auth/RequireAuth';
+import { UnlockPage } from './features/auth/UnlockPage';
 import { RequireTab } from './features/auth/RequireTab';
 import { LoginPage } from './features/auth/LoginPage';
 import { LegalPage } from './features/onboarding/LegalPage';
@@ -70,6 +71,7 @@ export function App() {
       <Route path="/customer-display" element={<CustomerDisplayPage />} />
       <Route path="/pair" element={<DevicePairPage />} />
       <Route path="/enrol/:token" element={<EnrolPage />} />
+      <Route path="/unlock" element={<UnlockPage />} />
       <Route path="/kiosk/pair" element={<Navigate to="/pair" replace />} />
       <Route path="/kitchen/pair" element={<Navigate to="/pair" replace />} />
       <Route path="/order-board/pair" element={<Navigate to="/pair" replace />} />

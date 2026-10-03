@@ -24,4 +24,8 @@ public interface IJwtTokenService
     /// <summary>A person signing in with email and password on a personal device: no device or branch claim, so it
     /// cannot sell. The role is the one <see cref="MembershipRoleMapper"/> derives from the membership.</summary>
     string IssueMembershipAccessToken(Membership membership);
+
+    /// <summary>The same person unlocking a paired till or warehouse device: the device's id, branch and session version
+    /// are carried (so revoking the device ends this session) and the device's own duty decides a staff member's role.</summary>
+    string IssueMembershipAccessToken(Membership membership, Device device);
 }

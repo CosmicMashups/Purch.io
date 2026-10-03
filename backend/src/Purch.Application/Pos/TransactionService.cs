@@ -480,7 +480,7 @@ public sealed class TransactionService(
         {
             // Tenant-scoped lookup, so an id from another tenant simply isn't found. The role comes from
             // the database, never from the request.
-            var rungBy = await userRepository.GetByIdAsync(rungByStaffId, cancellationToken);
+            var rungBy = await userRepository.FindActorAsync(rungByStaffId, cancellationToken);
             if (request.SeniorPwdDiscountApplied && rungBy?.Role is not (Role.Admin or Role.Manager))
             {
                 throw new ForbiddenException("Only a manager or admin can apply the Senior Citizen/PWD discount.");
@@ -1047,7 +1047,7 @@ public sealed class TransactionService(
                 throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.");
             }
 
-            var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+            var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
             if (caller is null || !ApproverRoles.Contains(caller.Role))
             {
                 throw new ForbiddenException("Only a manager or admin can override a customer's credit limit.");
@@ -1337,7 +1337,7 @@ public sealed class TransactionService(
                 "The kitchen has already started or finished this order, so it can no longer be changed here. Refund or exchange the item instead.");
         }
 
-        var caller = await userRepository.GetByIdAsync(CurrentUserId, cancellationToken);
+        var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
         if (caller is not null && ApproverRoles.Contains(caller.Role))
         {
             return null;

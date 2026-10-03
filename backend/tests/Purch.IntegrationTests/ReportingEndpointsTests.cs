@@ -490,8 +490,10 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         var csv = await response.Content.ReadAsStringAsync();
         var lines = csv.TrimEnd('\n', '\r').Split('\n');
         Assert.Equal(2, lines.Length); // header + the one completed sale
-        Assert.Contains("150", lines[1]);
-        Assert.DoesNotContain("40", csv);
+
+        // Compared on the Total column, not the whole text: the timestamp on the row can contain "40" by chance, which made
+        // a search for the voided cart's price fail now and then. The row count above already shows the void is left out.
+        Assert.StartsWith("150", lines[1].Split(',')[4], StringComparison.Ordinal);
     }
 
     [Fact]
