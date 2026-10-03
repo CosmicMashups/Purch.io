@@ -16,6 +16,15 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
     }
 }
 
+public class LocalCredentialConfiguration : IEntityTypeConfiguration<LocalCredential>
+{
+    public void Configure(EntityTypeBuilder<LocalCredential> builder)
+    {
+        _ = builder.HasIndex(c => c.Email).IsUnique();
+        _ = builder.Property(c => c.Email).HasMaxLength(320);
+    }
+}
+
 public class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
     public void Configure(EntityTypeBuilder<Membership> builder)

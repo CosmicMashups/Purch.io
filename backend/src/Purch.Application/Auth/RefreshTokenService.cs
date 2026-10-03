@@ -34,6 +34,39 @@ public sealed class RefreshTokenService(
         return rawToken;
     }
 
+    public async Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default)
+    {
+        var rawToken = GenerateRawToken();
+
+        refreshTokenRepository.Add(new RefreshToken
+        {
+            TenantId = tenantId,
+            MembershipId = membershipId,
+            TokenHash = Hash(rawToken),
+            ExpiresAt = DateTimeOffset.UtcNow.Add(Lifetime),
+        });
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return rawToken;
+    }
+
+    public async Task RevokeAllForMembershipAsync(Guid membershipId, CancellationToken cancellationToken = default)
+    {
+        var activeTokens = await refreshTokenRepository.ListActiveByMembershipIdAsync(membershipId, cancellationToken);
+        if (activeTokens.Count == 0)
+        {
+            return;
+        }
+
+        var revokedAt = DateTimeOffset.UtcNow;
+        foreach (var token in activeTokens)
+        {
+            Expire(token, revokedAt);
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<RefreshTokenOwner?> RedeemAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
@@ -61,6 +94,10 @@ public sealed class RefreshTokenService(
             {
                 await RevokeAllForUserAsync(userId, cancellationToken);
             }
+            else if (existing.MembershipId is { } membershipId)
+            {
+                await RevokeAllForMembershipAsync(membershipId, cancellationToken);
+            }
             else if (existing.DeviceId is { } deviceId)
             {
                 await RevokeAllForDeviceAsync(deviceId, cancellationToken);
@@ -74,7 +111,7 @@ public sealed class RefreshTokenService(
         // failure between the two can never burn the client's only token without giving it a new one.
         existing.RevokedAt ??= now;
 
-        return new RefreshTokenOwner(existing.TenantId, existing.UserId, existing.DeviceId);
+        return new RefreshTokenOwner(existing.TenantId, existing.UserId, existing.DeviceId, existing.MembershipId);
     }
 
     public async Task RevokeAsync(string rawToken, CancellationToken cancellationToken = default)

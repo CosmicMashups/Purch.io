@@ -6,6 +6,7 @@ public sealed class TokenRefreshService(
     IRefreshTokenService refreshTokenService,
     IUserRepository userRepository,
     IDeviceRepository deviceRepository,
+    IAccountRepository accountRepository,
     IJwtTokenService jwtTokenService) : ITokenRefreshService
 {
     public async Task<TokenRefreshResult> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
@@ -14,6 +15,21 @@ public sealed class TokenRefreshService(
         if (owner is null)
         {
             return new TokenRefreshResult.InvalidToken();
+        }
+
+        if (owner.MembershipId is { } membershipId)
+        {
+            var membership = await accountRepository.GetMembershipAsync(membershipId, cancellationToken);
+
+            // A person who has been deactivated, or whose business role no longer lets them sign in, stops renewing.
+            if (membership is not { IsActive: true } || MembershipRoleMapper.ToApiRole(membership) is null)
+            {
+                return new TokenRefreshResult.InvalidToken();
+            }
+
+            var membershipAccess = jwtTokenService.IssueMembershipAccessToken(membership);
+            var membershipRefresh = await refreshTokenService.IssueForMembershipAsync(owner.TenantId, membership.Id, cancellationToken);
+            return new TokenRefreshResult.Success(membershipAccess, membershipRefresh);
         }
 
         var user = owner.UserId is { } userId ? await userRepository.GetByIdUnscopedAsync(userId, cancellationToken) : null;

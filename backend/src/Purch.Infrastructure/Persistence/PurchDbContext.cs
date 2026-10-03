@@ -21,6 +21,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<Account> Accounts => Set<Account>();
 
+    public DbSet<LocalCredential> LocalCredentials => Set<LocalCredential>();
+
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<MembershipBranch> MembershipBranches => Set<MembershipBranch>();

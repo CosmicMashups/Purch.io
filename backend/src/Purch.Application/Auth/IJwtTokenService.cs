@@ -20,4 +20,8 @@ public interface IJwtTokenService
     /// branch only) generalized to any unattended device role (OrderBoard,
     /// KitchenDisplay) — these are read-only display terminals, never a cart.</summary>
     string IssueUnattendedAccessToken(Device device, Role role);
+
+    /// <summary>A person signing in with email and password on a personal device: no device or branch claim, so it
+    /// cannot sell. The role is the one <see cref="MembershipRoleMapper"/> derives from the membership.</summary>
+    string IssueMembershipAccessToken(Membership membership);
 }

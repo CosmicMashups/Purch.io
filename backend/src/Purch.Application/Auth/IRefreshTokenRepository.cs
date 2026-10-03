@@ -19,6 +19,8 @@ public interface IRefreshTokenRepository
     /// login) — for revoking every outstanding session when a device's pairing code/PIN is reset.</summary>
     Task<IReadOnlyList<RefreshToken>> ListActiveByDeviceIdAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<RefreshToken>> ListActiveByMembershipIdAsync(Guid membershipId, CancellationToken cancellationToken = default);
+
     /// <summary>Stages a new refresh token for insert — call IUnitOfWork.SaveChangesAsync to commit.</summary>
     void Add(RefreshToken refreshToken);
 }

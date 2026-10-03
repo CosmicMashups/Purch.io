@@ -36,6 +36,12 @@ public sealed class ConfigDeploymentContext : IDeploymentContext
                 configuration["SUPABASE_STORAGE_BUCKET"] ?? "uploads"),
             _ => throw new InvalidOperationException($"Unhandled deployment mode: {Mode}"),
         };
+
+        // Not required at startup: a Cloud deployment that has not set these up yet keeps running, and only the
+        // email-and-password sign-in reports that it is not configured.
+        IdentityUrl = configuration["SUPABASE_AUTH_URL"];
+        IdentityAnonKey = configuration["SUPABASE_AUTH_ANON_KEY"];
+        IdentityServiceKey = configuration["SUPABASE_AUTH_SERVICE_KEY"];
     }
 
     public DeploymentMode Mode { get; }
@@ -47,4 +53,10 @@ public sealed class ConfigDeploymentContext : IDeploymentContext
     public string? StorageKey { get; }
 
     public string? StorageBucket { get; }
+
+    public string? IdentityUrl { get; }
+
+    public string? IdentityAnonKey { get; }
+
+    public string? IdentityServiceKey { get; }
 }

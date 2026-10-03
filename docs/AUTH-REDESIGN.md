@@ -22,6 +22,27 @@ expire. Roles also do not depend on the device type for staff sessions.
   limited and normally only delivers to project team members, so resets may not reach real inboxes until a custom sender
   is added. Plan for an admin-issued reset link as a later fallback.
 
+## Supabase setup (step 2)
+
+Settings the API reads (all optional at startup, so an existing deployment keeps running; email sign-in reports it is
+not configured until they are set):
+
+- `SUPABASE_AUTH_URL`: the project URL, for example `https://abcdefgh.supabase.co`.
+- `SUPABASE_AUTH_SERVICE_KEY`: the service-role key. Creates logins. Never sent to a client.
+- `SUPABASE_AUTH_ANON_KEY`: the public key, used to check a password. Optional; the service key works too.
+
+In the Supabase dashboard (Authentication, Sign In / Providers, Email): turn **off** "Allow new users to sign up".
+Logins are created only by our backend through the admin API, with the email already confirmed. Local deployment mode
+and the tests use a credential table in our own database instead (`LocalCredentials`).
+
+Endpoints so far: `POST /auth/sign-in` (email, password, optional tenantId; returns tokens, or the list of businesses to
+choose from) and the existing `POST /onboarding/bootstrap`, which now also creates the owner's account and Admin
+membership when an email and password are given. The old PIN login is untouched until step 8.
+
+Known stopgaps: a personal-device session gets the single API role the existing checks understand (Warehouse if the
+person has that duty, otherwise Cashier; none means no sign-in), and a staff member with several branches gets tenant
+scope because a token carries one scope id. Both are replaced when sessions are tied to devices (step 6).
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.

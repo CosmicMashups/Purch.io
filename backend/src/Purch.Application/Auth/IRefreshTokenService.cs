@@ -3,7 +3,7 @@ namespace Purch.Application.Auth;
 /// <summary>Who a redeemed refresh token belonged to — exactly one of UserId/DeviceId
 /// pairing mirrors which IJwtTokenService.Issue* method originally applied: both set
 /// for staff, DeviceId-only for kiosk, UserId-only for admin.</summary>
-public sealed record RefreshTokenOwner(Guid TenantId, Guid? UserId, Guid? DeviceId);
+public sealed record RefreshTokenOwner(Guid TenantId, Guid? UserId, Guid? DeviceId, Guid? MembershipId = null);
 
 public interface IRefreshTokenService
 {
@@ -11,6 +11,12 @@ public interface IRefreshTokenService
     /// Returns the raw token to hand to the client — the only time it's ever available
     /// in plaintext, since only its hash is stored.</summary>
     Task<string> IssueAsync(Guid tenantId, Guid? userId, Guid? deviceId, CancellationToken cancellationToken = default);
+
+    /// <summary>Same, for a session that came from signing in with email and password.</summary>
+    Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default);
+
+    /// <summary>Revokes every outstanding refresh token of this membership, for example when it is deactivated.</summary>
+    Task RevokeAllForMembershipAsync(Guid membershipId, CancellationToken cancellationToken = default);
 
     /// <summary>Validates a raw refresh token and stages its revocation (single-use — each refresh
     /// rotates to a new token), returning who it belonged to. Returns null for a token that's missing,

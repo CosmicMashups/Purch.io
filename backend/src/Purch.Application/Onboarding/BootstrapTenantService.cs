@@ -14,6 +14,8 @@ public sealed class BootstrapTenantService(
     IPinHasher pinHasher,
     IPasswordHasher passwordHasher,
     IDeploymentContext deploymentContext,
+    IAccountService accountService,
+    IAccountRepository accountRepository,
     IUnitOfWork unitOfWork) : IBootstrapTenantService
 {
     public async Task<BootstrapTenantResult> BootstrapAsync(BootstrapTenantRequest request, CancellationToken cancellationToken = default)
@@ -42,6 +44,11 @@ public sealed class BootstrapTenantService(
         };
         deviceRepository.Add(device);
 
+        // The old PIN user keeps the email only when this is the first business for it: that column is unique across
+        // businesses, and a person adding a second business already has the email on their account.
+        var emailIsNew = string.IsNullOrWhiteSpace(request.AdminEmail)
+            || await accountRepository.FindByEmailAsync(AccountService.NormalizeEmail(request.AdminEmail), cancellationToken) is null;
+
         var admin = new User
         {
             TenantId = tenant.Id,
@@ -49,13 +56,27 @@ public sealed class BootstrapTenantService(
             Role = Role.Admin,
             ScopeType = ScopeType.Tenant,
             PinHash = pinHasher.Hash(request.AdminPin),
-            Email = request.AdminEmail?.Trim(),
-            PasswordHash = request.AdminPassword is { Length: > 0 }
+            Email = emailIsNew ? request.AdminEmail?.Trim() : null,
+            PasswordHash = emailIsNew && request.AdminPassword is { Length: > 0 }
                 ? passwordHasher.Hash(request.AdminPassword)
                 : null,
             IsActive = true,
         };
         userRepository.Add(admin);
+
+        // The owner also gets the new kind of login: an account (email and password, checked by the identity
+        // provider) with an Admin membership in this business. The old PIN user above stays until it is retired.
+        if (!string.IsNullOrWhiteSpace(request.AdminEmail) && request.AdminPassword is { Length: > 0 })
+        {
+            var account = await accountService.CreateAccountAsync(request.AdminEmail, request.AdminName, request.AdminPassword, cancellationToken);
+            accountRepository.Add(new Membership
+            {
+                TenantId = tenant.Id,
+                AccountId = account.Id,
+                Role = MembershipRole.Admin,
+                LegacyUserId = admin.Id,
+            });
+        }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 

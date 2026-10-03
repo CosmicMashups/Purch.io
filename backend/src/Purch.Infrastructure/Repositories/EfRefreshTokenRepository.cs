@@ -31,6 +31,14 @@ public sealed class EfRefreshTokenRepository(PurchDbContext dbContext) : IRefres
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RefreshToken>> ListActiveByMembershipIdAsync(Guid membershipId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.RefreshTokens
+            .IgnoreQueryFilters()
+            .Where(token => token.MembershipId == membershipId && token.ExpiresAt > DateTimeOffset.UtcNow)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(RefreshToken refreshToken)
     {
         _ = dbContext.RefreshTokens.Add(refreshToken);

@@ -138,11 +138,26 @@ public sealed class LoginServiceValidationTests
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }
+
+        public string IssueMembershipAccessToken(Membership membership)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
     }
 
     private sealed class NeverCalledRefreshTokenService : IRefreshTokenService
     {
         public Task<string> IssueAsync(Guid tenantId, Guid? userId, Guid? deviceId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task<string> IssueForMembershipAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Should not be called when validation fails.");
+        }
+
+        public Task RevokeAllForMembershipAsync(Guid membershipId, CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Should not be called when validation fails.");
         }

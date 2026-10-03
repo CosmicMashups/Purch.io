@@ -22,4 +22,13 @@ public interface IDeploymentContext
 
     /// <summary>Supabase Storage bucket name. Null in Local mode.</summary>
     string? StorageBucket { get; }
+
+    /// <summary>Supabase project URL for Auth (Cloud). Null when not configured, or in Local mode.</summary>
+    string? IdentityUrl { get; }
+
+    /// <summary>Supabase public (anon) key, used to check a password. Optional: the service key works too.</summary>
+    string? IdentityAnonKey { get; }
+
+    /// <summary>Supabase service-role key, used to create and update logins. Never leaves the API.</summary>
+    string? IdentityServiceKey { get; }
 }

@@ -16,6 +16,9 @@ public class RefreshToken : TenantScopedEntity
     /// (not tied to any physical terminal).</summary>
     public Guid? DeviceId { get; set; }
 
+    /// <summary>Set for a sign-in with email and password (see Membership); the refresh then rebuilds that membership's token.</summary>
+    public Guid? MembershipId { get; set; }
+
     public string TokenHash { get; set; } = string.Empty;
 
     public DateTimeOffset ExpiresAt { get; set; }

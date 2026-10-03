@@ -94,6 +94,28 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         return WriteToken(claims, TimeSpan.FromHours(24));
     }
 
+    public string IssueMembershipAccessToken(Membership membership)
+    {
+        var role = MembershipRoleMapper.ToApiRole(membership)
+            ?? throw new InvalidOperationException("This membership has no duty to sign in with.");
+        var (scope, scopeId) = MembershipRoleMapper.ToScope(membership);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, membership.Id.ToString()),
+            new(JwtClaimTypes.TenantId, membership.TenantId.ToString()),
+            new(JwtClaimTypes.Role, role.ToString()),
+            new(JwtClaimTypes.ScopeType, scope.ToString()),
+        };
+
+        if (scopeId is { } id)
+        {
+            claims.Add(new Claim(JwtClaimTypes.ScopeId, id.ToString()));
+        }
+
+        return WriteToken(claims, TimeSpan.FromMinutes(30));
+    }
+
     private string WriteToken(IReadOnlyList<Claim> claims, TimeSpan validFor)
     {
         var signingKey = _configuration["JWT_SIGNING_KEY"]

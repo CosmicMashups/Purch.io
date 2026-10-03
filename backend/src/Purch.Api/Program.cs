@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -112,6 +112,18 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+// Email and password sign-in. Cloud mode checks the password with Supabase Auth; Local mode keeps a credential table in
+// our own database. Permissions always come from our own Membership rows, never from the provider.
+builder.Services.AddHttpClient(SupabaseIdentityProvider.HttpClientName);
+builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
+    serviceProvider.GetRequiredService<IDeploymentContext>().Mode == DeploymentMode.Local
+        ? ActivatorUtilities.CreateInstance<LocalIdentityProvider>(serviceProvider)
+        : new SupabaseIdentityProvider(
+            serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(SupabaseIdentityProvider.HttpClientName),
+            serviceProvider.GetRequiredService<IDeploymentContext>()));
+builder.Services.AddScoped<IAccountRepository, EfAccountRepository>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();
 builder.Services.AddScoped<ILoginService, LoginService>();

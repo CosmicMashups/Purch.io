@@ -42,6 +42,26 @@ public static class AuthEndpoints
             };
         }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
 
+        // Email and password, for a personal device (no device pairing, so no selling). A person who belongs to several
+        // businesses gets the list back and signs in again with the tenant they chose.
+        _ = app.MapPost("/auth/sign-in", async (SignInRequest request, IAccountService accountService, CancellationToken cancellationToken) =>
+        {
+            var result = await accountService.SignInAsync(request, cancellationToken);
+            return result switch
+            {
+                SignInResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
+
+                SignInResult.ChooseBusiness choose => Results.Ok(new { chooseBusiness = true, businesses = choose.Businesses }),
+
+                SignInResult.Invalid => Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Invalid credentials.",
+                    detail: "The email or password was not recognized."),
+
+                _ => throw new InvalidOperationException($"Unhandled {nameof(SignInResult)} case: {result.GetType().Name}"),
+            };
+        }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.AuthSensitive);
+
         _ = app.MapPost("/auth/refresh", async (RefreshTokenRequest request, ITokenRefreshService tokenRefreshService, CancellationToken cancellationToken) =>
         {
             var result = await tokenRefreshService.RefreshAsync(request.RefreshToken, cancellationToken);

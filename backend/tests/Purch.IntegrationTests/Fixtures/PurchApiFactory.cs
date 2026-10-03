@@ -49,6 +49,10 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
 
         _ = builder.ConfigureServices(services =>
         {
+            // Cloud mode would check passwords with Supabase Auth, which has no project behind it in tests.
+            _ = services.RemoveAll<IIdentityProvider>();
+            _ = services.AddScoped<IIdentityProvider, Purch.Infrastructure.Auth.LocalIdentityProvider>();
+
             _ = services.RemoveAll<IPasswordResetTokenNotifier>();
             _ = services.AddSingleton<IPasswordResetTokenNotifier>(PasswordResetTokenNotifier);
 
