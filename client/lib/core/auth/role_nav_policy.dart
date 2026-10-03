@@ -53,9 +53,12 @@ const Map<AppTab, TabSpec> _tabSpecs = {
 
 TabSpec tabSpecFor(AppTab tab) => _tabSpecs[tab]!;
 
-/// Which bottom-nav tabs a signed-in staff member sees, by role. A `null`
-/// role (claim missing/unparseable) gets the most restrictive set rather
-/// than the most permissive one.
+/// Which bottom-nav tabs a signed-in staff member sees, by role. Admin and
+/// Manager see everything, and Home (the dashboard and its revenue) is theirs
+/// alone: a Cashier sees only the Cashier tab and a Warehouse user only
+/// Inventory. A `null` role (claim missing/unparseable) gets the most
+/// restrictive set rather than the most permissive one. Presentation only: the
+/// API re-checks every action.
 List<AppTab> tabsForRole(StaffRole? role) {
   switch (role) {
     case StaffRole.admin:
@@ -67,13 +70,36 @@ List<AppTab> tabsForRole(StaffRole? role) {
         AppTab.business,
       ];
     case StaffRole.cashier:
-      return const [AppTab.home, AppTab.cashier];
+      return const [AppTab.cashier];
     case StaffRole.warehouse:
-      return const [AppTab.home, AppTab.inventory];
+      return const [AppTab.inventory];
     case null:
-      return const [AppTab.home, AppTab.cashier];
+      return const [AppTab.cashier];
   }
 }
+
+/// The router path each tab lives under.
+String pathForTab(AppTab tab) {
+  switch (tab) {
+    case AppTab.home:
+      return '/home';
+    case AppTab.cashier:
+      return '/cashier';
+    case AppTab.inventory:
+      return '/inventory';
+    case AppTab.business:
+      return '/business';
+  }
+}
+
+/// The first page a role lands on, and where it is sent when it asks for a
+/// page it has no tab for.
+String landingPathForRole(StaffRole? role) => pathForTab(tabsForRole(role).first);
+
+/// Whether [location] is inside a tab this role has.
+bool roleMayOpen(StaffRole? role, String location) => tabsForRole(
+  role,
+).any((tab) => location.startsWith(pathForTab(tab)));
 
 /// Business-tab tiles gate further by role: Admin sees everything, Manager
 /// loses the two Admin-only settings tiles, and no other role reaches the

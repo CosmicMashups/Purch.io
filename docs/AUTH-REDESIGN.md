@@ -93,6 +93,19 @@ scope because a token carries one scope id. Both are replaced when sessions are 
   guess four-digit PINs offline, so it belongs with the Flutter client, which does sell offline, and needs a deliberate
   design there. The idle time is fixed at five minutes; making it an Admin setting is a later change.
 
+## The access rule (step 6)
+
+- Tabs by role, in the web and in Flutter: Admin and Manager get Home, Cashier, Inventory and Business; a Cashier gets the
+  Cashier page only; a Warehouse user gets Inventory only; an unknown role gets the Cashier page only. Home, with the
+  revenue dashboard, is for Admin and Manager alone.
+- Where someone lands, and where they are sent for a page they have no tab for: Admin and Manager the dashboard, a
+  Cashier the Cashier page, a Warehouse user Inventory. The web does this in `RequireTab`, Flutter in the router redirect.
+  A role with a single tab gets no bottom navigation bar in Flutter.
+- The API needed no change: the roles each kind of session gets already decide what it can call. `AccessMatrixTests` now
+  pins it down: a Cashier on a Register reaches the till only; a Warehouse device Inventory only; a Manager everything but
+  Devices wherever they unlock; an Admin every area; and the kiosk, order board, kitchen display and customer display
+  reach none of the staff pages.
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.

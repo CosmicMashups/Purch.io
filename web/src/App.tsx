@@ -95,7 +95,9 @@ export function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route path="/" element={<HomePage />} />
+          <Route element={<RequireTab tab="home" />}>
+            <Route path="/" element={<HomePage />} />
+          </Route>
 
           <Route element={<RequireTab tab="sell" />}>
             <Route path="/sell" element={<SellPage />} />

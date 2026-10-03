@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../session/session_scope.dart';
+import '../auth/role_nav_policy.dart';
 import 'auth_gate.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/catalog/presentation/screens/category_list_screen.dart';
@@ -46,6 +47,8 @@ import '../theming/theme_builder.dart';
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
     ref.listen(authGateProvider, (_, _) => notifyListeners());
+    // The landing page and the allowed pages depend on the role, which is read asynchronously.
+    ref.listen(currentStaffRoleProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -81,10 +84,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               return location.startsWith('/kitchen-display') ? null : '/kitchen-display';
             case AuthGateState.staff:
               if (location == '/customer-facing-display') return null;
+              // The role is read from the stored token; until it has been, the shell paths alone decide.
+              final role = ref.read(currentStaffRoleProvider).valueOrNull;
               final inStaffShell = _staffShellPaths.any(
                 (path) => location.startsWith(path),
               );
-              return inStaffShell ? null : '/home';
+              if (ref.read(currentStaffRoleProvider).isLoading) {
+                return inStaffShell ? null : '/home';
+              }
+              // A page the role has no tab for sends it to the first one it does have.
+              return inStaffShell && roleMayOpen(role, location)
+                  ? null
+                  : landingPathForRole(role);
           }
         },
       );

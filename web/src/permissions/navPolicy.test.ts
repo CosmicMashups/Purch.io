@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBusinessTileVisible, staffRoleFromClaim, tabsForRole } from './navPolicy';
+import { isBusinessTileVisible, landingPath, staffRoleFromClaim, tabsForRole } from './navPolicy';
 
 describe('tabsForRole', () => {
   it('gives Admin and Manager all four tabs', () => {
@@ -8,16 +8,33 @@ describe('tabsForRole', () => {
     expect(tabsForRole('Manager')).toEqual(all);
   });
 
-  it('confines Cashier to Home and Cashier', () => {
-    expect(tabsForRole('Cashier')).toEqual(['home', 'sell']);
+  it('confines Cashier to the Cashier page, with no Home', () => {
+    expect(tabsForRole('Cashier')).toEqual(['sell']);
   });
 
-  it('confines Warehouse to Home and Inventory', () => {
-    expect(tabsForRole('Warehouse')).toEqual(['home', 'inventory']);
+  it('confines Warehouse to Inventory, with no Home', () => {
+    expect(tabsForRole('Warehouse')).toEqual(['inventory']);
   });
 
   it('falls back to the restrictive set for an unknown role', () => {
-    expect(tabsForRole(null)).toEqual(['home', 'sell']);
+    expect(tabsForRole(null)).toEqual(['sell']);
+  });
+
+  it('gives Home to Admin and Manager only', () => {
+    expect(tabsForRole('Admin')).toContain('home');
+    expect(tabsForRole('Manager')).toContain('home');
+    expect(tabsForRole('Cashier')).not.toContain('home');
+    expect(tabsForRole('Warehouse')).not.toContain('home');
+  });
+});
+
+describe('landingPath', () => {
+  it('lands each role on the first page it has', () => {
+    expect(landingPath('Admin')).toBe('/');
+    expect(landingPath('Manager')).toBe('/');
+    expect(landingPath('Cashier')).toBe('/sell');
+    expect(landingPath('Warehouse')).toBe('/inventory');
+    expect(landingPath(null)).toBe('/sell');
   });
 });
 

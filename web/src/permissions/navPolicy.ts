@@ -17,18 +17,27 @@ export function staffRoleFromClaim(claim: string | null): StaffRole | null {
   return STAFF_ROLES.find((role) => role.toLowerCase() === lower) ?? null;
 }
 
-/** Presentation only. The API re-checks every action. An unknown role gets the most restrictive set. */
+/**
+ * What each role gets. Admin and Manager see everything, and Home (the dashboard and its revenue) is theirs alone: a
+ * Cashier sees only the Cashier page, a Warehouse user only Inventory. Presentation only: the API re-checks every action.
+ * An unknown role gets the most restrictive set.
+ */
 export function tabsForRole(role: StaffRole | null): readonly AppTab[] {
   switch (role) {
     case 'Admin':
     case 'Manager':
       return ['home', 'sell', 'inventory', 'business'];
     case 'Warehouse':
-      return ['home', 'inventory'];
+      return ['inventory'];
     case 'Cashier':
     case null:
-      return ['home', 'sell'];
+      return ['sell'];
   }
+}
+
+/** The first page a role lands on, and where it is sent when it asks for one it has no tab for. */
+export function landingPath(role: StaffRole | null): string {
+  return tabPath(tabsForRole(role)[0]);
 }
 
 export function isBusinessTileVisible(tileId: string, role: StaffRole | null): boolean {

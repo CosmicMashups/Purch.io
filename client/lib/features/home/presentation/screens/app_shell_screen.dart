@@ -46,7 +46,8 @@ class AppShellScreen extends ConsumerWidget {
 
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBarTheme(
+      // A role with a single tab (a Cashier, a Warehouse user) has nothing to switch to, and a NavigationBar needs two.
+      bottomNavigationBar: visibleTabs.length < 2 ? null : NavigationBarTheme(
         data: NavigationBarThemeData(
           backgroundColor: AppColors.surface,
           indicatorColor: AppColors.brandPrimaryContainer,
