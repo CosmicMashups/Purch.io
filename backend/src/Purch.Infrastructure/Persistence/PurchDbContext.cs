@@ -31,6 +31,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<DeviceCredential> DeviceCredentials => Set<DeviceCredential>();
 
+    public DbSet<CustomerDisplayState> CustomerDisplayStates => Set<CustomerDisplayState>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Item> Items => Set<Item>();

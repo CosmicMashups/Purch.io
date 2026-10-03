@@ -1,6 +1,8 @@
 import { act, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '../../lib/authStore';
 import { renderPage } from '../../test/render';
+import * as serverFeed from './serverFeed';
 import { IDLE_STATE, type CustomerDisplayState } from './channel';
 import { CustomerDisplayPage } from './CustomerDisplayPage';
 
@@ -21,7 +23,12 @@ vi.mock('./channel', async (importOriginal) => {
 
 beforeEach(() => {
   supported = true;
+  useAuthStore.setState({ accessToken: null, refreshToken: null });
 });
+
+function b64(o: object) {
+  return btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
 
 describe('CustomerDisplayPage', () => {
   it('welcomes the customer before anything is rung up', () => {
@@ -56,5 +63,25 @@ describe('CustomerDisplayPage', () => {
     supported = false;
     renderPage(<CustomerDisplayPage />);
     expect(screen.getByText(/cannot share the order between windows/i)).toBeInTheDocument();
+  });
+  it('follows its Register through the server when it is paired as a customer display', async () => {
+    useAuthStore.setState({ accessToken: `${b64({ alg: 'none' })}.${b64({ role: 'CustomerDisplay', tenant_id: 't1', device_id: 'd1' })}.x`, refreshToken: 'r' });
+    vi.spyOn(serverFeed.customerDisplayFeed, 'poll').mockResolvedValue({
+      version: 4,
+      updatedAt: null,
+      state: { ...IDLE_STATE, mode: 'cart', lines: [{ name: 'Tea', quantity: 1, unitPrice: 90, lineTotal: 90 }], subtotal: 90, total: 90, vat: 9.64 },
+    });
+    renderPage(<CustomerDisplayPage />);
+    expect(await screen.findByText('Tea')).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it('works without the browser channel when it is a paired display', async () => {
+    supported = false;
+    useAuthStore.setState({ accessToken: `${b64({ alg: 'none' })}.${b64({ role: 'CustomerDisplay', tenant_id: 't1', device_id: 'd1' })}.x`, refreshToken: 'r' });
+    vi.spyOn(serverFeed.customerDisplayFeed, 'poll').mockResolvedValue({ version: 0, updatedAt: null, state: null });
+    renderPage(<CustomerDisplayPage />);
+    expect(await screen.findByRole('heading', { name: 'Welcome!' })).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });

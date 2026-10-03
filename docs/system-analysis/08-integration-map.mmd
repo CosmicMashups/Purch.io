@@ -10,7 +10,7 @@ flowchart LR
         ESCPOS["ESC/POS Thermal Receipt Printers<br/>- Protocol: Direct TCP/IP socket (9100) or USB spooler<br/>- Custom BIR receipt layout with QR Ph payload"]
         BARCODE["Barcode Scanners<br/>- Protocol: HID Keyboard emulation or Web Serial API"]
         SCALES["Weight Scales (Tingi / Fractional)<br/>- Protocol: Web Serial API (NCI / Toledo continuous data stream)"]
-        CFD_SCREEN["Customer Facing Display (CFD)<br/>- Protocol: Dual-head OS window or Local WebSocket mirror"]
+        CFD_SCREEN["Customer Facing Display (CFD)<br/>- Protocol: REST Server Relay (/customer-display/state)<br/>- Conditional GET with ETag versioning, or dual-head OS window"]
         CASH_DRAWER["Cash Drawer Trigger<br/>- Protocol: RJ11 solenoid pulse via receipt printer"]
     end
 

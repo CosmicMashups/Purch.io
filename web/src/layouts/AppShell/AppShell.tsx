@@ -7,6 +7,8 @@ import { signOut } from '../../features/auth/signOut';
 import { useSession } from '../../features/auth/useSession';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useAutoLock } from '../../hooks/useAutoLock';
+import { IDLE_STATE } from '../../hardware/display/channel';
+import { publishToCustomerDisplay } from '../../hardware/display/serverFeed';
 import { readDeviceCredential } from '../../features/kiosk/deviceCredential';
 import { tabPath, tabsForRole, type AppTab } from '../../permissions/navPolicy';
 
@@ -39,6 +41,8 @@ export function AppShell() {
   // On a paired till or warehouse device the session belongs to whoever unlocked it, so it locks itself when left alone.
   const onPairedDevice = !!claims?.deviceId && !!readDeviceCredential();
   function lock() {
+    // The next customer should not see the last order while the till waits for the next person.
+    publishToCustomerDisplay(IDLE_STATE);
     void signOut().then(() => navigate('/unlock', { replace: true }));
   }
   useAutoLock(onPairedDevice, lock);

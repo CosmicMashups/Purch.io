@@ -20,6 +20,7 @@ erDiagram
     DEVICE ||--o{ TRANSACTION : "rings_up"
     DEVICE ||--o{ RECEIPT_SEQUENCE : "maintains"
     DEVICE ||--o{ SYNCED_RECORD : "submits"
+    DEVICE ||--o| CUSTOMER_DISPLAY_STATE : "publishes_to"
 
     USER ||--o{ SHIFT : "opens_closes"
     USER ||--o{ TRANSACTION : "clerks"
@@ -227,4 +228,13 @@ erDiagram
         Guid ApprovedByUserId FK
         DateTimeOffset OpenedAt
         DateTimeOffset ClosedAt
+    }
+
+    CUSTOMER_DISPLAY_STATE {
+        Guid Id PK
+        Guid TenantId FK
+        Guid RegisterDeviceId FK
+        string StateJson
+        long Version
+        DateTimeOffset UpdatedAt
     }

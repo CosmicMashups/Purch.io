@@ -55,6 +55,15 @@ public class EnrolmentInviteConfiguration : IEntityTypeConfiguration<EnrolmentIn
     }
 }
 
+public class CustomerDisplayStateConfiguration : IEntityTypeConfiguration<CustomerDisplayState>
+{
+    public void Configure(EntityTypeBuilder<CustomerDisplayState> builder)
+    {
+        // One row per Register: the latest thing it showed.
+        _ = builder.HasIndex(s => s.RegisterDeviceId).IsUnique();
+    }
+}
+
 public class DeviceCredentialConfiguration : IEntityTypeConfiguration<DeviceCredential>
 {
     public void Configure(EntityTypeBuilder<DeviceCredential> builder)

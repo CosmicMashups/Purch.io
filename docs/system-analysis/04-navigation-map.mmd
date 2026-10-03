@@ -16,7 +16,7 @@ flowchart TD
 
     SPLASH -->|Device Role = KitchenDisplay| KD_PAIR["/kitchen/pair"] --> KD_VIEW["/kitchen (Ticket Cards: Queued/Prep/Ready/Picked)"]
     SPLASH -->|Device Role = OrderBoard| OB_PAIR["/order-board/pair"] --> OB_VIEW["/order-board (Prep & Ready Status Numbers)"]
-    SPLASH -->|Secondary Screen| CFD["/customer-facing-display (Mirror Cart)"]
+    SPLASH -->|Device Role = CustomerDisplay| CFD["/customer-display (Server-Relayed Live Cart / Polls ETag)"]
 
     %% AUTHENTICATED STAFF APP SHELL
     LOGIN -->|Staff Session Valid| SHELL["Staff App Shell (Role Filtered)"]

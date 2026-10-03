@@ -4,7 +4,9 @@ import { PurchImage } from '../../components/brand/PurchImage';
 import { formatPeso } from '../../features/dashboard/format';
 import { BUNDLED } from '../../lib/images';
 import { readBrandCache } from '../../theme/brandCache';
+import { useSession } from '../../features/auth/useSession';
 import { IDLE_STATE, customerDisplaySupported, subscribeCustomerDisplay, type CustomerDisplayState } from './channel';
+import { useServerCustomerDisplay } from './serverFeed';
 
 /**
  * A second window for the customer, dragged to the customer-facing monitor. It shows only what the till
@@ -14,11 +16,17 @@ import { IDLE_STATE, customerDisplaySupported, subscribeCustomerDisplay, type Cu
  * the order on the right.
  */
 export function CustomerDisplayPage() {
-  const [state, setState] = useState<CustomerDisplayState>(IDLE_STATE);
+  const { claims } = useSession();
+  // A screen paired as a customer display follows its Register through the server; a plain window opened from the till
+  // follows it through the browser.
+  const paired = claims?.role === 'CustomerDisplay';
+  const [windowState, setState] = useState<CustomerDisplayState>(IDLE_STATE);
+  const serverState = useServerCustomerDisplay(paired);
+  const state = paired ? serverState : windowState;
   const [{ businessName, kioskPosterImageUrl }] = useState(() => readBrandCache() ?? {});
-  const supported = customerDisplaySupported();
+  const supported = paired || customerDisplaySupported();
 
-  useEffect(() => subscribeCustomerDisplay(setState), []);
+  useEffect(() => (paired ? undefined : subscribeCustomerDisplay(setState)), [paired]);
 
   if (!supported) {
     return (

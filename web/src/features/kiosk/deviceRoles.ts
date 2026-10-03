@@ -1,10 +1,11 @@
 /** The three unattended device roles the API issues tokens for. They never see the staff shell. */
-export type DeviceRole = 'Kiosk' | 'KitchenDisplay' | 'OrderBoard';
+export type DeviceRole = 'Kiosk' | 'KitchenDisplay' | 'OrderBoard' | 'CustomerDisplay';
 
 export const DEVICE_HOME: Record<DeviceRole, string> = {
   Kiosk: '/kiosk',
   KitchenDisplay: '/kitchen',
   OrderBoard: '/order-board',
+  CustomerDisplay: '/customer-display',
 };
 
 /** One pairing screen for every kind of device: the code says which kind it is. */
@@ -14,14 +15,16 @@ export const DEVICE_PAIR: Record<DeviceRole, string> = {
   Kiosk: PAIR_PATH,
   KitchenDisplay: PAIR_PATH,
   OrderBoard: PAIR_PATH,
+  CustomerDisplay: PAIR_PATH,
 };
 
 export const DEVICE_LABEL: Record<DeviceRole, string> = {
   Kiosk: 'an order kiosk',
   KitchenDisplay: 'a kitchen display',
   OrderBoard: 'an order board',
+  CustomerDisplay: 'a customer display',
 };
 
 export function deviceRoleFromClaim(role: string | null | undefined): DeviceRole | null {
-  return role === 'Kiosk' || role === 'KitchenDisplay' || role === 'OrderBoard' ? role : null;
+  return role === 'Kiosk' || role === 'KitchenDisplay' || role === 'OrderBoard' || role === 'CustomerDisplay' ? role : null;
 }

@@ -107,6 +107,7 @@
 | **DISP-03** | Displays | Kitchen Display Session | `/kitchen/pair` | `POST /kitchen-display/session` | `Device` | Anonymous | **CONFIRMED** (24h Unattended JWT) |
 | **DISP-04** | Displays | Kitchen Pending Orders | `/kitchen` | `GET /kitchen-display/pending` | `Transaction`, `Lines` | KitchenDisplay Role | **CONFIRMED** (Shows modifiers & combo slots) |
 | **DISP-05** | Displays | Advance Kitchen Status | `/kitchen` (Status button) | `PUT /kitchen-display/orders/{id}/status`| `Transaction` | KitchenDisplay Role | **CONFIRMED** (Queued -> Preparing -> Ready) |
+| **DISP-06** | Displays | Customer Display Relay | `/customer-display` | `PUT/GET /customer-display/state` | `CustomerDisplayState`, `Device` | Register (PUT), CustomerDisplay (GET) | **CONFIRMED** (`CustomerDisplayEndpoints.cs`, ETag conditional GET) |
 | **SYNC-01** | Sync | Batch Mutation Ingestion| Client background coordinator| `POST /sync` | `SyncedRecord` | Any Staff | **CONFIRMED** (`SyncService.cs`, Idempotency key) |
 | **SYNC-02** | Sync | Query Flagged Conflicts | `/business/sync-conflicts` | `GET /sync/flagged` | `SyncedRecord` | Manager, Admin | **CONFIRMED** (Timestamp collision audit) |
 | **SYNC-03** | Sync | Acknowledge Conflict | `/business/sync-conflicts` (Ack) | `POST /sync/flagged/{id}/acknowledge`| `SyncedRecord` | Manager, Admin | **CONFIRMED** (Sets `ReviewedAt = UtcNow`) |

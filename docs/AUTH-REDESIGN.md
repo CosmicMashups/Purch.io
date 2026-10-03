@@ -1,6 +1,6 @@
 # Login and access redesign
 
-Status: planned, nothing built yet. Decisions below were agreed question by question.
+Status: Steps 1 through 7 built and verified (Data model, Supabase & local auth, one-time device pairing, staff enrolment, till PIN lock/unlock, access rule matrix, customer display relay). Decisions below were agreed question by question.
 
 ## Why
 
@@ -106,6 +106,20 @@ scope because a token carries one scope id. Both are replaced when sessions are 
   Devices wherever they unlock; an Admin every area; and the kiosk, order board, kitchen display and customer display
   reach none of the staff pages.
 
+## The customer display feed (step 7)
+
+- A customer display is created on the Devices page linked to one Register. Once paired it gets a `CustomerDisplay` token
+  (read-only) and renews it like any other unattended device.
+- The Register pushes what to show with `PUT /customer-display/state` (the same shape as the same-browser window: mode,
+  lines, savings, totals, VAT, paid, change). The server keeps only the latest state per Register
+  (`CustomerDisplayStates`) and only when an active display is paired to it, so a till with no screen costs nothing.
+- The display polls `GET /customer-display/state` once a second with `If-None-Match`; nothing new is a 304. It keeps the last
+  order on screen through a dropped connection. A serverless API cannot hold a connection or memory between requests, which
+  is why this is polling and not a push.
+- The web till pushes after a 250 ms pause in changes, and tells the screen to go idle when the till locks. A plain window
+  opened from the till still follows it through the browser, with no server involved.
+- Not done: the Flutter client has its own customer display (an HTTP-served page); it is not connected to this feed.
+
 ## Registering a business
 
 Creates the tenant, its first branch and the owner's Supabase account, and signs the owner in with email and password.
@@ -196,11 +210,11 @@ single-use link to set an email, password and new PIN; each device is re-paired 
 
 ## Build order
 
-1. Data model: memberships, duties, branches, one-time pairing codes, device credentials, enrolment links.
-2. Supabase Auth wiring (public sign-up off, admin-created accounts) and token exchange in the API.
-3. Pairing and device credentials; Devices page; revocation.
-4. Add Staff, enrolment link/QR, PIN setup, reset links.
-5. Register lock, PIN switch, offline PIN cache, lockout.
-6. Access rule in the API and in web and Flutter navigation (Home for Admin and Manager only, landing page per duty).
-7. Customer display pairing and server relay.
-8. Remove the old mechanisms and re-enrol existing staff and devices.
+1. [x] Data model: memberships, duties, branches, one-time pairing codes, device credentials, enrolment links.
+2. [x] Supabase Auth wiring (public sign-up off, admin-created accounts) and token exchange in the API.
+3. [x] Pairing and device credentials; Devices page; revocation.
+4. [x] Add Staff, enrolment link/QR, PIN setup, reset links.
+5. [x] Register lock, PIN switch, offline PIN cache, lockout.
+6. [x] Access rule in the API and in web and Flutter navigation (Home for Admin and Manager only, landing page per duty).
+7. [x] Customer display pairing and server relay (`/customer-display/state` PUT & conditional GET with ETags).
+8. [ ] Remove the old mechanisms and re-enrol existing staff and devices.

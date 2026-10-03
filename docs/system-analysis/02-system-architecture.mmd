@@ -27,6 +27,7 @@ flowchart TB
             EP_CREDIT["CreditLedgerEndpoints<br/>GET/POST /credit-ledger<br/>POST /credit-ledger/{id}/payments<br/>GET reminders, PUT limit, POST anonymize"]
             EP_REP["ReportingEndpoints<br/>POST /reports/x-reading, z-reading<br/>GET /reports/sales-dashboard<br/>GET CSV exports, staff, department"]
             EP_KIOSK["Kiosk & Display Endpoints<br/>POST /kiosk/session, cart/*, submit<br/>POST /order-board/session, pending<br/>POST /kitchen-display/session, status"]
+            EP_CFD["CustomerDisplayEndpoints<br/>PUT /customer-display/state<br/>GET /customer-display/state (ETag/304)"]
             EP_SYNC["SyncEndpoints<br/>POST /sync<br/>GET /sync/flagged<br/>POST /sync/flagged/{id}/acknowledge"]
             EP_UPLOAD["UploadEndpoints<br/>POST /uploads/image"]
         end

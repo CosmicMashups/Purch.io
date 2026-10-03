@@ -74,7 +74,9 @@ The HTTP entry point structured into modular, discoverable Minimal API route gro
 | **Inventory** | `/inventory` | Purchase orders, supplier directory, inter-branch stock transfers, real-time stock-in/out, and low-stock threshold alerting. |
 | **Compliance & Reports**| `/reporting` | Automated BIR-compliant X-Readings (mid-shift summary) and Z-Readings (daily fiscal closure), sales analytics, and audit logs. |
 | **Credit Ledger** | `/credit-ledger`| Customer accounts, credit balance tracking (*utang* management), repayments, and credit limits. |
-| **Kiosk** | `/kiosk` | Public tenant branding endpoints and self-service order dispatching. |
+| **Kiosk & Displays** | `/kiosk`, `/kitchen-display`, `/order-board` | Public tenant branding, self-service order dispatching, and unattended kitchen/order displays. |
+| **Customer Display** | `/customer-display` | Live cart relay between paired Register and secondary customer-facing display with conditional GET caching. |
+| **Devices & Pairing** | `/devices` | One-time device pairing code exchange, session creation, credential revocation, and staff rosters. |
 | **Uploads** | `/uploads` | Authenticated multipart image uploading with validation and tenant directory isolation. |
 | **Sync Engine** | `/sync` | Batch ingestion of offline queued mutations and conflict resolution. |
 

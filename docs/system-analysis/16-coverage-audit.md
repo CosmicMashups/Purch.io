@@ -5,11 +5,11 @@
 | Architectural Category | Discovered in Codebase | Formally Documented | Fully Diagrammed | Implementation Evidence |
 | :--- | :---: | :---: | :---: | :--- |
 | **Application Modules** | 11 | 11 | 11 | `Purch.Api/Endpoints`, `Purch.Application`, `client/lib/features`, `web/src/features` |
-| **Functional Features** | 76 | 76 | 76 | Documented in `10-feature-inventory.md`, verified against C# handlers & TS/Dart views |
+| **Functional Features** | 77 | 77 | 77 | Documented in `10-feature-inventory.md`, verified against C# handlers & TS/Dart views |
 | **Screens / Routes (Web)**| 38 | 38 | 38 | `web/src/App.tsx`, `AppShell.tsx` |
 | **Screens / Routes (Flutter)**| 32 | 32 | 32 | `client/lib/core/routing/app_router.dart` |
-| **API Endpoints (Minimal API)**| 64 | 64 | 64 | `Purch.Api/Endpoints/*.cs` (Auth, Onboarding, Catalog, POS, Shifts, Inventory, etc.) |
-| **Database Entities / Tables**| 41 | 41 | 41 | `Purch.Domain/Entities/*.cs`, `PurchDbContext.cs` (All 41 DbSets audited) |
+| **API Endpoints (Minimal API)**| 66 | 66 | 66 | `Purch.Api/Endpoints/*.cs` (Auth, Onboarding, Catalog, POS, CustomerDisplay, Shifts, Inventory, etc.) |
+| **Database Entities / Tables**| 42 | 42 | 42 | `Purch.Domain/Entities/*.cs`, `PurchDbContext.cs` (All 42 DbSets audited) |
 | **System Roles** | 7 | 7 | 7 | `Role.cs` (Admin, Manager, Cashier, Warehouse) + Device Roles (Kiosk, KitchenDisplay, OrderBoard) |
 | **Domain Enums** | 21 | 21 | 21 | `Purch.Domain/Enums/*.cs` |
 | **End-to-End Workflows** | 6 | 6 | 6 | Reconstructed in `12-workflows.md` and `07-api-architecture.mmd` |

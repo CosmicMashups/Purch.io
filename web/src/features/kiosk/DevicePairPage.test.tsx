@@ -13,6 +13,7 @@ function b64(o: object) {
   return btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 const kioskToken = `${b64({ alg: 'none' })}.${b64({ role: 'Kiosk', tenant_id: 't1' })}.x`;
+const displayToken = `${b64({ alg: 'none' })}.${b64({ role: 'CustomerDisplay', tenant_id: 't1' })}.x`;
 
 const paired = { deviceCredential: 'secret-1', deviceId: 'd1', tenantId: 't1', branchId: 'b1', deviceType: 1, name: 'Entrance kiosk' };
 const kioskSession = { accessToken: kioskToken, refreshToken: 'r1', requiresStaff: false, deviceId: 'd1', deviceType: 1, name: 'Entrance kiosk' };
@@ -31,6 +32,7 @@ function renderPair() {
       { path: '/kiosk', element: <p>Kiosk home</p> },
       { path: '/order-board', element: <p>Board home</p> },
       { path: '/unlock', element: <p>Lock screen</p> },
+      { path: '/customer-display', element: <p>Customer screen</p> },
     ],
   });
 }
@@ -79,12 +81,13 @@ describe('DevicePairPage', () => {
     expect(readDeviceCredential()).toBe('secret-1');
   });
 
-  it('confirms a customer display is paired, since it has no screen to open yet', async () => {
+  it('opens the customer display screen for a customer display device', async () => {
     vi.mocked(deviceApi.pair).mockResolvedValue({ ...paired, deviceType: 5, name: 'Counter screen' });
-    vi.mocked(deviceApi.startSession).mockResolvedValue({ accessToken: 'x', refreshToken: 'y', requiresStaff: false, deviceId: 'd1', deviceType: 5, name: 'Counter screen' });
+    vi.mocked(deviceApi.startSession).mockResolvedValue({ accessToken: displayToken, refreshToken: 'r1', requiresStaff: false, deviceId: 'd1', deviceType: 5, name: 'Counter screen' });
     renderPair();
     enter('AB12CD34');
-    expect(await screen.findByRole('heading', { name: 'This device is paired' })).toBeInTheDocument();
+    expect(await screen.findByText('Customer screen')).toBeInTheDocument();
+    expect(useAuthStore.getState().refreshToken).toBe('r1');
   });
 
   it('starts a session by itself when it was paired before and lost its sign-in', async () => {

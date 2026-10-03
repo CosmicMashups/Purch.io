@@ -12,6 +12,7 @@ const ROLE_OF_TYPE: Record<number, DeviceRole | undefined> = {
   [DeviceType.Kiosk]: 'Kiosk',
   [DeviceType.KitchenDisplay]: 'KitchenDisplay',
   [DeviceType.OrderBoard]: 'OrderBoard',
+  [DeviceType.CustomerDisplay]: 'CustomerDisplay',
 };
 
 const inputClass = 'h-16 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-center font-mono text-3xl font-bold uppercase tracking-widest text-ink focus:border-brand';

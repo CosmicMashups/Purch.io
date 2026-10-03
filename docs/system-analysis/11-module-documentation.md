@@ -201,6 +201,11 @@ Drives customer self-service terminals, kitchen display boards, and customer que
 * **Order Status Board**:
   * Session Init: `POST /order-board/session`.
   * Display: `GET /order-board/pending` renders "Now Preparing" and "Now Ready" tickets.
+* **Customer-Facing Display (CFD)**:
+  * Screen: `/customer-display` (paired to a Register).
+  * State Publishing: `PUT /customer-display/state` (unlocked Register pushes active cart, idle, payment, or completion payload up to 64 KB).
+  * Polling & Caching: `GET /customer-display/state` with `If-None-Match: "v{version}"` header returns `304 Not Modified` when unchanged or `200 OK` with updated JSON payload.
+  * Persistence: Single `CustomerDisplayState` row per Register in database, storing `StateJson` and monotonic `Version`.
 
 ---
 
