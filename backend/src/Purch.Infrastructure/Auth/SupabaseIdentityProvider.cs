@@ -16,8 +16,18 @@ public sealed class SupabaseIdentityProvider(HttpClient httpClient, IDeploymentC
 {
     public const string HttpClientName = nameof(SupabaseIdentityProvider);
 
-    private string BaseUrl => (deploymentContext.IdentityUrl
-        ?? throw new InvalidOperationException("SUPABASE_AUTH_URL is not configured.")).TrimEnd('/');
+    // The project URL (https://xxxx.supabase.co). The "/auth/v1" part is added on every call below, so a value that was
+    // copied with it already on the end is accepted too rather than doubling it.
+    private string BaseUrl
+    {
+        get
+        {
+            var url = (deploymentContext.IdentityUrl
+                ?? throw new InvalidOperationException("SUPABASE_AUTH_URL is not configured.")).Trim().TrimEnd('/');
+            const string authPath = "/auth/v1";
+            return url.EndsWith(authPath, StringComparison.OrdinalIgnoreCase) ? url[..^authPath.Length].TrimEnd('/') : url;
+        }
+    }
 
     private string ServiceKey => deploymentContext.IdentityServiceKey
         ?? throw new InvalidOperationException("SUPABASE_AUTH_SERVICE_KEY is not configured.");
