@@ -51,7 +51,7 @@ describe('ShiftPage access', () => {
   it('needs a paired device', () => {
     signInAs('Admin');
     renderPage(<ShiftPage />);
-    expect(screen.getByText('Sign in with a device to sell')).toBeInTheDocument();
+    expect(screen.getByText('Choose a Register to sell on')).toBeInTheDocument();
     expect(shiftsApi.current).not.toHaveBeenCalled();
   });
 });

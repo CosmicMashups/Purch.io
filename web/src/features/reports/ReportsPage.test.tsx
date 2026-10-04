@@ -148,7 +148,7 @@ describe('X and Z readings', () => {
   it('needs a paired device', async () => {
     signInAs('Admin');
     renderPage(<ReportsPage />, { route: '/?tab=bir' });
-    expect(await screen.findByText('Sign in with a device to sell')).toBeInTheDocument();
+    expect(await screen.findByText('Choose a Register to sell on')).toBeInTheDocument();
     expect(reportsApi.xReading).not.toHaveBeenCalled();
   });
 

@@ -135,6 +135,7 @@ builder.Services.AddScoped<IDeviceRepository, EfDeviceRepository>();
 builder.Services.AddScoped<IDeviceCredentialRepository, EfDeviceCredentialRepository>();
 builder.Services.AddScoped<IDevicePairingService, DevicePairingService>();
 builder.Services.AddScoped<IDeviceUnlockService, DeviceUnlockService>();
+builder.Services.AddScoped<IRegisterSessionService, RegisterSessionService>();
 builder.Services.AddScoped<ICustomerDisplayRepository, EfCustomerDisplayRepository>();
 builder.Services.AddScoped<ICustomerDisplayService, CustomerDisplayService>();
 builder.Services.AddScoped<IUserRepository, EfUserRepository>();

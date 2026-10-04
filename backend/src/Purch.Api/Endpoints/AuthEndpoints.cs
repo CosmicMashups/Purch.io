@@ -1,5 +1,7 @@
 using Purch.Api.RateLimiting;
 using Purch.Application.Auth;
+using Purch.Application.Common;
+using Purch.Domain.Enums;
 
 namespace Purch.Api.Endpoints;
 
@@ -42,6 +44,28 @@ public static class AuthEndpoints
                 _ => throw new InvalidOperationException($"Unhandled {nameof(TokenRefreshResult)} case: {result.GetType().Name}"),
             };
         }).AllowAnonymous().RequireRateLimiting(RateLimiterPolicies.Refresh);
+
+        // An Admin or Manager signed in by email has no till of their own. This ties their session to a Register of the
+        // business so they can sell without signing out; the old refresh token is revoked by the client's logout call.
+        _ = app.MapPost("/auth/register-session", async (RegisterSessionRequest request, ICurrentActorProvider actor, IRegisterSessionService registerSessionService, CancellationToken cancellationToken) =>
+        {
+            if (actor.UserId is not { } membershipId)
+            {
+                return Results.Unauthorized();
+            }
+
+            var result = await registerSessionService.StartAsync(membershipId, request, cancellationToken);
+            return result switch
+            {
+                RegisterSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
+                RegisterSessionResult.ChooseRegister choose => Results.Ok(new { chooseRegister = true, registers = choose.Registers }),
+                RegisterSessionResult.NoRegister => Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "No Register available.",
+                    detail: "Pair a Register under Business, then Devices, before selling."),
+                _ => throw new InvalidOperationException($"Unhandled {nameof(RegisterSessionResult)} case: {result.GetType().Name}"),
+            };
+        }).RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin), nameof(Role.Manager)));
 
         // Best-effort: revokes the refresh token so it can't be redeemed later, but
         // never fails the client's own logout flow (see IRefreshTokenService.RevokeAsync).

@@ -6,6 +6,7 @@ import { categorySchema } from '../schemas';
 import { useCategories, useCreateCategory, useUpdateCategory } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { ImageUploadField } from '../../../components/forms/ImageUploadField';
+import { PurchImage } from '../../../components/brand/PurchImage';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
@@ -63,7 +64,7 @@ export function CategoriesPage() {
           <input type="number" {...register('sortOrder')} className={inputClass} />
         </Field>
         <input type="hidden" {...register('imageUrl')} />
-        <ImageUploadField label="Image" samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
+        <ImageUploadField label="Image" allowUrl samples={ITEM_SAMPLES} value={imageUrl ?? null} onChange={(url) => setValue('imageUrl', url, { shouldDirty: true })} />
         <div className="flex gap-2">
           <button
             type="submit"
@@ -94,8 +95,15 @@ export function CategoriesPage() {
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
           {[...categories!].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => (
             <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
-              <span>
-                {c.name} <span className="text-gray-400">#{c.sortOrder}</span>
+              <span className="flex items-center gap-3">
+                {c.imageUrl ? (
+                  <PurchImage src={c.imageUrl} alt="" className="h-8 w-8 rounded object-cover" errorNode={<span className="h-8 w-8 rounded bg-gray-100" />} />
+                ) : (
+                  <span className="h-8 w-8 rounded bg-gray-100" />
+                )}
+                <span>
+                  {c.name} <span className="text-gray-400">#{c.sortOrder}</span>
+                </span>
               </span>
               <button onClick={() => startEdit(c)} className="text-gray-500 hover:text-gray-900 hover:underline">
                 Edit

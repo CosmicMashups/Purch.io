@@ -64,7 +64,7 @@ describe('SellPage access', () => {
   it('asks an email sign-in (no device) to sign in with a device instead of selling', () => {
     signInAs('Admin');
     renderPage(<SellPage />);
-    expect(screen.getByText('Sign in with a device to sell')).toBeInTheDocument();
+    expect(screen.getByText('Choose a Register to sell on')).toBeInTheDocument();
     expect(posApi.getCart).not.toHaveBeenCalled();
   });
 });
