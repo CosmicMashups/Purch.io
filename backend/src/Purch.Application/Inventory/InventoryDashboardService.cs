@@ -1,11 +1,14 @@
 using Purch.Application.Catalog;
 using Purch.Application.Common;
+using Purch.Application.Onboarding;
 
 namespace Purch.Application.Inventory;
 
 public sealed class InventoryDashboardService(
     IItemRepository itemRepository,
     IItemStockService itemStockService,
+    IInventoryItemRepository inventoryItemRepository,
+    ITenantRepository tenantRepository,
     ICurrentTenantProvider currentTenantProvider) : IInventoryDashboardService
 {
     public async Task<InventoryDashboardDto> GetDashboardAsync(CancellationToken cancellationToken = default)
@@ -29,7 +32,29 @@ public sealed class InventoryDashboardService(
             activeItems.Count,
             outOfStockCount,
             lowStockItems.Count,
-            lowStockItems);
+            lowStockItems,
+            await GetIngredientsAsync(cancellationToken));
+    }
+
+    private async Task<IngredientStockDto?> GetIngredientsAsync(CancellationToken cancellationToken)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is not { UseSeparateInventoryTracking: true })
+        {
+            return null;
+        }
+
+        var ingredients = (await inventoryItemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken))
+            .Where(ingredient => ingredient.IsActive && !ingredient.IsAutoCreatedForItem)
+            .ToList();
+
+        var low = ingredients
+            .Where(ingredient => ingredient.LowStockThreshold is { } threshold && ingredient.QuantityOnHand > 0 && ingredient.QuantityOnHand <= threshold)
+            .OrderBy(ingredient => ingredient.QuantityOnHand)
+            .Select(ingredient => new LowStockIngredientDto(ingredient.Id, ingredient.Name, ingredient.BaseUnit, ingredient.QuantityOnHand, ingredient.LowStockThreshold!.Value))
+            .ToList();
+
+        return new IngredientStockDto(ingredients.Count, ingredients.Count(ingredient => ingredient.QuantityOnHand <= 0), low.Count, low);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

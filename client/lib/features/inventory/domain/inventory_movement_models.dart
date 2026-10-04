@@ -144,6 +144,7 @@ class InventoryDashboard {
     required this.outOfStockCount,
     required this.lowStockCount,
     required this.lowStockItems,
+    this.ingredients,
   });
 
   factory InventoryDashboard.fromJson(Map<String, dynamic> json) {
@@ -156,6 +157,12 @@ class InventoryDashboard {
               .cast<Map<String, dynamic>>()
               .map(LowStockItem.fromJson)
               .toList(),
+      ingredients:
+          json['ingredients'] == null
+              ? null
+              : IngredientStock.fromJson(
+                json['ingredients'] as Map<String, dynamic>,
+              ),
     );
   }
 
@@ -163,6 +170,66 @@ class InventoryDashboard {
   final int outOfStockCount;
   final int lowStockCount;
   final List<LowStockItem> lowStockItems;
+
+  /// Present only when the business tracks ingredients separately.
+  final IngredientStock? ingredients;
+}
+
+/// Mirrors Purch.Application.Inventory.IngredientStockDto: the same counts as
+/// the items, for separately tracked ingredients. Stock records auto-paired to
+/// plain items are left out by the server (they already count as items).
+class IngredientStock {
+  const IngredientStock({
+    required this.total,
+    required this.outOfStockCount,
+    required this.lowStockCount,
+    required this.lowStock,
+  });
+
+  factory IngredientStock.fromJson(Map<String, dynamic> json) {
+    return IngredientStock(
+      total: json['total'] as int,
+      outOfStockCount: json['outOfStockCount'] as int,
+      lowStockCount: json['lowStockCount'] as int,
+      lowStock:
+          (json['lowStock'] as List<dynamic>)
+              .cast<Map<String, dynamic>>()
+              .map(LowStockIngredient.fromJson)
+              .toList(),
+    );
+  }
+
+  final int total;
+  final int outOfStockCount;
+  final int lowStockCount;
+  final List<LowStockIngredient> lowStock;
+}
+
+/// Mirrors Purch.Application.Inventory.LowStockIngredientDto.
+class LowStockIngredient {
+  const LowStockIngredient({
+    required this.inventoryItemId,
+    required this.name,
+    required this.baseUnit,
+    required this.quantityOnHand,
+    required this.lowStockThreshold,
+  });
+
+  factory LowStockIngredient.fromJson(Map<String, dynamic> json) {
+    return LowStockIngredient(
+      inventoryItemId: json['inventoryItemId'] as String,
+      name: json['name'] as String,
+      baseUnit: json['baseUnit'] as String,
+      quantityOnHand: (json['quantityOnHand'] as num).toDouble(),
+      lowStockThreshold: (json['lowStockThreshold'] as num).toDouble(),
+    );
+  }
+
+  final String inventoryItemId;
+  final String name;
+  final String baseUnit;
+  final double quantityOnHand;
+  final double lowStockThreshold;
 }
 
 /// Mirrors Purch.Application.Inventory.LowStockItemDto.

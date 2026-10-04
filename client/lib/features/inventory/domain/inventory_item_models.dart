@@ -15,6 +15,8 @@ class InventoryItem {
     required this.isAutoCreatedForItem,
     required this.linkedItemId,
     required this.isActive,
+    this.categoryId,
+    this.isCountedByHand = false,
   });
 
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,8 @@ class InventoryItem {
       isAutoCreatedForItem: json['isAutoCreatedForItem'] as bool,
       linkedItemId: json['linkedItemId'] as String?,
       isActive: json['isActive'] as bool,
+      categoryId: json['categoryId'] as String?,
+      isCountedByHand: json['isCountedByHand'] as bool? ?? false,
     );
   }
 
@@ -44,6 +48,13 @@ class InventoryItem {
   final bool isAutoCreatedForItem;
   final String? linkedItemId;
   final bool isActive;
+
+  /// The ingredient category this is filed under; null when uncategorised.
+  final String? categoryId;
+
+  /// True when recipes use it but none deducts it on a sale, so only a count
+  /// changes its stock (a sauce counted at the end of a shift, say).
+  final bool isCountedByHand;
 
   /// How many whole packaging units (e.g. "cases", "packs") remain, given
   /// the raw base-unit quantity on hand.
@@ -65,6 +76,7 @@ class CreateInventoryItemRequest {
     required this.packagingUnit,
     required this.packagingSize,
     this.lowStockThreshold,
+    this.categoryId,
   });
 
   final String name;
@@ -73,6 +85,7 @@ class CreateInventoryItemRequest {
   final String packagingUnit;
   final double packagingSize;
   final double? lowStockThreshold;
+  final String? categoryId;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -81,6 +94,7 @@ class CreateInventoryItemRequest {
     'packagingUnit': packagingUnit,
     'packagingSize': packagingSize,
     'lowStockThreshold': lowStockThreshold,
+    'categoryId': categoryId,
   };
 }
 
@@ -94,6 +108,7 @@ class UpdateInventoryItemRequest {
     required this.packagingSize,
     this.lowStockThreshold,
     required this.isActive,
+    this.categoryId,
   });
 
   final String name;
@@ -103,6 +118,7 @@ class UpdateInventoryItemRequest {
   final double packagingSize;
   final double? lowStockThreshold;
   final bool isActive;
+  final String? categoryId;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -112,7 +128,41 @@ class UpdateInventoryItemRequest {
     'packagingSize': packagingSize,
     'lowStockThreshold': lowStockThreshold,
     'isActive': isActive,
+    'categoryId': categoryId,
   };
+}
+
+/// Mirrors Purch.Application.Inventory.InventoryCategoryDto: a group for
+/// ingredients, kept apart from the item categories used at the till.
+class InventoryCategory {
+  const InventoryCategory({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+  });
+
+  factory InventoryCategory.fromJson(Map<String, dynamic> json) {
+    return InventoryCategory(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      sortOrder: json['sortOrder'] as int,
+    );
+  }
+
+  final String id;
+  final String name;
+  final int sortOrder;
+}
+
+/// Mirrors Purch.Application.Inventory.CreateInventoryCategoryRequest and
+/// UpdateInventoryCategoryRequest (same shape).
+class InventoryCategoryRequest {
+  const InventoryCategoryRequest({required this.name, required this.sortOrder});
+
+  final String name;
+  final int sortOrder;
+
+  Map<String, dynamic> toJson() => {'name': name, 'sortOrder': sortOrder};
 }
 
 /// Mirrors Purch.Application.Inventory.UpdatePhysicalCountRequest.

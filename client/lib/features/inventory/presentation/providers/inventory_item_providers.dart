@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../domain/inventory_item_models.dart';
+import '../../domain/inventory_repository.dart';
 import 'inventory_providers.dart';
 
 part 'inventory_item_providers.g.dart';
@@ -19,6 +20,58 @@ class InventoryItemList extends _$InventoryItemList {
   Future<void> refresh() async {
     ref.invalidateSelf();
     await future;
+  }
+}
+
+/// Ingredient categories, ordered by the server (position, then name).
+@riverpod
+class InventoryCategoryList extends _$InventoryCategoryList {
+  @override
+  Future<List<InventoryCategory>> build() {
+    return ref.watch(inventoryRepositoryProvider).listInventoryCategories();
+  }
+
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
+}
+
+/// Create, rename and delete for ingredient categories. A delete also
+/// refreshes the ingredient list, because its ingredients lose the category.
+@riverpod
+class InventoryCategoryController extends _$InventoryCategoryController {
+  @override
+  FutureOr<void> build() {}
+
+  Future<bool> create(InventoryCategoryRequest request) => _run(
+    (repository) => repository.createInventoryCategory(request),
+  );
+
+  Future<bool> updateCategory(String id, InventoryCategoryRequest request) =>
+      _run((repository) => repository.updateInventoryCategory(id, request));
+
+  Future<bool> delete(String id) =>
+      _run((repository) => repository.deleteInventoryCategory(id));
+
+  Future<bool> _run(
+    Future<Object?> Function(InventoryRepository repository) action,
+  ) async {
+    state = const AsyncLoading();
+    final repository = ref.read(inventoryRepositoryProvider);
+
+    state = await AsyncValue.guard(() => action(repository));
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(inventoryCategoryListProvider.notifier).refresh();
+      await ref.read(inventoryItemListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
+  Failure? get currentFailure {
+    final error = state.error;
+    return error is Failure ? error : null;
   }
 }
 

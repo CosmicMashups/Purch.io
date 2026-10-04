@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/theming/app_tokens.dart';
@@ -13,11 +14,29 @@ import '../providers/inventory_item_providers.dart';
 
 const _baseUnits = ['pc', 'g', 'kg', 'mL', 'L'];
 
+/// The dropdown entry that lets someone type any other unit, like pair or tray.
+const _otherUnit = 'Other…';
+
 /// Ingredient-level inventory — opt-in per tenant via
 /// useSeparateInventoryTracking. Lists InventoryItems, lets the user add new
 /// ones, and record physical counts / stock receipts against them.
-class InventoryItemListScreen extends ConsumerWidget {
-  const InventoryItemListScreen({super.key});
+class InventoryItemListScreen extends ConsumerStatefulWidget {
+  const InventoryItemListScreen({super.key, this.receiveItemId});
+
+  /// Set by "Restock first": opens that ingredient's delivery form once the
+  /// list has loaded.
+  final String? receiveItemId;
+
+  @override
+  ConsumerState<InventoryItemListScreen> createState() =>
+      _InventoryItemListScreenState();
+}
+
+class _InventoryItemListScreenState
+    extends ConsumerState<InventoryItemListScreen> {
+  /// null shows everything, '' only the uncategorised, otherwise a category id.
+  String? _filter;
+  bool _receiveOpened = false;
 
   String _formatQuantity(InventoryItem item) {
     if (item.packagingSize != 1) {
@@ -35,8 +54,12 @@ class InventoryItemListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final itemsAsync = ref.watch(inventoryItemListProvider);
+    final categories =
+        ref.watch(inventoryCategoryListProvider).valueOrNull ??
+        const <InventoryCategory>[];
+    final categoryNames = {for (final c in categories) c.id: c.name};
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -45,6 +68,13 @@ class InventoryItemListScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         centerTitle: false,
+        actions: [
+          TextButton.icon(
+            onPressed: () => context.push('/inventory/inventory-categories'),
+            icon: const Icon(Icons.category_outlined),
+            label: const Text('Categories'),
+          ),
+        ],
       ),
       body: itemsAsync.when(
         loading: () => const Center(
@@ -67,16 +97,34 @@ class InventoryItemListScreen extends ConsumerWidget {
             );
           }
 
-          return RefreshIndicator(
+          final receiveId = widget.receiveItemId;
+          if (receiveId != null && !_receiveOpened) {
+            _receiveOpened = true;
+            final target = items.where((i) => i.id == receiveId).firstOrNull;
+            if (target != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _openReceiveStockDialog(context, ref, target);
+              });
+            }
+          }
+
+          final shown =
+              _filter == null
+                  ? items
+                  : items
+                      .where((i) => (i.categoryId ?? '') == _filter)
+                      .toList();
+
+          final list = RefreshIndicator(
             color: AppColors.brandPrimary,
             onRefresh: () =>
                 ref.read(inventoryItemListProvider.notifier).refresh(),
             child: ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: items.length,
+              itemCount: shown.length,
               separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
-                final item = items[index];
+                final item = shown[index];
                 return Card(
                   elevation: 0,
                   color: AppColors.surface,
@@ -114,7 +162,9 @@ class InventoryItemListScreen extends ConsumerWidget {
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         '${_formatQuantity(item)}'
-                        '${item.sku != null ? ' · SKU ${item.sku}' : ''}',
+                        '${categoryNames[item.categoryId] != null ? ' · ${categoryNames[item.categoryId]}' : ''}'
+                        '${item.sku != null ? ' · SKU ${item.sku}' : ''}'
+                        '${item.isCountedByHand ? '\nCounted by hand: not deducted when items sell. Use Physical count, e.g. at the end of a shift.' : ''}',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
@@ -130,6 +180,38 @@ class InventoryItemListScreen extends ConsumerWidget {
                 );
               },
             ),
+          );
+
+          if (categories.isEmpty) return list;
+          return Column(
+            children: [
+              SizedBox(
+                height: 56,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
+                  ),
+                  children: [
+                    for (final chip in <(String?, String)>[
+                      (null, 'All'),
+                      for (final c in categories) (c.id, c.name),
+                      ('', 'Uncategorised'),
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.sm),
+                        child: ChoiceChip(
+                          label: Text(chip.$2),
+                          selected: _filter == chip.$1,
+                          onSelected: (_) => setState(() => _filter = chip.$1),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(child: list),
+            ],
           );
         },
       ),
@@ -249,8 +331,19 @@ class _InventoryItemFormDialogState
   late final _lowStockThresholdController = TextEditingController(
     text: widget.existing?.lowStockThreshold?.toString(),
   );
-  late String _baseUnit = widget.existing?.baseUnit ?? _baseUnits.first;
+  // A unit outside the common list (like pair, made on the web) opens as Other with its name filled in.
+  late String _baseUnit =
+      widget.existing == null || _baseUnits.contains(widget.existing!.baseUnit)
+          ? (widget.existing?.baseUnit ?? _baseUnits.first)
+          : _otherUnit;
+  late final _customUnitController = TextEditingController(
+    text:
+        widget.existing != null && !_baseUnits.contains(widget.existing!.baseUnit)
+            ? widget.existing!.baseUnit
+            : '',
+  );
   late bool _isActive = widget.existing?.isActive ?? true;
+  late String? _categoryId = widget.existing?.categoryId;
 
   @override
   void dispose() {
@@ -259,6 +352,7 @@ class _InventoryItemFormDialogState
     _packagingUnitController.dispose();
     _packagingSizeController.dispose();
     _lowStockThresholdController.dispose();
+    _customUnitController.dispose();
     super.dispose();
   }
 
@@ -275,6 +369,8 @@ class _InventoryItemFormDialogState
         : double.tryParse(_lowStockThresholdController.text.trim());
     final sku =
         _skuController.text.trim().isEmpty ? null : _skuController.text.trim();
+    final baseUnit =
+        _baseUnit == _otherUnit ? _customUnitController.text.trim() : _baseUnit;
 
     bool succeeded;
     if (_isEditing) {
@@ -285,11 +381,12 @@ class _InventoryItemFormDialogState
             UpdateInventoryItemRequest(
               name: _nameController.text.trim(),
               sku: sku,
-              baseUnit: _baseUnit,
+              baseUnit: baseUnit,
               packagingUnit: _packagingUnitController.text.trim(),
               packagingSize: packagingSize,
               lowStockThreshold: lowStockThreshold,
               isActive: _isActive,
+              categoryId: _categoryId,
             ),
           );
     } else {
@@ -299,10 +396,11 @@ class _InventoryItemFormDialogState
             CreateInventoryItemRequest(
               name: _nameController.text.trim(),
               sku: sku,
-              baseUnit: _baseUnit,
+              baseUnit: baseUnit,
               packagingUnit: _packagingUnitController.text.trim(),
               packagingSize: packagingSize,
               lowStockThreshold: lowStockThreshold,
+              categoryId: _categoryId,
             ),
           );
     }
@@ -350,13 +448,29 @@ class _InventoryItemFormDialogState
                 value: _baseUnit,
                 decoration: const InputDecoration(labelText: 'Base unit'),
                 items: [
-                  for (final unit in _baseUnits)
+                  for (final unit in [..._baseUnits, _otherUnit])
                     DropdownMenuItem(value: unit, child: Text(unit)),
                 ],
                 onChanged: isLoading
                     ? null
                     : (value) => setState(() => _baseUnit = value ?? _baseUnit),
               ),
+              if (_baseUnit == _otherUnit) ...[
+                const SizedBox(height: AppSpacing.sm),
+                TextFormField(
+                  controller: _customUnitController,
+                  enabled: !isLoading,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit name',
+                    hintText: 'e.g. pair, tray, bottle',
+                  ),
+                  validator: (value) =>
+                      _baseUnit == _otherUnit &&
+                              (value == null || value.trim().isEmpty)
+                          ? 'Required'
+                          : null,
+                ),
+              ],
               const SizedBox(height: AppSpacing.sm),
               TextFormField(
                 controller: _packagingUnitController,
@@ -387,6 +501,25 @@ class _InventoryItemFormDialogState
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<String?>(
+                value: _categoryId,
+                decoration: const InputDecoration(
+                  labelText: 'Category (optional)',
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Uncategorised'),
+                  ),
+                  for (final c
+                      in ref.watch(inventoryCategoryListProvider).valueOrNull ??
+                          const <InventoryCategory>[])
+                    DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
+                ],
+                onChanged:
+                    isLoading ? null : (value) => setState(() => _categoryId = value),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextFormField(

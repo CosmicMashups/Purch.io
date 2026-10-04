@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ITEM_SAMPLES } from '../../../lib/images';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,10 +9,15 @@ import { createItemSchema } from '../schemas';
 import { PricingType, TingiMode } from '../types';
 import { pricingTypeLabels } from '../labels';
 import { catalogApi } from '../api';
-import { useCategories, useCreateItem } from '../queries';
+import { catalogKeys, useCategories, useCreateItem } from '../queries';
+import { useTenantSettings } from '../../tenant/queries';
+import { useInventoryItems } from '../../inventory/queries';
+import { IngredientSelector } from '../components/IngredientSelector';
+import { buildRecipeLines, type RecipeSelection } from '../recipe';
 import { Field, inputClass } from '../../../components/Field';
 import { ImageUploadField } from '../../../components/forms/ImageUploadField';
-import { ApiError } from '../../../lib/apiError';
+import { ApiError, userMessage } from '../../../lib/apiError';
+import { toast } from '../../../components/feedback/toastStore';
 
 type FormValues = z.infer<typeof createItemSchema>;
 
@@ -19,6 +25,13 @@ export function AddItemPage() {
   const navigate = useNavigate();
   const { data: categories } = useCategories();
   const createItem = useCreateItem();
+  const qc = useQueryClient();
+  // Only a business that tracks ingredients separately has recipes at all.
+  const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
+  const inventoryItems = useInventoryItems();
+  const pickable = (inventoryItems.data ?? []).filter((i) => i.isActive);
+  const [recipe, setRecipe] = useState<RecipeSelection>({});
+  const [recipeError, setRecipeError] = useState<{ id: string; message: string } | null>(null);
 
   const {
     register,
@@ -105,6 +118,13 @@ export function AddItemPage() {
 
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
+    setRecipeError(null);
+    // Checked up front so a bad quantity never leaves a half-made item behind.
+    const recipeLines = tracksIngredients ? buildRecipeLines(recipe) : { ok: true as const, lines: [] };
+    if (!recipeLines.ok) {
+      setRecipeError({ id: recipeLines.inventoryItemId, message: recipeLines.message });
+      return;
+    }
     try {
       const item = await createItem.mutateAsync({
         name: values.name,
@@ -117,6 +137,18 @@ export function AddItemPage() {
       });
 
       await createSubResourceIfValid(item.id, values);
+
+      if (recipeLines.lines.length > 0) {
+        try {
+          await catalogApi.replaceRecipe(item.id, { lines: recipeLines.lines });
+          await Promise.all([qc.invalidateQueries({ queryKey: ['inventory-items'] }), qc.invalidateQueries({ queryKey: catalogKeys.items })]);
+        } catch (recipeFailure) {
+          // The item exists now, so resubmitting would make a duplicate. Send them to fix just the recipe.
+          toast.error(`${values.name} was saved, but its ingredients were not: ${userMessage(recipeFailure)}`);
+          navigate(`/catalog/items/${item.id}/recipe`);
+          return;
+        }
+      }
 
       navigate('/catalog/items');
     } catch (err) {
@@ -225,6 +257,8 @@ export function AddItemPage() {
           </Field>
         </>
       )}
+
+      {tracksIngredients && <IngredientSelector ingredients={pickable} selection={recipe} onChange={setRecipe} lineError={recipeError} />}
 
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 

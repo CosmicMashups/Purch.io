@@ -39,6 +39,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
 
+    public DbSet<InventoryCategory> InventoryCategories => Set<InventoryCategory>();
+
     public DbSet<ItemRecipeLine> ItemRecipeLines => Set<ItemRecipeLine>();
 
     public DbSet<ItemVariant> ItemVariants => Set<ItemVariant>();

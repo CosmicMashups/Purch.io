@@ -22,12 +22,25 @@ import '../../../inventory/presentation/screens/record_movement_screen.dart';
 /// stay reachable but demoted to a compact secondary strip, because a manager
 /// opening this tab almost always wants to know the stock position, not to
 /// navigate.
-class InventoryTabScreen extends ConsumerWidget {
+class InventoryTabScreen extends ConsumerStatefulWidget {
   const InventoryTabScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InventoryTabScreen> createState() => _InventoryTabScreenState();
+}
+
+/// Which stock the health cards and the restock list describe. Only offered
+/// when the business tracks ingredients separately.
+enum StockScope { items, ingredients }
+
+class _InventoryTabScreenState extends ConsumerState<InventoryTabScreen> {
+  StockScope _scope = StockScope.items;
+
+  @override
+  Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(inventoryDashboardNotifierProvider);
+    final hasIngredients = dashboardAsync.valueOrNull?.ingredients != null;
+    final scope = hasIngredients ? _scope : StockScope.items;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -41,10 +54,17 @@ class InventoryTabScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            _StatCardRow(dashboard: dashboardAsync),
+            if (hasIngredients) ...[
+              _ScopeSwitch(
+                scope: scope,
+                onChanged: (value) => setState(() => _scope = value),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            _StatCardRow(dashboard: dashboardAsync, scope: scope),
             const SizedBox(height: AppSpacing.xl),
             const _SectionHeader(title: 'Low stock alerts'),
-            _LowStockAlerts(dashboard: dashboardAsync),
+            _LowStockAlerts(dashboard: dashboardAsync, scope: scope),
             const SizedBox(height: AppSpacing.xl),
             const _SectionHeader(title: 'Items'),
             const _ItemsTable(),
@@ -70,6 +90,28 @@ class InventoryTabScreen extends ConsumerWidget {
   }
 }
 
+class _ScopeSwitch extends StatelessWidget {
+  const _ScopeSwitch({required this.scope, required this.onChanged});
+
+  final StockScope scope;
+  final ValueChanged<StockScope> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<StockScope>(
+      segments: const [
+        ButtonSegment(value: StockScope.items, label: Text('Items')),
+        ButtonSegment(
+          value: StockScope.ingredients,
+          label: Text('Ingredients'),
+        ),
+      ],
+      selected: {scope},
+      onSelectionChanged: (selection) => onChanged(selection.first),
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
 
@@ -89,9 +131,10 @@ class _SectionHeader extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _StatCardRow extends ConsumerWidget {
-  const _StatCardRow({required this.dashboard});
+  const _StatCardRow({required this.dashboard, required this.scope});
 
   final AsyncValue<InventoryDashboard> dashboard;
+  final StockScope scope;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -107,12 +150,18 @@ class _StatCardRow extends ConsumerWidget {
       );
     }
 
+    final ingredients =
+        scope == StockScope.ingredients ? data?.ingredients : null;
+    final total = ingredients?.total ?? data?.totalSkus;
+    final low = ingredients?.lowStockCount ?? data?.lowStockCount;
+    final out = ingredients?.outOfStockCount ?? data?.outOfStockCount;
+
     return Row(
       children: [
         Expanded(
           child: _StatCard(
-            label: 'Total SKUs',
-            value: data == null ? null : '${data.totalSkus}',
+            label: scope == StockScope.ingredients ? 'Ingredients' : 'Total SKUs',
+            value: total == null ? null : '$total',
             icon: Icons.inventory_2,
             accentColor: AppColors.brandPrimary,
             containerColor: AppColors.brandPrimaryContainer,
@@ -122,7 +171,7 @@ class _StatCardRow extends ConsumerWidget {
         Expanded(
           child: _StatCard(
             label: 'Low Stock',
-            value: data == null ? null : '${data.lowStockCount}',
+            value: low == null ? null : '$low',
             icon: Icons.warning_amber_rounded,
             accentColor: AppColors.accentWarm,
             containerColor: AppColors.accentWarmContainer,
@@ -132,7 +181,7 @@ class _StatCardRow extends ConsumerWidget {
         Expanded(
           child: _StatCard(
             label: 'Out of Stock',
-            value: data == null ? null : '${data.outOfStockCount}',
+            value: out == null ? null : '$out',
             icon: Icons.remove_shopping_cart,
             accentColor: AppColors.error,
             containerColor: AppColors.cardHover,
@@ -229,9 +278,10 @@ class _StatCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _LowStockAlerts extends ConsumerWidget {
-  const _LowStockAlerts({required this.dashboard});
+  const _LowStockAlerts({required this.dashboard, required this.scope});
 
   final AsyncValue<InventoryDashboard> dashboard;
+  final StockScope scope;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -243,6 +293,11 @@ class _LowStockAlerts extends ConsumerWidget {
         return const SizedBox.shrink();
       }
       return const _PanelPlaceholder(height: 96);
+    }
+
+    final ingredientStock = data.ingredients;
+    if (scope == StockScope.ingredients && ingredientStock != null) {
+      return _IngredientAlerts(alerts: ingredientStock.lowStock);
     }
 
     final alerts = data.lowStockItems;
@@ -337,6 +392,107 @@ class _LowStockAlerts extends ConsumerWidget {
                   );
                 },
                 child: const Text('Reorder'),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Ingredients running low. An ingredient is restocked by receiving a
+/// delivery, so each row opens the ingredient list on that delivery form.
+class _IngredientAlerts extends StatelessWidget {
+  const _IngredientAlerts({required this.alerts});
+
+  final List<LowStockIngredient> alerts;
+
+  static String _quantity(double value) =>
+      value.truncateToDouble() == value
+          ? value.toStringAsFixed(0)
+          : value.toStringAsFixed(1);
+
+  @override
+  Widget build(BuildContext context) {
+    if (alerts.isEmpty) {
+      return _Panel(
+        child: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              color: AppColors.accentEmerald,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                'No ingredient is running low right now.',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (final alert in alerts)
+          Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.lgBorder,
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.subtle,
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.accentWarmContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: const Icon(
+                  Icons.egg_outlined,
+                  color: AppColors.accentWarm,
+                  size: 20,
+                ),
+              ),
+              title: Text(
+                alert.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                '${_quantity(alert.quantityOnHand)} ${alert.baseUnit} left · '
+                'alert at ${_quantity(alert.lowStockThreshold)}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              trailing: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.brandPrimary),
+                  foregroundColor: AppColors.brandPrimary,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: AppRadius.mdBorder,
+                  ),
+                ),
+                onPressed:
+                    () => context.push(
+                      '/inventory/inventory-items?receive=${alert.inventoryItemId}',
+                    ),
+                child: const Text('Receive'),
               ),
             ),
           ),

@@ -6,7 +6,10 @@ import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/image_upload_field.dart';
 import '../../../../core/widgets/status_badge.dart';
-import '../../../inventory/presentation/screens/recipe_editor_screen.dart';
+import '../../../inventory/domain/inventory_item_models.dart';
+import '../../../inventory/domain/recipe_selection.dart';
+import '../../../inventory/presentation/providers/inventory_item_providers.dart';
+import '../../../inventory/presentation/widgets/ingredient_recipe_field.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../domain/item_models.dart';
 import '../../domain/pricing_type.dart';
@@ -31,6 +34,12 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
   String? _selectedCategoryId;
   String? _selectedDepartmentId;
   late bool _isActive;
+
+  // Ingredients (only when the business tracks them separately). The saved
+  // recipe is kept so saving only touches it when it was really changed.
+  RecipeSelection _recipe = {};
+  RecipeSelection? _initialRecipe;
+  RecipeLineError? _recipeError;
 
   @override
   void initState() {
@@ -77,6 +86,23 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
     final price = double.tryParse(_priceController.text.trim());
     if (price == null) return;
 
+    final tracksIngredients =
+        ref.read(tenantSettingsNotifierProvider).valueOrNull
+            ?.useSeparateInventoryTracking ==
+        true;
+    final initialRecipe = _initialRecipe;
+    final recipeChanged =
+        tracksIngredients &&
+        initialRecipe != null &&
+        !sameRecipeSelection(_recipe, initialRecipe);
+    final recipeResult =
+        recipeChanged ? buildRecipeLines(_recipe) : const RecipeBuildResult.ok([]);
+    if (!recipeResult.isOk) {
+      setState(() => _recipeError = recipeResult.error);
+      return;
+    }
+    setState(() => _recipeError = null);
+
     final controller = ref.read(updateItemControllerProvider.notifier);
     final succeeded = await controller.updateItem(
       widget.item.id,
@@ -99,6 +125,30 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
     );
 
     if (!mounted) return;
+
+    // An empty list is a real change here: it turns the item back into its own inventory item.
+    if (succeeded && recipeChanged) {
+      final recipeSaved = await ref
+          .read(replaceItemRecipeControllerProvider.notifier)
+          .replace(
+            widget.item.id,
+            ReplaceItemRecipeRequest(lines: recipeResult.lines),
+          );
+      if (!mounted) return;
+      if (!recipeSaved) {
+        final message =
+            ref.read(replaceItemRecipeControllerProvider.notifier).currentFailure
+                ?.message ??
+            'The ingredients could not be saved.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Item saved, but its ingredients were not: $message'),
+          ),
+        );
+        return;
+      }
+    }
 
     if (succeeded) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -126,6 +176,21 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
           data: (settings) => settings.useSeparateInventoryTracking,
           orElse: () => false,
         );
+    final savedRecipe =
+        useSeparateInventoryTracking
+            ? ref.watch(itemRecipeProvider(widget.item.id)).valueOrNull
+            : null;
+    if (savedRecipe != null && _initialRecipe == null) {
+      _initialRecipe = selectionFromRecipe(savedRecipe);
+      _recipe = Map.of(_initialRecipe!);
+    }
+    // An item's own paired stock record cannot be an ingredient of its own recipe.
+    final pickableIngredients = [
+      for (final i
+          in ref.watch(inventoryItemListProvider).valueOrNull ??
+              const <InventoryItem>[])
+        if (i.linkedItemId != widget.item.id) i,
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -427,29 +492,25 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                         ),
 
                         if (useSeparateInventoryTracking) ...[
-                          OutlinedButton.icon(
-                            onPressed: isLoading
-                                ? null
-                                : () => Navigator.of(context).push<void>(
-                                      MaterialPageRoute(
-                                        builder: (_) => RecipeEditorScreen(
-                                          itemId: widget.item.id,
-                                          itemName: widget.item.name,
-                                        ),
-                                      ),
-                                    ),
-                            icon: const Icon(Icons.receipt_long_outlined),
-                            label: const Text('Manage Recipe'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.brandPrimary,
-                              side: const BorderSide(color: AppColors.border),
-                              minimumSize: const Size.fromHeight(44),
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: AppRadius.mdBorder,
-                              ),
+                          if (_initialRecipe == null)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                              child: Text('Loading ingredients…'),
+                            )
+                          else ...[
+                            IngredientRecipeField(
+                              ingredients: pickableIngredients,
+                              selection: _recipe,
+                              lineError: _recipeError,
+                              enabled: !isLoading,
+                              onChanged:
+                                  (next) => setState(() {
+                                    _recipeError = null;
+                                    _recipe = next;
+                                  }),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
+                            const SizedBox(height: AppSpacing.lg),
+                          ],
                         ],
 
                         // Active State Switch

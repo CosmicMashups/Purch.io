@@ -11,6 +11,21 @@ export interface InventoryItem {
   isAutoCreatedForItem: boolean;
   linkedItemId: string | null;
   isActive: boolean;
+  categoryId: string | null;
+  /** True when recipes use it but none deducts it on a sale, so only a count changes its stock. */
+  isCountedByHand?: boolean;
+}
+
+/** Mirrors Purch.Application.Inventory.InventoryCategoryDto. */
+export interface InventoryCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface InventoryCategoryBody {
+  name: string;
+  sortOrder: number;
 }
 
 export interface CreateInventoryItemRequest {
@@ -20,6 +35,7 @@ export interface CreateInventoryItemRequest {
   packagingUnit: string;
   packagingSize: number;
   lowStockThreshold: number | null;
+  categoryId?: string | null;
 }
 
 export interface UpdateInventoryItemRequest extends CreateInventoryItemRequest {

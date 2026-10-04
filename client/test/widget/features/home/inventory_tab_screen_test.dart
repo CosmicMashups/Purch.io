@@ -255,4 +255,76 @@ void main() {
     expect(find.text('Stock Movements'), findsOneWidget);
     expect(find.text('Purchase Orders'), findsOneWidget);
   });
+
+  group('with ingredients tracked separately', () {
+    const dashboard = InventoryDashboard(
+      totalSkus: 10,
+      outOfStockCount: 1,
+      lowStockCount: 1,
+      lowStockItems: [
+        LowStockItem(
+          itemId: 'item-1',
+          itemName: 'Sugar',
+          stockOnHand: 3,
+          lowStockThreshold: 5,
+        ),
+      ],
+      ingredients: IngredientStock(
+        total: 4,
+        outOfStockCount: 0,
+        lowStockCount: 1,
+        lowStock: [
+          LowStockIngredient(
+            inventoryItemId: 'ing-1',
+            name: 'Oat Milk',
+            baseUnit: 'mL',
+            quantityOnHand: 800,
+            lowStockThreshold: 2000,
+          ),
+        ],
+      ),
+    );
+
+    testWidgets('has no Items/Ingredients switch when tracking is off', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          inventoryRepository: FakeInventoryRepository(
+            initialDashboard: _dashboardWithAlert,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SegmentedButton<StockScope>), findsNothing);
+    });
+
+    testWidgets('counts and lists ingredients apart from items', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          inventoryRepository: FakeInventoryRepository(
+            initialDashboard: dashboard,
+          ),
+          catalogRepository: FakeCatalogRepository(initialItems: [_sugar]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Total SKUs'), findsOneWidget);
+      expect(find.text('Sugar'), findsWidgets);
+      expect(find.text('Oat Milk'), findsNothing);
+
+      await tester.tap(find.text('Ingredients'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Total SKUs'), findsNothing);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.text('Oat Milk'), findsOneWidget);
+      expect(find.text('800 mL left · alert at 2000'), findsOneWidget);
+      expect(find.text('Receive'), findsOneWidget);
+    });
+  });
 }

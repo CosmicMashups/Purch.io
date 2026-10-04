@@ -5,6 +5,7 @@ import type { MovementCursor, MovementFilter } from './types';
 
 export const inventoryKeys = {
   items: ['inventory-items'] as const,
+  categories: ['inventory-categories'] as const,
   movements: ['inventory', 'movements'] as const,
   suppliers: ['inventory', 'suppliers'] as const,
   purchaseOrders: ['inventory', 'purchase-orders'] as const,
@@ -12,6 +13,7 @@ export const inventoryKeys = {
 };
 
 export const useInventoryItems = () => useQuery({ queryKey: inventoryKeys.items, queryFn: inventoryApi.listInventoryItems });
+export const useInventoryCategories = () => useQuery({ queryKey: inventoryKeys.categories, queryFn: inventoryApi.listInventoryCategories });
 export const useSuppliers = () => useQuery({ queryKey: inventoryKeys.suppliers, queryFn: inventoryApi.listSuppliers });
 export const usePurchaseOrders = () => useQuery({ queryKey: inventoryKeys.purchaseOrders, queryFn: inventoryApi.listPurchaseOrders });
 export const useTransfers = () => useQuery({ queryKey: inventoryKeys.transfers, queryFn: inventoryApi.listTransfers });
@@ -60,6 +62,20 @@ export const usePhysicalCount = () =>
   useStockMutation(({ id, body }: { id: string; body: Parameters<Api['physicalCount']>[1] }) => inventoryApi.physicalCount(id, body));
 export const useReceiveStock = () =>
   useStockMutation(({ id, body }: { id: string; body: Parameters<Api['receiveStock']>[1] }) => inventoryApi.receiveStock(id, body));
+
+/** A category change also changes how the ingredient list reads (a deleted one empties its ingredients' category). */
+function useCategoryMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: TVars) => fn(vars),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: inventoryKeys.categories }), qc.invalidateQueries({ queryKey: inventoryKeys.items })]),
+  });
+}
+
+export const useCreateInventoryCategory = () => useCategoryMutation(inventoryApi.createInventoryCategory);
+export const useUpdateInventoryCategory = () =>
+  useCategoryMutation(({ id, body }: { id: string; body: Parameters<Api['updateInventoryCategory']>[1] }) => inventoryApi.updateInventoryCategory(id, body));
+export const useDeleteInventoryCategory = () => useCategoryMutation(inventoryApi.deleteInventoryCategory);
 
 export function useCreateSupplier() {
   const qc = useQueryClient();

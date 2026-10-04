@@ -20,6 +20,7 @@ import '../../features/home/presentation/screens/home_tab_screen.dart';
 import '../../features/home/presentation/screens/inventory_tab_screen.dart';
 import '../../features/inventory/presentation/screens/branch_transfer_list_screen.dart';
 import '../../features/inventory/presentation/screens/movement_log_screen.dart';
+import '../../features/inventory/presentation/screens/inventory_category_list_screen.dart';
 import '../../features/inventory/presentation/screens/inventory_item_list_screen.dart';
 import '../../features/inventory/presentation/screens/purchase_order_list_screen.dart';
 import '../../features/inventory/presentation/screens/recipe_editor_screen.dart';
@@ -264,7 +265,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'inventory-items',
                     builder:
-                        (context, state) => const InventoryItemListScreen(),
+                        (context, state) => InventoryItemListScreen(
+                          receiveItemId: state.uri.queryParameters['receive'],
+                        ),
+                  ),
+                  GoRoute(
+                    path: 'inventory-categories',
+                    builder:
+                        (context, state) => const InventoryCategoryListScreen(),
                   ),
                   GoRoute(
                     path: 'items/:itemId/recipe',

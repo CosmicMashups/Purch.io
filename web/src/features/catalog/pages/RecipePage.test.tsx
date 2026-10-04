@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,6 +23,7 @@ const inv = (over: Partial<InventoryItem>): InventoryItem => ({
   isAutoCreatedForItem: false,
   linkedItemId: null,
   isActive: true,
+  categoryId: null,
   ...over,
 });
 
@@ -53,25 +54,37 @@ describe('RecipePage', () => {
     vi.mocked(catalogApi.replaceRecipe).mockResolvedValue([]);
   });
 
-  it('preloads the recipe and hides the item\'s own stock record', async () => {
+  const pick = async (name: RegExp) => {
+    fireEvent.focus(await screen.findByRole('combobox', { name: 'Ingredients' }));
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name }));
+  };
+
+  it("preloads the recipe and hides the item's own stock record", async () => {
     renderPage();
-    expect(await screen.findByLabelText(/Espresso Beans/)).toBeChecked();
-    expect(screen.getByLabelText(/Milk/)).not.toBeChecked();
-    expect(screen.queryByText('Latte (own stock)')).not.toBeInTheDocument();
+    const chosen = within(await screen.findByRole('list', { name: 'Selected ingredients' }));
+    expect(chosen.getByText('Espresso Beans')).toBeInTheDocument();
+    expect(chosen.getByRole('radio', { name: 'Used up every order' })).toBeChecked();
     expect(screen.getByLabelText('Quantity per order (g)')).toHaveValue('18');
+
+    fireEvent.focus(screen.getByRole('combobox', { name: 'Ingredients' }));
+    const options = within(await screen.findByRole('listbox')).getAllByRole('option');
+    expect(options).toHaveLength(2);
+    expect(screen.queryByText('Latte (own stock)')).not.toBeInTheDocument();
   });
 
-  it('saves the checked ingredients with their quantities', async () => {
+  it('saves a used ingredient with its quantity and an availability-only one without', async () => {
     renderPage();
-    fireEvent.click(await screen.findByLabelText(/Milk/));
-    fireEvent.change(screen.getByLabelText('Quantity per order (ml)'), { target: { value: '200' } });
+    await screen.findByRole('list', { name: 'Selected ingredients' });
+    await pick(/Milk/);
+    // A newly chosen ingredient starts as availability-only.
+    expect(screen.queryByLabelText('Quantity per order (ml)')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save recipe' }));
 
     await waitFor(() => expect(catalogApi.replaceRecipe).toHaveBeenCalledTimes(1));
     expect(catalogApi.replaceRecipe).toHaveBeenCalledWith('latte', {
       lines: [
         { inventoryItemId: 'beans', quantityPerOrder: 18 },
-        { inventoryItemId: 'milk', quantityPerOrder: 200 },
+        { inventoryItemId: 'milk', quantityPerOrder: null },
       ],
     });
     expect(await screen.findByText('Item list')).toBeInTheDocument();

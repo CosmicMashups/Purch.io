@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../../test/render';
 import { dashboardApi } from '../../dashboard/api';
@@ -54,5 +54,50 @@ describe('InventoryHomePage', () => {
     vi.mocked(dashboardApi.inventory).mockRejectedValue(new Error('boom'));
     renderPage(<InventoryHomePage />);
     expect(await screen.findByText('Stock health is unavailable')).toBeInTheDocument();
+  });
+
+  it('has no tabs when ingredients are not tracked separately', async () => {
+    signInAs('Warehouse');
+    renderPage(<InventoryHomePage />);
+    await screen.findByText('64');
+    expect(screen.queryByRole('tab', { name: 'Ingredients' })).not.toBeInTheDocument();
+  });
+
+  describe('with ingredients tracked separately', () => {
+    beforeEach(() => {
+      vi.mocked(dashboardApi.inventory).mockResolvedValue({
+        totalSkus: 64,
+        outOfStockCount: 1,
+        lowStockCount: 1,
+        lowStockItems: [{ itemId: 'a', itemName: 'Latte', stockOnHand: 3, lowStockThreshold: 10 }],
+        ingredients: {
+          total: 5,
+          outOfStockCount: 0,
+          lowStockCount: 1,
+          lowStock: [{ inventoryItemId: 'ing1', name: 'Oat Milk', baseUnit: 'ml', quantityOnHand: 800, lowStockThreshold: 2000 }],
+        },
+      });
+    });
+
+    it('splits Stock health into Items and Ingredients, each counted on its own', async () => {
+      signInAs('Warehouse');
+      renderPage(<InventoryHomePage />);
+      await screen.findByText('64');
+      fireEvent.click(screen.getAllByRole('tab', { name: 'Ingredients' })[0]);
+      expect(await screen.findByText('5')).toBeInTheDocument();
+      expect(screen.queryByText('64')).not.toBeInTheDocument();
+    });
+
+    it('lists low ingredients on their own tab and sends them to Receive delivery', async () => {
+      signInAs('Warehouse');
+      renderPage(<InventoryHomePage />);
+      expect(await screen.findByText('Latte')).toBeInTheDocument();
+      expect(screen.queryByText('Oat Milk')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getAllByRole('tab', { name: 'Ingredients' })[0]);
+      expect(await screen.findByText('Oat Milk')).toBeInTheDocument();
+      expect(screen.queryByText('Latte')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Receive delivery' })).toHaveAttribute('href', '/inventory/ingredients?receive=ing1');
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { countSchema, ingredientSchema, parseThreshold, receiveSchema } from './ingredient';
 
-const base = { name: 'Espresso Beans', sku: '', baseUnit: 'g', packagingUnit: 'sack', packagingSize: 1000, lowStockThreshold: '', isActive: true };
+const base = { name: 'Espresso Beans', sku: '', baseUnit: 'g', packagingUnit: 'sack', packagingSize: 1000, lowStockThreshold: '', categoryId: '', isActive: true };
 const first = (r: { success: boolean; error?: { issues: { message: string }[] } }) => (r.success ? null : r.error?.issues[0].message);
 
 describe('ingredientSchema', () => {

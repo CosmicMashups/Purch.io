@@ -6,6 +6,12 @@ import '../../../../core/hardware/barcode_scanner_screen.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/formatting/money.dart';
 import '../../../../core/widgets/image_upload_field.dart';
+import '../../../inventory/domain/recipe_selection.dart';
+import '../../../inventory/presentation/providers/inventory_item_providers.dart';
+import '../../../inventory/presentation/providers/inventory_providers.dart';
+import '../../../inventory/presentation/widgets/ingredient_recipe_field.dart';
+import '../../../inventory/domain/inventory_item_models.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../domain/bundle_promo_rule_models.dart';
 import '../../domain/category_models.dart';
 import '../../domain/item_combo_component_models.dart';
@@ -85,6 +91,10 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   final _comboUpchargeController = TextEditingController();
   Category? _comboCategory;
 
+  // --- Ingredients (only when the business tracks them separately) ---
+  RecipeSelection _recipe = {};
+  RecipeLineError? _recipeError;
+
   bool _isSaving = false;
   String? _customError;
 
@@ -135,9 +145,24 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
       return;
     }
 
+    // Checked up front so a bad quantity never leaves a half-made item behind.
+    final tracksIngredients =
+        ref.read(tenantSettingsNotifierProvider).valueOrNull
+            ?.useSeparateInventoryTracking ==
+        true;
+    final recipeResult =
+        tracksIngredients
+            ? buildRecipeLines(_recipe)
+            : const RecipeBuildResult.ok([]);
+    if (!recipeResult.isOk) {
+      setState(() => _recipeError = recipeResult.error);
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _customError = null;
+      _recipeError = null;
     });
 
     final repository = ref.read(catalogRepositoryProvider);
@@ -263,10 +288,37 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
         }
       }
 
+      var recipeFailure = '';
+      if (recipeResult.lines.isNotEmpty) {
+        try {
+          await ref
+              .read(inventoryRepositoryProvider)
+              .replaceItemRecipe(
+                createdItem.id,
+                ReplaceItemRecipeRequest(lines: recipeResult.lines),
+              );
+          await ref.read(inventoryItemListProvider.notifier).refresh();
+        } catch (e) {
+          // The item exists now, so resubmitting would make a duplicate.
+          recipeFailure = e is Failure ? e.message : e.toString();
+        }
+      }
+
       await ref.read(itemListProvider.notifier).refresh();
 
       if (!mounted) {
         return;
+      }
+      if (recipeFailure.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text(
+              '"${_nameController.text.trim()}" was saved, but its '
+              'ingredients were not: $recipeFailure. Edit the item to try again.',
+            ),
+          ),
+        );
       }
       Navigator.of(context).pop();
     } catch (e) {
@@ -638,6 +690,27 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                           ),
                         ],
                       ),
+                    ),
+                  ],
+
+                  if (ref
+                          .watch(tenantSettingsNotifierProvider)
+                          .valueOrNull
+                          ?.useSeparateInventoryTracking ==
+                      true) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    IngredientRecipeField(
+                      ingredients:
+                          ref.watch(inventoryItemListProvider).valueOrNull ??
+                          const <InventoryItem>[],
+                      selection: _recipe,
+                      lineError: _recipeError,
+                      enabled: !isLoading,
+                      onChanged:
+                          (next) => setState(() {
+                            _recipeError = null;
+                            _recipe = next;
+                          }),
                     ),
                   ],
 

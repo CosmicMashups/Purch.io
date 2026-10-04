@@ -4,15 +4,22 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { z } from 'zod';
 import { updateItemSchema } from '../schemas';
-import { useCategories, useItems, useUpdateItem } from '../queries';
+import { useCategories, useItems, useRecipe, useReplaceRecipe, useUpdateItem } from '../queries';
+import { useTenantSettings } from '../../tenant/queries';
+import { useInventoryItems } from '../../inventory/queries';
+import { IngredientSelector } from '../components/IngredientSelector';
+import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
 import { Field, inputClass } from '../../../components/Field';
 import { ImageUploadField } from '../../../components/forms/ImageUploadField';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { pricingTypeLabels } from '../labels';
 import { ApiError } from '../../../lib/apiError';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type FormValues = z.infer<typeof updateItemSchema>;
+
+/** Key order must not matter when comparing two selections. */
+const sorted = (selection: RecipeSelection) => Object.entries(selection).sort(([a], [b]) => a.localeCompare(b));
 
 export function EditItemPage() {
   const { itemId } = useParams<{ itemId: string }>();
@@ -21,6 +28,25 @@ export function EditItemPage() {
   const { data: categories } = useCategories();
   const updateItem = useUpdateItem();
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
+  const inventoryItems = useInventoryItems();
+  const savedRecipe = useRecipe(tracksIngredients ? (itemId ?? '') : '');
+  const replaceRecipe = useReplaceRecipe(itemId ?? '');
+  const [recipe, setRecipe] = useState<RecipeSelection>({});
+  const [recipeError, setRecipeError] = useState<{ id: string; message: string } | null>(null);
+  // What the form started from, so saving only touches the recipe when it was really changed.
+  const [initialRecipe, setInitialRecipe] = useState<RecipeSelection | null>(null);
+
+  useEffect(() => {
+    if (!savedRecipe.data || initialRecipe) return;
+    const fromServer = selectionFromRecipe(savedRecipe.data);
+    setInitialRecipe(fromServer);
+    setRecipe(fromServer);
+  }, [savedRecipe.data, initialRecipe]);
+
+  // An item's own paired stock record cannot be an ingredient of its own recipe. A retired one stays pickable only if already chosen.
+  const pickable = (inventoryItems.data ?? []).filter((i) => i.linkedItemId !== itemId && (i.isActive || (initialRecipe !== null && i.id in initialRecipe)));
 
   const item = items?.find((i) => i.id === itemId);
 
@@ -54,6 +80,13 @@ export function EditItemPage() {
 
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
+    setRecipeError(null);
+    const recipeChanged = tracksIngredients && initialRecipe !== null && JSON.stringify(sorted(recipe)) !== JSON.stringify(sorted(initialRecipe));
+    const recipeLines = recipeChanged ? buildRecipeLines(recipe) : { ok: true as const, lines: [] };
+    if (!recipeLines.ok) {
+      setRecipeError({ id: recipeLines.inventoryItemId, message: recipeLines.message });
+      return;
+    }
     try {
       await updateItem.mutateAsync({
         itemId: itemId!,
@@ -68,6 +101,8 @@ export function EditItemPage() {
           departmentId: values.departmentId ?? null,
         },
       });
+      // An empty list is a real change here: it turns the item back into its own inventory item.
+      if (recipeChanged) await replaceRecipe.mutateAsync({ lines: recipeLines.lines });
       navigate('/catalog/items');
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : 'Failed to update item');
@@ -117,14 +152,21 @@ export function EditItemPage() {
         Active
       </label>
 
+      {tracksIngredients &&
+        (initialRecipe === null ? (
+          <p className="text-sm text-gray-500">Loading ingredients…</p>
+        ) : (
+          <IngredientSelector ingredients={pickable} selection={recipe} onChange={setRecipe} lineError={recipeError} />
+        ))}
+
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
       <button
         type="submit"
-        disabled={updateItem.isPending}
+        disabled={updateItem.isPending || replaceRecipe.isPending}
         className="self-start rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {updateItem.isPending ? 'Saving…' : 'Save Changes'}
+        {updateItem.isPending || replaceRecipe.isPending ? 'Saving…' : 'Save Changes'}
       </button>
     </form>
   );

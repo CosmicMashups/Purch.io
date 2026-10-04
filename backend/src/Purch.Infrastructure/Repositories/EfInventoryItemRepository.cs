@@ -37,6 +37,11 @@ public sealed class EfInventoryItemRepository(PurchDbContext dbContext) : IInven
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<InventoryItem>> ListByCategoryTrackedAsync(Guid categoryId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.InventoryItems.Where(inventoryItem => inventoryItem.CategoryId == categoryId).ToListAsync(cancellationToken);
+    }
+
     public void Add(InventoryItem inventoryItem)
     {
         _ = dbContext.InventoryItems.Add(inventoryItem);

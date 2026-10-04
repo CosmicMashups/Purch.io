@@ -11,11 +11,13 @@ interface AsyncPanelProps<T> {
   isEmpty?: (data: T) => boolean;
   emptyMessage: string;
   minHeight?: string;
+  /** Shown under the heading whatever state the data is in, e.g. tabs that pick which data to show. */
+  tabs?: ReactNode;
   children: (data: T) => ReactNode;
 }
 
 /** A titled panel that owns the loading, error and empty states so every dashboard block behaves alike. */
-export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, minHeight = 'min-h-48', children }: AsyncPanelProps<T>) {
+export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, minHeight = 'min-h-48', tabs, children }: AsyncPanelProps<T>) {
   let body: ReactNode;
 
   if (query.isPending) {
@@ -50,6 +52,7 @@ export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, m
         )}
       </div>
       {subtitle && <p className="text-sm text-ink-soft">{subtitle}</p>}
+      {tabs && <div className="mt-3">{tabs}</div>}
       <div className={`mt-4 transition-opacity ${query.isFetching && !query.isPending ? "opacity-60" : ""}`} aria-busy={query.isFetching}>
         {body}
       </div>

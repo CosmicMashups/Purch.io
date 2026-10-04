@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorState } from '../../../components/ErrorState';
 import { Skeleton } from '../../../components/Skeleton';
 import { toast } from '../../../components/feedback/toastStore';
-import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
+import { PrimaryButton } from '../../../components/forms/FormField';
+import { IngredientSelector } from '../components/IngredientSelector';
 import { userMessage } from '../../../lib/apiError';
 import { useInventoryItems } from '../../inventory/queries';
 import type { InventoryItem } from '../../inventory/types';
@@ -59,16 +60,6 @@ function RecipeEditor({ itemId, itemName, ingredients, lines }: { itemId: string
     );
   }
 
-  function toggle(id: string, checked: boolean) {
-    setLineError(null);
-    setSelection((current) => {
-      const next = { ...current };
-      if (checked) next[id] = '';
-      else delete next[id];
-      return next;
-    });
-  }
-
   async function onSave() {
     const result = buildRecipeLines(selection);
     if (!result.ok) {
@@ -88,45 +79,7 @@ function RecipeEditor({ itemId, itemName, ingredients, lines }: { itemId: string
         (its stock must be zero first). Save an empty recipe to make it an inventory item again.
       </p>
 
-      <ul className="flex flex-col gap-3">
-        {ingredients.map((ingredient) => {
-          const checked = ingredient.id in selection;
-          return (
-            <li key={ingredient.id} className="rounded-panel border border-line bg-surface p-4">
-              <label className="flex min-h-12 items-center gap-3 text-base font-semibold">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e) => toggle(ingredient.id, e.target.checked)}
-                  className="size-6 accent-brand"
-                />
-                <span>
-                  {ingredient.name}
-                  <span className="block text-sm font-normal text-ink-soft">
-                    {ingredient.baseUnit} / {ingredient.packagingUnit}
-                  </span>
-                </span>
-              </label>
-              {checked && (
-                <div className="mt-3 sm:pl-9">
-                  <FormField
-                    label={`Quantity per order (${ingredient.baseUnit})`}
-                    hint="Leave blank to just check availability"
-                    error={lineError?.id === ingredient.id ? lineError.message : undefined}
-                  >
-                    <input
-                      inputMode="decimal"
-                      value={selection[ingredient.id]}
-                      onChange={(e) => setSelection((current) => ({ ...current, [ingredient.id]: e.target.value }))}
-                      className={controlClass}
-                    />
-                  </FormField>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <IngredientSelector ingredients={ingredients} selection={selection} onChange={(next) => { setLineError(null); setSelection(next); }} lineError={lineError} />
 
       <div>
         <PrimaryButton type="button" busy={save.isPending} onClick={() => void onSave()}>

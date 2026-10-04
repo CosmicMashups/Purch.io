@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { HubGroups } from '../../../components/HubGroups';
 import { LinkButton, PageHeader } from '../../../components/PageHeader';
 import { useSession } from '../../auth/useSession';
@@ -5,10 +6,12 @@ import { useCategories, useItems } from '../../catalog/queries';
 import { RestockList } from '../components/RestockList';
 import { StockOverview } from '../components/StockOverview';
 import { INVENTORY_GROUPS, inventoryHubStats } from '../hub';
+import type { StockScope } from '../stockScope';
 import { useInventoryItems, usePurchaseOrders, useSuppliers, useTransfers } from '../queries';
 
 export function InventoryHomePage() {
   const { role } = useSession();
+  const [scope, setScope] = useState<StockScope>('items');
   const isManager = role === 'Admin' || role === 'Manager';
   const ingredients = useInventoryItems();
   const suppliers = useSuppliers();
@@ -30,8 +33,8 @@ export function InventoryHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Inventory" action={<LinkButton to="/inventory/movements/new" primary>Record movement</LinkButton>} />
-      <StockOverview />
-      <RestockList />
+      <StockOverview scope={scope} onScopeChange={setScope} />
+      <RestockList scope={scope} onScopeChange={setScope} />
       <HubGroups groups={groups} stats={stats} idPrefix="inventory-hub" />
     </div>
   );

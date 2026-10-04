@@ -88,6 +88,61 @@ class InventoryRepositoryImpl implements InventoryRepository {
   }
 
   @override
+  Future<List<InventoryCategory>> listInventoryCategories() async {
+    try {
+      final response = await _apiClient.dio.get<List<dynamic>>(
+        '/inventory-categories',
+      );
+      return response.data!
+          .cast<Map<String, dynamic>>()
+          .map(InventoryCategory.fromJson)
+          .toList();
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryCategory> createInventoryCategory(
+    InventoryCategoryRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/inventory-categories',
+        data: request.toJson(),
+      );
+      return InventoryCategory.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<InventoryCategory> updateInventoryCategory(
+    String id,
+    InventoryCategoryRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.put<Map<String, dynamic>>(
+        '/inventory-categories/$id',
+        data: request.toJson(),
+      );
+      return InventoryCategory.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
+  Future<void> deleteInventoryCategory(String id) async {
+    try {
+      await _apiClient.dio.delete<void>('/inventory-categories/$id');
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  @override
   Future<InventoryItem> createInventoryItem(
     CreateInventoryItemRequest request,
   ) async {

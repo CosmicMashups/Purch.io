@@ -40,6 +40,22 @@ abstract class InventoryRepository {
     ReceiveInventoryStockRequest request,
   );
 
+  // Ingredient categories (separate from the item categories at the till).
+
+  Future<List<InventoryCategory>> listInventoryCategories();
+
+  Future<InventoryCategory> createInventoryCategory(
+    InventoryCategoryRequest request,
+  );
+
+  Future<InventoryCategory> updateInventoryCategory(
+    String id,
+    InventoryCategoryRequest request,
+  );
+
+  /// Its ingredients become uncategorised; they are not deleted.
+  Future<void> deleteInventoryCategory(String id);
+
   Future<List<ItemRecipeLine>> getItemRecipe(String itemId);
 
   Future<List<ItemRecipeLine>> replaceItemRecipe(

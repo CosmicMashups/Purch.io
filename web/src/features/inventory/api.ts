@@ -5,6 +5,8 @@ import type {
   CreateInventoryItemRequest,
   CreatePurchaseOrderRequest,
   CreateSupplierRequest,
+  InventoryCategory,
+  InventoryCategoryBody,
   InventoryItem,
   InventoryMovement,
   MovementCursor,
@@ -27,6 +29,12 @@ export const inventoryApi = {
     apiClient.post<InventoryItem>(`/inventory-items/${id}/physical-count`, body).then((r) => r.data),
   receiveStock: (id: string, body: { packagesReceived: number; branchId: string; supplierReference: string | null }) =>
     apiClient.post<InventoryItem>(`/inventory-items/${id}/receive`, body).then((r) => r.data),
+
+  listInventoryCategories: () => apiClient.get<InventoryCategory[]>('/inventory-categories').then((r) => r.data),
+  createInventoryCategory: (body: InventoryCategoryBody) => apiClient.post<InventoryCategory>('/inventory-categories', body).then((r) => r.data),
+  updateInventoryCategory: (id: string, body: InventoryCategoryBody) =>
+    apiClient.put<InventoryCategory>(`/inventory-categories/${id}`, body).then((r) => r.data),
+  deleteInventoryCategory: (id: string) => apiClient.delete(`/inventory-categories/${id}`).then(() => undefined),
 
   listMovements: (filter: MovementFilter, cursor: MovementCursor | null) =>
     apiClient

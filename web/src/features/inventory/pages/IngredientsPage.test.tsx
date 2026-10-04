@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../../test/render';
 import { branchesApi } from '../../branches/api';
@@ -11,6 +11,10 @@ vi.mock('../api', () => ({
   MOVEMENT_PAGE_SIZE: 30,
   inventoryApi: {
     listInventoryItems: vi.fn(),
+    listInventoryCategories: vi.fn(),
+    createInventoryCategory: vi.fn(),
+    updateInventoryCategory: vi.fn(),
+    deleteInventoryCategory: vi.fn(),
     createInventoryItem: vi.fn(),
     updateInventoryItem: vi.fn(),
     physicalCount: vi.fn(),
@@ -30,6 +34,7 @@ const beans: InventoryItem = {
   isAutoCreatedForItem: false,
   linkedItemId: null,
   isActive: true,
+  categoryId: null,
 };
 
 describe('IngredientsPage', () => {
@@ -41,6 +46,7 @@ describe('IngredientsPage', () => {
       { id: 'kam', name: 'Kamuning', address: null },
     ]);
     vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([beans]);
+    vi.mocked(inventoryApi.listInventoryCategories).mockResolvedValue([]);
   });
 
   it('shows stock and pack size in plain words', async () => {
@@ -67,6 +73,7 @@ describe('IngredientsPage', () => {
       packagingUnit: 'case',
       packagingSize: 12000,
       lowStockThreshold: null,
+      categoryId: null,
     });
   });
 
@@ -81,7 +88,7 @@ describe('IngredientsPage', () => {
     await waitFor(() => expect(inventoryApi.updateInventoryItem).toHaveBeenCalledTimes(1));
     expect(vi.mocked(inventoryApi.updateInventoryItem).mock.calls[0]).toEqual([
       'beans',
-      { name: 'Espresso Beans', sku: 'EB-1', baseUnit: 'g', packagingUnit: 'sack', packagingSize: 1000, lowStockThreshold: 750, isActive: true },
+      { name: 'Espresso Beans', sku: 'EB-1', baseUnit: 'g', packagingUnit: 'sack', packagingSize: 1000, lowStockThreshold: 750, categoryId: null, isActive: true },
     ]);
   });
 
@@ -116,5 +123,62 @@ describe('IngredientsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Cannot be negative')).toBeInTheDocument();
     expect(inventoryApi.createInventoryItem).not.toHaveBeenCalled();
+  });
+
+  it('files an ingredient under a category and filters the list by it', async () => {
+    const dairy = { id: 'dairy', name: 'Dairy', sortOrder: 1 };
+    vi.mocked(inventoryApi.listInventoryCategories).mockResolvedValue([dairy]);
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([
+      beans,
+      { ...beans, id: 'milk', name: 'Milk', sku: null, categoryId: 'dairy', quantityOnHand: 10 },
+    ]);
+    renderPage(<IngredientsPage />);
+    expect(await screen.findByText('Espresso Beans')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dairy' }));
+    expect(screen.queryByText('Espresso Beans')).not.toBeInTheDocument();
+    expect(screen.getByText('Milk')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Uncategorised' }));
+    expect(screen.getByText('Espresso Beans')).toBeInTheDocument();
+    expect(screen.queryByText('Milk')).not.toBeInTheDocument();
+  });
+
+  it('creates a category from the Categories tab for a Manager', async () => {
+    signInAs('Manager');
+    vi.mocked(inventoryApi.createInventoryCategory).mockResolvedValue({ id: 'c', name: 'Dry goods', sortOrder: 2 });
+    renderPage(<IngredientsPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Dry goods' } });
+    fireEvent.change(screen.getByLabelText('Position'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(inventoryApi.createInventoryCategory).toHaveBeenCalledWith({ name: 'Dry goods', sortOrder: 2 }));
+  });
+
+  it('shows categories read-only to Warehouse', async () => {
+    vi.mocked(inventoryApi.listInventoryCategories).mockResolvedValue([{ id: 'dairy', name: 'Dairy', sortOrder: 1 }]);
+    renderPage(<IngredientsPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
+    expect(await screen.findByText('Dairy')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument();
+  });
+
+  it('deletes a category after confirming', async () => {
+    signInAs('Admin');
+    vi.mocked(inventoryApi.listInventoryCategories).mockResolvedValue([{ id: 'dairy', name: 'Dairy', sortOrder: 1 }]);
+    vi.mocked(inventoryApi.deleteInventoryCategory).mockResolvedValue(undefined);
+    renderPage(<IngredientsPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(inventoryApi.deleteInventoryCategory).toHaveBeenCalledWith('dairy'));
+  });
+
+  it('flags an ingredient no recipe deducts as counted by hand', async () => {
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([beans, { ...beans, id: 'dressing', name: 'Dressing', isCountedByHand: true }]);
+    renderPage(<IngredientsPage />);
+    expect(await screen.findByText('Counted by hand')).toBeInTheDocument();
+    expect(screen.getAllByText('Counted by hand')).toHaveLength(1);
   });
 });

@@ -9,6 +9,8 @@ export const ingredientSchema = z.object({
   packagingUnit: z.string().trim().min(1, 'Enter how it is bought, like case or sack'),
   packagingSize: num('Enter a number').gt(0, 'Must be more than 0'),
   lowStockThreshold: z.string(),
+  /** Empty string means uncategorised. */
+  categoryId: z.string(),
   isActive: z.boolean(),
 });
 

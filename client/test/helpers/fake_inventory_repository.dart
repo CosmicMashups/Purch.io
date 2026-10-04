@@ -111,6 +111,7 @@ class FakeInventoryRepository implements InventoryRepository {
       isAutoCreatedForItem: false,
       linkedItemId: null,
       isActive: true,
+      categoryId: request.categoryId,
     );
     inventoryItems.add(created);
     return created;
@@ -135,6 +136,7 @@ class FakeInventoryRepository implements InventoryRepository {
       isAutoCreatedForItem: current.isAutoCreatedForItem,
       linkedItemId: current.linkedItemId,
       isActive: request.isActive,
+      categoryId: request.categoryId,
     );
     inventoryItems[index] = updated;
     return updated;
@@ -187,6 +189,63 @@ class FakeInventoryRepository implements InventoryRepository {
     );
     inventoryItems[index] = updated;
     return updated;
+  }
+
+  final List<InventoryCategory> inventoryCategories = [];
+
+  @override
+  Future<List<InventoryCategory>> listInventoryCategories() async =>
+      inventoryCategories;
+
+  @override
+  Future<InventoryCategory> createInventoryCategory(
+    InventoryCategoryRequest request,
+  ) async {
+    final created = InventoryCategory(
+      id: 'inventory-category-${inventoryCategories.length + 1}',
+      name: request.name,
+      sortOrder: request.sortOrder,
+    );
+    inventoryCategories.add(created);
+    return created;
+  }
+
+  @override
+  Future<InventoryCategory> updateInventoryCategory(
+    String id,
+    InventoryCategoryRequest request,
+  ) async {
+    final index = inventoryCategories.indexWhere((c) => c.id == id);
+    final updated = InventoryCategory(
+      id: id,
+      name: request.name,
+      sortOrder: request.sortOrder,
+    );
+    inventoryCategories[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<void> deleteInventoryCategory(String id) async {
+    inventoryCategories.removeWhere((c) => c.id == id);
+    for (var i = 0; i < inventoryItems.length; i++) {
+      final item = inventoryItems[i];
+      if (item.categoryId == id) {
+        inventoryItems[i] = InventoryItem(
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          baseUnit: item.baseUnit,
+          packagingUnit: item.packagingUnit,
+          packagingSize: item.packagingSize,
+          quantityOnHand: item.quantityOnHand,
+          lowStockThreshold: item.lowStockThreshold,
+          isAutoCreatedForItem: item.isAutoCreatedForItem,
+          linkedItemId: item.linkedItemId,
+          isActive: item.isActive,
+        );
+      }
+    }
   }
 
   @override

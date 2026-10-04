@@ -160,6 +160,39 @@ public static class InventoryEndpoints
             Results.Ok(await inventoryItemService.ReceiveStockAsync(id, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // --- Ingredient categories: everyone in inventory can read them; only Admin and Manager change them ---
+        var categoryEditor = new[] { nameof(Role.Admin), nameof(Role.Manager) };
+
+        _ = app.MapGet("/inventory-categories", async (
+            IInventoryCategoryService categoryService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await categoryService.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/inventory-categories", async (
+            CreateInventoryCategoryRequest request,
+            IInventoryCategoryService categoryService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await categoryService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(categoryEditor));
+
+        _ = app.MapPut("/inventory-categories/{id:guid}", async (
+            Guid id,
+            UpdateInventoryCategoryRequest request,
+            IInventoryCategoryService categoryService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await categoryService.UpdateAsync(id, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(categoryEditor));
+
+        _ = app.MapDelete("/inventory-categories/{id:guid}", async (
+            Guid id,
+            IInventoryCategoryService categoryService,
+            CancellationToken cancellationToken) =>
+        {
+            await categoryService.DeleteAsync(id, cancellationToken);
+            return Results.NoContent();
+        }).RequireAuthorization(policy => policy.RequireRole(categoryEditor));
+
         return app;
     }
 }

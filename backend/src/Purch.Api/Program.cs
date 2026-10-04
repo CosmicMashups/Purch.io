@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -214,6 +214,8 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseOrderRepository, EfPurchaseOrderRepository>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IInventoryItemRepository, EfInventoryItemRepository>();
+builder.Services.AddScoped<IInventoryCategoryRepository, EfInventoryCategoryRepository>();
+builder.Services.AddScoped<IInventoryCategoryService, InventoryCategoryService>();
 builder.Services.AddScoped<IItemStockService, ItemStockService>();
 builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
 builder.Services.AddScoped<IItemRecipeRepository, EfItemRecipeRepository>();

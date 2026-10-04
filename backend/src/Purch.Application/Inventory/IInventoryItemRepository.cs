@@ -12,5 +12,8 @@ public interface IInventoryItemRepository
 
     Task<InventoryItem?> GetByLinkedItemIdAsync(Guid tenantId, Guid itemId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked, so a category being deleted can clear it from its ingredients in the same save.</summary>
+    Task<IReadOnlyList<InventoryItem>> ListByCategoryTrackedAsync(Guid categoryId, CancellationToken cancellationToken = default);
+
     void Add(InventoryItem inventoryItem);
 }

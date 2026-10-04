@@ -14,6 +14,8 @@ namespace Purch.Application.Inventory;
 public sealed class InventoryItemService(
     IInventoryItemRepository inventoryItemRepository,
     IInventoryMovementRepository movementRepository,
+    IInventoryCategoryRepository categoryRepository,
+    IItemRecipeRepository recipeRepository,
     IBranchScopeGuard branchScopeGuard,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -22,7 +24,15 @@ public sealed class InventoryItemService(
     public async Task<IReadOnlyList<InventoryItemDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         var items = await inventoryItemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
-        return [.. items.OrderBy(item => item.Name).Select(ToDto)];
+
+        var recipeLines = await recipeRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+        var usedInARecipe = recipeLines.Select(line => line.InventoryItemId).ToHashSet();
+        var deductedBySomeRecipe = recipeLines.Where(line => line.QuantityPerOrder is not null).Select(line => line.InventoryItemId).ToHashSet();
+
+        return [.. items.OrderBy(item => item.Name).Select(item => ToDto(item) with
+        {
+            IsCountedByHand = usedInARecipe.Contains(item.Id) && !deductedBySomeRecipe.Contains(item.Id),
+        })];
     }
 
     public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemRequest request, CancellationToken cancellationToken = default)
@@ -46,6 +56,7 @@ public sealed class InventoryItemService(
             PackagingUnit = string.IsNullOrWhiteSpace(request.PackagingUnit) ? "pc" : request.PackagingUnit.Trim(),
             PackagingSize = request.PackagingSize,
             LowStockThreshold = request.LowStockThreshold,
+            CategoryId = await ValidCategoryAsync(request.CategoryId, cancellationToken),
             IsActive = true,
         };
 
@@ -75,6 +86,7 @@ public sealed class InventoryItemService(
         inventoryItem.PackagingUnit = string.IsNullOrWhiteSpace(request.PackagingUnit) ? "pc" : request.PackagingUnit.Trim();
         inventoryItem.PackagingSize = request.PackagingSize;
         inventoryItem.LowStockThreshold = request.LowStockThreshold;
+        inventoryItem.CategoryId = await ValidCategoryAsync(request.CategoryId, cancellationToken);
         inventoryItem.IsActive = request.IsActive;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -140,6 +152,19 @@ public sealed class InventoryItemService(
         return ToDto(inventoryItem);
     }
 
+    private async Task<Guid?> ValidCategoryAsync(Guid? categoryId, CancellationToken cancellationToken)
+    {
+        if (categoryId is not { } id)
+        {
+            return null;
+        }
+
+        var category = await categoryRepository.GetByIdAsync(id, cancellationToken);
+        return category is null || category.TenantId != CurrentTenantId
+            ? throw new ValidationException(nameof(categoryId), "That ingredient category does not exist.")
+            : id;
+    }
+
     private async Task<InventoryItem> GetOwnedAsync(Guid inventoryItemId, CancellationToken cancellationToken)
     {
         var inventoryItem = await inventoryItemRepository.GetByIdAsync(inventoryItemId, cancellationToken)
@@ -167,6 +192,7 @@ public sealed class InventoryItemService(
             inventoryItem.LowStockThreshold,
             inventoryItem.IsAutoCreatedForItem,
             inventoryItem.LinkedItemId,
-            inventoryItem.IsActive);
+            inventoryItem.IsActive,
+            inventoryItem.CategoryId);
     }
 }

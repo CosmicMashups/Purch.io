@@ -39,6 +39,24 @@ export interface InventoryDashboard {
   outOfStockCount: number;
   lowStockCount: number;
   lowStockItems: LowStockItem[];
+  /** Present only when the business tracks ingredients separately. */
+  ingredients?: IngredientStock | null;
+}
+
+export interface LowStockIngredient {
+  inventoryItemId: string;
+  name: string;
+  baseUnit: string;
+  quantityOnHand: number;
+  lowStockThreshold: number;
+}
+
+/** Mirrors Purch.Application.Inventory.IngredientStockDto. */
+export interface IngredientStock {
+  total: number;
+  outOfStockCount: number;
+  lowStockCount: number;
+  lowStock: LowStockIngredient[];
 }
 
 /** Mirrors Purch.Application.Sync.FlaggedSyncRecordDto. */

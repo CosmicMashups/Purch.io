@@ -29,4 +29,7 @@ public class InventoryItem : TenantScopedEntity
     public Guid? LinkedItemId { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>The ingredient group this belongs to (InventoryCategory); null when uncategorised.</summary>
+    public Guid? CategoryId { get; set; }
 }
