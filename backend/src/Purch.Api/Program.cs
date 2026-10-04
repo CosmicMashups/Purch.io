@@ -435,6 +435,9 @@ using (var startupScope = app.Services.CreateScope())
 // handlers) is caught and turned into a consistent ProblemDetails response, never a raw 500 with no body.
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+// CORS sits outside the exception handler on purpose: the handler clears the response it rebuilds, so with CORS inside it
+// a 500 reached the browser without Access-Control-Allow-Origin and showed up as a CORS error that hid the real failure.
+app.UseCors();
 app.UseExceptionHandler();
 app.UseResponseCompression();
 
@@ -480,7 +483,6 @@ if (deploymentMode == DeploymentMode.Local)
     _ = app.UseStaticFiles();
 }
 
-app.UseCors();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
