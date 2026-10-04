@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:hosted": "playwright test -c playwright.hosted.config.ts",
     "e2e:types": "tsc -p e2e",
     "preview": "vite preview",
     "preview:cf": "wrangler dev",

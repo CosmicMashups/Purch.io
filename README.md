@@ -245,6 +245,8 @@ npx playwright install chromium   # once; or set PW_CHANNEL=chrome to use instal
 npm run e2e
 ```
 
+**Hosted sign-in checks** (`npm run e2e:hosted`, config `web/playwright.hosted.config.ts`) sign in as the two enrolled debug admins against the hosted backend and change nothing. Credentials are read from the git-ignored `web/e2e/.env.debug` (`DEBUG_ADMIN2_EMAIL`, `DEBUG_ADMIN3_EMAIL`, `DEBUG_ADMIN_PASSWORD`); without them the tests skip.
+
 ---
 
 ### Flutter client status
