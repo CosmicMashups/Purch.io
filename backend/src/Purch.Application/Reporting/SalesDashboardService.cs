@@ -13,7 +13,13 @@ public sealed class SalesDashboardService(
 {
     private const int TrendDays = 14;
 
-    public async Task<SalesDashboardDto> GetDashboardAsync(Guid? branchId, CancellationToken cancellationToken = default)
+    private const int MaxRangeDays = 731;
+
+    public async Task<SalesDashboardDto> GetDashboardAsync(
+        Guid? branchId,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
+        CancellationToken cancellationToken = default)
     {
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
 
@@ -31,30 +37,55 @@ public sealed class SalesDashboardService(
         var revenueLast7 = branchTotals.Sum(t => t.Last7Days);
         var revenueLast30 = branchTotals.Sum(t => t.Last30Days);
 
-        var trendStart = todayStart.AddDays(-(TrendDays - 1));
+        // The selected window: whole business days from the start of the first to the start of the day after the
+        // last. Without one, the trend is the last 14 days and the lists/total cover the last 30.
+        DateTimeOffset windowStart;
+        DateTimeOffset windowEnd;
+        int trendDays;
+        if (fromUtc is { } requestedFrom && toUtc is { } requestedTo && requestedTo > requestedFrom)
+        {
+            windowStart = ReportTimeZone.StartOfDay(requestedFrom);
+            windowEnd = requestedTo;
+            trendDays = Math.Clamp((int)Math.Ceiling((windowEnd - windowStart).TotalDays), 1, MaxRangeDays);
+            windowEnd = windowStart.AddDays(trendDays) < windowEnd ? windowStart.AddDays(trendDays) : windowEnd;
+        }
+        else
+        {
+            windowStart = last30Start;
+            windowEnd = to;
+            trendDays = TrendDays;
+        }
+
+        var trendStart = fromUtc is null || toUtc is null ? todayStart.AddDays(-(TrendDays - 1)) : windowStart;
         var dailyRevenue = (await reportingRepository.GetDailyRevenueAsync(
-                resolvedBranchId, trendStart, TrendDays, cancellationToken))
+                resolvedBranchId, trendStart, trendDays, cancellationToken))
             .ToDictionary(d => d.DayIndex, d => d.Revenue);
-        var trend = Enumerable.Range(0, TrendDays)
+        var trend = Enumerable.Range(0, trendDays)
             .Select(offset => new DailyRevenuePointDto(
                 DateOnly.FromDateTime(trendStart.AddDays(offset).ToOffset(ReportTimeZone.Offset).DateTime),
                 dailyRevenue.GetValueOrDefault(offset)))
             .ToList();
+        var revenueInRange = fromUtc is null || toUtc is null ? revenueLast30 : dailyRevenue.Values.Sum();
 
-        var topItems = await reportingRepository.GetTopItemsByRevenueAsync(
-            resolvedBranchId, last30Start, to, 10, cancellationToken);
-        // Only the top 10 items' names are needed — loading the whole catalog here cost one query per
-        // dashboard view that grew with the tenant's item count instead of staying fixed at 10.
-        var items = await itemRepository.ListByIdsAsync(topItems.Select(top => top.ItemId).ToList(), cancellationToken);
+        var topByRevenue = await reportingRepository.GetTopItemsByRevenueAsync(
+            resolvedBranchId, windowStart, windowEnd, 10, cancellationToken);
+        var topByQuantity = await reportingRepository.GetTopItemsByQuantityAsync(
+            resolvedBranchId, windowStart, windowEnd, 10, cancellationToken);
+        // Only the listed items' names are needed — loading the whole catalog here cost one query per
+        // dashboard view that grew with the tenant's item count instead of staying fixed at 20.
+        var items = await itemRepository.ListByIdsAsync(
+            topByRevenue.Concat(topByQuantity).Select(top => top.ItemId).Distinct().ToList(), cancellationToken);
         var itemNamesById = items.ToDictionary(item => item.Id, item => item.Name);
 
-        var topSellingItems = topItems
+        List<TopSellingItemDto> ToDtos(IEnumerable<ItemSalesTotals> rows) => rows
             .Select(top => new TopSellingItemDto(
                 top.ItemId,
                 itemNamesById.TryGetValue(top.ItemId, out var name) ? name : "(deleted item)",
                 top.Quantity,
                 top.Revenue))
             .ToList();
+        var topSellingItems = ToDtos(topByRevenue);
+        var topSellingByQuantity = ToDtos(topByQuantity);
 
         var allBranches = await branchRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
         var branches = resolvedBranchId is { } singleBranchId
@@ -67,7 +98,7 @@ public sealed class SalesDashboardService(
             .OrderByDescending(dto => dto.Revenue)
             .ToList();
 
-        return new SalesDashboardDto(revenueToday, revenueLast7, revenueLast30, trend, topSellingItems, branchComparison);
+        return new SalesDashboardDto(revenueToday, revenueLast7, revenueLast30, trend, topSellingItems, branchComparison, revenueInRange, topSellingByQuantity);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

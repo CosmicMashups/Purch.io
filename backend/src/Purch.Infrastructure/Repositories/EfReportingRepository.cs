@@ -102,6 +102,31 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
         return [.. rows.Select(r => new ItemSalesTotals(r.ItemId, r.Quantity, r.Revenue))];
     }
 
+    public async Task<IReadOnlyList<ItemSalesTotals>> GetTopItemsByQuantityAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await (
+                from line in dbContext.TransactionLines.AsNoTracking()
+                join transaction in CompletedTransactions(branchId, fromUtc, toUtc)
+                    on line.TransactionId equals transaction.Id
+                group line by line.ItemId into itemGroup
+                orderby itemGroup.Sum(l => l.Quantity) descending
+                select new
+                {
+                    ItemId = itemGroup.Key,
+                    Quantity = itemGroup.Sum(l => l.Quantity),
+                    Revenue = itemGroup.Sum(l => l.LineTotal),
+                })
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId, r.Quantity, r.Revenue))];
+    }
+
     private IQueryable<Transaction> CompletedTransactions(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc)
     {
         var query = dbContext.Transactions

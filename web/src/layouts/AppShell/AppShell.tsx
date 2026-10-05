@@ -107,7 +107,7 @@ export function AppShell() {
         )}
         <button
           type="button"
-          onClick={() => void signOut()}
+          onClick={() => void signOut({ leaveTenant: true })}
           className={`${onPairedDevice ? '' : 'mt-auto'} flex min-h-14 flex-none flex-col items-center justify-center gap-1 rounded-control px-2 py-2 text-sm font-medium text-ink-soft hover:bg-canvas hover:text-ink md:min-h-20`}
         >
           <SignOut size={28} aria-hidden="true" />

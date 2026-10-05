@@ -1,4 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { RangeParams } from '../reports/types';
 import { dashboardApi } from './api';
 
 export const dashboardKeys = {
@@ -18,8 +19,15 @@ const DASHBOARD_STALE_MS = 45_000;
 // `enabled` mirrors the API's role rules so a role never fires a call it is certain to be refused. The cached
 // figure (from this session or, after a reload, from the saved copy — see offline/db/cachePolicy.ts) is shown
 // at once; a revisit only refetches once it is older than DASHBOARD_STALE_MS.
-export const useSalesDashboard = (enabled: boolean) =>
-  useQuery({ queryKey: dashboardKeys.sales, queryFn: dashboardApi.sales, enabled, staleTime: DASHBOARD_STALE_MS });
+export const useSalesDashboard = (enabled: boolean, range: RangeParams | null = null) =>
+  useQuery({
+    queryKey: range ? [...dashboardKeys.sales, range.from, range.to] : dashboardKeys.sales,
+    queryFn: () => dashboardApi.sales(range),
+    enabled,
+    staleTime: DASHBOARD_STALE_MS,
+    // Switching the window keeps the previous figures on screen (dimmed) instead of flashing a skeleton.
+    placeholderData: keepPreviousData,
+  });
 
 export const useInventoryDashboard = (enabled: boolean) =>
   useQuery({ queryKey: dashboardKeys.inventory, queryFn: dashboardApi.inventory, enabled, staleTime: DASHBOARD_STALE_MS });

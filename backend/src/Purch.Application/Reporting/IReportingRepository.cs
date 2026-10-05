@@ -44,6 +44,13 @@ public interface IReportingRepository
         int take,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ItemSalesTotals>> GetTopItemsByQuantityAsync(
+        Guid? branchId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        int take,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<InventoryMovement>> ListMovementsInRangeAsync(
         Guid? branchId,
         DateTimeOffset fromUtc,

@@ -35,6 +35,8 @@ const sales: SalesDashboard = {
   revenueToday: 1250.5,
   revenueLast7Days: 8000,
   revenueLast30Days: 31000,
+  revenueInRange: 31000,
+  topSellingItemsByQuantity: [],
   trend: [
     { date: '2026-09-23', revenue: 900 },
     { date: '2026-09-24', revenue: 1250.5 },

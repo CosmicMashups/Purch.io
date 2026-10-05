@@ -24,6 +24,9 @@ export interface SalesDashboard {
   trend: DailyRevenuePoint[];
   topSellingItems: TopSellingItem[];
   branchComparison: BranchRevenue[];
+  /** Revenue across the window asked for (the last 30 days when none was). */
+  revenueInRange: number;
+  topSellingItemsByQuantity: TopSellingItem[];
 }
 
 /** Mirrors Purch.Application.Inventory.InventoryDashboardDto. */

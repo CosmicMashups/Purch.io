@@ -27,9 +27,11 @@ public static class ReportingEndpoints
         // --- F1 — sales dashboard ---
         _ = app.MapGet("/reports/sales-dashboard", async (
             Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset? fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset? toUtc,
             ISalesDashboardService salesDashboardService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await salesDashboardService.GetDashboardAsync(branchId, cancellationToken)))
+            Results.Ok(await salesDashboardService.GetDashboardAsync(branchId, fromUtc, toUtc, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
         // --- F3 — inventory reports ---

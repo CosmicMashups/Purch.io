@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { DashboardRangeFilter } from './components/DashboardRangeFilter';
+import { DASHBOARD_PRESET_LABELS, dashboardParams, defaultDashboardRange } from './dashboardRange';
 import { CalendarHeatmap } from '../../components/charts/CalendarHeatmap';
 import { assignColors } from '../../components/charts/colors';
 import { BarList } from '../../components/charts/RankedCharts';
@@ -14,6 +17,11 @@ import { DepartmentPanel, MovementPanel, StaffPanels } from '../reports/componen
 import { choiceToParams, defaultChoice } from '../reports/params';
 import { useDepartmentTracking } from '../tenant/queries';
 
+const TOP_SORTS = [
+  { key: 'revenue', label: 'By revenue' },
+  { key: 'quantity', label: 'By quantity sold' },
+] as const;
+
 export function HomePage() {
   const departmentsOn = useDepartmentTracking();
   const { role } = useSession();
@@ -22,7 +30,13 @@ export function HomePage() {
   const canSeeStock = canReport || role === 'Warehouse';
   const tabs = tabsForRole(role);
 
-  const sales = useSalesDashboard(canReport);
+  const [period, setPeriod] = useState(defaultDashboardRange);
+  const [topSort, setTopSort] = useState<'revenue' | 'quantity'>('revenue');
+  const periodParams = dashboardParams(period);
+  const periodLabel = DASHBOARD_PRESET_LABELS[period.preset];
+  const sales = useSalesDashboard(canReport && periodParams !== null, periodParams);
+  // The branch comparison is not period-scoped, so it shares the default (last 30 days) query.
+  const branchSales = useSalesDashboard(canReport);
   const flagged = useFlaggedSync(canReport);
   const monthParams = canReport ? choiceToParams(defaultChoice('30d')) : null;
   const openConflicts = flagged.data?.filter((r) => r.reviewedAt === null).length ?? 0;
@@ -80,7 +94,9 @@ export function HomePage() {
         )}
       </div>
 
-      {canReport && <RevenueOverview />}
+      {canReport && <DashboardRangeFilter value={period} onChange={setPeriod} />}
+
+      {canReport && <RevenueOverview range={periodParams} periodLabel={periodLabel} />}
 
       {canReport && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
@@ -103,28 +119,51 @@ export function HomePage() {
 
           <AsyncPanel
             title="Top sellers"
-            subtitle="Best-selling items by revenue"
+            subtitle={topSort === 'revenue' ? `Highest-earning items · ${periodLabel}` : `Most units sold · ${periodLabel}`}
             query={sales}
             isEmpty={(d) => d.topSellingItems.length === 0}
-            emptyMessage="No item sales yet."
+            emptyMessage="No item sales in this period."
+            tabs={
+              <div role="group" aria-label="Rank top sellers" className="flex gap-2">
+                {TOP_SORTS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={topSort === key}
+                    onClick={() => setTopSort(key)}
+                    className={`h-9 rounded-control px-4 text-sm font-semibold ${topSort === key ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }
           >
-            {(d) => (
-              <BarList
-                formatValue={formatPeso}
-                rows={d.topSellingItems.map((item) => ({ key: item.itemId, label: item.itemName, value: item.revenue, detail: `${item.quantitySold} sold` }))}
-              />
-            )}
+            {(d) =>
+              topSort === 'revenue' ? (
+                <BarList
+                  formatValue={formatPeso}
+                  rows={d.topSellingItems.map((item) => ({ key: item.itemId, label: item.itemName, value: item.revenue, detail: `${item.quantitySold} sold` }))}
+                />
+              ) : (
+                <BarList
+                  formatValue={(n) => `${n.toLocaleString('en-PH', { maximumFractionDigits: 2 })} sold`}
+                  rows={d.topSellingItemsByQuantity.map((item) => ({ key: item.itemId, label: item.itemName, value: item.quantitySold, detail: formatPeso(item.revenue) }))}
+                />
+              )
+            }
           </AsyncPanel>
         </div>
       )}
 
       {canSeeStock && <StockHealth />}
 
-      {canReport && (
+      {/* A single-branch business has nothing to compare, so the card stays out of the way. */}
+      {canReport && (branchSales.data?.branchComparison.length ?? 0) > 1 && (
         <AsyncPanel
           title="Branches"
           subtitle="Revenue by branch"
-          query={sales}
+          query={branchSales}
           isEmpty={(d) => d.branchComparison.length < 2}
           emptyMessage="Branch comparison shows once more than one branch is in your scope."
         >

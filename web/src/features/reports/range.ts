@@ -13,7 +13,7 @@ export interface UtcRange {
   to: string;
 }
 
-function addDays(day: string, days: number): string {
+export function addDays(day: string, days: number): string {
   const date = new Date(`${day}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);

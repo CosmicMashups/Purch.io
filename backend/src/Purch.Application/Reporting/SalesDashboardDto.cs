@@ -11,7 +11,9 @@ public sealed record SalesDashboardDto(
     decimal RevenueLast30Days,
     IReadOnlyList<DailyRevenuePointDto> Trend,
     IReadOnlyList<TopSellingItemDto> TopSellingItems,
-    IReadOnlyList<BranchRevenueDto> BranchComparison);
+    IReadOnlyList<BranchRevenueDto> BranchComparison,
+    decimal RevenueInRange,
+    IReadOnlyList<TopSellingItemDto> TopSellingItemsByQuantity);
 
 public sealed record DailyRevenuePointDto(DateOnly Date, decimal Revenue);
 

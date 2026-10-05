@@ -31,6 +31,8 @@ const sales: SalesDashboard = {
   revenueToday: 1250.5,
   revenueLast7Days: 8000,
   revenueLast30Days: 31000,
+  revenueInRange: 31000,
+  topSellingItemsByQuantity: [],
   trend: [
     { date: '2026-09-23', revenue: 900 },
     { date: '2026-09-24', revenue: 1250.5 },
@@ -62,7 +64,7 @@ describe('Home charts', () => {
   it('leads with today, then the shape of the days and a calendar of the busiest', async () => {
     renderHome();
     expect(await screen.findByText('Today')).toBeInTheDocument();
-    expect(screen.getAllByText('₱8,000.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₱31,000.00').length).toBeGreaterThan(0);
     expect(await screen.findByText('Best: ₱1,250.50')).toBeInTheDocument();
     expect(screen.getByText('Busiest days')).toBeInTheDocument();
     expect(screen.getByText('Less')).toBeInTheDocument();
@@ -86,7 +88,8 @@ describe('Home charts', () => {
 
   it('splits revenue by branch only when there is more than one', async () => {
     const { unmount } = renderHome();
-    expect(await screen.findByText('Branch comparison shows once more than one branch is in your scope.')).toBeInTheDocument();
+    expect(await screen.findByText('Busiest days')).toBeInTheDocument();
+    expect(screen.queryByText('Branches')).not.toBeInTheDocument();
     unmount();
     vi.mocked(dashboardApi.sales).mockResolvedValue({
       ...sales,
