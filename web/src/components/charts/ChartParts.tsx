@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Modal } from '../Modal';
 import type { TipState } from './chartHooks';
 
 /** The readout: values lead, names follow. Placed above the point and kept inside the chart's width. */
@@ -60,11 +62,13 @@ export interface TableColumn {
 
 /** Every chart's numbers, as plain text, one tap away. Tooltips enhance; this never depends on hover. */
 export function TableView({ caption, columns, rows }: { caption: string; columns: TableColumn[]; rows: string[][] }) {
+  const [open, setOpen] = useState(false);
   return (
-    <details className="group mt-3">
-      <summary className="inline-flex h-12 cursor-pointer items-center text-sm font-semibold text-brand-strong underline">
+    <div className="mt-3">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex h-12 cursor-pointer items-center text-sm font-semibold text-brand-strong underline">
         Show as table
-      </summary>
+      </button>
+      <Modal open={open} title={caption} onClose={() => setOpen(false)}>
       <div className="overflow-x-auto">
         <table className="mt-1 w-full text-sm">
           <caption className="sr-only">{caption}</caption>
@@ -90,6 +94,7 @@ export function TableView({ caption, columns, rows }: { caption: string; columns
           </tbody>
         </table>
       </div>
-    </details>
+      </Modal>
+    </div>
   );
 }
