@@ -55,6 +55,31 @@ export interface Modifier {
   id: string;
   name: string;
   priceDelta: number;
+  /** The server's verdict from the modifier's ingredients. A sold-out modifier cannot be chosen. */
+  isOutOfStock?: boolean;
+  /** What choosing it uses up. Names only: stock levels are never sent to the till or the kiosk. */
+  ingredients?: ModifierIngredient[];
+}
+
+/** Mirrors Purch.Application.Catalog.ModifierIngredientDto. A null quantity means "only check availability". */
+export interface ModifierIngredient {
+  inventoryItemId: string;
+  inventoryItemName: string;
+  quantityPerOrder: number | null;
+}
+
+export interface ReplaceModifierIngredientLine {
+  inventoryItemId: string;
+  quantityPerOrder: number | null;
+}
+
+export interface ReplaceModifierIngredientsRequest {
+  lines: ReplaceModifierIngredientLine[];
+}
+
+export interface UpdateItemModifierRequest {
+  name: string;
+  priceDelta: number;
 }
 
 export interface ItemBatch {
@@ -82,13 +107,25 @@ export interface ItemVariant {
   imageUrl: string | null;
 }
 
+/** One part of a combo or deal: either a choice from a category, or (with `componentItemId`) one fixed item. */
 export interface ItemComboComponent {
   id: string;
-  itemId: string;
   componentCategoryId: string;
+  componentCategoryName?: string;
   slotLabel: string;
   quantity: number;
-  substitutionUpchargeAmount: number;
+  /** A flat charge added once for the slot, whichever item is picked. The server may send null for none. */
+  substitutionUpchargeAmount: number | null;
+  /** Set for a fixed slot: every unit of it is exactly this item and the customer picks nothing. */
+  componentItemId?: string | null;
+  componentItemName?: string | null;
+  /** Extra price for particular choices in a choose slot. An item that is not listed is included. */
+  choiceUpcharges?: ComboChoiceUpcharge[];
+}
+
+export interface ComboChoiceUpcharge {
+  itemId: string;
+  amount: number;
 }
 
 export interface Department {
@@ -164,11 +201,16 @@ export interface CreateItemVariantRequest {
 }
 
 export interface CreateItemComboComponentRequest {
+  /** Not used for a fixed slot: the server takes the fixed item's own category. */
   componentCategoryId: string;
   slotLabel: string;
   quantity: number;
-  substitutionUpchargeAmount: number;
+  substitutionUpchargeAmount: number | null;
+  componentItemId?: string | null;
+  choiceUpcharges?: ComboChoiceUpcharge[];
 }
+
+export type UpdateItemComboComponentRequest = CreateItemComboComponentRequest;
 
 export interface UpdateTingiConfigRequest {
   tingiMode: TingiMode;

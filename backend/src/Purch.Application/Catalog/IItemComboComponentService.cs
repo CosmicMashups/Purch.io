@@ -8,4 +8,12 @@ public interface IItemComboComponentService
         Guid parentItemId,
         CreateItemComboComponentRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<ItemComboComponentDto> UpdateAsync(
+        Guid parentItemId,
+        Guid componentId,
+        UpdateItemComboComponentRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(Guid parentItemId, Guid componentId, CancellationToken cancellationToken = default);
 }

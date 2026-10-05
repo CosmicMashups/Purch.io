@@ -41,10 +41,23 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
 
     public async Task<string> GetModifierGroupsVersionAsync(CancellationToken cancellationToken = default)
     {
+        var tenantId = currentTenantProvider.TenantId
+            ?? throw new InvalidOperationException("The catalog version requires an authenticated tenant context.");
+
+        var separateTracking = await dbContext.Tenants
+            .Where(tenant => tenant.Id == tenantId)
+            .Select(tenant => tenant.UseSeparateInventoryTracking)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A modifier's availability comes from its ingredients' stock, which changes with every sale, so the
+        // version has to move with inventory as well or a client would keep showing a sold-out option as free.
         var parts = new List<string>
         {
+            separateTracking ? "sep" : "single",
             await StampAsync(dbContext.ModifierGroups, cancellationToken),
             await StampAsync(dbContext.ItemModifiers, cancellationToken),
+            await StampAsync(dbContext.ItemModifierIngredients, cancellationToken),
+            await StampAsync(dbContext.InventoryItems, cancellationToken),
         };
         return Hash(parts);
     }

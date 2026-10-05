@@ -78,6 +78,10 @@ export interface Transaction {
   orderType: string | null;
   originatedFromKiosk: boolean;
   kioskPrepNumber: number | null;
+  /** Kiosk orders only: how the customer said they will pay ("cash", "card", "ewallet", "discount"). */
+  kioskPaymentPreference?: string | null;
+  /** With the "discount" choice: which one they will ask for ("senior", "pwd", "other"). */
+  kioskDiscountHint?: string | null;
   kitchenStatus: KitchenStatus;
   payments: Payment[];
   /** When the cart was started. */

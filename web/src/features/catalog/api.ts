@@ -18,8 +18,12 @@ import type {
   ItemComboComponent,
   ItemVariant,
   ModifierGroup,
+  ModifierIngredient,
+  ReplaceModifierIngredientsRequest,
   UpdateCategoryRequest,
+  UpdateItemComboComponentRequest,
   UpdateItemDepartmentRequest,
+  UpdateItemModifierRequest,
   UpdateItemRequest,
   UpdateLowStockThresholdRequest,
   UpdateServiceDurationRequest,
@@ -67,6 +71,17 @@ export const catalogApi = {
     apiClient.get<ItemComboComponent[]>(`/items/${itemId}/combo-components`).then((r) => r.data),
   createComboComponent: (itemId: string, body: CreateItemComboComponentRequest) =>
     apiClient.post<ItemComboComponent>(`/items/${itemId}/combo-components`, body).then((r) => r.data),
+  updateComboComponent: (itemId: string, componentId: string, body: UpdateItemComboComponentRequest) =>
+    apiClient.put<ItemComboComponent>(`/items/${itemId}/combo-components/${componentId}`, body).then((r) => r.data),
+  deleteComboComponent: (itemId: string, componentId: string) =>
+    apiClient.delete(`/items/${itemId}/combo-components/${componentId}`).then(() => undefined),
+
+  updateModifier: (modifierId: string, body: UpdateItemModifierRequest) =>
+    apiClient.put<ModifierGroup>(`/modifiers/${modifierId}`, body).then((r) => r.data),
+  getModifierIngredients: (modifierId: string) =>
+    apiClient.get<ModifierIngredient[]>(`/modifiers/${modifierId}/ingredients`).then((r) => r.data),
+  replaceModifierIngredients: (modifierId: string, body: ReplaceModifierIngredientsRequest) =>
+    apiClient.put<ModifierIngredient[]>(`/modifiers/${modifierId}/ingredients`, body).then((r) => r.data),
 
   updateTingiConfig: (itemId: string, body: UpdateTingiConfigRequest) =>
     apiClient.put<Item>(`/items/${itemId}/tingi-config`, body).then((r) => r.data),

@@ -1173,7 +1173,13 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ChoiceUpchargesJson")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("ComponentCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ComponentItemId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -1305,6 +1311,38 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("ItemModifierGroups");
+                });
+
+            modelBuilder.Entity("Purch.Domain.Entities.ItemModifierIngredient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemModifierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("QuantityPerOrder")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemModifierId");
+
+                    b.ToTable("ItemModifierIngredients");
                 });
 
             modelBuilder.Entity("Purch.Domain.Entities.ItemRecipeLine", b =>
@@ -2165,6 +2203,12 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("ItemPromoDiscountAmount")
                         .HasPrecision(14, 4)
                         .HasColumnType("numeric(14,4)");
+
+                    b.Property<string>("KioskDiscountHint")
+                        .HasColumnType("text");
+
+                    b.Property<string>("KioskPaymentPreference")
+                        .HasColumnType("text");
 
                     b.Property<long>("KioskPrepNumber")
                         .HasColumnType("bigint");

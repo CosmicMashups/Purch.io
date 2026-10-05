@@ -63,6 +63,14 @@ public class Transaction : TenantScopedEntity
 
     public string? OrderType { get; set; }
 
+    /// <summary>What the customer chose on the kiosk ("cash", "card", "ewallet", "discount"), shown to the
+    /// cashier and printed on the receipt. Informational only: the cashier records the real payment.</summary>
+    public string? KioskPaymentPreference { get; set; }
+
+    /// <summary>With a "discount" preference, the discount the customer will ask for ("senior", "pwd",
+    /// "other"). The kiosk never applies it; the cashier does through the normal Senior/PWD flow.</summary>
+    public string? KioskDiscountHint { get; set; }
+
     /// <summary>Kiosk-originated orders are prep-only — set true, payment always finalized at cashier POS.</summary>
     public bool OriginatedFromKiosk { get; set; }
 

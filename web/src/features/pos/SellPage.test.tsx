@@ -69,6 +69,13 @@ describe('SellPage access', () => {
   });
 });
 
+/** The menu's category headings, leaving out the cart panel's own heading. */
+const sectionHeadings = () =>
+  screen
+    .getAllByRole('heading', { level: 2 })
+    .map((heading) => heading.textContent)
+    .filter((text) => text !== 'Cart');
+
 describe('SellPage catalog', () => {
   it('shows active items only, with a stock badge from the server flag', async () => {
     renderPage(<SellPage />);
@@ -77,16 +84,34 @@ describe('SellPage catalog', () => {
     expect(screen.getByRole('button', { name: /Ube Cookie/ })).toHaveTextContent('Out of stock');
   });
 
-  it('filters by category and by search text', async () => {
+  it('lists every category in one continuous scroll, with no "All" tile, and gathers uncategorised items last', async () => {
     renderPage(<SellPage />);
     await screen.findByRole('button', { name: /Iced Latte/ });
-    fireEvent.click(screen.getByRole('button', { name: 'Bakery' }));
-    expect(screen.queryByRole('button', { name: /Iced Latte/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ube Cookie/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    // Nothing is filtered away: every category's items are on the page at once, each under its own heading.
+    expect(screen.getByRole('button', { name: /Ube Cookie/ })).toBeInTheDocument();
+    expect(sectionHeadings()).toEqual(['Coffee', 'Bakery', 'Other']);
+    expect(screen.getByRole('button', { name: /Logo Tee/ })).toBeInTheDocument();
+
+    const rail = screen.getByRole('navigation', { name: 'Categories' });
+    expect(within(rail).queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
+    expect(within(rail).getAllByRole('button').map((tile) => tile.textContent)).toEqual(['Coffee', 'Bakery', 'Other']);
+  });
+
+  it('narrows every category at once when searching, dimming the tiles that have nothing left', async () => {
+    renderPage(<SellPage />);
+    await screen.findByRole('button', { name: /Iced Latte/ });
+
     fireEvent.change(screen.getByLabelText('Search items or scan a barcode'), { target: { value: 'moc' } });
     expect(screen.getAllByRole('button', { name: /Mocha|Iced|Ube|Logo/ })).toHaveLength(1);
+    expect(sectionHeadings()).toEqual(['Coffee']);
+
+    const rail = screen.getByRole('navigation', { name: 'Categories' });
+    expect(within(rail).getByRole('button', { name: 'Coffee' })).toHaveAttribute('aria-disabled', 'false');
+    expect(within(rail).getByRole('button', { name: 'Bakery' })).toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.change(screen.getByLabelText('Search items or scan a barcode'), { target: { value: '' } });
+    expect(await screen.findByRole('button', { name: /Ube Cookie/ })).toBeInTheDocument();
   });
 });
 
@@ -172,7 +197,7 @@ describe('adding to the cart', () => {
       makeItem({ id: 'tea', name: 'Iced Tea', categoryId: 'drinks' }),
     ]);
     vi.mocked(catalogApi.listComboComponents).mockResolvedValue([
-      { id: 'slot1', itemId: 'meal', componentCategoryId: 'drinks', slotLabel: 'Drink', quantity: 2, substitutionUpchargeAmount: 20 },
+      { id: 'slot1', componentCategoryId: 'drinks', slotLabel: 'Drink', quantity: 2, substitutionUpchargeAmount: 20 },
     ]);
     vi.mocked(posApi.addLines).mockResolvedValue(makeCart());
     renderPage(<SellPage />);

@@ -1,147 +1,94 @@
-import { useState } from 'react';
-import { PurchImage } from '../../components/brand/PurchImage';
-import { Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
 import { toast } from '../../components/feedback/toastStore';
 import { userMessage } from '../../lib/apiError';
-import { catalogApi } from '../catalog/api';
-import { catalogKeys, useCategories, useItems, useModifierGroups } from '../catalog/queries';
+import { useCategories, useItems } from '../catalog/queries';
 import type { Item } from '../catalog/types';
-import { formatPeso } from '../dashboard/format';
-import { addFlowFor, filterItems } from '../pos/catalogView';
-import { OptionsDialog } from '../pos/components/OptionsDialog';
-import { PricingType } from '../catalog/types';
-import type { AddLineRequest } from '../pos/types';
-import { resolveAdd, useLocalKioskCartStore } from './localCart';
+import { CategoryRail } from '../pos/components/CategoryRail';
+import { addFlowFor, buildRailTiles, groupItemsByCategory } from '../pos/catalogView';
+import { useSectionSpy } from '../pos/useSectionSpy';
+import { KioskActionBar } from './KioskActionBar';
+import { KioskItemCard } from './KioskItemCard';
+import { menuScroll } from './menuScroll';
 
+const grid = 'grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 landscape:grid-cols-[repeat(auto-fill,minmax(16rem,1fr))]';
+
+/**
+ * The whole menu in one scroll, grouped by category, with the category rail on the left. Tapping a category scrolls
+ * to it and the rail follows as the customer scrolls. Tapping an item opens its page to choose quantity and options.
+ */
 export function KioskMenuPage() {
+  const navigate = useNavigate();
   const items = useItems();
   const categories = useCategories();
-  const modifierGroups = useModifierGroups();
-  const qc = useQueryClient();
-  const lines = useLocalKioskCartStore((s) => s.lines);
-  const addToCart = useLocalKioskCartStore((s) => s.add);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<Item | null>(null);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
 
-  const visible = filterItems(items.data ?? [], { categoryId, query: '' });
-  const count = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const total = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], categories.data ?? []), [items.data, categories.data]);
+  const tiles = useMemo(() => buildRailTiles(categories.data ?? [], sections), [categories.data, sections]);
+  const spy = useSectionSpy(
+    useMemo(() => sections.map((section) => section.id), [sections]),
+    scroller,
+  );
 
-  /** Priced and added to the on-screen order the instant you tap; nothing is sent to the counter until
-   * you submit the whole order at the end. */
-  async function add(request: AddLineRequest, item: Item) {
-    setDialog(null);
-    const [variants, comboComponents] = await Promise.all([
-      item.pricingType === PricingType.VariantMatrix ? qc.fetchQuery({ queryKey: catalogKeys.variants(item.id), queryFn: () => catalogApi.listVariants(item.id), staleTime: 5 * 60_000 }) : undefined,
-      item.pricingType === PricingType.Combo ? qc.fetchQuery({ queryKey: catalogKeys.comboComponents(item.id), queryFn: () => catalogApi.listComboComponents(item.id), staleTime: 5 * 60_000 }) : undefined,
-    ]);
-    addToCart(resolveAdd(item, request, { items: items.data ?? [], variants, comboComponents, modifierGroups: modifierGroups.data }));
-    toast.success(`${item.name} added to your order`);
-  }
+  // Put the customer back where they were scrolled to, once there is a menu to scroll.
+  const ready = items.isSuccess && scroller !== null;
+  useEffect(() => {
+    if (ready) scroller.scrollTo?.({ top: menuScroll.top, behavior: 'instant' });
+  }, [ready, scroller]);
+  useEffect(
+    () => () => {
+      if (scroller) menuScroll.top = scroller.scrollTop;
+    },
+    [scroller],
+  );
 
-  // A business with no modifier groups at all cannot have any attached to an item, so the per-item check is skipped.
-  const mayHaveModifiers = modifierGroups.data === undefined || modifierGroups.data.length > 0;
-
-  async function pick(item: Item) {
-    const flow = addFlowFor(item);
-    if (flow === 'weight') {
-      toast.info(`${item.name} is not available here yet. Please order at the counter.`);
+  function pick(item: Item) {
+    if (addFlowFor(item) === 'weight') {
+      toast.info(`${item.name} is sold by weight. Please order it at the counter.`);
       return;
     }
-    if (flow === 'variant' || flow === 'combo') return setDialog(item);
-
-    if (!mayHaveModifiers) return void add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
-    try {
-      const groups = await qc.fetchQuery({ queryKey: catalogKeys.itemModifierGroups(item.id), queryFn: () => catalogApi.listItemModifierGroups(item.id), staleTime: 5 * 60_000 });
-      if (groups.length > 0) setDialog(item);
-      else void add({ itemId: item.id, itemVariantId: null, quantity: 1 }, item);
-    } catch (error) {
-      toast.error(userMessage(error));
-    }
+    if (scroller) menuScroll.top = scroller.scrollTop;
+    navigate(`/kiosk/item/${item.id}`);
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex flex-col gap-3 border-b border-line bg-canvas px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <Link to="/kiosk" className="inline-flex h-12 items-center text-base font-semibold text-brand-strong underline">
-            Start over
-          </Link>
-          <h1 className="text-xl font-bold">Menu</h1>
-          <span className="w-20" aria-hidden="true" />
-        </div>
-        <div role="group" aria-label="Categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <Chip active={categoryId === null} onClick={() => setCategoryId(null)}>
-            All
-          </Chip>
-          {[...(categories.data ?? [])]
-            .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((c) => (
-              <Chip key={c.id} active={categoryId === c.id} onClick={() => setCategoryId(c.id)}>
-                {c.name}
-              </Chip>
-            ))}
-        </div>
-      </header>
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-0 flex-1">
+        <CategoryRail tiles={tiles} activeId={spy.activeId} onSelect={spy.scrollTo} size="lg" className="w-28 shrink-0 landscape:w-36" />
 
-      <main className="flex-1 p-4 pb-32">
-        {items.isPending && (
-          <div className="grid grid-cols-2 gap-4" aria-busy="true">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-44 w-full" />
+        <main ref={setScroller} aria-label="Menu" className="kiosk-scroll min-w-0 flex-1 overflow-y-auto px-5 pb-8 pt-2">
+          {items.isPending && (
+            <div className={grid} aria-busy="true">
+              {Array.from({ length: 8 }, (_, i) => (
+                <Skeleton key={i} className="h-64 w-full" />
+              ))}
+            </div>
+          )}
+          {items.isError && <ErrorState title="The menu could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />}
+          {items.isSuccess && sections.length === 0 && (
+            <p className="rounded-panel border border-dashed border-ink-soft/40 p-10 text-center text-xl text-ink-soft">Nothing is on the menu right now. Please order at the counter.</p>
+          )}
+          {items.isSuccess &&
+            sections.map((section) => (
+              <section key={section.id} ref={spy.sectionRef(section.id)} data-section-id={section.id} aria-labelledby={`menu-${section.id}`} className="scroll-mt-2 pb-8">
+                <h2 id={`menu-${section.id}`} className="mb-3 mt-4 text-3xl font-extrabold tracking-tight">
+                  {section.name}
+                </h2>
+                <ul className={grid}>
+                  {section.items.map((item) => (
+                    <li key={item.id}>
+                      <KioskItemCard item={item} onPick={pick} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </div>
-        )}
-        {items.isError && <ErrorState title="The menu could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />}
-        {items.isSuccess && visible.length === 0 && <p className="rounded-panel border border-dashed border-ink-soft/40 p-8 text-center text-lg text-ink-soft">Nothing here right now. Try another category.</p>}
-        {items.isSuccess && visible.length > 0 && (
-          <ul className="grid grid-cols-2 gap-4">
-            {visible.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  disabled={item.isOutOfStock}
-                  onClick={() => void pick(item)}
-                  className="flex h-full min-h-44 w-full flex-col overflow-hidden rounded-panel border border-line bg-surface text-left active:translate-y-px disabled:opacity-50"
-                >
-                  {item.imageUrl && <PurchImage src={item.imageUrl} alt="" className="aspect-[4/3] w-full object-cover" />}
-                  <span className="flex flex-1 flex-col justify-between gap-2 p-4">
-                    <span className="line-clamp-2 text-lg font-semibold leading-snug">{item.name}</span>
-                    <span className="text-lg font-bold tabular-nums text-brand-strong">
-                      {item.isOutOfStock ? 'Sold out' : item.pricingType === PricingType.VariantMatrix ? 'Choose option' : formatPeso(item.basePrice)}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
-
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl bg-gradient-to-t from-canvas via-canvas to-transparent p-4">
-        <Link to="/kiosk/cart" className="flex h-16 items-center justify-between rounded-control bg-brand px-6 text-xl font-bold text-on-brand">
-          <span>View your order ({count})</span>
-          <span className="tabular-nums">{formatPeso(total)}</span>
-        </Link>
+        </main>
       </div>
 
-      {dialog && <OptionsDialog item={dialog} items={items.data ?? []} busy={false} onAdd={(request) => void add(request, dialog)} onClose={() => setDialog(null)} />}
+      <KioskActionBar />
     </div>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`h-14 shrink-0 rounded-full px-6 text-lg font-semibold ${active ? 'bg-brand text-on-brand' : 'border border-line bg-surface'}`}
-    >
-      {children}
-    </button>
   );
 }

@@ -1,20 +1,9 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures';
+import { placeKioskOrder } from './support/kioskOrder';
 
 /** Orders a Latte at the kiosk and returns the order number the customer is given. */
-async function orderAtKiosk(kiosk: Page): Promise<number> {
-  await kiosk.goto('/kiosk');
-  await kiosk.getByRole('link', { name: 'Start your order' }).click();
-  await kiosk.getByRole('button', { name: /Iced Latte/ }).click();
-  await kiosk.getByRole('link', { name: /View your order \(1\)/ }).click();
-  await expect(kiosk.getByText('Iced Latte').first()).toBeVisible();
-  await kiosk.getByRole('link', { name: 'Continue' }).click();
-  await kiosk.getByRole('button', { name: /Take Out/ }).click();
-  const number = kiosk.getByLabel(/Order number \d+/);
-  await expect(number).toBeVisible();
-  const label = (await number.getAttribute('aria-label')) ?? '';
-  return Number(label.replace('Order number ', ''));
-}
+const orderAtKiosk = (kiosk: Page): Promise<number> => placeKioskOrder(kiosk, /Iced Latte/);
 
 test.describe('an order from the kiosk to the kitchen, the board and the counter', () => {
   test('the customer orders, the kitchen prepares it, and the board calls the number', async ({ actor }) => {
@@ -50,8 +39,9 @@ test.describe('an order from the kiosk to the kitchen, the board and the counter
     await orderAtKiosk(kiosk);
     await kiosk.getByRole('button', { name: 'Start a new order' }).click();
     await expect(kiosk).toHaveURL(/\/kiosk$/);
-    await kiosk.getByRole('link', { name: 'Start your order' }).click();
-    await expect(kiosk.getByRole('link', { name: /View your order \(0\)/ })).toBeVisible();
+    await kiosk.getByRole('link', { name: /Tap anywhere to begin/ }).click();
+    await expect(kiosk.getByText('Your order is empty')).toBeVisible();
+    await expect(kiosk.getByRole('button', { name: 'Complete Order' })).toBeDisabled();
   });
 
   test('a device screen never shows another kind of device its data', async ({ actor }) => {

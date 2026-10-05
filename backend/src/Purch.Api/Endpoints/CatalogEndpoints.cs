@@ -89,6 +89,30 @@ public static class CatalogEndpoints
             Results.Ok(await modifierGroupService.AddModifierAsync(groupId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        _ = app.MapPut("/modifiers/{modifierId:guid}", async (
+            Guid modifierId,
+            UpdateItemModifierRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.UpdateModifierAsync(modifierId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Modifier ingredients (stock a chosen modifier uses up, for UseSeparateInventoryTracking tenants) ---
+        _ = app.MapGet("/modifiers/{modifierId:guid}/ingredients", async (
+            Guid modifierId,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.GetIngredientsAsync(modifierId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapPut("/modifiers/{modifierId:guid}/ingredients", async (
+            Guid modifierId,
+            ReplaceModifierIngredientsRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.ReplaceIngredientsAsync(modifierId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Item modifier group attachment (B5, item-scoped customization e.g. "No Ice") ---
         _ = app.MapGet("/items/{itemId:guid}/modifier-groups", async (
             Guid itemId,
@@ -214,6 +238,25 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await itemComboComponentService.CreateAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapPut("/items/{itemId:guid}/combo-components/{componentId:guid}", async (
+            Guid itemId,
+            Guid componentId,
+            UpdateItemComboComponentRequest request,
+            IItemComboComponentService itemComboComponentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemComboComponentService.UpdateAsync(itemId, componentId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapDelete("/items/{itemId:guid}/combo-components/{componentId:guid}", async (
+            Guid itemId,
+            Guid componentId,
+            IItemComboComponentService itemComboComponentService,
+            CancellationToken cancellationToken) =>
+        {
+            await itemComboComponentService.DeleteAsync(itemId, componentId, cancellationToken);
+            return Results.NoContent();
+        }).RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
         return app;
     }

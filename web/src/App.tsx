@@ -52,10 +52,14 @@ import { CategoriesPage } from './features/catalog/pages/CategoriesPage';
 import { DevicePairPage } from './features/kiosk/DevicePairPage';
 import { KioskCartPage } from './features/kiosk/KioskCartPage';
 import { KioskDonePage } from './features/kiosk/KioskDonePage';
+import { KioskItemPage } from './features/kiosk/KioskItemPage';
 import { KioskLandingPage } from './features/kiosk/KioskLandingPage';
 import { KioskLayout } from './features/kiosk/KioskLayout';
 import { KioskMenuPage } from './features/kiosk/KioskMenuPage';
 import { KioskOrderTypePage } from './features/kiosk/KioskOrderTypePage';
+import { KioskPaymentPage } from './features/kiosk/KioskPaymentPage';
+import { KioskPrinterPage } from './features/kiosk/KioskPrinterPage';
+import { KioskProcessingPage } from './features/kiosk/KioskProcessingPage';
 import { KitchenDisplayPage } from './features/kiosk/KitchenDisplayPage';
 import { OrderBoardPage } from './features/kiosk/OrderBoardPage';
 import { RequireDevice } from './features/kiosk/RequireDevice';
@@ -80,9 +84,13 @@ export function App() {
         <Route element={<KioskLayout />}>
           <Route path="/kiosk" element={<KioskLandingPage />} />
           <Route path="/kiosk/menu" element={<KioskMenuPage />} />
+          <Route path="/kiosk/item/:itemId" element={<KioskItemPage />} />
           <Route path="/kiosk/cart" element={<KioskCartPage />} />
           <Route path="/kiosk/order-type" element={<KioskOrderTypePage />} />
+          <Route path="/kiosk/payment" element={<KioskPaymentPage />} />
+          <Route path="/kiosk/processing" element={<KioskProcessingPage />} />
           <Route path="/kiosk/done" element={<KioskDonePage />} />
+          <Route path="/kiosk/printer" element={<KioskPrinterPage />} />
           <Route path="/kiosk/*" element={<Navigate to="/kiosk" replace />} />
         </Route>
       </Route>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CategoryStrip } from './components/CategoryStrip';
 import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
@@ -12,12 +12,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/useSession';
 import { formatPeso } from '../dashboard/format';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
-import { addFlowFor, filterItems, findByCode } from './catalogView';
+import { addFlowFor, buildRailTiles, findByCode, groupItemsByCategory } from './catalogView';
+import { useSectionSpy } from './useSectionSpy';
 import { previewFor, withPending } from './optimisticCart';
 import { CashierTopBar, type MenuAction } from './components/CashierTopBar';
 import { CartPanel } from './components/CartPanel';
 import { DeviceRequired } from './components/DeviceRequired';
-import { ItemGrid } from './components/ItemGrid';
+import { ItemSections } from './components/ItemGrid';
 import { OptionsDialog } from './components/OptionsDialog';
 import { WeightDialog } from './components/WeightDialog';
 import { useCart, usePosAdds } from './queries';
@@ -48,13 +49,31 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
   const modifierGroups = useModifierGroups();
   const qc = useQueryClient();
   const catalogSync = useCatalogSync(online);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  const visible = filterItems(items.data ?? [], { categoryId, query });
+  // The menu is one continuous list, grouped by category. Search narrows every group at once, and the rail
+  // follows whichever category is at the top as you scroll.
+  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], categories.data ?? [], query), [items.data, categories.data, query]);
+  const railTiles = useMemo(() => buildRailTiles(categories.data ?? [], sections), [categories.data, sections]);
+  const spy = useSectionSpy(
+    useMemo(() => sections.map((section) => section.id), [sections]),
+    null,
+  );
+  const scrollBeforeSearch = useRef<number | null>(null);
+
+  /** Searching shrinks the page, so remember where you were and put the menu back there when the search is cleared. */
+  function changeQuery(next: string) {
+    if (query === '' && next !== '') scrollBeforeSearch.current = window.scrollY;
+    if (next === '' && scrollBeforeSearch.current !== null) {
+      const restoreTo = scrollBeforeSearch.current;
+      scrollBeforeSearch.current = null;
+      requestAnimationFrame(() => window.scrollTo({ top: restoreTo }));
+    }
+    setQuery(next);
+  }
   const pendingCount = adds.pending.reduce((sum, row) => sum + (Number.isInteger(row.quantity) ? row.quantity : 1), 0);
   const lineCount = (cart.data?.lines.reduce((sum, line) => sum + (Number.isInteger(line.quantity) ? line.quantity : 1), 0) ?? 0) + pendingCount;
 
@@ -129,7 +148,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
   return (
     <div className="flex flex-col gap-4">
       <CashierTopBar role={role} kioskTo="/sell/kiosk-orders" onRefresh={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))} actions={menuActions} />
-      <CategoryStrip categories={categories.data ?? []} selectedId={categoryId} onSelect={setCategoryId} />
+      <CategoryStrip tiles={railTiles} activeId={spy.activeId} onSelect={spy.scrollTo} />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="flex min-w-0 flex-col gap-4">
         <input
@@ -137,7 +156,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
           aria-label="Search items or scan a barcode"
           placeholder="Search or scan a barcode"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => changeQuery(e.target.value)}
           onKeyDown={onSearchKey}
           className="h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-lg"
         />
@@ -150,7 +169,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
           </div>
         )}
         {items.isError && <ErrorState title="Items could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />}
-        {items.isSuccess && <ItemGrid items={visible} onPick={(item) => void beginAdd(item)} />}
+        {items.isSuccess && <ItemSections sections={sections} sectionRef={spy.sectionRef} onPick={(item) => void beginAdd(item)} />}
       </div>
 
       <aside className="hidden lg:sticky lg:top-4 lg:block lg:h-[calc(100dvh-6rem)]">

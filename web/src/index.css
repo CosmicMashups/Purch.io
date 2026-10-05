@@ -75,6 +75,67 @@ html {
   }
 }
 
+/* Text selection takes the tenant's colour instead of the browser's default blue. */
+::selection {
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  color: var(--ink);
+}
+
+/*
+ * Scrollbar for the scrolling regions of the kiosk and the till. A slim rounded thumb in the tenant's colour on a
+ * barely tinted track; it thickens and darkens while it is hovered or dragged. Firefox and Safari ignore the
+ * ::-webkit rules, so scrollbar-color / scrollbar-width carry the same palette there.
+ */
+.kiosk-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand) 55%, var(--surface)) transparent;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+.kiosk-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.kiosk-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--brand-tint) 70%, transparent);
+  border-radius: 999px;
+  margin-block: 6px;
+}
+.kiosk-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand) 55%, var(--surface));
+  border: 4px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  min-height: 56px;
+  transition: background-color 160ms ease-out;
+}
+.kiosk-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--brand);
+  background-clip: padding-box;
+  border-width: 3px;
+}
+.kiosk-scroll::-webkit-scrollbar-thumb:active {
+  background: var(--brand-strong);
+  background-clip: padding-box;
+  border-width: 2px;
+}
+/* The category rail is a narrow strip of its own: it scrolls, but a bar there would only crowd the tiles. */
+.kiosk-scroll-hidden {
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+.kiosk-scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-scroll,
+  .kiosk-scroll-hidden {
+    scroll-behavior: auto;
+  }
+}
+
 /* Prevent browser autofill from painting harsh default yellow/blue backgrounds */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -108,9 +169,73 @@ input:-webkit-autofill:active {
   }
 }
 
+/*
+ * The kiosk's order slip sits on the page only while it is being printed. On screen it is never visible, and when it prints
+ * everything else on the page is hidden so the slip is the whole printout.
+ */
+.kiosk-slip {
+  display: none;
+}
+@media print {
+  html.printing-kiosk-slip body > *:not(.kiosk-slip) {
+    display: none !important;
+  }
+  html.printing-kiosk-slip .kiosk-slip {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
     transform: translateY(16px);
+  }
+}
+
+/* The kiosk's "Sending your order" mark: three bars that rise and fall in turn. Transform and opacity only. */
+@keyframes kiosk-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Counts the Done screen's hand-off ring down; the duration is set inline from DONE_RESET_MS. */
+@keyframes kiosk-countdown {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: var(--ring-length);
+  }
+}
+
+/* The welcome screen's hand: a slow lift that says "touch me". Only played when motion is welcome. */
+@keyframes kiosk-nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Keeps a chosen option from looking inert: a quick settle when its card becomes selected. */
+@keyframes kiosk-pick {
+  0% {
+    transform: scale(0.97);
+  }
+  60% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
   }
 }

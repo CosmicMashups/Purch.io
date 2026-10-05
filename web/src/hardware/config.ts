@@ -10,11 +10,27 @@ export interface HardwareConfig {
   paperWidth: PaperWidth;
   /** Open the print window by itself when a sale is completed. */
   autoPrintReceipt: boolean;
+  /** Kiosk only: print the order slip when an order is sent. Only takes effect once a test slip was confirmed for this paper width. */
+  kioskPrintSlip: boolean;
+  /** The paper width a test slip was last confirmed to print correctly on, or null if never. Changing the paper makes it stale. */
+  kioskSlipConfirmedWidth: PaperWidth | null;
+}
+
+/** Whether the kiosk should print its order slip: switched on, and the printer was proven on the paper now selected. */
+export function kioskSlipReady(config: Pick<HardwareConfig, 'kioskPrintSlip' | 'kioskSlipConfirmedWidth' | 'paperWidth'>): boolean {
+  return config.kioskPrintSlip && config.kioskSlipConfirmedWidth === config.paperWidth;
 }
 
 export const BAUD_RATES = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200] as const;
 
-export const DEFAULT_CONFIG: HardwareConfig = { scaleProtocol: 'cas', scaleBaudRate: 9600, paperWidth: 'mm80', autoPrintReceipt: false };
+export const DEFAULT_CONFIG: HardwareConfig = {
+  scaleProtocol: 'cas',
+  scaleBaudRate: 9600,
+  paperWidth: 'mm80',
+  autoPrintReceipt: false,
+  kioskPrintSlip: false,
+  kioskSlipConfirmedWidth: null,
+};
 
 const KEY = 'purch.hardware';
 
@@ -26,6 +42,8 @@ export function sanitizeConfig(value: unknown): HardwareConfig {
     scaleBaudRate: typeof v.scaleBaudRate === 'number' && (BAUD_RATES as readonly number[]).includes(v.scaleBaudRate) ? v.scaleBaudRate : DEFAULT_CONFIG.scaleBaudRate,
     paperWidth: v.paperWidth === 'mm58' || v.paperWidth === 'mm80' ? v.paperWidth : DEFAULT_CONFIG.paperWidth,
     autoPrintReceipt: typeof v.autoPrintReceipt === 'boolean' ? v.autoPrintReceipt : DEFAULT_CONFIG.autoPrintReceipt,
+    kioskPrintSlip: typeof v.kioskPrintSlip === 'boolean' ? v.kioskPrintSlip : DEFAULT_CONFIG.kioskPrintSlip,
+    kioskSlipConfirmedWidth: v.kioskSlipConfirmedWidth === 'mm58' || v.kioskSlipConfirmedWidth === 'mm80' ? v.kioskSlipConfirmedWidth : DEFAULT_CONFIG.kioskSlipConfirmedWidth,
   };
 }
 
@@ -54,7 +72,9 @@ export const useHardwareConfig = create<ConfigState>((set, get) => ({
   ...load(),
   update: (patch) => {
     const { update: _update, ...current } = get();
-    const next = sanitizeConfig({ ...current, ...patch });
+    // A printer proven on one paper is not proven on another: switching paper turns the kiosk slip off until it is tested again.
+    const paperChanged = patch.paperWidth !== undefined && patch.paperWidth !== current.paperWidth;
+    const next = sanitizeConfig({ ...current, ...patch, ...(paperChanged ? { kioskPrintSlip: false } : {}) });
     save(next);
     set(next);
   },

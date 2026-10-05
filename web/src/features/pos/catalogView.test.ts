@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PricingType, TingiMode, type Item } from '../catalog/types';
-import { addFlowFor, cashQuickAmounts, changePreview, filterItems, findByCode, stockBadge, tenderCoversTotal } from './catalogView';
+import { addFlowFor, buildRailTiles, cashQuickAmounts, changePreview, filterItems, findByCode, groupItemsByCategory, OTHER_SECTION_ID, stockBadge, tenderCoversTotal } from './catalogView';
 
 const item = (over: Partial<Item>): Item =>
   ({
@@ -64,6 +64,72 @@ describe('filterItems', () => {
     expect(filterItems(items, { categoryId: 'coffee', query: '' }).map((i) => i.id)).toEqual(['a']);
     expect(filterItems(items, { categoryId: null, query: 'ck-' }).map((i) => i.id)).toEqual(['b']);
     expect(filterItems(items, { categoryId: null, query: '48000' }).map((i) => i.id)).toEqual(['a']);
+  });
+});
+
+describe('groupItemsByCategory', () => {
+  const categories = [
+    { id: 'bakery', name: 'Bakery', sortOrder: 2, imageUrl: null },
+    { id: 'coffee', name: 'Coffee', sortOrder: 1, imageUrl: 'coffee.png' },
+    { id: 'empty', name: 'Empty shelf', sortOrder: 3, imageUrl: null },
+  ];
+  const items = [
+    item({ id: 'a', name: 'Iced Latte', categoryId: 'coffee' }),
+    item({ id: 'b', name: 'Cookie', categoryId: 'bakery' }),
+    item({ id: 'c', name: 'Mocha', categoryId: 'coffee' }),
+    item({ id: 'd', name: 'Retired', categoryId: 'coffee', isActive: false }),
+    item({ id: 'e', name: 'Mystery', categoryId: null }),
+    item({ id: 'f', name: 'From a deleted category', categoryId: 'gone' }),
+  ];
+
+  it('makes one section per category in the shop order, with only active items, and no "All"', () => {
+    const sections = groupItemsByCategory(items, categories);
+    expect(sections.map((section) => [section.id, section.items.map((i) => i.id)])).toEqual([
+      ['coffee', ['a', 'c']],
+      ['bakery', ['b']],
+      [OTHER_SECTION_ID, ['e', 'f']],
+    ]);
+    expect(sections.map((section) => section.name)).not.toContain('All');
+  });
+
+  it('leaves out a category with nothing in it, so there is no empty heading to scroll to', () => {
+    expect(groupItemsByCategory(items, categories).map((section) => section.id)).not.toContain('empty');
+  });
+
+  it('keeps nothing sellable unreachable: uncategorised items land in a closing Other section', () => {
+    const last = groupItemsByCategory(items, categories).at(-1);
+    expect(last?.name).toBe('Other');
+    expect(last?.imageUrl).toBeNull();
+  });
+
+  it('narrows every section at once for a search and drops the ones left empty', () => {
+    const sections = groupItemsByCategory(items, categories, 'mo');
+    expect(sections.map((section) => [section.id, section.items.map((i) => i.id)])).toEqual([['coffee', ['c']]]);
+  });
+});
+
+describe('buildRailTiles', () => {
+  const categories = [
+    { id: 'coffee', name: 'Coffee', sortOrder: 1, imageUrl: 'coffee.png' },
+    { id: 'bakery', name: 'Bakery', sortOrder: 2, imageUrl: null },
+  ];
+
+  it('has a tile per category with its picture and never an "All" tile', () => {
+    const tiles = buildRailTiles(categories, groupItemsByCategory([item({ id: 'a', categoryId: 'coffee' }), item({ id: 'b', categoryId: 'bakery' })], categories));
+    expect(tiles.map((tile) => [tile.label, tile.imageUrl, tile.disabled])).toEqual([
+      ['Coffee', 'coffee.png', false],
+      ['Bakery', null, false],
+    ]);
+  });
+
+  it('dims the tile of a category with nothing to show and adds Other only when needed', () => {
+    const onlyCoffee = groupItemsByCategory([item({ id: 'a', categoryId: 'coffee' }), item({ id: 'z', categoryId: null })], categories);
+    const tiles = buildRailTiles(categories, onlyCoffee);
+    expect(tiles.map((tile) => [tile.label, tile.disabled])).toEqual([
+      ['Coffee', false],
+      ['Bakery', true],
+      ['Other', false],
+    ]);
   });
 });
 

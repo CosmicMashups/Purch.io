@@ -1,4 +1,4 @@
-import { PricingType, TingiMode, type Item } from '../catalog/types';
+import { PricingType, TingiMode, type Category, type Item } from '../catalog/types';
 
 /** How tapping an item adds it. The server prices whatever is added. */
 export type AddFlow = 'direct' | 'variant' | 'combo' | 'weight';
@@ -34,6 +34,54 @@ export function filterItems(items: Item[], { categoryId, query }: CatalogFilter)
       (item) =>
         q === '' || item.name.toLowerCase().includes(q) || (item.sku?.toLowerCase().includes(q) ?? false) || (item.barcode?.toLowerCase().includes(q) ?? false),
     );
+}
+
+/** The id of the trailing section for items with no category (or one that no longer exists). */
+export const OTHER_SECTION_ID = 'other';
+
+export interface CatalogSection {
+  /** The category id, or {@link OTHER_SECTION_ID}. Doubles as the anchor the category rail scrolls to. */
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  items: Item[];
+}
+
+/**
+ * The menu as one continuous list: a section per category in the shop's own order, each holding its active items
+ * that match the search. A category with nothing to show gets no section, and items without a category are
+ * gathered into a closing "Other" section so nothing sellable is ever unreachable.
+ */
+export function groupItemsByCategory(items: Item[], categories: Category[], query = ''): CatalogSection[] {
+  const visible = filterItems(items, { categoryId: null, query });
+  const known = new Set(categories.map((category) => category.id));
+
+  const sections: CatalogSection[] = [...categories]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((category) => ({ id: category.id, name: category.name, imageUrl: category.imageUrl, items: visible.filter((item) => item.categoryId === category.id) }))
+    .filter((section) => section.items.length > 0);
+
+  const uncategorised = visible.filter((item) => item.categoryId === null || !known.has(item.categoryId));
+  if (uncategorised.length > 0) sections.push({ id: OTHER_SECTION_ID, name: 'Other', imageUrl: null, items: uncategorised });
+  return sections;
+}
+
+export interface RailTile {
+  id: string;
+  label: string;
+  imageUrl: string | null;
+  /** Nothing to scroll to: the category has no sellable items, or none match the search. */
+  disabled: boolean;
+}
+
+/** One rail tile per category in the shop's order, dimmed when its section is empty, plus "Other" when it is needed. */
+export function buildRailTiles(categories: Category[], sections: CatalogSection[]): RailTile[] {
+  const present = new Set(sections.map((section) => section.id));
+  const tiles: RailTile[] = [...categories]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((category) => ({ id: category.id, label: category.name, imageUrl: category.imageUrl, disabled: !present.has(category.id) }));
+  if (present.has(OTHER_SECTION_ID)) tiles.push({ id: OTHER_SECTION_ID, label: 'Other', imageUrl: null, disabled: false });
+  return tiles;
 }
 
 /** A scanner types the code and presses Enter, so only an exact barcode or SKU match counts. */

@@ -28,6 +28,7 @@ public sealed class TransactionService(
     IItemComboComponentRepository comboComponentRepository,
     IItemModifierGroupRepository itemModifierGroupRepository,
     IModifierGroupRepository modifierGroupRepository,
+    IItemModifierIngredientRepository modifierIngredientRepository,
     IPromoCodeRepository promoCodeRepository,
     IBogoPromoRuleRepository bogoPromoRuleRepository,
     IComboPromoRuleRepository comboPromoRuleRepository,
@@ -306,9 +307,10 @@ public sealed class TransactionService(
 
     /// <summary>Validates that every combo slot got exactly its required number of
     /// selections, each a real, active item from that slot's category, and prices
-    /// the line as the combo's base price plus every selected slot's upcharge (if
-    /// any) — the domain model prices a slot's substitution as a flat amount, not
-    /// per specific component, so any pick within a paid slot costs the same.</summary>
+    /// the line as the combo's base price plus each slot's flat upcharge (charged once
+    /// per slot) plus the surcharge of every individual choice that carries one.
+    /// A fixed slot (one that names a specific item) needs no pick from the customer:
+    /// the server fills its selections in, so stock still leaves for those items.</summary>
     private async Task<(decimal UnitPrice, IReadOnlyList<ComboSelectionRequest> Selections)> ResolveComboSelectionsAsync(
         Item item,
         IReadOnlyList<ComboSelectionRequest>? requestedSelections,
@@ -327,9 +329,35 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(AddTransactionLineRequest.ComboSelections), "One of the selections doesn't belong to this combo.");
         }
 
+        var resolved = new List<ComboSelectionRequest>();
+        var choiceUpcharges = 0m;
+
         foreach (var slot in slots)
         {
             var slotSelections = selections.Where(selection => selection.SlotId == slot.Id).ToList();
+
+            if (slot.ComponentItemId is { } fixedItemId)
+            {
+                var fixedItem = await itemRepository.GetByIdAsync(fixedItemId, cancellationToken)
+                    ?? throw new NotFoundException("Item", fixedItemId);
+
+                if (!fixedItem.IsActive)
+                {
+                    throw new ValidationException(nameof(AddTransactionLineRequest.ComboSelections), $"{fixedItem.Name} is no longer available.");
+                }
+
+                // A client may echo the fixed picks back, but nothing else is acceptable for this slot.
+                if (slotSelections.Any(selection => selection.SelectedItemId != fixedItemId))
+                {
+                    throw new ValidationException(
+                        nameof(AddTransactionLineRequest.ComboSelections),
+                        $"\"{slot.SlotLabel}\" is always {fixedItem.Name}.");
+                }
+
+                resolved.AddRange(Enumerable.Range(0, slot.Quantity).Select(_ => new ComboSelectionRequest(slot.Id, fixedItemId)));
+                continue;
+            }
+
             if (slotSelections.Count != slot.Quantity)
             {
                 throw new ValidationException(
@@ -348,11 +376,14 @@ public sealed class TransactionService(
                         nameof(AddTransactionLineRequest.ComboSelections),
                         $"\"{selectedItem.Name}\" isn't a valid choice for \"{slot.SlotLabel}\".");
                 }
+
+                choiceUpcharges += ComboChoiceUpcharges.For(slot, selectedItem.Id);
+                resolved.Add(selection);
             }
         }
 
-        var unitPrice = item.BasePrice + slots.Sum(slot => slot.SubstitutionUpchargeAmount ?? 0m);
-        return (unitPrice, selections);
+        var unitPrice = item.BasePrice + slots.Sum(slot => slot.SubstitutionUpchargeAmount ?? 0m) + choiceUpcharges;
+        return (unitPrice, resolved);
     }
 
     /// <summary>Validates the caller's chosen modifiers against every modifier
@@ -412,8 +443,45 @@ public sealed class TransactionService(
             }
         }
 
+        await RejectSoldOutModifiersAsync(selectedModifiersByGroup.SelectMany(pair => pair.Selected).ToList(), cancellationToken);
+
         var priceDeltaTotal = selectedModifiersByGroup.SelectMany(pair => pair.Selected).Sum(m => m.PriceDelta);
         return (priceDeltaTotal, selectedIds);
+    }
+
+    /// <summary>A modifier whose ingredients have run out is shown as sold out and can't be chosen. The check
+    /// only applies when the business tracks inventory separately; otherwise modifiers have no stock to run out of.</summary>
+    private async Task RejectSoldOutModifiersAsync(List<ItemModifier> selected, CancellationToken cancellationToken)
+    {
+        if (selected.Count == 0)
+        {
+            return;
+        }
+
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is not { UseSeparateInventoryTracking: true })
+        {
+            return;
+        }
+
+        var ingredients = await modifierIngredientRepository.ListByModifiersAsync([.. selected.Select(m => m.Id)], cancellationToken);
+        if (ingredients.Count == 0)
+        {
+            return;
+        }
+
+        var inventoryById = (await inventoryItemRepository.ListByIdsAsync([.. ingredients.Select(i => i.InventoryItemId).Distinct()], cancellationToken))
+            .ToDictionary(inventoryItem => inventoryItem.Id);
+
+        foreach (var modifier in selected)
+        {
+            if (ModifierAvailability.IsOutOfStock(ingredients.Where(i => i.ItemModifierId == modifier.Id), inventoryById))
+            {
+                throw new ValidationException(
+                    nameof(AddTransactionLineRequest.SelectedModifierIds),
+                    $"{modifier.Name} is sold out.");
+            }
+        }
     }
 
     public async Task<TransactionDto> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default)
@@ -1012,6 +1080,64 @@ public sealed class TransactionService(
                 });
             }
         }
+
+        await ConsumeModifierIngredientsForCompletedSaleAsync(cart, cancellationToken);
+    }
+
+    /// <summary>The stock the chosen modifiers used up (Coke Zero's syrup and water, an extra slice of cheese),
+    /// on top of what each item's own recipe drew down. Scaled by the line quantity, and a null amount only
+    /// checks availability and takes nothing, like a recipe line.</summary>
+    private async Task ConsumeModifierIngredientsForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        var selections = await transactionRepository.ListModifierSelectionsByLinesAsync([.. lines.Select(line => line.Id)], cancellationToken);
+        if (selections.Count == 0)
+        {
+            return;
+        }
+
+        var ingredients = (await modifierIngredientRepository.ListByModifiersAsync([.. selections.Select(s => s.ItemModifierId).Distinct()], cancellationToken))
+            .ToLookup(ingredient => ingredient.ItemModifierId);
+
+        foreach (var selection in selections)
+        {
+            var line = lines.First(candidate => candidate.Id == selection.TransactionLineId);
+
+            foreach (var ingredient in ingredients[selection.ItemModifierId])
+            {
+                if (ingredient.QuantityPerOrder is not { } quantityPerOrder)
+                {
+                    continue;
+                }
+
+                var inventoryItem = await inventoryItemRepository.GetByIdAsync(ingredient.InventoryItemId, cancellationToken);
+                if (inventoryItem is null)
+                {
+                    continue;
+                }
+
+                var consumedQuantity = quantityPerOrder * line.Quantity;
+                inventoryItem.QuantityOnHand -= consumedQuantity;
+
+                inventoryMovementRepository.Add(new InventoryMovement
+                {
+                    TenantId = CurrentTenantId,
+                    CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
+                    ItemId = line.ItemId,
+                    InventoryItemId = inventoryItem.Id,
+                    BranchId = cart.BranchId,
+                    Type = MovementType.Consumption,
+                    Quantity = consumedQuantity,
+                    StaffUserId = CurrentUserId,
+                    Note = $"Consumed by a chosen modifier on item {line.ItemId}",
+                });
+            }
+        }
     }
 
     /// <summary>B7's checkout-side enforcement: utang is off unless the tenant
@@ -1203,6 +1329,8 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(request.OrderType), "Order type is required.");
         }
 
+        var (paymentPreference, discountHint) = ValidateKioskPaymentChoice(request);
+
         // Idempotent replay: this exact order already went through (a retry after a lost response),
         // so return it as-is instead of placing a second one.
         var existing = await transactionRepository.GetByClientSaleIdAsync(request.OrderId, cancellationToken);
@@ -1248,9 +1376,40 @@ public sealed class TransactionService(
 
         await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
         cart.OrderType = request.OrderType.Trim();
+        cart.KioskPaymentPreference = paymentPreference;
+        cart.KioskDiscountHint = discountHint;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await SubmitKioskOrderAsync(cancellationToken);
+    }
+
+    /// <summary>Normalises the kiosk's payment preference and discount hint. A hint is only meaningful with
+    /// the "discount" preference; sending one without it is rejected rather than silently dropped.</summary>
+    private static (string? Preference, string? Hint) ValidateKioskPaymentChoice(PlaceKioskOrderRequest request)
+    {
+        var preference = string.IsNullOrWhiteSpace(request.PaymentPreference)
+            ? null
+            : request.PaymentPreference.Trim().ToLowerInvariant();
+        var hint = string.IsNullOrWhiteSpace(request.DiscountHint)
+            ? null
+            : request.DiscountHint.Trim().ToLowerInvariant();
+
+        if (preference is not null && !KioskPaymentPreferences.All.Contains(preference))
+        {
+            throw new ValidationException(nameof(request.PaymentPreference), "Choose cash, card, e-wallet or discount.");
+        }
+
+        if (hint is not null && preference != KioskPaymentPreferences.Discount)
+        {
+            throw new ValidationException(nameof(request.DiscountHint), "A discount type can only be sent with the discount payment choice.");
+        }
+
+        if (hint is not null && !KioskPaymentPreferences.DiscountHints.Contains(hint))
+        {
+            throw new ValidationException(nameof(request.DiscountHint), "Choose senior, PWD or other.");
+        }
+
+        return (preference, hint);
     }
 
     public async Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default)
@@ -1643,7 +1802,9 @@ public sealed class TransactionService(
             transaction.KitchenStatus,
             paymentDtos,
             transaction.CreatedAt,
-            transaction.CompletedAt);
+            transaction.CompletedAt,
+            transaction.KioskPaymentPreference,
+            transaction.KioskDiscountHint);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

@@ -7,7 +7,7 @@ import { userMessage } from '../../../lib/apiError';
 import { useComboComponents, useItemModifierGroups, useVariants } from '../../catalog/queries';
 import { PricingType, type Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
-import { buildAddLine, missingOption, toggleModifier, type OptionPicks, type OptionShape } from '../options';
+import { buildAddLine, isFixedSlot, missingOption, slotChoices, toggleModifier, unorderableReason, type OptionPicks, type OptionShape } from '../options';
 import type { AddLineRequest } from '../types';
 
 interface OptionsDialogProps {
@@ -35,7 +35,7 @@ export function OptionsDialog({ item, items, busy, onAdd, onClose }: OptionsDial
   const shape: OptionShape | null = ready
     ? { needsVariant, variants: variants.data ?? [], slots: isCombo ? (slots.data ?? []) : [], groups: groups.data ?? [] }
     : null;
-  const problem = shape ? missingOption(shape, picks) : null;
+  const problem = shape ? (unorderableReason(shape, items) ?? missingOption(shape, picks)) : null;
 
   return (
     <Modal
@@ -86,7 +86,16 @@ export function OptionsDialog({ item, items, busy, onAdd, onClose }: OptionsDial
             </fieldset>
           )}
 
-          {shape.slots.map((slot) => (
+          {shape.slots.map((slot) =>
+            isFixedSlot(slot) ? (
+              <div key={slot.id} className="flex items-center justify-between gap-3 rounded-control bg-brand-tint px-4 py-3 text-base">
+                <span className="font-semibold">{slot.slotLabel}</span>
+                <span className="text-ink-soft">
+                  {slot.quantity > 1 ? `${slot.quantity} x ` : ''}
+                  {slot.componentItemName ?? 'Included'} (included)
+                </span>
+              </div>
+            ) : (
             <fieldset key={slot.id} className="flex flex-col gap-2">
               <legend className="mb-1 text-base font-semibold">{slot.slotLabel}</legend>
               {Array.from({ length: slot.quantity }, (_, index) => (
@@ -104,20 +113,21 @@ export function OptionsDialog({ item, items, busy, onAdd, onClose }: OptionsDial
                   className={controlClass}
                 >
                   <option value="">Choose</option>
-                  {items
-                    .filter((candidate) => candidate.isActive && candidate.categoryId === slot.componentCategoryId)
-                    .map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name}
-                      </option>
-                    ))}
+                  {slotChoices(slot, items).map((choice) => (
+                    <option key={choice.item.id} value={choice.item.id} disabled={choice.soldOut}>
+                      {choice.item.name}
+                      {choice.upcharge > 0 ? ` (+${formatPeso(choice.upcharge)})` : ''}
+                      {choice.soldOut ? ' (sold out)' : ''}
+                    </option>
+                  ))}
                 </select>
               ))}
-              {slot.substitutionUpchargeAmount > 0 && (
-                <p className="text-sm text-ink-soft">Swapping from the usual choice can add {formatPeso(slot.substitutionUpchargeAmount)}.</p>
+              {(slot.substitutionUpchargeAmount ?? 0) > 0 && (
+                <p className="text-sm text-ink-soft">Swapping from the usual choice can add {formatPeso(slot.substitutionUpchargeAmount ?? 0)}.</p>
               )}
             </fieldset>
-          ))}
+            ),
+          )}
 
           {shape.groups.map((group) => (
             <fieldset key={group.id} className="flex flex-col gap-2">
@@ -127,16 +137,24 @@ export function OptionsDialog({ item, items, busy, onAdd, onClose }: OptionsDial
               </legend>
               {group.modifiers.map((modifier) => {
                 const selected = (picks.groups[group.id] ?? []).includes(modifier.id);
+                const soldOut = Boolean(modifier.isOutOfStock);
                 return (
-                  <label key={modifier.id} className="flex min-h-14 cursor-pointer items-center gap-3 rounded-control border border-line px-4 has-[:checked]:border-brand has-[:checked]:bg-brand-tint">
+                  <label
+                    key={modifier.id}
+                    className={`flex min-h-14 items-center gap-3 rounded-control border border-line px-4 has-[:checked]:border-brand has-[:checked]:bg-brand-tint ${soldOut ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  >
                     <input
                       type={group.allowMultipleSelection ? 'checkbox' : 'radio'}
                       name={`group-${group.id}`}
                       checked={selected}
+                      disabled={soldOut}
                       onChange={() => setPicks((p) => ({ ...p, groups: { ...p.groups, [group.id]: toggleModifier(group, p.groups[group.id] ?? [], modifier.id) } }))}
                       className="size-5 accent-brand"
                     />
-                    <span className="flex-1 text-base font-medium">{modifier.name}</span>
+                    <span className="flex-1 text-base font-medium">
+                      {modifier.name}
+                      {soldOut && <span className="ml-2 text-sm font-semibold text-danger">Sold out</span>}
+                    </span>
                     {modifier.priceDelta !== 0 && (
                       <span className="text-base tabular-nums text-ink-soft">
                         {modifier.priceDelta > 0 ? '+' : ''}

@@ -59,15 +59,93 @@ describe('resolveAdd', () => {
     const request: AddLineRequest = { itemId: 'item-1', itemVariantId: null, quantity: 1, comboSelections: [{ slotId: 's1', selectedItemId: 'fries-large' }] };
     const line = resolveAdd(combo, request, {
       items: [{ ...makeItem({ id: 'fries-large', name: 'Large Fries' }) }],
-      comboComponents: [{ id: 's1', itemId: 'item-1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 15 }],
+      comboComponents: [{ id: 's1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 15 }],
     });
     expect(line.unitPrice).toBe(215);
     expect(line.comboSelections).toEqual([{ slotId: 's1', slotLabel: 'Side', selectedItemId: 'fries-large', selectedItemName: 'Large Fries' }]);
   });
 });
 
+describe('resolveAdd for deals', () => {
+  const deal = makeItem({ id: 'deal', name: 'Chicken Buy 1 Take 1', pricingType: PricingType.Combo, basePrice: 99 });
+  const catalog = {
+    items: [makeItem({ id: 'chicken', name: 'Fried Chicken' }), makeItem({ id: 'coke', name: 'Coke' }), makeItem({ id: 'tea', name: 'Milk Tea' })],
+    comboComponents: [
+      { id: 'fixed', componentCategoryId: 'meals', slotLabel: '2 pcs Fried Chicken', quantity: 2, substitutionUpchargeAmount: null, componentItemId: 'chicken', componentItemName: 'Fried Chicken' },
+      { id: 'drink', componentCategoryId: 'drinks', slotLabel: 'Choose a drink', quantity: 1, substitutionUpchargeAmount: null, choiceUpcharges: [{ itemId: 'tea', amount: 20 }] },
+    ],
+  };
+
+  it('adds the fixed items itself so the cart shows the whole deal, without the customer picking them', () => {
+    const line = resolveAdd(deal, { itemId: 'deal', itemVariantId: null, quantity: 1, comboSelections: [{ slotId: 'drink', selectedItemId: 'coke' }] }, catalog);
+    expect(line.comboSelections.map((selection) => `${selection.slotLabel}: ${selection.selectedItemName}`)).toEqual([
+      '2 pcs Fried Chicken: Fried Chicken',
+      '2 pcs Fried Chicken: Fried Chicken',
+      'Choose a drink: Coke',
+    ]);
+    expect(line.unitPrice).toBe(99);
+  });
+
+  it('adds the surcharge of a choice that has one and nothing for the others', () => {
+    const withTea = resolveAdd(deal, { itemId: 'deal', itemVariantId: null, quantity: 1, comboSelections: [{ slotId: 'drink', selectedItemId: 'tea' }] }, catalog);
+    expect(withTea.unitPrice).toBe(119);
+  });
+
+  it('still charges the older flat slot surcharge once per slot', () => {
+    const flat = { ...catalog, comboComponents: [{ ...catalog.comboComponents[1]!, substitutionUpchargeAmount: 10 }, catalog.comboComponents[0]!] };
+    const line = resolveAdd(deal, { itemId: 'deal', itemVariantId: null, quantity: 1, comboSelections: [{ slotId: 'drink', selectedItemId: 'tea' }] }, flat);
+    expect(line.unitPrice).toBe(129);
+  });
+});
+
 describe('useLocalKioskCartStore', () => {
   beforeEach(() => useLocalKioskCartStore.setState({ lines: [], lastActivityAt: Date.now() }));
+
+  it('keeps two lines of the same item apart when their modifiers differ, and merges them when they match', () => {
+    const extras = { id: 'g1', name: 'Extras', allowMultipleSelection: true, isRequired: false, modifiers: [{ id: 'm1', name: 'Extra shot', priceDelta: 25 }, { id: 'm2', name: 'Oat milk', priceDelta: 30 }] };
+    const add = useLocalKioskCartStore.getState().add;
+    const lineWith = (...ids: string[]) => resolveAdd(makeItem(), { itemId: 'item-1', itemVariantId: null, quantity: 1, selectedModifierIds: ids }, { items: [], modifierGroups: [extras] });
+    add(lineWith('m1'));
+    add(lineWith('m2'));
+    expect(useLocalKioskCartStore.getState().lines).toHaveLength(2);
+    add(lineWith('m1'));
+    expect(useLocalKioskCartStore.getState().lines).toHaveLength(2);
+    expect(useLocalKioskCartStore.getState().lines[0]?.quantity).toBe(2);
+  });
+
+  it('replaces an edited line in place, keeping its position', () => {
+    const { add, replaceLine } = useLocalKioskCartStore.getState();
+    add(resolveAdd(makeItem({ id: 'a', name: 'A' }), { itemId: 'a', itemVariantId: null, quantity: 1 }, { items: [] }));
+    add(resolveAdd(makeItem({ id: 'b', name: 'B' }), { itemId: 'b', itemVariantId: null, quantity: 1 }, { items: [] }));
+    const first = useLocalKioskCartStore.getState().lines[0]!;
+    replaceLine(first.localId, { ...first, quantity: 4 });
+    const lines = useLocalKioskCartStore.getState().lines;
+    expect(lines.map((line) => [line.itemName, line.quantity])).toEqual([['A', 4], ['B', 1]]);
+    expect(lines[0]?.localId).toBe(first.localId);
+  });
+
+  it('merges an edited line into another line it has become identical to', () => {
+    const extras = { id: 'g1', name: 'Extras', allowMultipleSelection: true, isRequired: false, modifiers: [{ id: 'm1', name: 'Extra shot', priceDelta: 25 }] };
+    const { add, replaceLine } = useLocalKioskCartStore.getState();
+    add(resolveAdd(makeItem(), { itemId: 'item-1', itemVariantId: null, quantity: 2 }, { items: [] }));
+    add(resolveAdd(makeItem(), { itemId: 'item-1', itemVariantId: null, quantity: 1, selectedModifierIds: ['m1'] }, { items: [], modifierGroups: [extras] }));
+    const withShot = useLocalKioskCartStore.getState().lines[1]!;
+
+    // The customer removes the shot from the second line: it is now the same as the first.
+    replaceLine(withShot.localId, { ...withShot, unitPrice: 150, modifierSelections: [] });
+
+    const lines = useLocalKioskCartStore.getState().lines;
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.quantity).toBe(3);
+  });
+
+  it('writes the cart through to the session so a reload picks the order back up', () => {
+    useLocalKioskCartStore.getState().add(resolveAdd(makeItem(), { itemId: 'item-1', itemVariantId: null, quantity: 2 }, { items: [] }));
+    const saved = JSON.parse(window.sessionStorage.getItem('purch.kiosk.cart') ?? 'null') as { lines: { quantity: number }[] } | null;
+    expect(saved?.lines[0]?.quantity).toBe(2);
+    useLocalKioskCartStore.getState().clear();
+    expect(window.sessionStorage.getItem('purch.kiosk.cart')).toBeNull();
+  });
 
   it('merges a second add of the same plain item into the existing line', () => {
     const add = useLocalKioskCartStore.getState().add;
@@ -81,8 +159,8 @@ describe('useLocalKioskCartStore', () => {
     const combo = makeItem({ pricingType: PricingType.Combo });
     const add = useLocalKioskCartStore.getState().add;
     const request: AddLineRequest = { itemId: 'item-1', itemVariantId: null, quantity: 1, comboSelections: [{ slotId: 's1', selectedItemId: 'x' }] };
-    add(resolveAdd(combo, request, { items: [], comboComponents: [{ id: 's1', itemId: 'item-1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 0 }] }));
-    add(resolveAdd(combo, request, { items: [], comboComponents: [{ id: 's1', itemId: 'item-1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 0 }] }));
+    add(resolveAdd(combo, request, { items: [], comboComponents: [{ id: 's1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 0 }] }));
+    add(resolveAdd(combo, request, { items: [], comboComponents: [{ id: 's1', componentCategoryId: 'c1', slotLabel: 'Side', quantity: 1, substitutionUpchargeAmount: 0 }] }));
     expect(useLocalKioskCartStore.getState().lines).toHaveLength(2);
   });
 

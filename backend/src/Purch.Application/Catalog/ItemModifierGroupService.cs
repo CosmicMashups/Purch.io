@@ -8,6 +8,7 @@ public sealed class ItemModifierGroupService(
     IItemModifierGroupRepository itemModifierGroupRepository,
     IModifierGroupRepository modifierGroupRepository,
     IItemRepository itemRepository,
+    ModifierDtoBuilder dtoBuilder,
     ICurrentTenantProvider currentTenantProvider,
     IUnitOfWork unitOfWork) : IItemModifierGroupService
 {
@@ -20,9 +21,7 @@ public sealed class ItemModifierGroupService(
         var groupIdSet = groupIds.ToHashSet();
 
         var allGroups = await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken);
-        return [.. allGroups
-            .Where(pair => groupIdSet.Contains(pair.Group.Id))
-            .Select(pair => ToDto(pair.Group, pair.Modifiers))];
+        return await dtoBuilder.BuildAsync(allGroups.Where(pair => groupIdSet.Contains(pair.Group.Id)), cancellationToken);
     }
 
     public async Task<ModifierGroupDto> AttachAsync(
@@ -50,20 +49,10 @@ public sealed class ItemModifierGroupService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var refreshed = await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken);
-        var (Group, Modifiers) = refreshed.First(pair => pair.Group.Id == group.Id);
-        return ToDto(Group, Modifiers);
+        var pair = refreshed.First(candidate => candidate.Group.Id == group.Id);
+        return (await dtoBuilder.BuildAsync([pair], cancellationToken))[0];
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Modifier group management requires an authenticated tenant context.");
-
-    private static ModifierGroupDto ToDto(ModifierGroup group, IReadOnlyList<ItemModifier> modifiers)
-    {
-        return new(
-        group.Id,
-        group.Name,
-        group.AllowMultipleSelection,
-        group.IsRequired,
-        [.. modifiers.Select(m => new ItemModifierDto(m.Id, m.Name, m.PriceDelta))]);
-    }
 }

@@ -15,6 +15,7 @@ public sealed class ItemService(
     IDepartmentRepository departmentRepository,
     IItemRecipeRepository itemRecipeRepository,
     IInventoryItemRepository inventoryItemRepository,
+    IItemComboComponentRepository itemComboComponentRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -42,12 +43,31 @@ public sealed class ItemService(
             .Where(inventoryItem => inventoryItem.LinkedItemId is not null)
             .ToDictionary(inventoryItem => inventoryItem.LinkedItemId!.Value);
 
-        return [.. items.Select(item => ToDto(
+        var dtos = items.Select(item => ToDto(
             item,
             tenant,
             recipeLinesByItemId.GetValueOrDefault(item.Id, []),
             inventoryItemsById,
-            inventoryItemsByLinkedItemId))];
+            inventoryItemsByLinkedItemId)).ToList();
+
+        // A combo has no stock of its own, but it cannot be sold while an item it always includes is sold
+        // out. Choice slots are not checked here: the customer can pick something that is in stock.
+        var fixedSlots = await itemComboComponentRepository.ListFixedByTenantAsync(CurrentTenantId, cancellationToken);
+        if (fixedSlots.Count > 0)
+        {
+            var soldOut = dtos.Where(dto => dto.IsOutOfStock).Select(dto => dto.Id).ToHashSet();
+            var blockedCombos = fixedSlots
+                .Where(slot => soldOut.Contains(slot.ComponentItemId!.Value))
+                .Select(slot => slot.ParentItemId)
+                .ToHashSet();
+
+            if (blockedCombos.Count > 0)
+            {
+                dtos = [.. dtos.Select(dto => blockedCombos.Contains(dto.Id) ? dto with { IsOutOfStock = true } : dto)];
+            }
+        }
+
+        return dtos;
     }
 
     public async Task<ItemDto> CreateAsync(CreateItemRequest request, CancellationToken cancellationToken = default)

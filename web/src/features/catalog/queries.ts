@@ -12,8 +12,11 @@ import type {
   CreateItemVariantRequest,
   CreateModifierGroupRequest,
   ReplaceItemRecipeRequest,
+  ReplaceModifierIngredientsRequest,
   UpdateCategoryRequest,
+  UpdateItemComboComponentRequest,
   UpdateItemDepartmentRequest,
+  UpdateItemModifierRequest,
   UpdateItemRequest,
   UpdateLowStockThresholdRequest,
   UpdateServiceDurationRequest,
@@ -30,6 +33,7 @@ export const catalogKeys = {
   itemModifierGroups: (itemId: string) => ['items', itemId, 'modifierGroups'] as const,
   comboComponents: (itemId: string) => ['items', itemId, 'comboComponents'] as const,
   recipe: (itemId: string) => ['items', itemId, 'recipe'] as const,
+  modifierIngredients: (modifierId: string) => ['modifiers', modifierId, 'ingredients'] as const,
   departments: ['departments'] as const,
 };
 
@@ -147,11 +151,11 @@ export function useCreateBundleRule(itemId: string) {
   });
 }
 
-export function useVariants(itemId: string) {
+export function useVariants(itemId: string, enabled = true) {
   return useQuery({
     queryKey: catalogKeys.variants(itemId),
     queryFn: () => catalogApi.listVariants(itemId),
-    enabled: !!itemId,
+    enabled: !!itemId && enabled,
   });
 }
 
@@ -167,11 +171,11 @@ export function useCreateVariant(itemId: string) {
   });
 }
 
-export function useComboComponents(itemId: string) {
+export function useComboComponents(itemId: string, enabled = true) {
   return useQuery({
     queryKey: catalogKeys.comboComponents(itemId),
     queryFn: () => catalogApi.listComboComponents(itemId),
-    enabled: !!itemId,
+    enabled: !!itemId && enabled,
   });
 }
 
@@ -180,6 +184,50 @@ export function useCreateComboComponent(itemId: string) {
   return useMutation({
     mutationFn: (body: CreateItemComboComponentRequest) => catalogApi.createComboComponent(itemId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.comboComponents(itemId) }),
+  });
+}
+
+export function useUpdateComboComponent(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ componentId, body }: { componentId: string; body: UpdateItemComboComponentRequest }) => catalogApi.updateComboComponent(itemId, componentId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.comboComponents(itemId) }),
+  });
+}
+
+export function useDeleteComboComponent(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (componentId: string) => catalogApi.deleteComboComponent(itemId, componentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.comboComponents(itemId) }),
+  });
+}
+
+export function useUpdateModifier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modifierId, body }: { modifierId: string; body: UpdateItemModifierRequest }) => catalogApi.updateModifier(modifierId, body),
+    // A renamed or repriced modifier shows up in the groups and in every item that has the group attached.
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.modifierGroups }),
+  });
+}
+
+export function useModifierIngredients(modifierId: string, enabled = true) {
+  return useQuery({
+    queryKey: catalogKeys.modifierIngredients(modifierId),
+    queryFn: () => catalogApi.getModifierIngredients(modifierId),
+    enabled: !!modifierId && enabled,
+  });
+}
+
+export function useReplaceModifierIngredients(modifierId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReplaceModifierIngredientsRequest) => catalogApi.replaceModifierIngredients(modifierId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: catalogKeys.modifierIngredients(modifierId) });
+      qc.invalidateQueries({ queryKey: catalogKeys.modifierGroups });
+    },
   });
 }
 

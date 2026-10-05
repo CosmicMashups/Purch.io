@@ -9,7 +9,24 @@ interface IngredientSelectorProps {
   onChange: (selection: RecipeSelection) => void;
   /** A problem with one chosen ingredient's quantity. */
   lineError?: { id: string; message: string } | null;
+  /** What the ingredients belong to, which only changes the wording: an item's recipe, or a modifier option. */
+  subject?: 'item' | 'modifier';
 }
+
+const COPY = {
+  item: {
+    used: 'Used up every order',
+    quantity: 'Quantity per order',
+    taken: 'Taken from stock every time this item is sold.',
+    checkOnly: 'Not deducted when sold. The item shows as out of stock only when this reaches 0, so set its count with Count stock, for example at the end of a shift.',
+  },
+  modifier: {
+    used: 'Used up each time it is chosen',
+    quantity: 'Quantity each time it is chosen',
+    taken: 'Taken from stock every time a customer chooses this option, on top of what the item itself uses.',
+    checkOnly: 'Not deducted when sold. The option shows as sold out only when this reaches 0, so set its count with Count stock, for example at the end of a shift.',
+  },
+} as const;
 
 /**
  * Pick the ingredients an item is made from: type to narrow the list, tick the ones you need, then say for each whether it is
@@ -19,7 +36,8 @@ function setEntry(selection: RecipeSelection, id: string, patch: Partial<RecipeE
   return { ...selection, [id]: { ...selection[id], ...patch } };
 }
 
-export function IngredientSelector({ ingredients, selection, onChange, lineError }: IngredientSelectorProps) {
+export function IngredientSelector({ ingredients, selection, onChange, lineError, subject = 'item' }: IngredientSelectorProps) {
+  const copy = COPY[subject];
   const id = useId();
   const listId = `${id}-list`;
   const root = useRef<HTMLDivElement>(null);
@@ -152,7 +170,7 @@ export function IngredientSelector({ ingredients, selection, onChange, lineError
                     checked={selection[ingredient.id].used}
                     onChange={() => onChange(setEntry(selection, ingredient.id, { used: true }))}
                   />
-                  Used up every order
+                  {copy.used}
                 </label>
                 <label className="mt-1 flex items-center gap-2 text-sm text-gray-700">
                   <input
@@ -167,7 +185,7 @@ export function IngredientSelector({ ingredients, selection, onChange, lineError
               {selection[ingredient.id].used ? (
                 <div className="mt-2">
                   <label htmlFor={`${id}-qty-${ingredient.id}`} className="block text-sm text-gray-700">
-                    Quantity per order ({ingredient.baseUnit})
+                    {copy.quantity} ({ingredient.baseUnit})
                   </label>
                   <div className="mt-1 flex items-center gap-2">
                     <input
@@ -179,12 +197,10 @@ export function IngredientSelector({ ingredients, selection, onChange, lineError
                     />
                     <span className="text-sm font-medium text-gray-700">{ingredient.baseUnit}</span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Taken from stock every time this item is sold.</p>
+                  <p className="mt-1 text-xs text-gray-500">{copy.taken}</p>
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500">
-                  Not deducted when sold. The item shows as out of stock only when this reaches 0, so set its count with Count stock, for example at the end of a shift.
-                </p>
+                <p className="mt-2 text-xs text-gray-500">{copy.checkOnly}</p>
               )}
               {lineError?.id === ingredient.id && (
                 <p role="alert" className="mt-1 text-sm text-red-600">

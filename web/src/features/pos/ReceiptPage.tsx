@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { RefundDialog } from '../../components/RefundDialog';
 import { toast } from '../../components/feedback/toastStore';
 import { formatPeso } from '../dashboard/format';
+import { paymentSummary } from '../kiosk/tickets';
 import { useHardwareConfig } from '../../hardware/config';
 import { IDLE_STATE, stateForReceipt, vatIncluded } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
@@ -104,6 +105,7 @@ export function ReceiptPage() {
           <Pair label="Time" value={printedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} />
           {receipt.orderType && <Pair label="Order type" value={receipt.orderType} />}
           {receipt.kioskPrepNumber !== null && <Pair label="Order no." value={String(receipt.kioskPrepNumber)} />}
+          {receipt.kioskPaymentPreference && <Pair label="Customer chose" value={paymentSummary(receipt.kioskPaymentPreference, receipt.kioskDiscountHint)} />}
         </div>
 
         <table className="mt-2 w-full text-left">

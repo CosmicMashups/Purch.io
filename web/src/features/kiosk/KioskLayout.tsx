@@ -1,54 +1,82 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Modal } from '../../components/Modal';
+import { KioskHeader } from './KioskHeader';
+import { primaryButton, secondaryButton } from './KioskActionBar';
+import { useKioskStore } from './kioskStore';
+import { menuScroll } from './menuScroll';
 import { useLocalKioskCartStore } from './localCart';
+import { useKioskIdle } from './useKioskIdle';
 
-/** How long a cart with items sits untouched before the kiosk assumes the customer walked away and
- * resets for the next one (E6 design decision). */
-export const IDLE_RESET_MS = 90_000;
+/** The screens that never time out: the welcome screen waits for the next customer, and the other two are mid-send or hand-off. */
+const NO_IDLE_PATHS = new Set(['/kiosk', '/kiosk/processing', '/kiosk/done', '/kiosk/printer']);
 
-/** The kiosk is portrait and customer-facing: one column, no staff navigation, large targets. */
+/**
+ * The kiosk is customer-facing and fills the screen in either orientation: no staff navigation, large targets, the
+ * business's logo and name at the top of every screen except the welcome one, and a content area that scrolls on its own.
+ */
 export function KioskLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const hasLines = useLocalKioskCartStore((s) => s.lines.length > 0);
   const clearCart = useLocalKioskCartStore((s) => s.clear);
+  const resetCheckout = useKioskStore((s) => s.resetCheckout);
+  const onLanding = location.pathname === '/kiosk';
 
-  useEffect(() => {
-    if (!hasLines) return;
-    const id = window.setInterval(() => {
-      const idleFor = Date.now() - useLocalKioskCartStore.getState().lastActivityAt;
-      if (idleFor >= IDLE_RESET_MS) {
-        clearCart();
-        navigate('/kiosk', { replace: true });
-      }
-    }, 5_000);
-    return () => window.clearInterval(id);
-  }, [hasLines, navigate, clearCart]);
+  const startFresh = useCallback(() => {
+    clearCart();
+    resetCheckout();
+    menuScroll.top = 0;
+  }, [clearCart, resetCheckout]);
 
-  // Any interaction anywhere in the kiosk flow counts as activity, not just cart edits — a customer
-  // browsing the menu for a minute is not "idle".
-  useEffect(() => {
-    const touch = () => {
-      if (useLocalKioskCartStore.getState().lines.length > 0) useLocalKioskCartStore.setState({ lastActivityAt: Date.now() });
-    };
-    window.addEventListener('pointerdown', touch);
-    window.addEventListener('keydown', touch);
-    return () => {
-      window.removeEventListener('pointerdown', touch);
-      window.removeEventListener('keydown', touch);
-    };
-  }, []);
+  const { stage, secondsLeft, keepGoing } = useKioskIdle({
+    enabled: !NO_IDLE_PATHS.has(location.pathname),
+    hasLines,
+    onExpire: () => {
+      startFresh();
+      navigate('/kiosk', { replace: true });
+    },
+  });
 
   // Landing back on the start screen means a fresh customer: nothing left over to reset.
   useEffect(() => {
-    if (location.pathname === '/kiosk') clearCart();
-  }, [location.pathname, clearCart]);
+    if (onLanding) startFresh();
+  }, [onLanding, startFresh]);
 
   return (
-    <div className="min-h-dvh bg-canvas text-ink">
-      <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
+    <div className="flex h-dvh flex-col bg-canvas text-ink">
+      {!onLanding && <KioskHeader />}
+      <div className="min-h-0 flex-1">
         <Outlet />
       </div>
+
+      <Modal
+        open={stage === 'warn'}
+        title="Need more time?"
+        onClose={keepGoing}
+        footer={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className={`${secondaryButton} flex-1`}
+              onClick={() => {
+                startFresh();
+                navigate('/kiosk', { replace: true });
+              }}
+            >
+              Start over
+            </button>
+            <button type="button" className={`${primaryButton} flex-1`} onClick={keepGoing}>
+              Yes, continue
+            </button>
+          </div>
+        }
+      >
+        <p role="timer" aria-live="polite" className="text-xl">
+          {hasLines ? 'Your order will be cleared in ' : 'Returning to the start in '}
+          <strong className="tabular-nums">{secondsLeft}s</strong>.
+        </p>
+      </Modal>
     </div>
   );
 }

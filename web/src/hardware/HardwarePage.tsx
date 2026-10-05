@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { KioskSlipSettings } from '../features/kiosk/KioskSlipSettings';
 import { FormField, controlClass } from '../components/forms/FormField';
 import { BAUD_RATES, useHardwareConfig, type PaperWidth } from './config';
 import { CUSTOMER_DISPLAY_PATH, customerDisplaySupported } from './display/channel';
@@ -115,6 +116,10 @@ export function HardwarePage() {
           <input type="checkbox" role="switch" checked={config.autoPrintReceipt} onChange={(e) => config.update({ autoPrintReceipt: e.target.checked })} className="size-7 shrink-0 accent-brand" />
         </label>
         <p className="text-sm text-ink-soft">In the print window, turn off headers and footers and set margins to none for the neatest receipt.</p>
+      </Section>
+
+      <Section title="Kiosk order slip">
+        <KioskSlipSettings showPaperWidth={false} />
       </Section>
 
       <Section title="Cash drawer and direct printer commands">

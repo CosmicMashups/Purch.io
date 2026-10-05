@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { displayApi, kioskApi } from './api';
+import { displayApi, kioskApi, type PlaceKioskOrderRequest } from './api';
 import type { KitchenStatus } from '../pos/types';
 import { toPricingRules } from './promoRules';
 
@@ -17,8 +17,9 @@ export const useKioskBranding = () => useQuery({ queryKey: kioskKeys.branding, q
 export const useKioskPromoRules = () =>
   useQuery({ queryKey: kioskKeys.promoRules, queryFn: () => kioskApi.promoRules().then(toPricingRules), retry: false, staleTime: 60_000, meta: { silent: true } });
 
-/** Reports its own, friendlier failure message (see KioskOrderTypePage), so the global toast is silenced. */
-export const usePlaceKioskOrder = () => useMutation({ mutationFn: kioskApi.placeOrder, meta: { silent: true } });
+/** Reports its own, friendlier failure message (see KioskProcessingPage), so the global toast is silenced. */
+export const usePlaceKioskOrder = () =>
+  useMutation({ mutationFn: ({ body, signal }: { body: PlaceKioskOrderRequest; signal?: AbortSignal }) => kioskApi.placeOrder(body, signal), meta: { silent: true } });
 
 /** Both displays poll, because the API has no push channel. */
 export const DISPLAY_POLL_MS = 5_000;

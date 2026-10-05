@@ -1,3 +1,4 @@
+import { Wallet } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { SkeletonList } from '../../components/Skeleton';
@@ -7,6 +8,7 @@ import { SecondaryButton } from '../../components/forms/FormField';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
 import { formatPeso } from '../dashboard/format';
+import { paymentSummary } from '../kiosk/tickets';
 import { DeviceRequired } from './components/DeviceRequired';
 import { useClaimKioskOrder, usePendingKioskOrders } from './queries';
 import type { Transaction } from './types';
@@ -19,6 +21,22 @@ export function KioskOrdersPage() {
 
 function summarize(order: Transaction): string {
   return order.lines.map((line) => `${line.quantity} x ${line.itemName}`).join(', ');
+}
+
+/**
+ * How the customer said they will pay, so the cashier is ready. A discount is highlighted because it changes the sale:
+ * the cashier checks the ID and applies it. The kiosk itself never takes a discount off the total.
+ */
+function PaymentChoice({ order }: { order: Transaction }) {
+  const summary = paymentSummary(order.kioskPaymentPreference, order.kioskDiscountHint);
+  if (!summary) return null;
+  const discount = order.kioskPaymentPreference === 'discount';
+  return (
+    <p className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${discount ? 'bg-amber-100 text-amber-900' : 'bg-brand-tint text-brand-strong'}`}>
+      <Wallet size={18} weight="bold" aria-hidden="true" />
+      {discount ? `${summary}. Check their ID` : `Will pay: ${summary}`}
+    </p>
+  );
 }
 
 function PendingOrders({ branchId }: { branchId: string }) {
@@ -61,6 +79,7 @@ function PendingOrders({ branchId }: { branchId: string }) {
                 <p className="text-2xl font-bold tabular-nums">{order.kioskPrepNumber !== null ? `Order ${order.kioskPrepNumber}` : 'Kiosk order'}</p>
                 <p className="text-base">{summarize(order)}</p>
                 <p className="text-sm text-ink-soft">{order.orderType ? `${order.orderType}, ` : ''}total {formatPeso(order.totalAmount)}</p>
+                <PaymentChoice order={order} />
               </div>
               <button
                 type="button"

@@ -1,24 +1,19 @@
 import { resetRegister } from './support/api';
 import { expect, test } from './support/fixtures';
+import { placeKioskOrder } from './support/kioskOrder';
 
 test.describe('at the counter', () => {
   test('a cashier takes a kiosk order and collects payment for it', async ({ page, actor, signInAs, ip, seed }) => {
     // The customer orders at the kiosk.
     const kiosk = await actor('kiosk');
-    await kiosk.goto('/kiosk');
-    await kiosk.getByRole('link', { name: 'Start your order' }).click();
-    await kiosk.getByRole('button', { name: /Ube Cookie/ }).click();
-    await kiosk.getByRole('link', { name: /View your order \(1\)/ }).click();
-    await kiosk.getByRole('link', { name: 'Continue' }).click();
-    await kiosk.getByRole('button', { name: /Dine In/ }).click();
-    const label = (await kiosk.getByLabel(/Order number \d+/).getAttribute('aria-label')) ?? '';
-    const number = label.replace('Order number ', '');
+    const number = String(await placeKioskOrder(kiosk, /Ube Cookie/, { orderType: 'Dine In', payment: /^E-Wallet/ }));
 
-    // The cashier takes it and is paid.
+    // The cashier sees how the customer said they will pay, takes the order, and is paid.
     await signInAs('cashier');
     await resetRegister(seed, ip, { removeCart: true });
     await page.goto('/sell/kiosk-orders');
     const order = page.getByRole('listitem').filter({ hasText: `Order ${number}` });
+    await expect(order).toContainText('Will pay: E-Wallet (GCash / Maya)');
     await order.getByRole('button', { name: 'Take this order' }).click();
 
     await expect(page).toHaveURL(/\/sell$/);
@@ -64,13 +59,7 @@ test.describe('at the counter', () => {
 // has an open cart, and merely opening Cashier creates one. Only a manager can clear it. Remove `fixme` once fixed.
 test.fixme('a cashier who has looked at an empty register can still take a kiosk order', async ({ page, actor, signInAs, ip, seed }) => {
   const kiosk = await actor('kiosk');
-  await kiosk.goto('/kiosk');
-  await kiosk.getByRole('link', { name: 'Start your order' }).click();
-  await kiosk.getByRole('button', { name: /Ube Cookie/ }).click();
-  await kiosk.getByRole('link', { name: /View your order \(1\)/ }).click();
-  await kiosk.getByRole('link', { name: 'Continue' }).click();
-  await kiosk.getByRole('button', { name: /Dine In/ }).click();
-  await expect(kiosk.getByLabel(/Order number \d+/)).toBeVisible();
+  await placeKioskOrder(kiosk, /Ube Cookie/, { orderType: 'Dine In' });
 
   await signInAs('cashier');
   await resetRegister(seed, ip, { removeCart: true });

@@ -148,6 +148,49 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_kiosk_order_carries_the_payment_choice_to_the_cashier_without_changing_the_price()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, branchId, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Pancit", null, null, null, 70m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var placed = await (await kioskClient.PostAsJsonAsync(
+            "/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], "Dine In", "Discount", "Senior"))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        // Stored normalised, and the kiosk applies no discount: the cashier does that at the counter.
+        Assert.Equal("discount", placed!.KioskPaymentPreference);
+        Assert.Equal("senior", placed.KioskDiscountHint);
+        Assert.Equal(70m, placed.TotalAmount);
+
+        var pending = await adminClient.GetFromJsonAsync<List<TransactionDto>>($"/transactions/kiosk-pending?branchId={branchId}", JsonOptions);
+        var listed = Assert.Single(pending!, order => order.Id == placed.Id);
+        Assert.Equal("discount", listed.KioskPaymentPreference);
+        Assert.Equal("senior", listed.KioskDiscountHint);
+    }
+
+    [Theory]
+    [InlineData("bitcoin", null)]
+    [InlineData("cash", "senior")]
+    [InlineData("discount", "student")]
+    public async Task A_kiosk_order_with_an_unknown_payment_choice_or_a_stray_discount_hint_is_refused(string preference, string? hint)
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, _, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Lumpia", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var response = await kioskClient.PostAsJsonAsync(
+            "/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], "Take Out", preference, hint));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Placing_a_kiosk_order_with_an_inactive_item_is_refused_and_a_retry_still_works()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

@@ -2,11 +2,38 @@ import { Package, Scales } from '@phosphor-icons/react';
 import { PurchImage } from '../../../components/brand/PurchImage';
 import { PricingType, type Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
-import { addFlowFor, stockBadge } from '../catalogView';
+import { addFlowFor, stockBadge, type CatalogSection } from '../catalogView';
 
 interface ItemGridProps {
   items: Item[];
   onPick: (item: Item) => void;
+}
+
+interface ItemSectionsProps {
+  sections: CatalogSection[];
+  onPick: (item: Item) => void;
+  /** From useSectionSpy: lets the category rail find and watch each section. */
+  sectionRef: (id: string) => (element: HTMLElement | null) => void;
+}
+
+/** The whole menu in one scroll, grouped by category. Each section is the anchor its rail tile scrolls to. */
+export function ItemSections({ sections, onPick, sectionRef }: ItemSectionsProps) {
+  if (sections.length === 0) {
+    return <p className="rounded-panel border border-dashed border-ink-soft/40 p-8 text-center text-base text-ink-soft">No items match. Try another search.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {sections.map((section) => (
+        <section key={section.id} ref={sectionRef(section.id)} data-section-id={section.id} aria-labelledby={`section-${section.id}`} className="scroll-mt-20">
+          <h2 id={`section-${section.id}`} className="mb-3 text-xl font-bold">
+            {section.name}
+          </h2>
+          <ItemGrid items={section.items} onPick={onPick} />
+        </section>
+      ))}
+    </div>
+  );
 }
 
 function priceLabel(item: Item): string {

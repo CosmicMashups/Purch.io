@@ -33,6 +33,10 @@ export interface PlaceKioskOrderRequest {
   orderId: string;
   lines: AddLineRequest[];
   orderType: string;
+  /** What the customer chose to pay with at the counter. Informational: it never changes the price. */
+  paymentPreference?: string | null;
+  /** With the discount choice, which discount they will ask for. */
+  discountHint?: string | null;
 }
 
 /** The kiosk's cart lives on the device (see localCart.ts); placeOrder is the one call that builds
@@ -41,7 +45,8 @@ export const kioskApi = {
   branding: () => apiClient.get<{ kioskPosterImageUrl: string | null }>('/kiosk/branding').then((r) => r.data),
   /** The active automatic promotions (no promo codes) the cart totals itself with. */
   promoRules: () => apiClient.get<KioskPromoRulesResponse>('/kiosk/promo-rules').then((r) => r.data),
-  placeOrder: (body: PlaceKioskOrderRequest) => apiClient.post<Transaction>('/kiosk/cart/place-order', body).then((r) => r.data),
+  /** `signal` lets the screen give up on a send that is taking too long and offer a retry under the same order id. */
+  placeOrder: (body: PlaceKioskOrderRequest, signal?: AbortSignal) => apiClient.post<Transaction>('/kiosk/cart/place-order', body, { signal }).then((r) => r.data),
 };
 
 export const displayApi = {

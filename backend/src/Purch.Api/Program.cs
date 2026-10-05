@@ -162,6 +162,8 @@ builder.Services.AddScoped<ICatalogVersionProvider, EfCatalogVersionProvider>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<IModifierGroupRepository, EfModifierGroupRepository>();
+builder.Services.AddScoped<IItemModifierIngredientRepository, EfItemModifierIngredientRepository>();
+builder.Services.AddScoped<ModifierDtoBuilder>();
 builder.Services.AddScoped<IModifierGroupService, ModifierGroupService>();
 builder.Services.AddScoped<IItemModifierGroupRepository, EfItemModifierGroupRepository>();
 builder.Services.AddScoped<IItemModifierGroupService, ItemModifierGroupService>();
