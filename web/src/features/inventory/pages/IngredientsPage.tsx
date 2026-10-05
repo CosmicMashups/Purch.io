@@ -6,6 +6,7 @@ import { toast } from '../../../components/feedback/toastStore';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { Modal } from '../../../components/Modal';
 import { StockBranchPicker, StockStepper, useStockBranch } from '../../../components/StockStepper';
+import { SearchBar } from '../../../components/SearchBar';
 import { Pill } from '../../../components/lists/QueryList';
 import { SortableGroupedTable, type SortableColumn, type SortableGroup } from '../../../components/lists/SortableGroupedTable';
 import { ErrorState } from '../../../components/ErrorState';
@@ -37,6 +38,10 @@ const PAGE_TABS = [
 ] as const;
 type PageTab = (typeof PAGE_TABS)[number]['id'];
 
+// Option values for the category dropdown ('' is a real filter: ingredients with no category).
+const ALL = 'all';
+const NONE = 'none';
+
 export function IngredientsPage() {
   const items = useInventoryItems();
   const categories = useInventoryCategories();
@@ -46,6 +51,8 @@ export function IngredientsPage() {
   const [tab, setTab] = useState<PageTab>('ingredients');
   // null: all; '': uncategorised; otherwise a category id.
   const [filter, setFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const searching = search.trim() !== '';
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const close = () => setDialog(null);
   const stockBranch = useStockBranch();
@@ -74,7 +81,8 @@ export function IngredientsPage() {
   const groups: SortableGroup<InventoryItem>[] = (() => {
     const byOrder = (a: InventoryItem, b: InventoryItem) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
     // An item's own paired stock record is managed on the Items page, not here.
-    const rows = (items.data ?? []).filter((i) => !i.isAutoCreatedForItem);
+    const q = search.trim().toLowerCase();
+    const rows = (items.data ?? []).filter((i) => !i.isAutoCreatedForItem && (q === '' || i.name.toLowerCase().includes(q) || (i.sku?.toLowerCase().includes(q) ?? false)));
     const known = new Set((categories.data ?? []).map((c) => c.id));
     const result: SortableGroup<InventoryItem>[] = [...(categories.data ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -148,21 +156,26 @@ export function IngredientsPage() {
         </div>
       ) : (
       <div id="ingredients-page-panel" role="tabpanel" className="flex flex-col gap-4">
-      {(categories.data ?? []).length > 0 && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
-          {[{ id: null, label: 'All' }, ...(categories.data ?? []).map((c) => ({ id: c.id as string | null, label: c.name })), { id: '', label: 'Uncategorised' }].map((chip) => (
-            <button
-              key={chip.id ?? 'all'}
-              type="button"
-              aria-pressed={filter === chip.id}
-              onClick={() => setFilter(chip.id)}
-              className={`h-11 rounded-control px-4 text-base font-semibold ${filter === chip.id ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchBar value={search} onChange={setSearch} placeholder="Search ingredients…" />
+        {(categories.data ?? []).length > 0 && (
+          <select
+            aria-label="Filter by category"
+            value={filter === null ? ALL : filter === '' ? NONE : filter}
+            onChange={(e) => setFilter(e.target.value === ALL ? null : e.target.value === NONE ? '' : e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            <option value={ALL}>All categories</option>
+            {(categories.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value={NONE}>Uncategorised</option>
+          </select>
+        )}
+      </div>
+      {searching && <p className="text-xs text-gray-500">Clear the search to change the order of ingredients.</p>}
       <StockBranchPicker branches={stockBranch.branches} branchId={stockBranch.branchId} onChange={stockBranch.setBranchId} />
         <div className="min-w-0">
           {items.isPending ? (
@@ -170,14 +183,16 @@ export function IngredientsPage() {
           ) : items.isError ? (
             <ErrorState title="Ingredients could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />
           ) : groups.length === 0 ? (
-            <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No ingredients yet. Add one to start tracking it.</p>
+            <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">
+              {searching ? 'No ingredients match your search.' : 'No ingredients yet. Add one to start tracking it.'}
+            </p>
           ) : (
             <SortableGroupedTable
               groups={groups}
               columns={columns}
               getId={(item) => item.id}
               rowLabel={(item) => item.name}
-              disabled={reorder.isPending}
+              disabled={reorder.isPending || searching}
               onReorder={(ids) => reorder.mutate(ids, { onError: () => toast.error('Could not save the new order') })}
             />
           )}

@@ -151,13 +151,36 @@ describe('IngredientsPage', () => {
     renderPage(<IngredientsPage />);
     expect(await screen.findByText('Espresso Beans')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dairy' }));
+    const filter = screen.getByRole('combobox', { name: 'Filter by category' });
+    fireEvent.change(filter, { target: { value: 'dairy' } });
     expect(screen.queryByText('Espresso Beans')).not.toBeInTheDocument();
     expect(screen.getByText('Milk')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Uncategorised' }));
+    fireEvent.change(filter, { target: { value: 'none' } });
     expect(screen.getByText('Espresso Beans')).toBeInTheDocument();
     expect(screen.queryByText('Milk')).not.toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: 'all' } });
+    expect(screen.getByText('Espresso Beans')).toBeInTheDocument();
+    expect(screen.getByText('Milk')).toBeInTheDocument();
+  });
+
+  it('searches ingredients by name or SKU', async () => {
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([beans, { ...beans, id: 'milk', name: 'Milk', sku: 'MK-9' }]);
+    renderPage(<IngredientsPage />);
+    expect(await screen.findByText('Milk')).toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText('Search ingredients…');
+    fireEvent.change(search, { target: { value: 'espresso' } });
+    expect(screen.getByText('Espresso Beans')).toBeInTheDocument();
+    expect(screen.queryByText('Milk')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'mk-9' } });
+    expect(screen.getByText('Milk')).toBeInTheDocument();
+    expect(screen.queryByText('Espresso Beans')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'zzz' } });
+    expect(screen.getByText('No ingredients match your search.')).toBeInTheDocument();
   });
 
   it('creates a category from the Categories tab for a Manager', async () => {
