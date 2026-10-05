@@ -25,7 +25,7 @@ export function KioskItemCard({ item, onPick }: { item: Item; onPick: (item: Ite
         <PurchImage
           src={item.imageUrl}
           alt=""
-          className={`size-full object-cover ${soldOut ? 'opacity-45 grayscale' : ''}`}
+          className="size-full object-cover"
           errorNode={
             <span className="grid size-full place-items-center">
               <span className="grid size-16 place-items-center rounded-control bg-brand-tint text-brand-strong">
@@ -35,8 +35,8 @@ export function KioskItemCard({ item, onPick }: { item: Item; onPick: (item: Ite
           }
         />
         {soldOut && (
-          <span className="absolute inset-0 grid place-items-center">
-            <span className="rounded-full bg-ink px-4 py-1.5 text-base font-bold text-canvas">Sold out</span>
+          <span className="absolute inset-0 grid place-items-center bg-black/45">
+            <span className="rounded-full bg-red-100 px-4 py-1.5 text-base font-bold text-red-900">Out of stock</span>
           </span>
         )}
         {badge === 'low' && (
@@ -45,7 +45,7 @@ export function KioskItemCard({ item, onPick }: { item: Item; onPick: (item: Ite
           </span>
         )}
       </span>
-      <span className={`flex flex-1 flex-col justify-between gap-2 p-4 ${soldOut ? 'opacity-55' : ''}`}>
+      <span className="flex flex-1 flex-col justify-between gap-2 p-4">
         <span className="line-clamp-2 text-xl font-semibold leading-snug">{item.name}</span>
         <span className="flex items-end justify-between gap-2">
           <span className="text-xl font-bold tabular-nums text-brand-strong">{priceLabel(item)}</span>
