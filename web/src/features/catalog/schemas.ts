@@ -17,6 +17,7 @@ export const itemBaseSchema = z.object({
   categoryId: optionalTrimmed,
   basePrice: z.coerce.number({ invalid_type_error: 'Enter a valid amount' }).min(0, 'Price cannot be negative'),
   imageUrl: optionalTrimmed,
+  sortOrder: z.coerce.number({ invalid_type_error: 'Enter a number' }).int('Whole numbers only'),
 });
 
 export const createItemSchema = itemBaseSchema.extend({

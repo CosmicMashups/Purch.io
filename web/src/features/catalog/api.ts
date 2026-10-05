@@ -41,6 +41,7 @@ export const catalogApi = {
 
   listItems: () => apiClient.get<Item[]>('/items').then((r) => r.data),
   createItem: (body: CreateItemRequest) => apiClient.post<Item>('/items', body).then((r) => r.data),
+  reorderItems: (itemIds: string[]) => apiClient.put('/items/order', { itemIds }).then(() => undefined),
   updateItem: (itemId: string, body: UpdateItemRequest) =>
     apiClient.put<Item>(`/items/${itemId}`, body).then((r) => r.data),
 

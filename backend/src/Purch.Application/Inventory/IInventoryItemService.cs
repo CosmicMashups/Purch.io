@@ -8,6 +8,8 @@ public interface IInventoryItemService
 
     Task<InventoryItemDto> UpdateAsync(Guid inventoryItemId, UpdateInventoryItemRequest request, CancellationToken cancellationToken = default);
 
+    Task ReorderAsync(ReorderInventoryItemsRequest request, CancellationToken cancellationToken = default);
+
     Task<InventoryItemDto> UpdatePhysicalCountAsync(Guid inventoryItemId, UpdatePhysicalCountRequest request, CancellationToken cancellationToken = default);
 
     Task<InventoryItemDto> ReceiveStockAsync(Guid inventoryItemId, ReceiveInventoryStockRequest request, CancellationToken cancellationToken = default);

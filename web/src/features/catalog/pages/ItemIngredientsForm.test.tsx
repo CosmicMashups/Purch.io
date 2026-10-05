@@ -25,6 +25,7 @@ vi.mock('../../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 
 const ingredient = (id: string, name: string, extra: Partial<InventoryItem> = {}): InventoryItem => ({
   id,
+  sortOrder: 0,
   name,
   sku: null,
   baseUnit: 'g',
@@ -46,6 +47,7 @@ const ownStock = ingredient('own', 'Latte', { linkedItemId: 'latte', isAutoCreat
 
 const latte: Item = {
   id: 'latte',
+  sortOrder: 0,
   name: 'Latte',
   sku: null,
   barcode: null,

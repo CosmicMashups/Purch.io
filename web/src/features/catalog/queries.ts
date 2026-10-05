@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { catalogApi } from './api';
 import { departmentsApi } from '../departments/api';
 import type {
+  Item,
   AttachModifierGroupRequest,
   CreateBundlePromoRuleRequest,
   CreateCategoryRequest,
@@ -78,6 +79,27 @@ export function useUpdateItem() {
     mutationFn: ({ itemId, body }: { itemId: string; body: UpdateItemRequest }) =>
       catalogApi.updateItem(itemId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.items }),
+  });
+}
+
+/** Moves the given items to the positions they are listed in, showing the new order straight away and undoing it if the save fails. */
+export function useReorderItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemIds: string[]) => catalogApi.reorderItems(itemIds),
+    onMutate: async (itemIds) => {
+      await qc.cancelQueries({ queryKey: catalogKeys.items });
+      const previous = qc.getQueryData<Item[]>(catalogKeys.items);
+      qc.setQueryData<Item[]>(catalogKeys.items, (items) =>
+        items?.map((item) => {
+          const position = itemIds.indexOf(item.id);
+          return position < 0 ? item : { ...item, sortOrder: position };
+        }),
+      );
+      return { previous };
+    },
+    onError: (_error, _ids, context) => qc.setQueryData(catalogKeys.items, context?.previous),
+    onSettled: () => qc.invalidateQueries({ queryKey: catalogKeys.items }),
   });
 }
 

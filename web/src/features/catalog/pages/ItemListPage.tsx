@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { PurchImage } from '../../../components/brand/PurchImage';
 import { Link } from 'react-router-dom';
-import { useCategories, useItems } from '../queries';
+import { useCategories, useItems, useReorderItems } from '../queries';
+import { SortableGroupedTable, type SortableColumn, type SortableGroup } from '../../../components/lists/SortableGroupedTable';
+import { toast } from '../../../components/feedback/toastStore';
 import { StaleDataNotice } from '../../../components/feedback/StaleDataNotice';
 import { SearchBar } from '../../../components/SearchBar';
 import { EmptyState } from '../../../components/EmptyState';
@@ -9,7 +11,7 @@ import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonRows } from '../../../components/Skeleton';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { useTenantSettings } from '../../tenant/queries';
-import { PricingType } from '../types';
+import { PricingType, type Item } from '../types';
 import { pricingTypeLabels } from '../labels';
 
 export function ItemListPage() {
@@ -19,11 +21,8 @@ export function ItemListPage() {
   const showRecipe = useTenantSettings().data?.useSeparateInventoryTracking === true;
   const [search, setSearch] = useState('');
 
-  const categoryNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const c of categories ?? []) map.set(c.id, c.name);
-    return map;
-  }, [categories]);
+  const reorder = useReorderItems();
+  const searching = search.trim() !== '';
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -35,6 +34,53 @@ export function ItemListPage() {
         item.barcode?.toLowerCase().includes(q),
     );
   }, [items, search]);
+
+  // One group per category in the shop's own order, then the items that have none. Within a group, the saved order.
+  const groups = useMemo<SortableGroup<Item>[]>(() => {
+    const byOrder = (a: Item, b: Item) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
+    const known = new Set((categories ?? []).map((c) => c.id));
+    const result: SortableGroup<Item>[] = [...(categories ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({ id: c.id, title: c.name, rows: filteredItems.filter((i) => i.categoryId === c.id).sort(byOrder) }));
+    const uncategorised = filteredItems.filter((i) => i.categoryId === null || !known.has(i.categoryId)).sort(byOrder);
+    result.push({ id: 'uncategorized', title: 'Uncategorized', rows: uncategorised });
+    return result.filter((g) => g.rows.length > 0);
+  }, [filteredItems, categories]);
+
+  const columns: SortableColumn<Item>[] = [
+    {
+      header: 'Item',
+      cell: (item) => (
+        <div className="flex items-center gap-2">
+          {item.imageUrl ? (
+            <PurchImage src={item.imageUrl} alt="" className="h-8 w-8 rounded object-cover" errorNode={<div className="h-8 w-8 rounded bg-gray-100" />} />
+          ) : (
+            <div className="h-8 w-8 rounded bg-gray-100" />
+          )}
+          <div>
+            <p className="font-medium text-gray-900">{item.name}</p>
+            {item.sku && <p className="text-xs text-gray-500">SKU {item.sku}</p>}
+          </div>
+        </div>
+      ),
+    },
+    { header: 'Pricing', className: 'text-gray-600', cell: (item) => pricingTypeLabels[item.pricingType] },
+    { header: 'Price', className: 'text-gray-900', cell: (item) => `₱${item.basePrice.toFixed(2)}` },
+    {
+      header: 'Stock',
+      cell: (item) => (
+        <>
+          {item.isOutOfStock ? <StatusBadge label="Out of stock" tone="danger" /> : <span className="text-gray-600">{item.stockOnHand}</span>}
+          {!item.isActive && <StatusBadge label="Inactive" tone="neutral" />}
+        </>
+      ),
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (item) => <ItemRowActions itemId={item.id} pricingType={item.pricingType} showRecipe={showRecipe} />,
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,53 +108,17 @@ export function ItemListPage() {
       )}
 
       {!isError && filteredItems.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
-              <tr>
-                <th className="px-4 py-2">Item</th>
-                <th className="px-4 py-2">Category</th>
-                <th className="px-4 py-2">Pricing</th>
-                <th className="px-4 py-2">Price</th>
-                <th className="px-4 py-2">Stock</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredItems.map((item) => (
-                <tr key={item.id}>
-                  <td className="flex items-center gap-2 px-4 py-2">
-                    {item.imageUrl ? (
-                      <PurchImage src={item.imageUrl} alt="" className="h-8 w-8 rounded object-cover" errorNode={<div className="h-8 w-8 rounded bg-gray-100" />} />
-                    ) : (
-                      <div className="h-8 w-8 rounded bg-gray-100" />
-                    )}
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      {item.sku && <p className="text-xs text-gray-500">SKU {item.sku}</p>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {item.categoryId ? categoryNameById.get(item.categoryId) ?? '—' : 'Uncategorized'}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">{pricingTypeLabels[item.pricingType]}</td>
-                  <td className="px-4 py-2 text-gray-900">₱{item.basePrice.toFixed(2)}</td>
-                  <td className="px-4 py-2">
-                    {item.isOutOfStock ? (
-                      <StatusBadge label="Out of stock" tone="danger" />
-                    ) : (
-                      <span className="text-gray-600">{item.stockOnHand}</span>
-                    )}
-                    {!item.isActive && <StatusBadge label="Inactive" tone="neutral" />}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <ItemRowActions itemId={item.id} pricingType={item.pricingType} showRecipe={showRecipe} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {searching && <p className="text-xs text-gray-500">Clear the search to change the order of items.</p>}
+          <SortableGroupedTable
+            groups={groups}
+            columns={columns}
+            getId={(item) => item.id}
+            rowLabel={(item) => item.name}
+            disabled={searching || reorder.isPending}
+            onReorder={(ids) => reorder.mutate(ids, { onError: () => toast.error('Could not save the new order') })}
+          />
+        </>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardKeys } from '../dashboard/queries';
 import { MOVEMENT_PAGE_SIZE, inventoryApi } from './api';
-import type { MovementCursor, MovementFilter } from './types';
+import type { InventoryItem, MovementCursor, MovementFilter } from './types';
 
 export const inventoryKeys = {
   items: ['inventory-items'] as const,
@@ -53,6 +53,27 @@ function useStockMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {
 }
 
 type Api = typeof inventoryApi;
+
+/** Moves the given ingredients to the positions they are listed in, showing the new order straight away and undoing it if the save fails. */
+export function useReorderInventoryItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => inventoryApi.reorderInventoryItems(ids),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: inventoryKeys.items });
+      const previous = qc.getQueryData<InventoryItem[]>(inventoryKeys.items);
+      qc.setQueryData<InventoryItem[]>(inventoryKeys.items, (rows) =>
+        rows?.map((row) => {
+          const position = ids.indexOf(row.id);
+          return position < 0 ? row : { ...row, sortOrder: position };
+        }),
+      );
+      return { previous };
+    },
+    onError: (_error, _ids, context) => qc.setQueryData(inventoryKeys.items, context?.previous),
+    onSettled: () => qc.invalidateQueries({ queryKey: inventoryKeys.items }),
+  });
+}
 
 export const useRecordMovement = () => useStockMutation(inventoryApi.recordMovement);
 export const useCreateInventoryItem = () => useStockMutation(inventoryApi.createInventoryItem);

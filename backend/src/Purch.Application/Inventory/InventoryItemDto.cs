@@ -15,7 +15,8 @@ public sealed record InventoryItemDto(
     Guid? LinkedItemId,
     bool IsActive,
     Guid? CategoryId = null,
-    bool IsCountedByHand = false);
+    bool IsCountedByHand = false,
+    int SortOrder = 0);
 
 public sealed record CreateInventoryItemRequest(
     string Name,
@@ -41,3 +42,6 @@ public sealed record UpdatePhysicalCountRequest(decimal QuantityOnHand, Guid Bra
 
 /// <summary>BranchId is required so the resulting StockIn InventoryMovement can be attributed to a branch, matching InventoryMovement's shape.</summary>
 public sealed record ReceiveInventoryStockRequest(decimal PackagesReceived, Guid BranchId, string? SupplierReference);
+
+/// <summary>The ingredients in their new order; each one's position in the list becomes its sort order.</summary>
+public sealed record ReorderInventoryItemsRequest(IReadOnlyList<Guid> InventoryItemIds);

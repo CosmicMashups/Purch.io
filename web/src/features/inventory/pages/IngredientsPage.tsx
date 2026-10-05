@@ -5,7 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
 import { EditorCard } from '../../../components/forms/EditorCard';
 import { FormField, controlClass } from '../../../components/forms/FormField';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { Pill } from '../../../components/lists/QueryList';
+import { SortableGroupedTable, type SortableColumn, type SortableGroup } from '../../../components/lists/SortableGroupedTable';
+import { ErrorState } from '../../../components/ErrorState';
+import { SkeletonList } from '../../../components/Skeleton';
+import { userMessage } from '../../../lib/apiError';
 import { PageHeader } from '../../../components/PageHeader';
 import { Tabs } from '../../../components/Tabs';
 import { useSession } from '../../auth/useSession';
@@ -19,13 +23,12 @@ import {
   useInventoryItems,
   usePhysicalCount,
   useReceiveStock,
+  useReorderInventoryItems,
   useUpdateInventoryItem,
 } from '../queries';
 import type { InventoryItem } from '../types';
 
 type Panel = { mode: 'create' } | { mode: 'edit' | 'count' | 'receive'; item: InventoryItem };
-
-const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
 
 const PAGE_TABS = [
   { id: 'ingredients', label: 'Ingredients' },
@@ -54,8 +57,64 @@ export function IngredientsPage() {
     setParams({}, { replace: true });
   }, [receiveItem, setParams]);
 
-  const categoryName = new Map((categories.data ?? []).map((c) => [c.id, c.name]));
-  const visible = (rows: InventoryItem[]) => (filter === null ? rows : rows.filter((i) => (i.categoryId ?? '') === filter));
+  const reorder = useReorderInventoryItems();
+
+  // One group per category in the shop's own order, then the uncategorised ones. Within a group, the saved order.
+  const groups: SortableGroup<InventoryItem>[] = (() => {
+    const byOrder = (a: InventoryItem, b: InventoryItem) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
+    const rows = items.data ?? [];
+    const known = new Set((categories.data ?? []).map((c) => c.id));
+    const result: SortableGroup<InventoryItem>[] = [...(categories.data ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({ id: c.id, title: c.name, rows: rows.filter((i) => i.categoryId === c.id).sort(byOrder) }));
+    result.push({ id: '', title: 'Uncategorised', rows: rows.filter((i) => i.categoryId === null || !known.has(i.categoryId)).sort(byOrder) });
+    return result.filter((g) => g.rows.length > 0 && (filter === null || g.id === filter));
+  })();
+
+  const columns: SortableColumn<InventoryItem>[] = [
+    {
+      header: 'Ingredient',
+      cell: (item) => (
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900">{item.name}</p>
+          {item.isCountedByHand && <p className="max-w-xs text-xs text-gray-500">Not deducted when items sell. Use Count stock to update it, for example at the end of a shift.</p>}
+        </div>
+      ),
+    },
+    { header: 'On hand', className: 'tabular-nums', cell: (item) => `${item.quantityOnHand} ${item.baseUnit}` },
+    {
+      header: 'Packaging',
+      className: 'text-gray-600',
+      cell: (item) => `1 ${item.packagingUnit} = ${item.packagingSize} ${item.baseUnit}${item.lowStockThreshold !== null ? `, alert at ${item.lowStockThreshold}` : ''}`,
+    },
+    {
+      header: 'Status',
+      cell: (item) => (
+        <div className="flex flex-wrap gap-1">
+          {!item.isActive && <Pill>Inactive</Pill>}
+          {item.isAutoCreatedForItem && <Pill tone="brand">Tracked with item</Pill>}
+          {item.isCountedByHand && <Pill tone="warn">Counted by hand</Pill>}
+        </div>
+      ),
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (item) => (
+        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
+          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'edit', item })}>
+            Edit
+          </button>
+          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'count', item })}>
+            Count stock
+          </button>
+          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'receive', item })}>
+            Receive delivery
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,44 +146,24 @@ export function IngredientsPage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
-        <QueryList
-          query={items}
-          transform={visible}
-          errorTitle="Ingredients could not be loaded"
-          emptyMessage="No ingredients yet. Add one to start tracking it."
-          renderRow={(item) => (
-            <ListCard key={item.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{item.name}</p>
-                {item.categoryId && categoryName.get(item.categoryId) && <p className="text-sm text-ink-soft">{categoryName.get(item.categoryId)}</p>}
-                <p className="text-base tabular-nums">
-                  {item.quantityOnHand} {item.baseUnit} on hand
-                </p>
-                <p className="text-sm text-ink-soft">
-                  1 {item.packagingUnit} = {item.packagingSize} {item.baseUnit}
-                  {item.lowStockThreshold !== null && `, alert at ${item.lowStockThreshold}`}
-                </p>
-                {item.isCountedByHand && <p className="text-sm text-ink-soft">Not deducted when items sell. Use Count stock to update it, for example at the end of a shift.</p>}
-                <div className="mt-2 flex flex-wrap gap-x-5">
-                  <button type="button" className={linkButton} onClick={() => setPanel({ mode: 'edit', item })}>
-                    Edit
-                  </button>
-                  <button type="button" className={linkButton} onClick={() => setPanel({ mode: 'count', item })}>
-                    Count stock
-                  </button>
-                  <button type="button" className={linkButton} onClick={() => setPanel({ mode: 'receive', item })}>
-                    Receive delivery
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {!item.isActive && <Pill>Inactive</Pill>}
-                {item.isAutoCreatedForItem && <Pill tone="brand">Tracked with item</Pill>}
-                {item.isCountedByHand && <Pill tone="warn">Counted by hand</Pill>}
-              </div>
-            </ListCard>
+        <div className="min-w-0">
+          {items.isPending ? (
+            <SkeletonList />
+          ) : items.isError ? (
+            <ErrorState title="Ingredients could not be loaded" message={userMessage(items.error)} onRetry={() => void items.refetch()} />
+          ) : groups.length === 0 ? (
+            <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No ingredients yet. Add one to start tracking it.</p>
+          ) : (
+            <SortableGroupedTable
+              groups={groups}
+              columns={columns}
+              getId={(item) => item.id}
+              rowLabel={(item) => item.name}
+              disabled={reorder.isPending}
+              onReorder={(ids) => reorder.mutate(ids, { onError: () => toast.error('Could not save the new order') })}
+            />
           )}
-        />
+        </div>
 
         {panel.mode === 'create' || panel.mode === 'edit' ? (
           <IngredientEditor key={panel.mode === 'edit' ? panel.item.id : 'new'} item={panel.mode === 'edit' ? panel.item : null} onDone={reset} />

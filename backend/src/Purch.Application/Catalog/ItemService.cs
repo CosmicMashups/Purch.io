@@ -67,7 +67,7 @@ public sealed class ItemService(
             }
         }
 
-        return dtos;
+        return [.. dtos.OrderBy(dto => dto.SortOrder).ThenBy(dto => dto.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     public async Task<ItemDto> CreateAsync(CreateItemRequest request, CancellationToken cancellationToken = default)
@@ -100,6 +100,7 @@ public sealed class ItemService(
             ImageUrl = request.ImageUrl,
             PricingType = request.PricingType,
             DepartmentId = request.DepartmentId,
+            SortOrder = request.SortOrder,
             IsActive = true,
         };
 
@@ -185,10 +186,24 @@ public sealed class ItemService(
         item.ImageUrl = request.ImageUrl;
         item.IsActive = request.IsActive;
         item.DepartmentId = request.DepartmentId;
+        item.SortOrder = request.SortOrder ?? item.SortOrder;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(item, await GetTenantAsync(cancellationToken), cancellationToken);
+    }
+
+    public async Task ReorderAsync(ReorderItemsRequest request, CancellationToken cancellationToken = default)
+    {
+        for (var position = 0; position < request.ItemIds.Count; position++)
+        {
+            var id = request.ItemIds[position];
+            var item = await itemRepository.GetByIdAsync(id, cancellationToken)
+                ?? throw new NotFoundException("Item", id);
+            item.SortOrder = position;
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ItemDto> UpdateTingiConfigAsync(
@@ -528,6 +543,7 @@ public sealed class ItemService(
         item.ServiceDurationMinutes,
         item.DepartmentId,
         item.LowStockThreshold,
-        isOutOfStock);
+        isOutOfStock,
+        item.SortOrder);
     }
 }

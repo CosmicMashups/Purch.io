@@ -32,4 +32,7 @@ public class InventoryItem : TenantScopedEntity
 
     /// <summary>The ingredient group this belongs to (InventoryCategory); null when uncategorised.</summary>
     public Guid? CategoryId { get; set; }
+
+    /// <summary>Position within its category on the Ingredients page; lower comes first, ties fall back to name.</summary>
+    public int SortOrder { get; set; }
 }

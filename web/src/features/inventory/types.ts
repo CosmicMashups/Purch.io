@@ -12,6 +12,7 @@ export interface InventoryItem {
   linkedItemId: string | null;
   isActive: boolean;
   categoryId: string | null;
+  sortOrder: number;
   /** True when recipes use it but none deducts it on a sale, so only a count changes its stock. */
   isCountedByHand?: boolean;
 }

@@ -41,6 +41,7 @@ export interface Item {
   serviceDurationMinutes: number | null;
   lowStockThreshold: number | null;
   isOutOfStock: boolean;
+  sortOrder: number;
 }
 
 export interface ModifierGroup {
@@ -181,6 +182,7 @@ export interface CreateItemRequest {
   imageUrl: string | null;
   pricingType: PricingType;
   departmentId?: string | null;
+  sortOrder?: number;
 }
 
 export interface UpdateItemRequest {
@@ -199,6 +201,7 @@ export interface CreateModifierGroupRequest {
   name: string;
   allowMultipleSelection: boolean;
   isRequired: boolean;
+  categoryId?: string | null;
 }
 
 export interface CreateItemModifierRequest {

@@ -41,7 +41,7 @@ export function AddItemPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(createItemSchema),
-    defaultValues: { pricingType: PricingType.Unit },
+    defaultValues: { pricingType: PricingType.Unit, sortOrder: 0 },
   });
 
   const pricingType = Number(watch('pricingType'));
@@ -134,6 +134,7 @@ export function AddItemPage() {
         basePrice: values.basePrice,
         imageUrl: values.imageUrl ?? null,
         pricingType: values.pricingType,
+        sortOrder: values.sortOrder,
       });
 
       await createSubResourceIfValid(item.id, values);
@@ -185,6 +186,10 @@ export function AddItemPage() {
 
       <Field label="Base Price" error={errors.basePrice?.message}>
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
+      </Field>
+
+      <Field label="Sort order" error={errors.sortOrder?.message}>
+        <input type="number" {...register('sortOrder')} className={inputClass} />
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />

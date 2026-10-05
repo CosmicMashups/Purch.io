@@ -21,6 +21,9 @@ public class Item : TenantScopedEntity
 
     public decimal StockOnHand { get; set; }
 
+    /// <summary>Position within its category on the menu; lower comes first, ties fall back to name.</summary>
+    public int SortOrder { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public Guid? DepartmentId { get; set; }

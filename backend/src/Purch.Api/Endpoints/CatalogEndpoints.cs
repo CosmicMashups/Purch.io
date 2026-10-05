@@ -55,6 +55,16 @@ public static class CatalogEndpoints
             Results.Ok(await itemService.CreateAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        _ = app.MapPut("/items/order", async (
+            ReorderItemsRequest request,
+            IItemService itemService,
+            CancellationToken cancellationToken) =>
+            {
+                await itemService.ReorderAsync(request, cancellationToken);
+                return Results.NoContent();
+            })
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         _ = app.MapPut("/items/{itemId:guid}", async (
             Guid itemId,
             UpdateItemRequest request,

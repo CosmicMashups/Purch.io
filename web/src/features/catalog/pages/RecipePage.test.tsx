@@ -13,6 +13,7 @@ vi.mock('../../inventory/api', () => ({ inventoryApi: { listInventoryItems: vi.f
 
 const inv = (over: Partial<InventoryItem>): InventoryItem => ({
   id: 'x',
+  sortOrder: 0,
   name: 'X',
   sku: null,
   baseUnit: 'g',

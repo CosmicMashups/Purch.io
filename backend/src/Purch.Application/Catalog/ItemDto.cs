@@ -20,4 +20,5 @@ public sealed record ItemDto(
     int? ServiceDurationMinutes,
     Guid? DepartmentId,
     decimal? LowStockThreshold,
-    bool IsOutOfStock);
+    bool IsOutOfStock,
+    int SortOrder = 0);

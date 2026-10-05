@@ -24,6 +24,7 @@ vi.mock('../api', () => ({
 
 const beans: InventoryItem = {
   id: 'beans',
+  sortOrder: 0,
   name: 'Espresso Beans',
   sku: 'EB-1',
   baseUnit: 'g',
@@ -51,14 +52,14 @@ describe('IngredientsPage', () => {
 
   it('shows stock and pack size in plain words', async () => {
     renderPage(<IngredientsPage />);
-    expect(await screen.findByText('2500 g on hand')).toBeInTheDocument();
+    expect(await screen.findByText('2500 g')).toBeInTheDocument();
     expect(screen.getByText(/1 sack = 1000 g, alert at 500/)).toBeInTheDocument();
   });
 
   it('adds an ingredient, turning blank optional fields into null', async () => {
     vi.mocked(inventoryApi.createInventoryItem).mockResolvedValue(beans);
     renderPage(<IngredientsPage />);
-    await screen.findByText('2500 g on hand');
+    await screen.findByText('2500 g');
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Oat Milk' } });
     fireEvent.change(screen.getByLabelText('Base unit'), { target: { value: 'ml' } });
     fireEvent.change(screen.getByLabelText('Packaging unit'), { target: { value: 'case' } });
@@ -114,7 +115,7 @@ describe('IngredientsPage', () => {
 
   it('rejects a negative alert level before calling the API', async () => {
     renderPage(<IngredientsPage />);
-    await screen.findByText('2500 g on hand');
+    await screen.findByText('2500 g');
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
     fireEvent.change(screen.getByLabelText('Base unit'), { target: { value: 'g' } });
     fireEvent.change(screen.getByLabelText('Packaging unit'), { target: { value: 'bag' } });

@@ -5,6 +5,7 @@ import { KitchenStatus, TransactionStatus, type Transaction } from './types';
 
 const item = (over: Partial<Item> = {}): Item => ({
   id: 'ramen',
+  sortOrder: 0,
   name: 'Ramen',
   sku: null,
   barcode: null,

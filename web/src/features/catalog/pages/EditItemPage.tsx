@@ -66,6 +66,7 @@ export function EditItemPage() {
           categoryId: item.categoryId,
           basePrice: item.basePrice,
           imageUrl: item.imageUrl,
+          sortOrder: item.sortOrder,
           isActive: item.isActive,
           departmentId: item.departmentId,
         }
@@ -97,6 +98,7 @@ export function EditItemPage() {
           categoryId: values.categoryId ?? null,
           basePrice: values.basePrice,
           imageUrl: values.imageUrl ?? null,
+          sortOrder: values.sortOrder,
           isActive: values.isActive,
           departmentId: values.departmentId ?? null,
         },
@@ -142,6 +144,10 @@ export function EditItemPage() {
 
       <Field label="Base Price" error={errors.basePrice?.message}>
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
+      </Field>
+
+      <Field label="Sort order" error={errors.sortOrder?.message}>
+        <input type="number" {...register('sortOrder')} className={inputClass} />
       </Field>
 
       <input type="hidden" {...register('imageUrl')} />

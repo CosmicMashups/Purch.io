@@ -23,6 +23,7 @@ export const MOVEMENT_PAGE_SIZE = 30;
 export const inventoryApi = {
   listInventoryItems: () => apiClient.get<InventoryItem[]>('/inventory-items').then((r) => r.data),
   createInventoryItem: (body: CreateInventoryItemRequest) => apiClient.post<InventoryItem>('/inventory-items', body).then((r) => r.data),
+  reorderInventoryItems: (inventoryItemIds: string[]) => apiClient.put('/inventory-items/order', { inventoryItemIds }).then(() => undefined),
   updateInventoryItem: (id: string, body: UpdateInventoryItemRequest) =>
     apiClient.put<InventoryItem>(`/inventory-items/${id}`, body).then((r) => r.data),
   physicalCount: (id: string, body: { quantityOnHand: number; branchId: string }) =>

@@ -136,6 +136,16 @@ public static class InventoryEndpoints
             Results.Ok(await inventoryItemService.CreateAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        _ = app.MapPut("/inventory-items/order", async (
+            ReorderInventoryItemsRequest request,
+            IInventoryItemService inventoryItemService,
+            CancellationToken cancellationToken) =>
+            {
+                await inventoryItemService.ReorderAsync(request, cancellationToken);
+                return Results.NoContent();
+            })
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         _ = app.MapPut("/inventory-items/{id:guid}", async (
             Guid id,
             UpdateInventoryItemRequest request,

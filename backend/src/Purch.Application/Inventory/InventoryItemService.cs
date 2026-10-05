@@ -21,6 +21,19 @@ public sealed class InventoryItemService(
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IInventoryItemService
 {
+    public async Task ReorderAsync(ReorderInventoryItemsRequest request, CancellationToken cancellationToken = default)
+    {
+        for (var position = 0; position < request.InventoryItemIds.Count; position++)
+        {
+            var id = request.InventoryItemIds[position];
+            var inventoryItem = await inventoryItemRepository.GetByIdAsync(id, cancellationToken)
+                ?? throw new NotFoundException("InventoryItem", id);
+            inventoryItem.SortOrder = position;
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<InventoryItemDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         var items = await inventoryItemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
@@ -29,7 +42,7 @@ public sealed class InventoryItemService(
         var usedInARecipe = recipeLines.Select(line => line.InventoryItemId).ToHashSet();
         var deductedBySomeRecipe = recipeLines.Where(line => line.QuantityPerOrder is not null).Select(line => line.InventoryItemId).ToHashSet();
 
-        return [.. items.OrderBy(item => item.Name).Select(item => ToDto(item) with
+        return [.. items.OrderBy(item => item.SortOrder).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).Select(item => ToDto(item) with
         {
             IsCountedByHand = usedInARecipe.Contains(item.Id) && !deductedBySomeRecipe.Contains(item.Id),
         })];
@@ -193,6 +206,7 @@ public sealed class InventoryItemService(
             inventoryItem.IsAutoCreatedForItem,
             inventoryItem.LinkedItemId,
             inventoryItem.IsActive,
-            inventoryItem.CategoryId);
+            inventoryItem.CategoryId,
+            SortOrder: inventoryItem.SortOrder);
     }
 }

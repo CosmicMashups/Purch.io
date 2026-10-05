@@ -6,6 +6,7 @@ import { resolveAdd, toLocalTransaction, useLocalKioskCartStore } from './localC
 function makeItem(overrides: Partial<Item> = {}): Item {
   return {
     id: 'item-1',
+    sortOrder: 0,
     name: 'Iced Latte',
     sku: null,
     barcode: null,

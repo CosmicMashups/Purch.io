@@ -8,4 +8,8 @@ public sealed record UpdateItemRequest(
     decimal BasePrice,
     string? ImageUrl,
     bool IsActive,
-    Guid? DepartmentId = null);
+    Guid? DepartmentId = null,
+    int? SortOrder = null);
+
+/// <summary>The items in their new order; each one's position in the list becomes its sort order.</summary>
+public sealed record ReorderItemsRequest(IReadOnlyList<Guid> ItemIds);
