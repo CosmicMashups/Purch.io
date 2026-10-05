@@ -17,4 +17,6 @@ export interface TenantSettings {
   creditLedgerEnabled: boolean;
   kioskPosterImageUrl: string | null;
   useSeparateInventoryTracking: boolean;
+  /** Off hides every department screen, field and report. Mirrors Tenant.UseDepartmentTracking. */
+  useDepartmentTracking: boolean;
 }

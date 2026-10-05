@@ -6,6 +6,7 @@ import { useBranches } from '../branches/queries';
 import { useCreditLedgers } from '../credit/queries';
 import { useFlaggedSync } from '../dashboard/queries';
 import { useDevices } from './deviceQueries';
+import { useDepartmentTracking } from '../tenant/queries';
 import { TILE_GROUPS, hubStats } from './hub';
 import { MoneyOwed } from './overview/MoneyOwed';
 import { NeedsAttention } from './overview/NeedsAttention';
@@ -37,7 +38,8 @@ export function BusinessPage() {
     flagged: flagged.data,
   });
 
-  const groups = TILE_GROUPS.map((group) => ({ ...group, tiles: group.tiles.filter((tile) => isBusinessTileVisible(tile.id, role)) })).filter((g) => g.tiles.length > 0);
+  const departmentsOn = useDepartmentTracking();
+  const groups = TILE_GROUPS.map((group) => ({ ...group, tiles: group.tiles.filter((tile) => isBusinessTileVisible(tile.id, role)).map((tile) => (tile.id === 'branches' && !departmentsOn ? { ...tile, hint: 'Hardware and GCash QR' } : tile)) })).filter((g) => g.tiles.length > 0);
 
   return (
     <div className="flex flex-col gap-6">

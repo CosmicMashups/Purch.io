@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, controlClass } from '../../../components/forms/FormField';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { Modal } from '../../../components/Modal';
+import { StockBranchPicker, StockStepper, useStockBranch } from '../../../components/StockStepper';
 import { Pill } from '../../../components/lists/QueryList';
 import { SortableGroupedTable, type SortableColumn, type SortableGroup } from '../../../components/lists/SortableGroupedTable';
 import { ErrorState } from '../../../components/ErrorState';
@@ -16,7 +17,7 @@ import { useSession } from '../../auth/useSession';
 import { IngredientCategories } from '../components/IngredientCategories';
 import type { Branch } from '../../branches/types';
 import { useSelectableBranches } from '../../branches/queries';
-import { countSchema, ingredientSchema, parseThreshold, receiveSchema, type CountForm, type IngredientForm, type ReceiveForm } from '../ingredient';
+import { ingredientSchema, parseThreshold, receiveSchema, type IngredientForm, type ReceiveForm } from '../ingredient';
 import {
   useCreateInventoryItem,
   useInventoryCategories,
@@ -28,7 +29,7 @@ import {
 } from '../queries';
 import type { InventoryItem } from '../types';
 
-type Panel = { mode: 'create' } | { mode: 'edit' | 'count' | 'receive'; item: InventoryItem };
+type Dialog = { mode: 'create' } | { mode: 'edit' | 'receive'; item: InventoryItem };
 
 const PAGE_TABS = [
   { id: 'ingredients', label: 'Ingredients' },
@@ -45,15 +46,25 @@ export function IngredientsPage() {
   const [tab, setTab] = useState<PageTab>('ingredients');
   // null: all; '': uncategorised; otherwise a category id.
   const [filter, setFilter] = useState<string | null>(null);
-  const [panel, setPanel] = useState<Panel>({ mode: 'create' });
-  const reset = () => setPanel({ mode: 'create' });
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const close = () => setDialog(null);
+  const stockBranch = useStockBranch();
+  const physicalCount = usePhysicalCount();
+
+  function setStock(item: InventoryItem, next: number) {
+    if (!stockBranch.branchId) {
+      toast.error('No branch is available to record this stock change against.');
+      return;
+    }
+    return physicalCount.mutateAsync({ id: item.id, body: { quantityOnHand: next, branchId: stockBranch.branchId } });
+  }
 
   // Restock first links here with ?receive=<id> to open that ingredient's delivery form.
   const receiveId = params.get('receive');
   const receiveItem = receiveId ? items.data?.find((i) => i.id === receiveId) : undefined;
   useEffect(() => {
     if (!receiveItem) return;
-    setPanel({ mode: 'receive', item: receiveItem });
+    setDialog({ mode: 'receive', item: receiveItem });
     setParams({}, { replace: true });
   }, [receiveItem, setParams]);
 
@@ -62,7 +73,8 @@ export function IngredientsPage() {
   // One group per category in the shop's own order, then the uncategorised ones. Within a group, the saved order.
   const groups: SortableGroup<InventoryItem>[] = (() => {
     const byOrder = (a: InventoryItem, b: InventoryItem) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
-    const rows = items.data ?? [];
+    // An item's own paired stock record is managed on the Items page, not here.
+    const rows = (items.data ?? []).filter((i) => !i.isAutoCreatedForItem);
     const known = new Set((categories.data ?? []).map((c) => c.id));
     const result: SortableGroup<InventoryItem>[] = [...(categories.data ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -77,11 +89,14 @@ export function IngredientsPage() {
       cell: (item) => (
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">{item.name}</p>
-          {item.isCountedByHand && <p className="max-w-xs text-xs text-gray-500">Not deducted when items sell. Use Count stock to update it, for example at the end of a shift.</p>}
+          {item.isCountedByHand && <p className="max-w-xs text-xs text-gray-500">Not deducted when items sell. Update the count by hand, for example at the end of a shift.</p>}
         </div>
       ),
     },
-    { header: 'On hand', className: 'tabular-nums', cell: (item) => `${item.quantityOnHand} ${item.baseUnit}` },
+    {
+      header: 'On hand',
+      cell: (item) => <StockStepper value={item.quantityOnHand} unit={item.baseUnit} label={item.name} disabled={physicalCount.isPending || !stockBranch.branchId} onSet={(next) => setStock(item, next)} />,
+    },
     {
       header: 'Packaging',
       className: 'text-gray-600',
@@ -92,7 +107,6 @@ export function IngredientsPage() {
       cell: (item) => (
         <div className="flex flex-wrap gap-1">
           {!item.isActive && <Pill>Inactive</Pill>}
-          {item.isAutoCreatedForItem && <Pill tone="brand">Tracked with item</Pill>}
           {item.isCountedByHand && <Pill tone="warn">Counted by hand</Pill>}
         </div>
       ),
@@ -102,13 +116,10 @@ export function IngredientsPage() {
       className: 'text-right',
       cell: (item) => (
         <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'edit', item })}>
+          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setDialog({ mode: 'edit', item })}>
             Edit
           </button>
-          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'count', item })}>
-            Count stock
-          </button>
-          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setPanel({ mode: 'receive', item })}>
+          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setDialog({ mode: 'receive', item })}>
             Receive delivery
           </button>
         </div>
@@ -122,6 +133,13 @@ export function IngredientsPage() {
         title="Ingredients"
         subtitle="Stock items you buy in bulk and use in recipes"
         backTo={{ to: '/inventory', label: 'Inventory' }}
+        action={
+          tab === 'ingredients' ? (
+            <button type="button" onClick={() => setDialog({ mode: 'create' })} className="h-12 rounded-control bg-brand px-5 text-base font-semibold text-on-brand hover:bg-brand-strong">
+              Add Ingredient
+            </button>
+          ) : undefined
+        }
       />
       <Tabs label="Ingredients section" tabs={PAGE_TABS} active={tab} onChange={setTab} idPrefix="ingredients-page" />
       {tab === 'categories' ? (
@@ -145,7 +163,7 @@ export function IngredientsPage() {
           ))}
         </div>
       )}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <StockBranchPicker branches={stockBranch.branches} branchId={stockBranch.branchId} onChange={stockBranch.setBranchId} />
         <div className="min-w-0">
           {items.isPending ? (
             <SkeletonList />
@@ -164,22 +182,19 @@ export function IngredientsPage() {
             />
           )}
         </div>
-
-        {panel.mode === 'create' || panel.mode === 'edit' ? (
-          <IngredientEditor key={panel.mode === 'edit' ? panel.item.id : 'new'} item={panel.mode === 'edit' ? panel.item : null} onDone={reset} />
-        ) : panel.mode === 'count' ? (
-          <CountPanel key={`count-${panel.item.id}`} item={panel.item} branches={branches ?? []} onDone={reset} />
-        ) : (
-          <ReceivePanel key={`receive-${panel.item.id}`} item={panel.item} branches={branches ?? []} onDone={reset} />
-        )}
-      </div>
       </div>
       )}
+      {dialog &&
+        (dialog.mode === 'receive' ? (
+          <ReceiveDialog item={dialog.item} branches={branches ?? []} onDone={close} />
+        ) : (
+          <IngredientDialog item={dialog.mode === 'edit' ? dialog.item : null} onDone={close} />
+        ))}
     </div>
   );
 }
 
-function IngredientEditor({ item, onDone }: { item: InventoryItem | null; onDone: () => void }) {
+function IngredientDialog({ item, onDone }: { item: InventoryItem | null; onDone: () => void }) {
   const create = useCreateInventoryItem();
   const update = useUpdateInventoryItem();
   const categories = useInventoryCategories();
@@ -226,7 +241,22 @@ function IngredientEditor({ item, onDone }: { item: InventoryItem | null; onDone
   });
 
   return (
-    <EditorCard title="ingredient" editing={!!item} busy={create.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
+    <Modal
+      open
+      title={item ? 'Edit Ingredient' : 'Add Ingredient'}
+      onClose={onDone}
+      footer={
+        <div className="flex justify-end gap-3">
+          <SecondaryButton type="button" onClick={onDone}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton type="submit" form="ingredient-dialog-form" busy={create.isPending || update.isPending}>
+            {create.isPending || update.isPending ? 'Saving...' : item ? 'Save changes' : 'Add'}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      <form id="ingredient-dialog-form" onSubmit={submit} noValidate className="flex flex-col gap-4">
       <FormField label="Name" error={errors.name?.message}>
         <input {...register('name')} className={controlClass} />
       </FormField>
@@ -261,7 +291,8 @@ function IngredientEditor({ item, onDone }: { item: InventoryItem | null; onDone
           Active
         </label>
       )}
-    </EditorCard>
+      </form>
+    </Modal>
   );
 }
 
@@ -280,34 +311,7 @@ function BranchField({ branches, error, registration }: { branches: Branch[]; er
   );
 }
 
-function CountPanel({ item, branches, onDone }: { item: InventoryItem; branches: Branch[]; onDone: () => void }) {
-  const count = usePhysicalCount();
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<CountForm>({ resolver: zodResolver(countSchema), defaultValues: { branchId: branches.length === 1 ? branches[0].id : '' } });
-
-  const submit = handleSubmit(async (v) => {
-    await count.mutateAsync({ id: item.id, body: { quantityOnHand: v.quantityOnHand, branchId: v.branchId } });
-    toast.success(`Count saved for ${item.name}`);
-    onDone();
-  });
-
-  return (
-    <EditorCard title="count" heading={`Count stock: ${item.name}`} cancelable editing={false} submitLabel="Save count" busy={count.isPending} onSubmit={submit} onCancel={onDone}>
-      <p className="text-base text-ink-soft">
-        Enter what is really on the shelf. The system records the difference as an adjustment.
-      </p>
-      <BranchField branches={branches} error={errors.branchId?.message} registration={register('branchId')} />
-      <FormField label={`Counted quantity (${item.baseUnit})`} error={errors.quantityOnHand?.message}>
-        <input type="number" inputMode="decimal" step="any" {...register('quantityOnHand', { valueAsNumber: true })} className={controlClass} />
-      </FormField>
-    </EditorCard>
-  );
-}
-
-function ReceivePanel({ item, branches, onDone }: { item: InventoryItem; branches: Branch[]; onDone: () => void }) {
+function ReceiveDialog({ item, branches, onDone }: { item: InventoryItem; branches: Branch[]; onDone: () => void }) {
   const receive = useReceiveStock();
   const {
     register,
@@ -328,7 +332,22 @@ function ReceivePanel({ item, branches, onDone }: { item: InventoryItem; branche
   });
 
   return (
-    <EditorCard title="delivery" heading={`Receive delivery: ${item.name}`} cancelable editing={false} submitLabel="Receive delivery" busy={receive.isPending} onSubmit={submit} onCancel={onDone}>
+    <Modal
+      open
+      title={`Receive delivery: ${item.name}`}
+      onClose={onDone}
+      footer={
+        <div className="flex justify-end gap-3">
+          <SecondaryButton type="button" onClick={onDone}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton type="submit" form="receive-dialog-form" busy={receive.isPending}>
+            {receive.isPending ? 'Saving...' : 'Receive delivery'}
+          </PrimaryButton>
+        </div>
+      }
+    >
+      <form id="receive-dialog-form" onSubmit={submit} noValidate className="flex flex-col gap-4">
       <BranchField branches={branches} error={errors.branchId?.message} registration={register('branchId')} />
       <FormField
         label={`Packages received (${item.packagingUnit})`}
@@ -340,6 +359,7 @@ function ReceivePanel({ item, branches, onDone }: { item: InventoryItem; branche
       <FormField label="Supplier reference (optional)">
         <input {...register('supplierReference')} className={controlClass} />
       </FormField>
-    </EditorCard>
+      </form>
+    </Modal>
   );
 }

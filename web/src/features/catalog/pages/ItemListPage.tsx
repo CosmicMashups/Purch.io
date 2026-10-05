@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { PurchImage } from '../../../components/brand/PurchImage';
 import { Link } from 'react-router-dom';
+import { ItemDialog } from './ItemDialog';
+import { StockBranchPicker, StockStepper, useStockBranch } from '../../../components/StockStepper';
+import { useRecordMovement } from '../../inventory/queries';
+import { MovementType } from '../../inventory/types';
+import { useDepartmentTracking } from '../../tenant/queries';
 import { useCategories, useItems, useReorderItems } from '../queries';
 import { SortableGroupedTable, type SortableColumn, type SortableGroup } from '../../../components/lists/SortableGroupedTable';
 import { toast } from '../../../components/feedback/toastStore';
@@ -10,16 +15,36 @@ import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonRows } from '../../../components/Skeleton';
 import { StatusBadge } from '../../../components/StatusBadge';
-import { useTenantSettings } from '../../tenant/queries';
 import { PricingType, type Item } from '../types';
 import { pricingTypeLabels } from '../labels';
 
 export function ItemListPage() {
   const { data: items, isLoading, isError, error, refetch, dataUpdatedAt } = useItems();
   const { data: categories } = useCategories();
-  // Unknown (a non-Admin, or still loading) reads as off, exactly like the Flutter client.
-  const showRecipe = useTenantSettings().data?.useSeparateInventoryTracking === true;
   const [search, setSearch] = useState('');
+  const departmentsOn = useDepartmentTracking();
+  // null: closed; 'new': adding; otherwise the item being edited (looked up live so its stock stays current).
+  const [dialog, setDialog] = useState<'new' | string | null>(null);
+  const editing = dialog && dialog !== 'new' ? (items ?? []).find((i) => i.id === dialog) : undefined;
+  const stockBranch = useStockBranch();
+  const recordMovement = useRecordMovement();
+
+  async function setStock(item: Item, next: number) {
+    if (!stockBranch.branchId) {
+      toast.error('No branch is available to record this stock change against.');
+      return;
+    }
+    await recordMovement.mutateAsync({
+      itemId: item.id,
+      branchId: stockBranch.branchId,
+      type: MovementType.Adjustment,
+      quantity: next - (item.countOnHand ?? item.stockOnHand),
+      note: 'Quick stock change from the Items page',
+      reasonCategory: null,
+      photoUrl: null,
+      supplierReference: null,
+    });
+  }
 
   const reorder = useReorderItems();
   const searching = search.trim() !== '';
@@ -69,16 +94,21 @@ export function ItemListPage() {
     {
       header: 'Stock',
       cell: (item) => (
-        <>
-          {item.isOutOfStock ? <StatusBadge label="Out of stock" tone="danger" /> : <span className="text-gray-600">{item.stockOnHand}</span>}
+        <div className="flex flex-col items-start gap-1">
+          {item.hasOwnStock === false ? (
+            <span className="text-xs text-gray-500">{item.pricingType === PricingType.Service || item.pricingType === PricingType.Combo ? 'No stock' : 'From ingredients'}</span>
+          ) : (
+            <StockStepper value={item.countOnHand ?? item.stockOnHand} label={item.name} disabled={recordMovement.isPending || !stockBranch.branchId} onSet={(next) => setStock(item, next)} />
+          )}
+          {item.isOutOfStock && <StatusBadge label="Out of stock" tone="danger" />}
           {!item.isActive && <StatusBadge label="Inactive" tone="neutral" />}
-        </>
+        </div>
       ),
     },
     {
       header: '',
       className: 'text-right',
-      cell: (item) => <ItemRowActions itemId={item.id} pricingType={item.pricingType} showRecipe={showRecipe} />,
+      cell: (item) => <ItemRowActions item={item} showDepartment={departmentsOn} onEdit={() => setDialog(item.id)} />,
     },
   ];
 
@@ -86,13 +116,12 @@ export function ItemListPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <SearchBar value={search} onChange={setSearch} placeholder="Search items…" />
-        <Link
-          to="/catalog/items/new"
-          className="whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white"
-        >
+        <button type="button" onClick={() => setDialog('new')} className="whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">
           Add Item
-        </Link>
+        </button>
       </div>
+
+      <StockBranchPicker branches={stockBranch.branches} branchId={stockBranch.branchId} onChange={stockBranch.setBranchId} />
 
       <StaleDataNotice updatedAt={dataUpdatedAt} what="items" />
 
@@ -120,12 +149,16 @@ export function ItemListPage() {
           />
         </>
       )}
+      {dialog === 'new' && <ItemDialog item={null} onClose={() => setDialog(null)} />}
+      {editing && <ItemDialog item={editing} onClose={() => setDialog(null)} />}
     </div>
   );
 }
 
-function ItemRowActions({ itemId, pricingType, showRecipe }: { itemId: string; pricingType: PricingType; showRecipe: boolean }) {
-  const links: { to: string; label: string }[] = [{ to: `/catalog/items/${itemId}/edit`, label: 'Edit' }];
+function ItemRowActions({ item, showDepartment, onEdit }: { item: Item; showDepartment: boolean; onEdit: () => void }) {
+  const itemId = item.id;
+  const pricingType = item.pricingType;
+  const links: { to: string; label: string }[] = [];
 
   if (pricingType === PricingType.WeightVolume) {
     links.push(
@@ -146,15 +179,14 @@ function ItemRowActions({ itemId, pricingType, showRecipe }: { itemId: string; p
     links.push({ to: `/catalog/items/${itemId}/combo-components`, label: 'Combo Components' });
   }
 
-  links.push(
-    { to: `/catalog/items/${itemId}/modifier-groups`, label: 'Modifier Groups' },
-    { to: `/catalog/items/${itemId}/department`, label: 'Assign Department' },
-    { to: `/catalog/items/${itemId}/low-stock-threshold`, label: 'Low-Stock Threshold' },
-  );
-  if (showRecipe) links.push({ to: `/catalog/items/${itemId}/recipe`, label: 'Recipe' });
+  links.push({ to: `/catalog/items/${itemId}/modifier-groups`, label: 'Modifier Groups' });
+  if (showDepartment) links.push({ to: `/catalog/items/${itemId}/department`, label: 'Assign Department' });
 
   return (
     <div className="flex flex-wrap justify-end gap-x-2 gap-y-1 text-xs">
+      <button type="button" onClick={onEdit} className="text-gray-500 hover:text-gray-900 hover:underline">
+        Edit
+      </button>
       {links.map((link) => (
         <Link key={link.to} to={link.to} className="text-gray-500 hover:text-gray-900 hover:underline">
           {link.label}

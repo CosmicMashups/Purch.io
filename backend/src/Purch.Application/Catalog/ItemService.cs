@@ -470,7 +470,7 @@ public sealed class ItemService(
         Tenant tenant,
         IReadOnlyList<ItemRecipeLine> recipeLines,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
-        IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
+        Dictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
     {
         // A service or a combo has no stock of its own to run out of (a combo's stock is its components').
         if (item.PricingType is PricingType.Service or PricingType.Combo)
@@ -515,7 +515,7 @@ public sealed class ItemService(
         Tenant tenant,
         IReadOnlyList<ItemRecipeLine> recipeLines,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
-        IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
+        Dictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
     {
         var allowedSizes = new List<decimal>();
         if (item.TingiAllowedSizesJson is not null)
@@ -524,6 +524,12 @@ public sealed class ItemService(
         }
 
         var isOutOfStock = ComputeIsOutOfStock(item, tenant, recipeLines, inventoryItemsById, inventoryItemsByLinkedItemId);
+
+        // Where the shown count lives: with separate tracking, an item without a recipe counts on its paired
+        // ingredient record; one made from a recipe, a service and a combo have no count of their own.
+        var linked = tenant.UseSeparateInventoryTracking && inventoryItemsByLinkedItemId.TryGetValue(item.Id, out var pair) ? pair : null;
+        var hasOwnStock = item.PricingType is not (PricingType.Service or PricingType.Combo)
+            && (!tenant.UseSeparateInventoryTracking || recipeLines.Count == 0 || linked is not null);
 
         return new(
         item.Id,
@@ -544,6 +550,8 @@ public sealed class ItemService(
         item.DepartmentId,
         item.LowStockThreshold,
         isOutOfStock,
-        item.SortOrder);
+        item.SortOrder,
+        hasOwnStock,
+        linked?.QuantityOnHand ?? item.StockOnHand);
     }
 }

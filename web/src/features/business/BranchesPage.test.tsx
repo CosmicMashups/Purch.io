@@ -4,12 +4,15 @@ import { renderPage, signInAs } from '../../test/render';
 import { branchAdminApi } from '../branches/adminApi';
 import { branchesApi } from '../branches/api';
 import type { Branch } from '../branches/types';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { BranchesPage } from './BranchesPage';
 
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
 vi.mock('../branches/adminApi', () => ({
   branchAdminApi: { create: vi.fn(), updateHardware: vi.fn(), updateGcash: vi.fn(), listDepartments: vi.fn(), createDepartment: vi.fn() },
 }));
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 vi.mock('../uploads/api', () => ({ uploadsApi: { uploadImage: vi.fn() } }));
 vi.mock('../departments/api', () => ({ departmentsApi: { listAllDepartments: vi.fn() } }));
 
@@ -28,6 +31,8 @@ const kat: Branch = {
 beforeEach(() => {
   vi.clearAllMocks();
   signInAs('Admin');
+  // Departments only show when the shop monitors them (Options).
+  vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: true } as TenantSettings);
   vi.mocked(branchesApi.list).mockResolvedValue([kat, { id: 'kam', name: 'Kamuning', address: null }]);
   vi.mocked(branchAdminApi.listDepartments).mockResolvedValue([{ id: 'd1', branchId: 'kat', name: 'Bakery', concessionaireContactInfo: '0917 555 0101' }]);
   vi.mocked(branchAdminApi.create).mockResolvedValue(kat);
@@ -37,6 +42,16 @@ beforeEach(() => {
 });
 
 describe('BranchesPage', () => {
+  it('hides departments when the shop does not monitor them', async () => {
+    vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: false } as TenantSettings);
+    renderPage(<BranchesPage />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Manage' }))[0]);
+    await screen.findByRole('form', { name: 'Hardware settings' });
+    await waitFor(() => expect(tenantApi.get).toHaveBeenCalled());
+    expect(branchAdminApi.listDepartments).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Departments' })).not.toBeInTheDocument();
+  });
+
   it('lets a manager see branches but not change them', async () => {
     signInAs('Manager');
     renderPage(<BranchesPage />);

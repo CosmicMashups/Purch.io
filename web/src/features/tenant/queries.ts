@@ -32,3 +32,7 @@ export const useUpdateBir = () => useSettingsMutation((body: Parameters<typeof t
 export const useUpdateBarcode = () => useSettingsMutation((value: boolean) => tenantApi.updateBarcode(value));
 export const useUpdateCreditLedger = () => useSettingsMutation((value: boolean) => tenantApi.updateCreditLedger(value));
 export const useUpdateInventoryTracking = () => useSettingsMutation((value: boolean) => tenantApi.updateInventoryTracking(value));
+export const useUpdateDepartmentTracking = () => useSettingsMutation((value: boolean) => tenantApi.updateDepartmentTracking(value));
+
+/** Whether the shop monitors departments. Unknown (still loading) reads as off, so department screens never flash in. */
+export const useDepartmentTracking = () => useTenantSettings().data?.useDepartmentTracking === true;

@@ -52,15 +52,15 @@ describe('IngredientsPage', () => {
 
   it('shows stock and pack size in plain words', async () => {
     renderPage(<IngredientsPage />);
-    expect(await screen.findByText('2500 g')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Stock count of Espresso Beans')).toHaveValue(2500);
     expect(screen.getByText(/1 sack = 1000 g, alert at 500/)).toBeInTheDocument();
   });
 
   it('adds an ingredient, turning blank optional fields into null', async () => {
     vi.mocked(inventoryApi.createInventoryItem).mockResolvedValue(beans);
     renderPage(<IngredientsPage />);
-    await screen.findByText('2500 g');
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Oat Milk' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Ingredient' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Oat Milk' } });
     fireEvent.change(screen.getByLabelText('Base unit'), { target: { value: 'ml' } });
     fireEvent.change(screen.getByLabelText('Packaging unit'), { target: { value: 'case' } });
     fireEvent.change(screen.getByLabelText('Packaging size'), { target: { value: '12000' } });
@@ -93,15 +93,30 @@ describe('IngredientsPage', () => {
     ]);
   });
 
-  it('records a physical count for the account\'s only branch', async () => {
+  it('saves a typed stock count as a physical count at the only branch', async () => {
     vi.mocked(inventoryApi.physicalCount).mockResolvedValue(beans);
     renderPage(<IngredientsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Count stock' }));
-    expect(await screen.findByText('Count stock: Espresso Beans')).toBeInTheDocument();
-    expect(screen.getByLabelText('Branch')).toHaveValue('kat');
-    fireEvent.change(screen.getByLabelText('Counted quantity (g)'), { target: { value: '0' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save count' }));
+    const count = await screen.findByLabelText('Stock count of Espresso Beans');
+    fireEvent.focus(count);
+    fireEvent.change(count, { target: { value: '0' } });
+    fireEvent.blur(count);
     await waitFor(() => expect(inventoryApi.physicalCount).toHaveBeenCalledWith('beans', { quantityOnHand: 0, branchId: 'kat' }));
+  });
+
+  it('steps the count up and down by one with the + and - buttons', async () => {
+    vi.mocked(inventoryApi.physicalCount).mockResolvedValue(beans);
+    renderPage(<IngredientsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Increase stock of Espresso Beans' }));
+    await waitFor(() => expect(inventoryApi.physicalCount).toHaveBeenLastCalledWith('beans', { quantityOnHand: 2501, branchId: 'kat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease stock of Espresso Beans' }));
+    await waitFor(() => expect(inventoryApi.physicalCount).toHaveBeenLastCalledWith('beans', { quantityOnHand: 2499, branchId: 'kat' }));
+  });
+
+  it('leaves out the stock record an item keeps for itself', async () => {
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([beans, { ...beans, id: 'latte-stock', name: 'Latte', isAutoCreatedForItem: true, linkedItemId: 'latte' }]);
+    renderPage(<IngredientsPage />);
+    expect(await screen.findByText('Espresso Beans')).toBeInTheDocument();
+    expect(screen.queryByText('Latte')).not.toBeInTheDocument();
   });
 
   it('records a delivery in packages', async () => {
@@ -115,8 +130,8 @@ describe('IngredientsPage', () => {
 
   it('rejects a negative alert level before calling the API', async () => {
     renderPage(<IngredientsPage />);
-    await screen.findByText('2500 g');
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Ingredient' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'X' } });
     fireEvent.change(screen.getByLabelText('Base unit'), { target: { value: 'g' } });
     fireEvent.change(screen.getByLabelText('Packaging unit'), { target: { value: 'bag' } });
     fireEvent.change(screen.getByLabelText('Packaging size'), { target: { value: '5' } });

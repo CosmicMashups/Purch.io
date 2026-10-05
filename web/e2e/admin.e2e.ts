@@ -5,12 +5,13 @@ test.describe('running the business', () => {
     await signInAs('admin');
     const name = `Espresso ${Date.now().toString(36)}`;
 
-    await page.goto('/catalog/items/new');
+    await page.goto('/catalog/items');
+    await page.getByRole('button', { name: 'Add Item' }).click();
     await page.getByLabel('Name').fill(name);
     await page.getByLabel('Base Price').fill('95');
     await page.getByRole('button', { name: 'Save Item' }).click();
 
-    await expect(page).toHaveURL(/\/catalog\/items$/);
+    await expect(page.getByRole('dialog')).toBeHidden();
     await expect(page.getByText(name)).toBeVisible();
   });
 

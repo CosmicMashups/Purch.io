@@ -9,6 +9,7 @@ import { ExportsPanel } from './components/ExportsPanel';
 import { DepartmentPanel, MovementPanel, StaffPanels } from './components/RangePanels';
 import { RangeControl } from './components/RangeControl';
 import { choiceToParams, defaultChoice, type RangeChoice } from './params';
+import { useDepartmentTracking } from '../tenant/queries';
 
 const TABS = [
   { id: 'staff', label: 'Staff', usesRange: true },
@@ -27,8 +28,10 @@ function isTabId(value: string | null): value is TabId {
 
 export function ReportsPage() {
   const [search, setSearch] = useSearchParams();
+  const departmentsOn = useDepartmentTracking();
+  const tabs = TABS.filter((t) => t.id !== 'departments' || departmentsOn);
   const requested = search.get('tab');
-  const active: TabId = isTabId(requested) ? requested : 'staff';
+  const active: TabId = isTabId(requested) && tabs.some((t) => t.id === requested) ? requested : 'staff';
   const tab = TABS.find((t) => t.id === active)!;
   const { role } = useSession();
   const { branches } = useSelectableBranches();
@@ -40,7 +43,7 @@ export function ReportsPage() {
       <PageHeader title="Reports" backTo={{ to: '/business', label: 'Business' }} />
 
       <div role="tablist" aria-label="Report" className="flex flex-wrap gap-2 print:hidden">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const selected = t.id === active;
           return (
             <button

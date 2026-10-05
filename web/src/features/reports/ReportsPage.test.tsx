@@ -5,6 +5,8 @@ import { ApiError } from '../../lib/apiError';
 import * as download from '../../lib/download';
 import { renderPage, signInAs } from '../../test/render';
 import { branchesApi } from '../branches/api';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { reportsApi } from './api';
 import { ReportsPage } from './ReportsPage';
 import { BirReadingType, type BirReading } from './types';
@@ -22,6 +24,7 @@ vi.mock('./api', () => ({
   },
 }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 vi.mock('../../lib/download', async (importActual) => ({ ...(await importActual<typeof import('../../lib/download')>()), downloadTextFile: vi.fn() }));
 
 const reading = (over: Partial<BirReading> = {}): BirReading => ({
@@ -55,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   useToastStore.setState({ toasts: [] });
   signInAs('Manager', { device_id: 'dev1', branch_id: 'kat', scope_type: 'Tenant' });
+  // Department reports only show when the shop monitors departments (Options).
+  vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: true } as TenantSettings);
   vi.mocked(branchesApi.list).mockResolvedValue([
     { id: 'kat', name: 'Katipunan', address: null },
     { id: 'kam', name: 'Kamuning', address: null },
@@ -74,6 +79,14 @@ beforeEach(() => {
 });
 
 describe('range reports', () => {
+  it('has no Departments tab when the shop does not monitor departments', async () => {
+    vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: false } as TenantSettings);
+    renderPage(<ReportsPage />);
+    await screen.findByText('30 sales');
+    expect(screen.getByRole('tab', { name: 'Staff' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Departments' })).not.toBeInTheDocument();
+  });
+
   it('shows staff sales ranked, with the server figures and pluralised sale counts', async () => {
     renderPage(<ReportsPage />);
     expect(await screen.findByText('₱9,000.00')).toBeInTheDocument();

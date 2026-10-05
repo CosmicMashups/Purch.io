@@ -21,4 +21,6 @@ public sealed record ItemDto(
     Guid? DepartmentId,
     decimal? LowStockThreshold,
     bool IsOutOfStock,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    bool HasOwnStock = true,
+    decimal CountOnHand = 0);

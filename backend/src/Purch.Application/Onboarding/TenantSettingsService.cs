@@ -81,6 +81,15 @@ public sealed partial class TenantSettingsService(
         return ToDto(tenant);
     }
 
+    public async Task<TenantSettingsDto> UpdateDepartmentTrackingSettingAsync(UpdateDepartmentTrackingSettingRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetCurrentTenantAsync(cancellationToken);
+        tenant.UseDepartmentTracking = request.UseDepartmentTracking;
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return ToDto(tenant);
+    }
+
     private async Task<Domain.Entities.Tenant> GetCurrentTenantAsync(CancellationToken cancellationToken)
     {
         var tenantId = currentTenantProvider.TenantId
@@ -109,7 +118,8 @@ public sealed partial class TenantSettingsService(
         tenant.CreditLedgerRetentionDays,
         tenant.CreditLedgerEnabled,
         tenant.KioskPosterImageUrl,
-        tenant.UseSeparateInventoryTracking);
+        tenant.UseSeparateInventoryTracking,
+        tenant.UseDepartmentTracking);
     }
 
     private static void ValidateHex(string? value, string field, string label)

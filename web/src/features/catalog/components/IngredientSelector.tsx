@@ -18,13 +18,13 @@ const COPY = {
     used: 'Used up every order',
     quantity: 'Quantity per order',
     taken: 'Taken from stock every time this item is sold.',
-    checkOnly: 'Not deducted when sold. The item shows as out of stock only when this reaches 0, so set its count with Count stock, for example at the end of a shift.',
+    checkOnly: 'Not deducted when sold. The item shows as out of stock only when this reaches 0, so update its count by hand, for example at the end of a shift.',
   },
   modifier: {
     used: 'Used up each time it is chosen',
     quantity: 'Quantity each time it is chosen',
     taken: 'Taken from stock every time a customer chooses this option, on top of what the item itself uses.',
-    checkOnly: 'Not deducted when sold. The option shows as sold out only when this reaches 0, so set its count with Count stock, for example at the end of a shift.',
+    checkOnly: 'Not deducted when sold. The option shows as sold out only when this reaches 0, so update its count by hand, for example at the end of a shift.',
   },
 } as const;
 

@@ -52,4 +52,7 @@ public class Tenant : Entity
 
     /// <summary>When true, Cashier items track stock via linked InventoryItem records + recipes instead of Item.StockOnHand directly.</summary>
     public bool UseSeparateInventoryTracking { get; set; }
+
+    /// <summary>Whether this shop monitors sales and stock per department (concessionaire). Off hides every department screen, field and report; the data is kept.</summary>
+    public bool UseDepartmentTracking { get; set; }
 }

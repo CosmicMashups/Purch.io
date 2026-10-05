@@ -7,8 +7,7 @@ import { tenantApi } from '../../tenant/api';
 import type { TenantSettings } from '../../tenant/types';
 import { catalogApi } from '../api';
 import { PricingType, TingiMode, type Item } from '../types';
-import { AddItemPage } from './AddItemPage';
-import { EditItemPage } from './EditItemPage';
+import { ItemDialog } from './ItemDialog';
 
 vi.mock('../api', () => ({
   catalogApi: {
@@ -71,6 +70,8 @@ function tracking(on: boolean) {
   vi.mocked(tenantApi.get).mockResolvedValue({ useSeparateInventoryTracking: on } as TenantSettings);
 }
 
+const onClose = vi.fn();
+
 const options = () => within(screen.getByRole('listbox')).getAllByRole('option');
 const option = (name: RegExp) => within(screen.getByRole('listbox')).getByRole('option', { name });
 const combobox = () => screen.findByRole('combobox', { name: 'Ingredients' });
@@ -87,7 +88,7 @@ describe('ingredient selector on Add Item', () => {
 
   it('is not offered when ingredients are not tracked separately', async () => {
     tracking(false);
-    renderPage(<AddItemPage />);
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     await screen.findByLabelText('Name');
     await waitFor(() => expect(tenantApi.get).toHaveBeenCalled());
     expect(screen.queryByRole('combobox', { name: 'Ingredients' })).not.toBeInTheDocument();
@@ -95,7 +96,7 @@ describe('ingredient selector on Add Item', () => {
 
   it('narrows the list as you type and ticks several ingredients', async () => {
     tracking(true);
-    renderPage(<AddItemPage />);
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     const input = await combobox();
 
     fireEvent.focus(input);
@@ -119,7 +120,7 @@ describe('ingredient selector on Add Item', () => {
 
   it('creates the item, then saves the ingredients with their quantities as its recipe', async () => {
     tracking(true);
-    renderPage(<AddItemPage />, { otherRoutes: [{ path: '/catalog/items', element: <p>Items list</p> }] });
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Latte' } });
     fireEvent.change(screen.getByLabelText('Base Price'), { target: { value: '120' } });
 
@@ -142,7 +143,7 @@ describe('ingredient selector on Add Item', () => {
         { inventoryItemId: 'milk', quantityPerOrder: null },
       ],
     });
-    expect(await screen.findByText('Items list')).toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it('handles the Burger example: bun and patty consumed, dressing only checked', async () => {
@@ -151,7 +152,7 @@ describe('ingredient selector on Add Item', () => {
     const patty = ingredient('patty', 'Burger patty', { baseUnit: 'pc' });
     const dressing = ingredient('dressing', 'Dressing', { baseUnit: 'mL' });
     vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([bun, patty, dressing]);
-    renderPage(<AddItemPage />, { otherRoutes: [{ path: '/catalog/items', element: <p>Items list</p> }] });
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Burger McDo' } });
     fireEvent.change(screen.getByLabelText('Base Price'), { target: { value: '99' } });
 
@@ -185,7 +186,7 @@ describe('ingredient selector on Add Item', () => {
 
   it('will not save a used-up ingredient with no quantity', async () => {
     tracking(true);
-    renderPage(<AddItemPage />);
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Latte' } });
     fireEvent.change(screen.getByLabelText('Base Price'), { target: { value: '120' } });
     fireEvent.focus(await combobox());
@@ -199,7 +200,7 @@ describe('ingredient selector on Add Item', () => {
 
   it('refuses a bad quantity before creating anything', async () => {
     tracking(true);
-    renderPage(<AddItemPage />);
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Latte' } });
     fireEvent.change(screen.getByLabelText('Base Price'), { target: { value: '120' } });
     fireEvent.focus(await combobox());
@@ -215,11 +216,11 @@ describe('ingredient selector on Add Item', () => {
 
   it('does not touch recipes when no ingredient is chosen', async () => {
     tracking(true);
-    renderPage(<AddItemPage />, { otherRoutes: [{ path: '/catalog/items', element: <p>Items list</p> }] });
+    renderPage(<ItemDialog item={null} onClose={onClose} />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Latte' } });
     fireEvent.change(screen.getByLabelText('Base Price'), { target: { value: '120' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Item' }));
-    expect(await screen.findByText('Items list')).toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(catalogApi.replaceRecipe).not.toHaveBeenCalled();
   });
 });
@@ -236,12 +237,7 @@ describe('ingredient selector on Edit Item', () => {
     vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([beans, milk, retired, ownStock]);
   });
 
-  const renderEdit = () =>
-    renderPage(<EditItemPage />, {
-      route: '/catalog/items/latte/edit',
-      path: '/catalog/items/:itemId/edit',
-      otherRoutes: [{ path: '/catalog/items', element: <p>Items list</p> }],
-    });
+  const renderEdit = () => renderPage(<ItemDialog item={latte} onClose={onClose} />);
 
   it('starts from the saved recipe and leaves it alone when nothing changed', async () => {
     vi.mocked(catalogApi.getRecipe).mockResolvedValue([{ inventoryItemId: 'beans', inventoryItemName: 'Espresso Beans', quantityPerOrder: 18 }]);
@@ -252,7 +248,7 @@ describe('ingredient selector on Edit Item', () => {
     expect(screen.getByLabelText('Quantity per order (g)')).toHaveValue('18');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
-    expect(await screen.findByText('Items list')).toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(catalogApi.replaceRecipe).not.toHaveBeenCalled();
   });
 

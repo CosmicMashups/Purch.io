@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { useUpdateBarcode, useUpdateCreditLedger, useUpdateInventoryTracking } from '../../tenant/queries';
+import { useUpdateBarcode, useUpdateCreditLedger, useUpdateDepartmentTracking, useUpdateInventoryTracking } from '../../tenant/queries';
 import type { TenantSettings } from '../../tenant/types';
 
 function Switch({ label, description, checked, busy, onChange }: { label: string; description: string; checked: boolean; busy: boolean; onChange: (next: boolean) => void }) {
@@ -20,6 +20,7 @@ export function OptionsSection({ settings }: { settings: TenantSettings }) {
   const barcode = useUpdateBarcode();
   const credit = useUpdateCreditLedger();
   const tracking = useUpdateInventoryTracking();
+  const departments = useUpdateDepartmentTracking();
   const [confirmTracking, setConfirmTracking] = useState<boolean | null>(null);
 
   function applyTracking() {
@@ -54,6 +55,13 @@ export function OptionsSection({ settings }: { settings: TenantSettings }) {
           checked={settings.useSeparateInventoryTracking}
           busy={tracking.isPending}
           onChange={setConfirmTracking}
+        />
+        <Switch
+          label="Monitor departments separately"
+          description="Assign items to departments or concessionaires and report on them. When off, every department setting, field, report and chart is hidden."
+          checked={settings.useDepartmentTracking}
+          busy={departments.isPending}
+          onChange={(next) => departments.mutate(next, { onSuccess: () => toast.success(next ? 'Department monitoring is on' : 'Department monitoring is off') })}
         />
       </ul>
 

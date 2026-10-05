@@ -36,8 +36,6 @@ import { PaymentPage } from './features/pos/PaymentPage';
 import { ReceiptPage } from './features/pos/ReceiptPage';
 import { SellPage } from './features/pos/SellPage';
 import { ItemListPage } from './features/catalog/pages/ItemListPage';
-import { AddItemPage } from './features/catalog/pages/AddItemPage';
-import { EditItemPage } from './features/catalog/pages/EditItemPage';
 import { BatchesPage } from './features/catalog/pages/BatchesPage';
 import { TingiConfigPage } from './features/catalog/pages/TingiConfigPage';
 import { BundleRulesPage } from './features/catalog/pages/BundleRulesPage';
@@ -46,8 +44,6 @@ import { VariantsPage } from './features/catalog/pages/VariantsPage';
 import { ComboComponentsPage } from './features/catalog/pages/ComboComponentsPage';
 import { ItemModifierGroupsPage } from './features/catalog/pages/ItemModifierGroupsPage';
 import { AssignDepartmentPage } from './features/catalog/pages/AssignDepartmentPage';
-import { LowStockThresholdPage } from './features/catalog/pages/LowStockThresholdPage';
-import { RecipePage } from './features/catalog/pages/RecipePage';
 import { CategoriesPage } from './features/catalog/pages/CategoriesPage';
 import { DevicePairPage } from './features/kiosk/DevicePairPage';
 import { KioskCartPage } from './features/kiosk/KioskCartPage';
@@ -144,8 +140,6 @@ export function App() {
               <Route path="/business/settings" element={<SettingsPage />} />
             </Route>
             <Route path="/catalog/items" element={<ItemListPage />} />
-            <Route path="/catalog/items/new" element={<AddItemPage />} />
-            <Route path="/catalog/items/:itemId/edit" element={<EditItemPage />} />
             <Route path="/catalog/items/:itemId/batches" element={<BatchesPage />} />
             <Route path="/catalog/items/:itemId/tingi-config" element={<TingiConfigPage />} />
             <Route path="/catalog/items/:itemId/bundle-rules" element={<BundleRulesPage />} />
@@ -154,8 +148,6 @@ export function App() {
             <Route path="/catalog/items/:itemId/combo-components" element={<ComboComponentsPage />} />
             <Route path="/catalog/items/:itemId/modifier-groups" element={<ItemModifierGroupsPage />} />
             <Route path="/catalog/items/:itemId/department" element={<AssignDepartmentPage />} />
-            <Route path="/catalog/items/:itemId/low-stock-threshold" element={<LowStockThresholdPage />} />
-            <Route path="/catalog/items/:itemId/recipe" element={<RecipePage />} />
             <Route path="/catalog/categories" element={<CategoriesPage />} />
             <Route path="/catalog/modifier-groups" element={<ModifierGroupsPage />} />
           </Route>

@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useTenantSettings } from '../../tenant/queries';
 import type { z } from 'zod';
 import { departmentAssignmentSchema } from '../schemas';
 import { useDepartments, useItems, useUpdateItemDepartment } from '../queries';
@@ -14,6 +15,7 @@ type FormValues = z.infer<typeof departmentAssignmentSchema>;
 export function AssignDepartmentPage() {
   const { itemId } = useParams<{ itemId: string }>();
   const navigate = useNavigate();
+  const settings = useTenantSettings();
   const { data: items } = useItems();
   const { data: departments } = useDepartments();
   const item = items?.find((i) => i.id === itemId);
@@ -35,6 +37,8 @@ export function AssignDepartmentPage() {
     }
   }
 
+  // Departments are switched off in Options: there is nothing to assign.
+  if (settings.data && !settings.data.useDepartmentTracking) return <Navigate to="/catalog/items" replace />;
   if (!item) return <p className="text-sm text-gray-500">Loading…</p>;
 
   return (

@@ -13,4 +13,6 @@ public interface ITenantSettingsService
     Task<TenantSettingsDto> UpdateCreditLedgerSettingAsync(UpdateCreditLedgerSettingRequest request, CancellationToken cancellationToken = default);
 
     Task<TenantSettingsDto> UpdateInventoryTrackingSettingAsync(UpdateInventoryTrackingSettingRequest request, CancellationToken cancellationToken = default);
+
+    Task<TenantSettingsDto> UpdateDepartmentTrackingSettingAsync(UpdateDepartmentTrackingSettingRequest request, CancellationToken cancellationToken = default);
 }

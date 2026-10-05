@@ -11,6 +11,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { ErrorState } from '../../components/ErrorState';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
+import { useDepartmentTracking } from '../tenant/queries';
 import { useBranchDepartments, useCreateBranch, useCreateDepartment, useUpdateGcash, useUpdateHardware } from '../branches/adminQueries';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
@@ -94,7 +95,7 @@ function BranchDetail({ branch, onClose }: { branch: Branch; onClose: () => void
       </div>
       <HardwareForm branch={branch} />
       <GcashForm branch={branch} />
-      <Departments branchId={branch.id} />
+      {useDepartmentTracking() && <Departments branchId={branch.id} />}
     </div>
   );
 }

@@ -37,6 +37,7 @@ const settings: TenantSettings = {
   creditLedgerEnabled: true,
   kioskPosterImageUrl: null,
   useSeparateInventoryTracking: false,
+  useDepartmentTracking: false,
 };
 
 beforeEach(() => {

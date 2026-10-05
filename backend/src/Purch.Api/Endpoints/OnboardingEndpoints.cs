@@ -283,6 +283,13 @@ public static class OnboardingEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await settingsService.UpdateInventoryTrackingSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
+        // --- Department tracking toggle: off hides every department screen, field and report ---
+        _ = app.MapPut("/tenant/settings/department-tracking", async (
+            UpdateDepartmentTrackingSettingRequest request,
+            ITenantSettingsService settingsService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settingsService.UpdateDepartmentTrackingSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
         // --- Security & access: audit log viewer (A6) ---
         _ = app.MapGet("/audit-logs", async (
             Guid? actorUserId,

@@ -28,4 +28,6 @@ export const tenantApi = {
     apiClient.put<TenantSettings>('/tenant/settings/credit-ledger', { creditLedgerEnabled }).then((r) => r.data),
   updateInventoryTracking: (useSeparateInventoryTracking: boolean) =>
     apiClient.put<TenantSettings>('/tenant/settings/inventory-tracking', { useSeparateInventoryTracking }).then((r) => r.data),
+  updateDepartmentTracking: (useDepartmentTracking: boolean) =>
+    apiClient.put<TenantSettings>('/tenant/settings/department-tracking', { useDepartmentTracking }).then((r) => r.data),
 };

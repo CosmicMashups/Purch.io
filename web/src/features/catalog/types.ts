@@ -42,6 +42,10 @@ export interface Item {
   lowStockThreshold: number | null;
   isOutOfStock: boolean;
   sortOrder: number;
+  /** False for a service, a combo, or an item made from ingredients: it has no count of its own to edit. Absent reads as true. */
+  hasOwnStock?: boolean;
+  /** The count to show and edit: the paired ingredient record's with separate tracking, else stockOnHand. Absent reads as stockOnHand. */
+  countOnHand?: number;
 }
 
 export interface ModifierGroup {

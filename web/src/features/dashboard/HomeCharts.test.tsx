@@ -4,11 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../lib/authStore';
 import { reportsApi } from '../reports/api';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { dashboardApi } from './api';
 import { HomePage } from './HomePage';
 import type { InventoryDashboard, SalesDashboard } from './types';
 
 vi.mock('../reports/api', () => ({ reportsApi: { staffPerformance: vi.fn(), departmentSales: vi.fn(), movementSummary: vi.fn() } }));
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 vi.mock('./api', () => ({ dashboardApi: { sales: vi.fn(), inventory: vi.fn(), flaggedSync: vi.fn() } }));
 
 function renderHome(role = 'Admin') {
@@ -45,6 +48,8 @@ const inventory: InventoryDashboard = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The department chart only shows when the shop monitors departments (Options).
+  vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: true } as TenantSettings);
   vi.mocked(dashboardApi.sales).mockResolvedValue(sales);
   vi.mocked(dashboardApi.inventory).mockResolvedValue(inventory);
   vi.mocked(dashboardApi.flaggedSync).mockResolvedValue([]);

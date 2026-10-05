@@ -12,8 +12,10 @@ import { useFlaggedSync, useRefreshDashboards, useSalesDashboard } from './queri
 import { tabsForRole } from '../../permissions/navPolicy';
 import { DepartmentPanel, MovementPanel, StaffPanels } from '../reports/components/RangePanels';
 import { choiceToParams, defaultChoice } from '../reports/params';
+import { useDepartmentTracking } from '../tenant/queries';
 
 export function HomePage() {
+  const departmentsOn = useDepartmentTracking();
   const { role } = useSession();
   // Mirrors the API's rules (reports and sync review: Admin/Manager; inventory dashboard also Warehouse).
   const canReport = role === 'Admin' || role === 'Manager';
@@ -153,7 +155,7 @@ export function HomePage() {
           </div>
           <StaffPanels params={monthParams} />
           <div className="grid gap-6 lg:grid-cols-2">
-            <DepartmentPanel params={monthParams} />
+            {departmentsOn && <DepartmentPanel params={monthParams} />}
             <MovementPanel params={monthParams} />
           </div>
         </section>

@@ -6,32 +6,39 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** For long forms: a wider panel. */
+  wide?: boolean;
 }
 
 /** A dialog for picking things. Escape closes it, focus moves inside it, and it scrolls on short screens. */
-export function Modal({ open, title, onClose, children, footer }: ModalProps) {
+export function Modal({ open, title, onClose, children, footer, wide = false }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  // Read through a ref so a parent that passes a fresh function each render does not re-run the focus handling.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     panel.current?.querySelector<HTMLElement>('input, select, button:not([data-close])')?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') close.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
       previous?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:px-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-panel bg-surface shadow-xl sm:rounded-panel">
+      <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`flex max-h-[92dvh] w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} flex-col rounded-t-panel bg-surface shadow-xl sm:rounded-panel`}>
         <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
           <h2 id={titleId} className="text-xl font-bold">
             {title}
