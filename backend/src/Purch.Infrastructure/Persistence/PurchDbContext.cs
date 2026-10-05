@@ -73,6 +73,10 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
 
+    public DbSet<IncomingReceivingReport> IncomingReceivingReports => Set<IncomingReceivingReport>();
+
+    public DbSet<IncomingReceivingReportLine> IncomingReceivingReportLines => Set<IncomingReceivingReportLine>();
+
     public DbSet<BranchTransfer> BranchTransfers => Set<BranchTransfer>();
 
     public DbSet<BranchTransferLine> BranchTransferLines => Set<BranchTransferLine>();

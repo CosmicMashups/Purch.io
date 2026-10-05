@@ -7,7 +7,7 @@ import { RestockList } from '../components/RestockList';
 import { StockOverview } from '../components/StockOverview';
 import { INVENTORY_GROUPS, inventoryHubStats } from '../hub';
 import type { StockScope } from '../stockScope';
-import { useInventoryItems, usePurchaseOrders, useSuppliers, useTransfers } from '../queries';
+import { useInventoryItems, useIncomingReceiving, usePurchaseOrders, useSuppliers, useTransfers } from '../queries';
 
 export function InventoryHomePage() {
   const { role } = useSession();
@@ -17,6 +17,7 @@ export function InventoryHomePage() {
   const suppliers = useSuppliers();
   const orders = usePurchaseOrders();
   const transfers = useTransfers();
+  const incomingReceiving = useIncomingReceiving();
   const items = useItems();
   const categories = useCategories();
 
@@ -25,6 +26,7 @@ export function InventoryHomePage() {
     suppliers: suppliers.data,
     purchaseOrders: orders.data,
     transfers: transfers.data,
+    incomingReceiving: incomingReceiving.data,
     itemCount: isManager ? items.data?.length : undefined,
     categoryCount: isManager ? categories.data?.length : undefined,
   });

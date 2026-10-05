@@ -10,7 +10,11 @@ public sealed record PurchaseOrderDto(
     string BranchName,
     PurchaseOrderStatus Status,
     DateTimeOffset? SentAt,
-    IReadOnlyList<PurchaseOrderLineDto> Lines);
+    IReadOnlyList<PurchaseOrderLineDto> Lines,
+    IReadOnlyList<PurchaseOrderReceiptDto> Receipts);
+
+/// <summary>An Incoming Receiving Report linked to this order.</summary>
+public sealed record PurchaseOrderReceiptDto(Guid ReportId, DateOnly DeliveryDate);
 
 public sealed record PurchaseOrderLineDto(
     Guid Id,
@@ -29,10 +33,3 @@ public sealed record CreatePurchaseOrderLineRequest(
     Guid ItemId,
     decimal QuantityOrdered,
     decimal ExpectedUnitCost);
-
-/// <summary>One PO can be received in several batches (partial deliveries) —
-/// each entry adds ReceivedQuantity on top of that line's running total,
-/// rather than replacing it.</summary>
-public sealed record ReceivePurchaseOrderRequest(IReadOnlyList<ReceivePurchaseOrderLineRequest> Lines);
-
-public sealed record ReceivePurchaseOrderLineRequest(Guid LineId, decimal ReceivedQuantity);

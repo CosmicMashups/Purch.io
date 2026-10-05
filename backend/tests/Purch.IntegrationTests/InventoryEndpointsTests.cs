@@ -373,8 +373,14 @@ public sealed class InventoryEndpointsTests(PostgresContainerFixture postgres)
         _ = await client.PostAsync($"/purchase-orders/{order.Id}/mark-sent", null);
 
         var receive = await client.PostAsJsonAsync(
-            $"/purchase-orders/{order.Id}/receive",
-            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(order.Lines.Single().Id, 30m)]));
+            "/incoming-receiving",
+            new CreateIncomingReceivingRequest(
+                order.Id,
+                supplier.Id,
+                branchId,
+                DateOnly.FromDateTime(DateTime.UtcNow),
+                null,
+                [new CreateIncomingReceivingLineRequest(item.Id, 30m, "pc", 10m, ReceivingCondition.Good, ReceivingRemark.Accepted)]));
 
         Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
         Assert.Equal(30m, await LinkedQuantityAsync(client, item.Id));

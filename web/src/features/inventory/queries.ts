@@ -9,12 +9,14 @@ export const inventoryKeys = {
   movements: ['inventory', 'movements'] as const,
   suppliers: ['inventory', 'suppliers'] as const,
   purchaseOrders: ['inventory', 'purchase-orders'] as const,
+  incomingReceiving: ['inventory', 'incoming-receiving'] as const,
   transfers: ['inventory', 'transfers'] as const,
 };
 
 export const useInventoryItems = () => useQuery({ queryKey: inventoryKeys.items, queryFn: inventoryApi.listInventoryItems });
 export const useInventoryCategories = () => useQuery({ queryKey: inventoryKeys.categories, queryFn: inventoryApi.listInventoryCategories });
 export const useSuppliers = () => useQuery({ queryKey: inventoryKeys.suppliers, queryFn: inventoryApi.listSuppliers });
+export const useIncomingReceiving = () => useQuery({ queryKey: inventoryKeys.incomingReceiving, queryFn: inventoryApi.listIncomingReceiving });
 export const usePurchaseOrders = () => useQuery({ queryKey: inventoryKeys.purchaseOrders, queryFn: inventoryApi.listPurchaseOrders });
 export const useTransfers = () => useQuery({ queryKey: inventoryKeys.transfers, queryFn: inventoryApi.listTransfers });
 
@@ -39,6 +41,7 @@ function useStockInvalidation() {
       qc.invalidateQueries({ queryKey: inventoryKeys.movements }),
       qc.invalidateQueries({ queryKey: inventoryKeys.items }),
       qc.invalidateQueries({ queryKey: inventoryKeys.purchaseOrders }),
+      qc.invalidateQueries({ queryKey: inventoryKeys.incomingReceiving }),
       qc.invalidateQueries({ queryKey: inventoryKeys.transfers }),
       qc.invalidateQueries({ queryKey: dashboardKeys.inventory }),
       qc.invalidateQueries({ queryKey: ['items'] }),
@@ -98,6 +101,14 @@ export const useUpdateInventoryCategory = () =>
   useCategoryMutation(({ id, body }: { id: string; body: Parameters<Api['updateInventoryCategory']>[1] }) => inventoryApi.updateInventoryCategory(id, body));
 export const useDeleteInventoryCategory = () => useCategoryMutation(inventoryApi.deleteInventoryCategory);
 
+export function useUpdateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<Api['updateSupplier']>[1] }) => inventoryApi.updateSupplier(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.suppliers }),
+  });
+}
+
 export function useCreateSupplier() {
   const qc = useQueryClient();
   return useMutation({
@@ -109,8 +120,9 @@ export function useCreateSupplier() {
 export const useCreatePurchaseOrder = () => useStockMutation(inventoryApi.createPurchaseOrder);
 export const useMarkPurchaseOrderSent = () => useStockMutation(inventoryApi.markPurchaseOrderSent);
 export const useCancelPurchaseOrder = () => useStockMutation(inventoryApi.cancelPurchaseOrder);
-export const useReceivePurchaseOrder = () =>
-  useStockMutation(({ id, body }: { id: string; body: Parameters<Api['receivePurchaseOrder']>[1] }) => inventoryApi.receivePurchaseOrder(id, body));
+export const useCreateIncomingReceiving = () => useStockMutation(inventoryApi.createIncomingReceiving);
+export const useLinkIncomingReceiving = () =>
+  useStockMutation(({ id, purchaseOrderId }: { id: string; purchaseOrderId: string }) => inventoryApi.linkIncomingReceiving(id, purchaseOrderId));
 
 export const useCreateTransfer = () => useStockMutation(inventoryApi.createTransfer);
 export const useMarkTransferInTransit = () => useStockMutation(inventoryApi.markTransferInTransit);

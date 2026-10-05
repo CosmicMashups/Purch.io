@@ -44,6 +44,23 @@ class CreateSupplierController extends _$CreateSupplierController {
     return succeeded;
   }
 
+  Future<bool> updateSupplier(
+    String supplierId,
+    UpdateSupplierRequest request,
+  ) async {
+    state = const AsyncLoading();
+    final repository = ref.read(supplierRepositoryProvider);
+
+    state = await AsyncValue.guard(
+      () => repository.updateSupplier(supplierId, request),
+    );
+    final succeeded = !state.hasError;
+    if (succeeded) {
+      await ref.read(supplierListProvider.notifier).refresh();
+    }
+    return succeeded;
+  }
+
   Failure? get currentFailure {
     final error = state.error;
     return error is Failure ? error : null;

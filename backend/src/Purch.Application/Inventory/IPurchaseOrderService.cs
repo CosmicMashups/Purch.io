@@ -11,9 +11,4 @@ public interface IPurchaseOrderService
 
     /// <summary>Draft or Sent -> Cancelled.</summary>
     Task<PurchaseOrderDto> CancelAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default);
-
-    /// <summary>Sent or PartiallyReceived -> PartiallyReceived or Received, depending on
-    /// whether every line is now fully received. Adds the received quantity to
-    /// Item.StockOnHand and records a StockIn InventoryMovement per line.</summary>
-    Task<PurchaseOrderDto> ReceiveAsync(Guid purchaseOrderId, ReceivePurchaseOrderRequest request, CancellationToken cancellationToken = default);
 }

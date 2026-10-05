@@ -97,16 +97,36 @@ export interface MovementCursor {
   beforeId: string;
 }
 
+export const CONTACT_MODES = ['Call', 'Viber', 'Email', 'Facebook', 'Messenger', 'Landline', 'Others'] as const;
+export type ContactMode = (typeof CONTACT_MODES)[number];
+
+export interface SupplierContact {
+  contactPerson: string;
+  modes: string[];
+  numbers: string[];
+  emails: string[];
+}
+
 export interface Supplier {
   id: string;
   name: string;
+  /** A one-line summary of the contacts, or the old free text on suppliers saved before contacts were structured. */
   contactInfo: string | null;
   isActive: boolean;
+  specialization: string | null;
+  address: string | null;
+  tin: string | null;
+  remarks: string | null;
+  contacts: SupplierContact[];
 }
 
-export interface CreateSupplierRequest {
+export interface SupplierRequest {
   name: string;
-  contactInfo: string | null;
+  specialization: string | null;
+  address: string | null;
+  tin: string | null;
+  remarks: string | null;
+  contacts: SupplierContact[];
 }
 
 /** Mirrors Purch.Domain.Enums.PurchaseOrderStatus. */
@@ -137,6 +157,7 @@ export interface PurchaseOrder {
   status: PurchaseOrderStatus;
   sentAt: string | null;
   lines: PurchaseOrderLine[];
+  receipts: { reportId: string; deliveryDate: string }[];
 }
 
 export interface CreatePurchaseOrderRequest {
@@ -145,8 +166,47 @@ export interface CreatePurchaseOrderRequest {
   lines: { itemId: string; quantityOrdered: number; expectedUnitCost: number }[];
 }
 
-export interface ReceivePurchaseOrderRequest {
-  lines: { lineId: string; receivedQuantity: number }[];
+/** Mirrors Purch.Domain.Enums.ReceivingCondition. */
+export const ReceivingCondition = { Good: 0, NotGood: 1 } as const;
+export type ReceivingCondition = (typeof ReceivingCondition)[keyof typeof ReceivingCondition];
+
+/** Mirrors Purch.Domain.Enums.ReceivingRemark. */
+export const ReceivingRemark = { Accepted: 0, Rejected: 1 } as const;
+export type ReceivingRemark = (typeof ReceivingRemark)[keyof typeof ReceivingRemark];
+
+export interface IncomingReceivingLine {
+  id: string;
+  itemId: string;
+  itemName: string;
+  quantityReceived: number;
+  uom: string;
+  unitPrice: number;
+  condition: ReceivingCondition;
+  remark: ReceivingRemark;
+}
+
+export interface IncomingReceiving {
+  id: string;
+  purchaseOrderId: string | null;
+  supplierId: string;
+  supplierName: string;
+  branchId: string;
+  branchName: string;
+  receivedByUserId: string;
+  receivedByName: string;
+  deliveryDate: string;
+  remarks: string | null;
+  createdAt: string;
+  lines: IncomingReceivingLine[];
+}
+
+export interface CreateIncomingReceivingRequest {
+  purchaseOrderId: string | null;
+  supplierId: string;
+  branchId: string;
+  deliveryDate: string;
+  remarks: string | null;
+  lines: { itemId: string; quantityReceived: number; uom: string; unitPrice: number; condition: ReceivingCondition; remark: ReceivingRemark }[];
 }
 
 /** Mirrors Purch.Domain.Enums.BranchTransferStatus. */

@@ -4,7 +4,9 @@ import type {
   CreateBranchTransferRequest,
   CreateInventoryItemRequest,
   CreatePurchaseOrderRequest,
-  CreateSupplierRequest,
+  CreateIncomingReceivingRequest,
+  IncomingReceiving,
+  SupplierRequest,
   InventoryCategory,
   InventoryCategoryBody,
   InventoryItem,
@@ -12,7 +14,6 @@ import type {
   MovementCursor,
   MovementFilter,
   PurchaseOrder,
-  ReceivePurchaseOrderRequest,
   RecordMovementRequest,
   Supplier,
   UpdateInventoryItemRequest,
@@ -46,14 +47,20 @@ export const inventoryApi = {
   recordMovement: (body: RecordMovementRequest) => apiClient.post<InventoryMovement>('/inventory/movements', body).then((r) => r.data),
 
   listSuppliers: () => apiClient.get<Supplier[]>('/suppliers').then((r) => r.data),
-  createSupplier: (body: CreateSupplierRequest) => apiClient.post<Supplier>('/suppliers', body).then((r) => r.data),
+  createSupplier: (body: SupplierRequest) => apiClient.post<Supplier>('/suppliers', body).then((r) => r.data),
+
+  updateSupplier: (id: string, body: SupplierRequest & { isActive: boolean }) => apiClient.put<Supplier>(`/suppliers/${id}`, body).then((r) => r.data),
 
   listPurchaseOrders: () => apiClient.get<PurchaseOrder[]>('/purchase-orders').then((r) => r.data),
   createPurchaseOrder: (body: CreatePurchaseOrderRequest) => apiClient.post<PurchaseOrder>('/purchase-orders', body).then((r) => r.data),
   markPurchaseOrderSent: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/mark-sent`).then((r) => r.data),
   cancelPurchaseOrder: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`).then((r) => r.data),
-  receivePurchaseOrder: (id: string, body: ReceivePurchaseOrderRequest) =>
-    apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/receive`, body).then((r) => r.data),
+
+  listIncomingReceiving: () => apiClient.get<IncomingReceiving[]>('/incoming-receiving').then((r) => r.data),
+  createIncomingReceiving: (body: CreateIncomingReceivingRequest) =>
+    apiClient.post<IncomingReceiving>('/incoming-receiving', body).then((r) => r.data),
+  linkIncomingReceiving: (id: string, purchaseOrderId: string) =>
+    apiClient.post<IncomingReceiving>(`/incoming-receiving/${id}/link-purchase-order`, { purchaseOrderId }).then((r) => r.data),
 
   listTransfers: () => apiClient.get<BranchTransfer[]>('/branch-transfers').then((r) => r.data),
   createTransfer: (body: CreateBranchTransferRequest) => apiClient.post<BranchTransfer>('/branch-transfers', body).then((r) => r.data),

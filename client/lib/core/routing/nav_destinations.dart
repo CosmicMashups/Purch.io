@@ -81,7 +81,7 @@ const List<NavSection> inventorySections = [
     ],
   ),
   NavSection(
-    title: 'Purchasing',
+    title: 'Procurement',
     tiles: [
       NavTile(
         id: 'suppliers',
@@ -94,6 +94,12 @@ const List<NavSection> inventorySections = [
         label: 'Purchase Orders',
         icon: Icons.assignment_outlined,
         path: 'purchase-orders',
+      ),
+      NavTile(
+        id: 'incoming-receiving',
+        label: 'Incoming Receiving',
+        icon: Icons.move_to_inbox_outlined,
+        path: 'incoming-receiving',
       ),
     ],
   ),

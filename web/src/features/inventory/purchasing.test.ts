@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { purchaseOrderSchema, supplierSchema, transferSchema } from './purchasing';
+import { emptySupplierForm, purchaseOrderSchema, supplierSchema, transferSchema } from './purchasing';
 
 const first = (r: { success: boolean; error?: { issues: { message: string }[] } }) => (r.success ? null : r.error?.issues[0].message);
 
 describe('supplierSchema', () => {
-  it('needs a name but not contact info', () => {
-    expect(supplierSchema.safeParse({ name: 'Metro Foods', contactInfo: '' }).success).toBe(true);
-    expect(first(supplierSchema.safeParse({ name: ' ', contactInfo: '' }))).toBe('Enter the supplier name');
+  it('needs a name but nothing else', () => {
+    expect(supplierSchema.safeParse({ ...emptySupplierForm(), name: 'Metro Foods' }).success).toBe(true);
+    expect(first(supplierSchema.safeParse({ ...emptySupplierForm(), name: ' ' }))).toBe('Enter the supplier name');
+    const bad = { ...emptySupplierForm(), name: 'X', contacts: [{ contactPerson: '', modes: [], numbers: [], emails: [{ value: 'nope' }] }] };
+    expect(first(supplierSchema.safeParse(bad))).toBe('Enter a valid email');
   });
 });
 

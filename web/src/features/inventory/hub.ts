@@ -1,5 +1,5 @@
 import type { HubGroup, HubStat } from '../../components/HubGroups';
-import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
+import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type IncomingReceiving, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
 
 
 export const INVENTORY_GROUPS: readonly HubGroup[] = [
@@ -12,10 +12,11 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
     ],
   },
   {
-    title: 'Buying',
+    title: 'Procurement',
     tiles: [
       { id: 'suppliers', label: 'Suppliers', hint: 'Who you buy from', to: '/inventory/suppliers' },
-      { id: 'purchase-orders', label: 'Purchase orders', hint: 'Order and receive stock', to: '/inventory/purchase-orders' },
+      { id: 'purchase-orders', label: 'Purchase orders', hint: 'Order stock from suppliers', to: '/inventory/purchase-orders' },
+      { id: 'incoming-receiving', label: 'Incoming receiving', hint: 'Record and check deliveries', to: '/inventory/incoming-receiving' },
     ],
   },
   {
@@ -32,6 +33,7 @@ export interface InventoryHubData {
   suppliers?: Supplier[];
   purchaseOrders?: PurchaseOrder[];
   transfers?: BranchTransfer[];
+  incomingReceiving?: IncomingReceiving[];
   itemCount?: number;
   categoryCount?: number;
 }
@@ -55,6 +57,10 @@ export function inventoryHubStats(data: InventoryHubData): Record<string, HubSta
     const drafts = data.purchaseOrders.filter((p) => p.status === PurchaseOrderStatus.Draft).length;
     const parts = [open > 0 && `${open} awaiting delivery`, drafts > 0 && n(drafts, 'draft', 'drafts')].filter(Boolean);
     stats['purchase-orders'] = { text: parts.length > 0 ? parts.join(', ') : 'None open' };
+  }
+  if (data.incomingReceiving) {
+    const unlinked = data.incomingReceiving.filter((r) => r.purchaseOrderId === null).length;
+    stats['incoming-receiving'] = unlinked > 0 ? { text: `${unlinked} not linked to an order`, warn: true } : { text: n(data.incomingReceiving.length, 'report', 'reports') };
   }
   if (data.transfers) {
     const moving = data.transfers.filter((t) => t.status === BranchTransferStatus.InTransit).length;

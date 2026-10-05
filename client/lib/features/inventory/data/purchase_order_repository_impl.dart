@@ -43,14 +43,6 @@ class PurchaseOrderRepositoryImpl implements PurchaseOrderRepository {
     return _post('/purchase-orders/$purchaseOrderId/cancel', null);
   }
 
-  @override
-  Future<PurchaseOrder> receive(
-    String purchaseOrderId,
-    ReceivePurchaseOrderRequest request,
-  ) {
-    return _post('/purchase-orders/$purchaseOrderId/receive', request.toJson());
-  }
-
   Future<PurchaseOrder> _post(String path, Map<String, dynamic>? data) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(

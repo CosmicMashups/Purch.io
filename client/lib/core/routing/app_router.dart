@@ -22,6 +22,7 @@ import '../../features/inventory/presentation/screens/branch_transfer_list_scree
 import '../../features/inventory/presentation/screens/movement_log_screen.dart';
 import '../../features/inventory/presentation/screens/inventory_category_list_screen.dart';
 import '../../features/inventory/presentation/screens/inventory_item_list_screen.dart';
+import '../../features/inventory/presentation/screens/incoming_receiving_list_screen.dart';
 import '../../features/inventory/presentation/screens/purchase_order_list_screen.dart';
 import '../../features/inventory/presentation/screens/recipe_editor_screen.dart';
 import '../../features/inventory/presentation/screens/supplier_list_screen.dart';
@@ -261,6 +262,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'purchase-orders',
                     builder:
                         (context, state) => const PurchaseOrderListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'incoming-receiving',
+                    builder:
+                        (context, state) => const IncomingReceivingListScreen(),
                   ),
                   GoRoute(
                     path: 'inventory-items',

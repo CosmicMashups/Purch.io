@@ -85,6 +85,14 @@ public static class InventoryEndpoints
             Results.Ok(await supplierService.CreateAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        _ = app.MapPut("/suppliers/{supplierId:guid}", async (
+            Guid supplierId,
+            UpdateSupplierRequest request,
+            ISupplierService supplierService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await supplierService.UpdateAsync(supplierId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- C5 — purchase orders ---
         _ = app.MapGet("/purchase-orders", async (
             IPurchaseOrderService purchaseOrderService,
@@ -113,13 +121,34 @@ public static class InventoryEndpoints
             Results.Ok(await purchaseOrderService.CancelAsync(purchaseOrderId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
-        _ = app.MapPost("/purchase-orders/{purchaseOrderId:guid}/receive", async (
-            Guid purchaseOrderId,
-            ReceivePurchaseOrderRequest request,
-            IPurchaseOrderService purchaseOrderService,
+        // --- Incoming Receiving Reports (IRR) ---
+        _ = app.MapGet("/incoming-receiving", async (
+            IIncomingReceivingService incomingReceivingService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await purchaseOrderService.ReceiveAsync(purchaseOrderId, request, cancellationToken)))
+            Results.Ok(await incomingReceivingService.ListAsync(cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/incoming-receiving/{reportId:guid}", async (
+            Guid reportId,
+            IIncomingReceivingService incomingReceivingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await incomingReceivingService.GetAsync(reportId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/incoming-receiving", async (
+            CreateIncomingReceivingRequest request,
+            IIncomingReceivingService incomingReceivingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await incomingReceivingService.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/incoming-receiving/{reportId:guid}/link-purchase-order", async (
+            Guid reportId,
+            LinkIncomingReceivingRequest request,
+            IIncomingReceivingService incomingReceivingService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await incomingReceivingService.LinkPurchaseOrderAsync(reportId, request.PurchaseOrderId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin), nameof(Role.Manager)));
 
         // --- Separately tracked inventory items (raw materials/ingredients), used when the
         // tenant opts into UseSeparateInventoryTracking instead of Item.StockOnHand directly ---

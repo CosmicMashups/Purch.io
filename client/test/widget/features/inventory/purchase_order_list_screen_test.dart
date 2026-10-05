@@ -47,7 +47,7 @@ void main() {
     );
   });
 
-  testWidgets('a draft PO can be marked sent', (tester) async {
+  testWidgets('a draft PO can be submitted', (tester) async {
     final repository = FakePurchaseOrderRepository(
       initialPurchaseOrders: [_draftPurchaseOrder],
     );
@@ -57,10 +57,10 @@ void main() {
     expect(find.text('Acme Distribution → Main Branch'), findsOneWidget);
     expect(find.text('Draft'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Mark Sent'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
     await tester.pumpAndSettle();
 
     expect(repository.purchaseOrders.single.status, PurchaseOrderStatus.sent);
-    expect(find.text('Receive'), findsOneWidget);
+    expect(find.text('Record Delivery'), findsOneWidget);
   });
 }

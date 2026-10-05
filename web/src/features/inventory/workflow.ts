@@ -1,12 +1,12 @@
-import { BranchTransferStatus, PurchaseOrderStatus, type PurchaseOrderLine } from './types';
+import { BranchTransferStatus, PurchaseOrderStatus, ReceivingCondition, ReceivingRemark } from './types';
 
 type Tone = 'brand' | 'neutral' | 'warn' | 'danger';
 
 export const purchaseOrderStatusLabel: Record<PurchaseOrderStatus, { label: string; tone: Tone }> = {
   [PurchaseOrderStatus.Draft]: { label: 'Draft', tone: 'neutral' },
-  [PurchaseOrderStatus.Sent]: { label: 'Sent', tone: 'brand' },
-  [PurchaseOrderStatus.PartiallyReceived]: { label: 'Partly received', tone: 'warn' },
-  [PurchaseOrderStatus.Received]: { label: 'Received', tone: 'brand' },
+  [PurchaseOrderStatus.Sent]: { label: 'Submitted', tone: 'brand' },
+  [PurchaseOrderStatus.PartiallyReceived]: { label: 'Partially delivered', tone: 'warn' },
+  [PurchaseOrderStatus.Received]: { label: 'Delivered', tone: 'brand' },
   [PurchaseOrderStatus.Cancelled]: { label: 'Cancelled', tone: 'danger' },
 };
 
@@ -17,7 +17,7 @@ export const transferStatusLabel: Record<BranchTransferStatus, { label: string; 
   [BranchTransferStatus.Cancelled]: { label: 'Cancelled', tone: 'danger' },
 };
 
-export type PurchaseOrderAction = 'send' | 'receive' | 'cancel';
+export type PurchaseOrderAction = 'send' | 'record-delivery' | 'cancel';
 export type TransferAction = 'ship' | 'receive' | 'cancel';
 
 /** What to offer on screen. These mirror the API's transition rules; the API still enforces them. */
@@ -26,9 +26,9 @@ export function purchaseOrderActions(status: PurchaseOrderStatus): PurchaseOrder
     case PurchaseOrderStatus.Draft:
       return ['send', 'cancel'];
     case PurchaseOrderStatus.Sent:
-      return ['receive', 'cancel'];
+      return ['record-delivery', 'cancel'];
     case PurchaseOrderStatus.PartiallyReceived:
-      return ['receive'];
+      return ['record-delivery'];
     default:
       return [];
   }
@@ -48,26 +48,12 @@ export function transferActions(status: BranchTransferStatus): TransferAction[] 
 export const isPurchaseOrderOpen = (status: PurchaseOrderStatus): boolean =>
   status === PurchaseOrderStatus.Sent || status === PurchaseOrderStatus.PartiallyReceived;
 
-export const remainingToReceive = (line: PurchaseOrderLine): number => Math.max(0, line.quantityOrdered - line.quantityReceived);
+export const conditionLabel: Record<ReceivingCondition, string> = {
+  [ReceivingCondition.Good]: 'Good',
+  [ReceivingCondition.NotGood]: 'Not good',
+};
 
-export type ReceiveEntries = Record<string, string>;
-export type ReceiveResult =
-  | { ok: true; lines: { lineId: string; receivedQuantity: number }[] }
-  | { ok: false; lineId?: string; message: string };
-
-/**
- * Blank lines are skipped, because a partial delivery only lists what arrived. Anything typed must be
- * a number above zero, and at least one line is needed, as the API requires.
- */
-export function buildReceiveLines(entries: ReceiveEntries): ReceiveResult {
-  const lines: { lineId: string; receivedQuantity: number }[] = [];
-  for (const [lineId, text] of Object.entries(entries)) {
-    const trimmed = text.trim();
-    if (trimmed === '') continue;
-    const quantity = Number(trimmed);
-    if (!Number.isFinite(quantity) || quantity <= 0) return { ok: false, lineId, message: 'Enter a quantity above zero' };
-    lines.push({ lineId, receivedQuantity: quantity });
-  }
-  if (lines.length === 0) return { ok: false, message: 'Enter how many arrived for at least one item' };
-  return { ok: true, lines };
-}
+export const remarkLabel: Record<ReceivingRemark, { label: string; tone: Tone }> = {
+  [ReceivingRemark.Accepted]: { label: 'Accepted', tone: 'brand' },
+  [ReceivingRemark.Rejected]: { label: 'Rejected', tone: 'danger' },
+};

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../../components/ConfirmModal';
@@ -19,13 +20,10 @@ import {
   useCreatePurchaseOrder,
   useMarkPurchaseOrderSent,
   usePurchaseOrders,
-  useReceivePurchaseOrder,
   useSuppliers,
 } from '../queries';
 import type { PurchaseOrder } from '../types';
-import { buildReceiveLines, purchaseOrderActions, purchaseOrderStatusLabel, remainingToReceive, type ReceiveEntries } from '../workflow';
-
-type Panel = { mode: 'create' } | { mode: 'receive'; order: PurchaseOrder };
+import { purchaseOrderActions, purchaseOrderStatusLabel } from '../workflow';
 
 const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
 
@@ -36,12 +34,11 @@ export function PurchaseOrdersPage() {
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
   const send = useMarkPurchaseOrderSent();
   const cancel = useCancelPurchaseOrder();
-  const [panel, setPanel] = useState<Panel>({ mode: 'create' });
   const [cancelling, setCancelling] = useState<PurchaseOrder | null>(null);
 
   async function onSend(order: PurchaseOrder) {
     await send.mutateAsync(order.id);
-    toast.success(`Order to ${order.supplierName} marked as sent`);
+    toast.success(`Order to ${order.supplierName} submitted`);
   }
 
   async function onConfirmCancel() {
@@ -50,7 +47,6 @@ export function PurchaseOrdersPage() {
     try {
       await cancel.mutateAsync(order.id);
       toast.success(`Order to ${order.supplierName} cancelled`);
-      if (panel.mode === 'receive' && panel.order.id === order.id) setPanel({ mode: 'create' });
     } finally {
       setCancelling(null);
     }
@@ -75,21 +71,26 @@ export function PurchaseOrdersPage() {
                   <ul className="mt-2 flex flex-col gap-1">
                     {order.lines.map((line) => (
                       <li key={line.id} className="text-base tabular-nums">
-                        {line.itemName}: {line.quantityReceived} of {line.quantityOrdered} received at {formatPeso(line.expectedUnitCost)} each
+                        {line.itemName}: {line.quantityReceived} of {line.quantityOrdered} delivered at {formatPeso(line.expectedUnitCost)} each
                       </li>
                     ))}
                   </ul>
+                  {order.receipts.length > 0 && (
+                    <p className="mt-2 text-sm text-ink-soft">
+                      {order.receipts.length} delivery {order.receipts.length === 1 ? 'report' : 'reports'}, last on {order.receipts[order.receipts.length - 1].deliveryDate}
+                    </p>
+                  )}
                   {actions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {actions.includes('send') && (
                         <button type="button" className={actionButton} disabled={send.isPending} onClick={() => void onSend(order)}>
-                          Mark as sent
+                          Submit order
                         </button>
                       )}
-                      {actions.includes('receive') && (
-                        <button type="button" className={actionButton} onClick={() => setPanel({ mode: 'receive', order })}>
-                          Receive delivery
-                        </button>
+                      {actions.includes('record-delivery') && (
+                        <Link to={`/inventory/incoming-receiving?po=${order.id}`} className={`${actionButton} inline-flex items-center`}>
+                          Record delivery
+                        </Link>
                       )}
                       {actions.includes('cancel') && (
                         <button type="button" className={`${actionButton} text-danger`} onClick={() => setCancelling(order)}>
@@ -105,16 +106,12 @@ export function PurchaseOrdersPage() {
           }}
         />
 
-        {panel.mode === 'receive' ? (
-          <ReceivePanel key={panel.order.id} order={panel.order} onDone={() => setPanel({ mode: 'create' })} />
-        ) : (
-          <FormLoader
+        <FormLoader
             failed={suppliers.isError ? suppliers : items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
             ready={!!(suppliers.data && items.data && branches)}
           >
             {suppliers.data && items.data && branches && <PurchaseOrderForm suppliers={suppliers.data} branches={branches} items={items.data} />}
-          </FormLoader>
-        )}
+        </FormLoader>
       </div>
 
       <ConfirmModal
@@ -122,7 +119,7 @@ export function PurchaseOrdersPage() {
         destructive
         busy={cancel.isPending}
         title="Cancel this purchase order?"
-        description={cancelling ? `The order to ${cancelling.supplierName} will be cancelled and can no longer be received.` : undefined}
+        description={cancelling ? `The order to ${cancelling.supplierName} will be cancelled and can no longer receive deliveries.` : undefined}
         confirmLabel="Cancel order"
         onConfirm={() => void onConfirmCancel()}
         onCancel={() => setCancelling(null)}
@@ -212,60 +209,6 @@ function PurchaseOrderForm({ suppliers, branches, items }: { suppliers: { id: st
           Add another item
         </SecondaryButton>
       </fieldset>
-    </EditorCard>
-  );
-}
-
-function ReceivePanel({ order, onDone }: { order: PurchaseOrder; onDone: () => void }) {
-  const receive = useReceivePurchaseOrder();
-  const [entries, setEntries] = useState<ReceiveEntries>({});
-  const [problem, setProblem] = useState<{ lineId?: string; message: string } | null>(null);
-
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const result = buildReceiveLines(entries);
-    if (!result.ok) {
-      setProblem({ lineId: result.lineId, message: result.message });
-      return;
-    }
-    setProblem(null);
-    await receive.mutateAsync({ id: order.id, body: { lines: result.lines } });
-    toast.success('Delivery recorded');
-    onDone();
-  }
-
-  return (
-    <EditorCard
-      title="delivery"
-      heading={`Receive delivery: ${order.supplierName}`}
-      cancelable
-      editing={false}
-      busy={receive.isPending}
-      submitLabel="Record delivery"
-      onSubmit={(e) => void onSubmit(e)}
-      onCancel={onDone}
-    >
-      <p className="text-base text-ink-soft">Enter only what arrived today. It adds to what was already received.</p>
-      {order.lines.map((line) => (
-        <FormField
-          key={line.id}
-          label={`${line.itemName}: arrived now`}
-          hint={`${remainingToReceive(line)} still to come`}
-          error={problem?.lineId === line.id ? problem.message : undefined}
-        >
-          <input
-            inputMode="decimal"
-            value={entries[line.id] ?? ''}
-            onChange={(e) => setEntries((current) => ({ ...current, [line.id]: e.target.value }))}
-            className={controlClass}
-          />
-        </FormField>
-      ))}
-      {problem && !problem.lineId && (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {problem.message}
-        </p>
-      )}
     </EditorCard>
   );
 }

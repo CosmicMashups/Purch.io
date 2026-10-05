@@ -18,7 +18,6 @@ vi.mock('../api', () => ({
     createPurchaseOrder: vi.fn(),
     markPurchaseOrderSent: vi.fn(),
     cancelPurchaseOrder: vi.fn(),
-    receivePurchaseOrder: vi.fn(),
   },
 }));
 
@@ -30,6 +29,7 @@ const order = (status: PurchaseOrderStatus, id = 'po1'): PurchaseOrder => ({
   branchName: 'Katipunan',
   status,
   sentAt: null,
+  receipts: [],
   lines: [{ id: 'l1', itemId: 'milk', itemName: 'Milk', quantityOrdered: 10, quantityReceived: 4, expectedUnitCost: 80 }],
 });
 
@@ -39,7 +39,7 @@ describe('PurchaseOrdersPage', () => {
     signInAs('Warehouse', { scope_type: 'Tenant' });
     vi.mocked(catalogApi.listItems).mockResolvedValue([{ id: 'milk', name: 'Milk' }] as Item[]);
     vi.mocked(branchesApi.list).mockResolvedValue([{ id: 'kat', name: 'Katipunan', address: null }]);
-    vi.mocked(inventoryApi.listSuppliers).mockResolvedValue([{ id: 's1', name: 'Metro Foods', contactInfo: null, isActive: true }]);
+    vi.mocked(inventoryApi.listSuppliers).mockResolvedValue([{ id: 's1', name: 'Metro Foods', contactInfo: null, isActive: true, specialization: null, address: null, tin: null, remarks: null, contacts: [] }]);
     vi.mocked(inventoryApi.listPurchaseOrders).mockResolvedValue([order(PurchaseOrderStatus.Draft)]);
   });
 
@@ -50,15 +50,15 @@ describe('PurchaseOrdersPage', () => {
     ]);
     renderPage(<PurchaseOrdersPage />);
     await screen.findAllByText('Deliver to Katipunan');
-    expect(screen.getAllByRole('button', { name: 'Mark as sent' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Submit order' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Cancel order' })).toHaveLength(1);
-    expect(screen.queryAllByRole('button', { name: 'Receive delivery' })).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: 'Record delivery' })).toHaveLength(0);
   });
 
-  it('marks a draft as sent', async () => {
+  it('submits a draft', async () => {
     vi.mocked(inventoryApi.markPurchaseOrderSent).mockResolvedValue({} as never);
     renderPage(<PurchaseOrdersPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Mark as sent' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit order' }));
     await waitFor(() => expect(inventoryApi.markPurchaseOrderSent).toHaveBeenCalledWith('po1'));
   });
 
@@ -81,20 +81,12 @@ describe('PurchaseOrdersPage', () => {
     expect(inventoryApi.cancelPurchaseOrder).not.toHaveBeenCalled();
   });
 
-  it('records a partial delivery with only the lines that arrived', async () => {
+  it('sends a partly delivered order to the receiving report with the order preselected', async () => {
     vi.mocked(inventoryApi.listPurchaseOrders).mockResolvedValue([order(PurchaseOrderStatus.PartiallyReceived)]);
-    vi.mocked(inventoryApi.receivePurchaseOrder).mockResolvedValue({} as never);
     renderPage(<PurchaseOrdersPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Receive delivery' }));
-
-    expect(screen.getByText('6 still to come')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Record delivery' }));
-    expect(await screen.findByText('Enter how many arrived for at least one item')).toBeInTheDocument();
-    expect(inventoryApi.receivePurchaseOrder).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText('Milk: arrived now'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record delivery' }));
-    await waitFor(() => expect(inventoryApi.receivePurchaseOrder).toHaveBeenCalledWith('po1', { lines: [{ lineId: 'l1', receivedQuantity: 3 }] }));
+    const link = await screen.findByRole('link', { name: 'Record delivery' });
+    expect(link).toHaveAttribute('href', '/inventory/incoming-receiving?po=po1');
+    expect(screen.getByText('Partially delivered')).toBeInTheDocument();
   });
 
   it('creates a draft order', async () => {

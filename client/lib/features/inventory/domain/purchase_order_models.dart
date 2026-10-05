@@ -4,9 +4,9 @@ enum PurchaseOrderStatus { draft, sent, partiallyReceived, received, cancelled }
 extension PurchaseOrderStatusLabel on PurchaseOrderStatus {
   String get label => switch (this) {
     PurchaseOrderStatus.draft => 'Draft',
-    PurchaseOrderStatus.sent => 'Sent',
-    PurchaseOrderStatus.partiallyReceived => 'Partially Received',
-    PurchaseOrderStatus.received => 'Received',
+    PurchaseOrderStatus.sent => 'Submitted',
+    PurchaseOrderStatus.partiallyReceived => 'Partially Delivered',
+    PurchaseOrderStatus.received => 'Delivered',
     PurchaseOrderStatus.cancelled => 'Cancelled',
   };
 }
@@ -22,6 +22,7 @@ class PurchaseOrder {
     required this.status,
     required this.sentAt,
     required this.lines,
+    this.receipts = const [],
   });
 
   factory PurchaseOrder.fromJson(Map<String, dynamic> json) {
@@ -41,6 +42,11 @@ class PurchaseOrder {
               .cast<Map<String, dynamic>>()
               .map(PurchaseOrderLine.fromJson)
               .toList(),
+      receipts:
+          (json['receipts'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>()
+              .map(PurchaseOrderReceipt.fromJson)
+              .toList(),
     );
   }
 
@@ -52,6 +58,24 @@ class PurchaseOrder {
   final PurchaseOrderStatus status;
   final DateTime? sentAt;
   final List<PurchaseOrderLine> lines;
+
+  /// Incoming Receiving Reports linked to this order.
+  final List<PurchaseOrderReceipt> receipts;
+}
+
+/// Mirrors Purch.Application.Inventory.PurchaseOrderReceiptDto.
+class PurchaseOrderReceipt {
+  const PurchaseOrderReceipt({required this.reportId, required this.deliveryDate});
+
+  factory PurchaseOrderReceipt.fromJson(Map<String, dynamic> json) {
+    return PurchaseOrderReceipt(
+      reportId: json['reportId'] as String,
+      deliveryDate: json['deliveryDate'] as String,
+    );
+  }
+
+  final String reportId;
+  final String deliveryDate;
 }
 
 /// Mirrors Purch.Application.Inventory.PurchaseOrderLineDto.
@@ -121,34 +145,5 @@ class CreatePurchaseOrderLineRequest {
     'itemId': itemId,
     'quantityOrdered': quantityOrdered,
     'expectedUnitCost': expectedUnitCost,
-  };
-}
-
-/// Mirrors Purch.Application.Inventory.ReceivePurchaseOrderRequest. A PO can
-/// be received across several partial deliveries — each entry adds on top
-/// of that line's running received total.
-class ReceivePurchaseOrderRequest {
-  const ReceivePurchaseOrderRequest({required this.lines});
-
-  final List<ReceivePurchaseOrderLineRequest> lines;
-
-  Map<String, dynamic> toJson() => {
-    'lines': lines.map((line) => line.toJson()).toList(),
-  };
-}
-
-/// Mirrors Purch.Application.Inventory.ReceivePurchaseOrderLineRequest.
-class ReceivePurchaseOrderLineRequest {
-  const ReceivePurchaseOrderLineRequest({
-    required this.lineId,
-    required this.receivedQuantity,
-  });
-
-  final String lineId;
-  final double receivedQuantity;
-
-  Map<String, dynamic> toJson() => {
-    'lineId': lineId,
-    'receivedQuantity': receivedQuantity,
   };
 }

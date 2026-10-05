@@ -6,18 +6,15 @@ class FakePurchaseOrderRepository implements PurchaseOrderRepository {
     this.createPurchaseOrderFailure,
     this.markSentFailure,
     this.cancelFailure,
-    this.receiveFailure,
     List<PurchaseOrder>? initialPurchaseOrders,
   }) : purchaseOrders = initialPurchaseOrders ?? [];
 
   final Object? createPurchaseOrderFailure;
   final Object? markSentFailure;
   final Object? cancelFailure;
-  final Object? receiveFailure;
   final List<PurchaseOrder> purchaseOrders;
 
   CreatePurchaseOrderRequest? lastCreateRequest;
-  ReceivePurchaseOrderRequest? lastReceiveRequest;
 
   @override
   Future<List<PurchaseOrder>> listPurchaseOrders() async => purchaseOrders;
@@ -68,55 +65,6 @@ class FakePurchaseOrderRepository implements PurchaseOrderRepository {
       throw cancelFailure!;
     }
     return _updateStatus(purchaseOrderId, PurchaseOrderStatus.cancelled);
-  }
-
-  @override
-  Future<PurchaseOrder> receive(
-    String purchaseOrderId,
-    ReceivePurchaseOrderRequest request,
-  ) async {
-    lastReceiveRequest = request;
-    if (receiveFailure != null) {
-      throw receiveFailure!;
-    }
-    final index = purchaseOrders.indexWhere((po) => po.id == purchaseOrderId);
-    final current = purchaseOrders[index];
-    final updatedLines = [
-      for (final line in current.lines)
-        if (request.lines.any((r) => r.lineId == line.id))
-          PurchaseOrderLine(
-            id: line.id,
-            itemId: line.itemId,
-            itemName: line.itemName,
-            quantityOrdered: line.quantityOrdered,
-            quantityReceived:
-                line.quantityReceived +
-                request.lines
-                    .firstWhere((r) => r.lineId == line.id)
-                    .receivedQuantity,
-            expectedUnitCost: line.expectedUnitCost,
-          )
-        else
-          line,
-    ];
-    final allReceived = updatedLines.every(
-      (line) => line.quantityReceived >= line.quantityOrdered,
-    );
-    final updated = PurchaseOrder(
-      id: current.id,
-      supplierId: current.supplierId,
-      supplierName: current.supplierName,
-      branchId: current.branchId,
-      branchName: current.branchName,
-      status:
-          allReceived
-              ? PurchaseOrderStatus.received
-              : PurchaseOrderStatus.partiallyReceived,
-      sentAt: current.sentAt,
-      lines: updatedLines,
-    );
-    purchaseOrders[index] = updated;
-    return updated;
   }
 
   PurchaseOrder _updateStatus(String id, PurchaseOrderStatus status) {

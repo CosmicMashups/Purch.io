@@ -24,10 +24,36 @@ class FakeSupplierRepository implements SupplierRepository {
     final created = Supplier(
       id: 'supplier-${suppliers.length + 1}',
       name: request.name,
-      contactInfo: request.contactInfo,
+      contactInfo: null,
       isActive: true,
+      specialization: request.specialization,
+      contacts: request.contacts,
     );
     suppliers.add(created);
     return created;
+  }
+
+  UpdateSupplierRequest? lastUpdateRequest;
+
+  @override
+  Future<Supplier> updateSupplier(
+    String supplierId,
+    UpdateSupplierRequest request,
+  ) async {
+    lastUpdateRequest = request;
+    final index = suppliers.indexWhere((s) => s.id == supplierId);
+    final updated = Supplier(
+      id: supplierId,
+      name: request.name,
+      contactInfo: null,
+      isActive: request.isActive,
+      specialization: request.specialization,
+      address: request.address,
+      tin: request.tin,
+      remarks: request.remarks,
+      contacts: request.contacts,
+    );
+    suppliers[index] = updated;
+    return updated;
   }
 }

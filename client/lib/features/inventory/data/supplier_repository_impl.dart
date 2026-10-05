@@ -36,4 +36,20 @@ class SupplierRepositoryImpl implements SupplierRepository {
       throw mapDioExceptionToFailure(exception);
     }
   }
+
+  @override
+  Future<Supplier> updateSupplier(
+    String supplierId,
+    UpdateSupplierRequest request,
+  ) async {
+    try {
+      final response = await _apiClient.dio.put<Map<String, dynamic>>(
+        '/suppliers/$supplierId',
+        data: request.toJson(),
+      );
+      return Supplier.fromJson(response.data!);
+    } on DioException catch (exception) {
+      throw mapDioExceptionToFailure(exception);
+    }
+  }
 }

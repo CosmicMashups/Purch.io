@@ -75,11 +75,8 @@ public sealed class SupplierAndPurchaseOrderEndpointsTests(PostgresContainerFixt
                 branchId,
                 [new CreatePurchaseOrderLineRequest(item.Id, 50m, 20m)]));
         var purchaseOrder = await createResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
-        var lineId = purchaseOrder!.Lines.Single().Id;
 
-        var response = await client.PostAsJsonAsync(
-            $"/purchase-orders/{purchaseOrder.Id}/receive",
-            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(lineId, 50m)]));
+        var response = await ReceiveAsync(client, purchaseOrder!.Id, supplierId, branchId, item.Id, 50m);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -100,28 +97,24 @@ public sealed class SupplierAndPurchaseOrderEndpointsTests(PostgresContainerFixt
                 branchId,
                 [new CreatePurchaseOrderLineRequest(item.Id, 100m, 25m)]));
         var purchaseOrder = await createResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
-        var lineId = purchaseOrder!.Lines.Single().Id;
+        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder!.Id}/mark-sent", null);
 
-        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder.Id}/mark-sent", null);
-
-        var receiveResponse = await client.PostAsJsonAsync(
-            $"/purchase-orders/{purchaseOrder.Id}/receive",
-            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(lineId, 40m)]));
+        var receiveResponse = await ReceiveAsync(client, purchaseOrder.Id, supplierId, branchId, item.Id, 40m);
 
         Assert.Equal(HttpStatusCode.OK, receiveResponse.StatusCode);
-        var afterFirstReceive = await receiveResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
-        Assert.Equal(PurchaseOrderStatus.PartiallyReceived, afterFirstReceive!.Status);
+        var orders = await client.GetFromJsonAsync<List<PurchaseOrderDto>>("/purchase-orders", JsonOptions);
+        var afterFirstReceive = orders!.Single(o => o.Id == purchaseOrder.Id);
+        Assert.Equal(PurchaseOrderStatus.PartiallyReceived, afterFirstReceive.Status);
         Assert.Equal(40m, afterFirstReceive.Lines.Single().QuantityReceived);
+        _ = Assert.Single(afterFirstReceive.Receipts);
 
         var items = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
         Assert.Equal(40m, items!.Single(i => i.Id == item.Id).StockOnHand);
 
-        var finalReceiveResponse = await client.PostAsJsonAsync(
-            $"/purchase-orders/{purchaseOrder.Id}/receive",
-            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(lineId, 60m)]));
-        var afterFinalReceive = await finalReceiveResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
+        _ = await ReceiveAsync(client, purchaseOrder.Id, supplierId, branchId, item.Id, 60m);
+        var finalOrders = await client.GetFromJsonAsync<List<PurchaseOrderDto>>("/purchase-orders", JsonOptions);
 
-        Assert.Equal(PurchaseOrderStatus.Received, afterFinalReceive!.Status);
+        Assert.Equal(PurchaseOrderStatus.Received, finalOrders!.Single(o => o.Id == purchaseOrder.Id).Status);
         var finalItems = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
         Assert.Equal(100m, finalItems!.Single(i => i.Id == item.Id).StockOnHand);
     }
@@ -142,12 +135,9 @@ public sealed class SupplierAndPurchaseOrderEndpointsTests(PostgresContainerFixt
                 branchId,
                 [new CreatePurchaseOrderLineRequest(item.Id, 10m, 5m)]));
         var purchaseOrder = await createResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
-        var lineId = purchaseOrder!.Lines.Single().Id;
-        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder.Id}/mark-sent", null);
+        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder!.Id}/mark-sent", null);
 
-        var response = await client.PostAsJsonAsync(
-            $"/purchase-orders/{purchaseOrder.Id}/receive",
-            new ReceivePurchaseOrderRequest([new ReceivePurchaseOrderLineRequest(lineId, 15m)]));
+        var response = await ReceiveAsync(client, purchaseOrder.Id, supplierId, branchId, item.Id, 15m);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -177,6 +167,110 @@ public sealed class SupplierAndPurchaseOrderEndpointsTests(PostgresContainerFixt
 
         var reCancelResponse = await client.PostAsync($"/purchase-orders/{purchaseOrder.Id}/cancel", null);
         Assert.Equal(HttpStatusCode.BadRequest, reCancelResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_delivery_recorded_without_a_purchase_order_can_be_linked_later_without_adding_stock_twice()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var supplierId = await CreateSupplierAsync(client);
+        var branchId = await MainBranchIdAsync(client);
+        var item = await CreateItemAsync(client, "Rice", 60m);
+
+        var irrResponse = await ReceiveAsync(client, null, supplierId, branchId, item.Id, 10m);
+        Assert.Equal(HttpStatusCode.OK, irrResponse.StatusCode);
+        var report = await irrResponse.Content.ReadFromJsonAsync<IncomingReceivingDto>(JsonOptions);
+        Assert.Null(report!.PurchaseOrderId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/purchase-orders",
+            new CreatePurchaseOrderRequest(supplierId, branchId, [new CreatePurchaseOrderLineRequest(item.Id, 10m, 5m)]));
+        var purchaseOrder = await createResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
+        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder!.Id}/mark-sent", null);
+
+        var linkResponse = await client.PostAsJsonAsync(
+            $"/incoming-receiving/{report.Id}/link-purchase-order",
+            new LinkIncomingReceivingRequest(purchaseOrder.Id));
+        Assert.Equal(HttpStatusCode.OK, linkResponse.StatusCode);
+
+        var orders = await client.GetFromJsonAsync<List<PurchaseOrderDto>>("/purchase-orders", JsonOptions);
+        Assert.Equal(PurchaseOrderStatus.Received, orders!.Single(o => o.Id == purchaseOrder.Id).Status);
+        var items = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
+        Assert.Equal(10m, items!.Single(i => i.Id == item.Id).StockOnHand);
+    }
+
+    [Fact]
+    public async Task Rejected_lines_add_no_stock_and_do_not_count_toward_the_order()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var supplierId = await CreateSupplierAsync(client);
+        var branchId = await MainBranchIdAsync(client);
+        var item = await CreateItemAsync(client, "Eggs", 8m);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/purchase-orders",
+            new CreatePurchaseOrderRequest(supplierId, branchId, [new CreatePurchaseOrderLineRequest(item.Id, 10m, 5m)]));
+        var purchaseOrder = await createResponse.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions);
+        _ = await client.PostAsync($"/purchase-orders/{purchaseOrder!.Id}/mark-sent", null);
+
+        var response = await ReceiveAsync(
+            client, purchaseOrder.Id, supplierId, branchId, item.Id, 10m, ReceivingCondition.NotGood, ReceivingRemark.Rejected);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var orders = await client.GetFromJsonAsync<List<PurchaseOrderDto>>("/purchase-orders", JsonOptions);
+        Assert.Equal(0m, orders!.Single(o => o.Id == purchaseOrder.Id).Lines.Single().QuantityReceived);
+        var items = await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions);
+        Assert.Equal(0m, items!.Single(i => i.Id == item.Id).StockOnHand);
+    }
+
+    [Fact]
+    public async Task Updating_a_supplier_saves_details_and_contacts()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var supplierId = await CreateSupplierAsync(client);
+
+        var response = await client.PutAsJsonAsync(
+            $"/suppliers/{supplierId}",
+            new UpdateSupplierRequest(
+                "Acme Foods",
+                "Dry goods",
+                "12 Rizal St",
+                null,
+                "Pays in 30 days",
+                [new SupplierContactDto("Ana", ["Call", "Viber"], ["0917 111 2222", "0918 333 4444"], ["ana@acme.test"])]));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var list = await client.GetFromJsonAsync<List<SupplierDto>>("/suppliers", JsonOptions);
+        var saved = list!.Single(s => s.Id == supplierId);
+        Assert.Equal("Dry goods", saved.Specialization);
+        Assert.Null(saved.Tin);
+        var contact = Assert.Single(saved.Contacts);
+        Assert.Equal(2, contact.Numbers.Count);
+        Assert.Contains("Viber", contact.Modes);
+    }
+
+    private static Task<HttpResponseMessage> ReceiveAsync(
+        HttpClient client,
+        Guid? purchaseOrderId,
+        Guid supplierId,
+        Guid branchId,
+        Guid itemId,
+        decimal quantity,
+        ReceivingCondition condition = ReceivingCondition.Good,
+        ReceivingRemark remark = ReceivingRemark.Accepted)
+    {
+        return client.PostAsJsonAsync(
+            "/incoming-receiving",
+            new CreateIncomingReceivingRequest(
+                purchaseOrderId,
+                supplierId,
+                branchId,
+                DateOnly.FromDateTime(DateTime.UtcNow),
+                null,
+                [new CreateIncomingReceivingLineRequest(itemId, quantity, "pc", 5m, condition, remark)]));
     }
 
     private static async Task<ItemDto> CreateItemAsync(HttpClient client, string name, decimal price)

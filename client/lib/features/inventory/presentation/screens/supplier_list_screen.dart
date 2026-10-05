@@ -87,19 +87,36 @@ class SupplierListScreen extends ConsumerWidget {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    subtitle:
-                        supplier.contactInfo != null
-                            ? Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                supplier.contactInfo!,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            )
-                            : null,
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => AddSupplierScreen(supplier: supplier),
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                    subtitle: () {
+                      final lines = [
+                        if (supplier.specialization != null) supplier.specialization!,
+                        if (supplier.address != null) supplier.address!,
+                        if (supplier.contactInfo != null) supplier.contactInfo!,
+                      ];
+                      if (lines.isEmpty) {
+                        return null;
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          lines.join('\n'),
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      );
+                    }(),
                   ),
                 );
               },

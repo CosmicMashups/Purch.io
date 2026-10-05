@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inventoryHubStats } from './hub';
-import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
+import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type IncomingReceiving, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
 
 const ingredient = (quantityOnHand: number, lowStockThreshold: number | null) => ({ quantityOnHand, lowStockThreshold }) as InventoryItem;
 const order = (status: PurchaseOrderStatus) => ({ status }) as PurchaseOrder;
@@ -23,6 +23,12 @@ describe('inventoryHubStats', () => {
     });
     expect(stats.suppliers?.text).toBe('2 suppliers, 1 active');
     expect(stats['purchase-orders']?.text).toBe('1 awaiting delivery, 1 draft');
+  });
+
+  it('counts deliveries not yet linked to an order', () => {
+    const report = (purchaseOrderId: string | null) => ({ purchaseOrderId }) as IncomingReceiving;
+    expect(inventoryHubStats({ incomingReceiving: [report(null), report('po')] })['incoming-receiving']).toEqual({ text: '1 not linked to an order', warn: true });
+    expect(inventoryHubStats({ incomingReceiving: [report('po')] })['incoming-receiving']).toEqual({ text: '1 report' });
   });
 
   it('summarises transfers on the move', () => {

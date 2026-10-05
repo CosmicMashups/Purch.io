@@ -9,6 +9,7 @@ import { LegalPage } from './features/onboarding/LegalPage';
 import { OnboardingPage } from './features/onboarding/OnboardingPage';
 import { HomePage } from './features/dashboard/HomePage';
 import { InventoryHomePage } from './features/inventory/pages/InventoryHomePage';
+import { IncomingReceivingPage } from './features/inventory/pages/IncomingReceivingPage';
 import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
 import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
 import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPage';
@@ -122,6 +123,7 @@ export function App() {
             <Route path="/inventory/ingredients" element={<IngredientsPage />} />
             <Route path="/inventory/suppliers" element={<SuppliersPage />} />
             <Route path="/inventory/purchase-orders" element={<PurchaseOrdersPage />} />
+            <Route path="/inventory/incoming-receiving" element={<IncomingReceivingPage />} />
             <Route path="/inventory/transfers" element={<TransfersPage />} />
             <Route path="/inventory/*" element={<Navigate to="/inventory" replace />} />
           </Route>

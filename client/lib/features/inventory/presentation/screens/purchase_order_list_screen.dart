@@ -7,11 +7,11 @@ import '../../../../core/widgets/error_state_view.dart';
 import '../../domain/purchase_order_models.dart';
 import '../providers/purchase_order_providers.dart';
 import 'create_purchase_order_screen.dart';
-import 'receive_purchase_order_screen.dart';
+import 'incoming_receiving_form_screen.dart';
 import '../../../../core/errors/failure.dart';
 
-/// C5 — the PO list with its status tracker (Draft → Sent → Partially
-/// Received/Received, or Cancelled from Draft/Sent).
+/// C5 — the PO list with its status tracker (Draft → Submitted → Partially
+/// Delivered/Delivered, or Cancelled from Draft/Sent).
 class PurchaseOrderListScreen extends ConsumerWidget {
   const PurchaseOrderListScreen({super.key});
 
@@ -160,7 +160,7 @@ class _PurchaseOrderCard extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 2),
               child: Text(
                 '${line.itemName}: ${line.quantityReceived.toStringAsFixed(0)} / '
-                '${line.quantityOrdered.toStringAsFixed(0)} received',
+                '${line.quantityOrdered.toStringAsFixed(0)} delivered',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -206,7 +206,7 @@ class _PurchaseOrderCard extends ConsumerWidget {
                     ),
                   ),
                   onPressed: isLoading ? null : controller.markSent,
-                  child: const Text('Mark Sent'),
+                  child: const Text('Submit'),
                 ),
               if (purchaseOrder.status == PurchaseOrderStatus.sent ||
                   purchaseOrder.status ==
@@ -225,12 +225,12 @@ class _PurchaseOrderCard extends ConsumerWidget {
                           : () => Navigator.of(context).push<void>(
                             MaterialPageRoute(
                               builder:
-                                  (_) => ReceivePurchaseOrderScreen(
+                                  (_) => IncomingReceivingFormScreen(
                                     purchaseOrder: purchaseOrder,
                                   ),
                             ),
                           ),
-                  child: const Text('Receive'),
+                  child: const Text('Record Delivery'),
                 ),
             ],
           ),

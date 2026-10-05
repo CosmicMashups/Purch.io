@@ -68,9 +68,6 @@ class PurchaseOrderActionController extends _$PurchaseOrderActionController {
   Future<bool> cancel() =>
       _act((repository) => repository.cancel(purchaseOrderId));
 
-  Future<bool> receive(ReceivePurchaseOrderRequest request) =>
-      _act((repository) => repository.receive(purchaseOrderId, request));
-
   Future<bool> _act(
     Future<PurchaseOrder> Function(PurchaseOrderRepository) action,
   ) async {

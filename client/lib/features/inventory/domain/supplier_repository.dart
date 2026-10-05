@@ -5,4 +5,6 @@ abstract class SupplierRepository {
   Future<List<Supplier>> listSuppliers();
 
   Future<Supplier> createSupplier(CreateSupplierRequest request);
+
+  Future<Supplier> updateSupplier(String supplierId, UpdateSupplierRequest request);
 }
