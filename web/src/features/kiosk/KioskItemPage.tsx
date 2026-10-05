@@ -15,6 +15,7 @@ import {
   missingOption,
   noneLabel,
   slotChoices,
+  groupOptions,
   toggleModifier,
   unorderableReason,
   type OptionPicks,
@@ -41,12 +42,12 @@ const variantLabel = (variant: ItemVariant) => Object.values(variant.attributes)
 
 /** What an existing cart line had chosen, in the shape the page edits. Every group the line carries was decided, even to "none". */
 function picksFromLine(line: LocalCartLine, slots: ItemComboComponent[], groups: ModifierGroup[]): Pick<OptionPicks, 'slots' | 'groups'> {
-  const chosenIds = new Set(line.modifierSelections.map((selection) => selection.itemModifierId));
+  const chosenIds = new Set(line.modifierSelections.map((selection) => selection.itemModifierId ?? selection.itemId));
   return {
     slots: Object.fromEntries(
       slots.filter((slot) => !isFixedSlot(slot)).map((slot) => [slot.id, line.comboSelections.filter((selection) => selection.slotId === slot.id).map((selection) => selection.selectedItemId)]),
     ),
-    groups: Object.fromEntries(groups.map((group) => [group.id, group.modifiers.filter((modifier) => chosenIds.has(modifier.id)).map((modifier) => modifier.id)])),
+    groups: Object.fromEntries(groups.map((group) => [group.id, groupOptions(group).filter((option) => chosenIds.has(option.id)).map((option) => option.id)])),
   };
 }
 
@@ -250,7 +251,7 @@ function buildTabs(shape: OptionShape, picks: OptionPicks, items: Item[]): Tab[]
 
   for (const group of shape.groups) {
     const chosen = picks.groups[group.id];
-    const names = (chosen ?? []).map((id) => group.modifiers.find((modifier) => modifier.id === id)?.name ?? '').filter(Boolean);
+    const names = (chosen ?? []).map((id) => groupOptions(group).find((option) => option.id === id)?.name ?? '').filter(Boolean);
     const resolved = group.isRequired ? (chosen ?? []).length > 0 : chosen !== undefined;
     tabs.push({
       id: `group:${group.id}`,
@@ -390,13 +391,13 @@ function GroupPanel({ group, picks, setPicks }: { group: ModifierGroup | undefin
       {!group.isRequired && (
         <OptionCard kind="radio" title={noneLabel(group.name)} selected={choseNone} onSelect={() => setPicks((current) => ({ ...current, groups: { ...current.groups, [group.id]: [] } }))} />
       )}
-      {group.modifiers.map((modifier) => (
+      {groupOptions(group).map((modifier) => (
         <OptionCard
           key={modifier.id}
           kind={group.allowMultipleSelection ? 'checkbox' : 'radio'}
           title={modifier.name}
           price={modifier.priceDelta !== 0 ? `${modifier.priceDelta > 0 ? '+' : '-'}${formatPeso(Math.abs(modifier.priceDelta))}` : undefined}
-          soldOut={Boolean(modifier.isOutOfStock)}
+          soldOut={modifier.soldOut}
           selected={(chosen ?? []).includes(modifier.id)}
           onSelect={() => setPicks((current) => ({ ...current, groups: { ...current.groups, [group.id]: toggleModifier(group, current.groups[group.id] ?? [], modifier.id) } }))}
         />

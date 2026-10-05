@@ -19,6 +19,7 @@ class _AddModifierGroupScreenState
   final _nameController = TextEditingController();
   bool _allowMultipleSelection = false;
   bool _isRequired = false;
+  String? _categoryId;
 
   @override
   void dispose() {
@@ -37,6 +38,7 @@ class _AddModifierGroupScreenState
         name: _nameController.text.trim(),
         allowMultipleSelection: _allowMultipleSelection,
         isRequired: _isRequired,
+        categoryId: _categoryId,
       ),
     );
 
@@ -51,6 +53,7 @@ class _AddModifierGroupScreenState
 
   @override
   Widget build(BuildContext context) {
+    final categories = ref.watch(categoryListProvider).valueOrNull ?? const [];
     final createState = ref.watch(createModifierGroupControllerProvider);
     final isLoading = createState.isLoading;
     final failure =
@@ -147,6 +150,31 @@ class _AddModifierGroupScreenState
                             isLoading
                                 ? null
                                 : (value) => setState(() => _isRequired = value),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      DropdownButtonFormField<String?>(
+                        value: _categoryId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Offer items from a category (optional)',
+                          helperText:
+                              'Every item in it becomes a choice, next to the options you add.',
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('None, only my own options'),
+                          ),
+                          for (final category in categories)
+                            DropdownMenuItem<String?>(
+                              value: category.id,
+                              child: Text(category.name),
+                            ),
+                        ],
+                        onChanged:
+                            isLoading
+                                ? null
+                                : (value) => setState(() => _categoryId = value),
                       ),
                       if (failure != null) ...[
                         const SizedBox(height: AppSpacing.md),

@@ -33,6 +33,17 @@ abstract class CatalogRepository {
 
   Future<ModifierGroup> createModifierGroup(CreateModifierGroupRequest request);
 
+  Future<ModifierGroup> updateModifierGroup(
+    String groupId,
+    UpdateModifierGroupRequest request,
+  );
+
+  Future<ModifierGroup> updateModifierCategoryItem(
+    String groupId,
+    String itemId,
+    UpdateModifierCategoryItemRequest request,
+  );
+
   Future<ModifierGroup> addModifier(
     String groupId,
     CreateItemModifierRequest request,

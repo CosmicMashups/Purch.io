@@ -41,6 +41,8 @@ public sealed class ModifierDtoBuilder(
     ITenantRepository tenantRepository,
     IInventoryItemRepository inventoryItemRepository,
     IItemModifierIngredientRepository ingredientRepository,
+    IModifierGroupRepository modifierGroupRepository,
+    IItemService itemService,
     ICurrentTenantProvider currentTenantProvider)
 {
     public async Task<IReadOnlyList<ModifierGroupDto>> BuildAsync(
@@ -61,7 +63,23 @@ public sealed class ModifierDtoBuilder(
             : (await inventoryItemRepository.ListByIdsAsync([.. ingredients.Select(i => i.InventoryItemId).Distinct()], cancellationToken))
                 .ToDictionary(inventoryItem => inventoryItem.Id);
 
-        return [.. groups.Select(pair => new ModifierGroupDto(
+        var groupList = groups.ToList();
+
+        // Category-linked groups offer the category's items live; load the catalog and the per-group tweaks
+        // once, and only when some group actually links a category.
+        var linkedCategoryIds = groupList.Where(pair => pair.Group.CategoryId is not null).Select(pair => pair.Group.CategoryId!.Value).ToHashSet();
+        var itemsByCategory = linkedCategoryIds.Count == 0
+            ? new Dictionary<Guid, List<ItemDto>>()
+            : (await itemService.ListAsync(cancellationToken))
+                .Where(item => item.IsActive && item.CategoryId is { } categoryId && linkedCategoryIds.Contains(categoryId))
+                .GroupBy(item => item.CategoryId!.Value)
+                .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToList());
+        var overrides = linkedCategoryIds.Count == 0
+            ? []
+            : (await modifierGroupRepository.ListCategoryItemOverridesAsync(tenantId, cancellationToken))
+                .ToDictionary(row => (row.ModifierGroupId, row.ItemId));
+
+        return [.. groupList.Select(pair => new ModifierGroupDto(
             pair.Group.Id,
             pair.Group.Name,
             pair.Group.AllowMultipleSelection,
@@ -74,6 +92,22 @@ public sealed class ModifierDtoBuilder(
                 [.. ingredientsByModifier[modifier.Id].Select(ingredient => new ModifierIngredientDto(
                     ingredient.InventoryItemId,
                     inventoryById.TryGetValue(ingredient.InventoryItemId, out var inventoryItem) ? inventoryItem.Name : "(deleted inventory item)",
-                    ingredient.QuantityPerOrder))]))]))];
+                    ingredient.QuantityPerOrder))]))],
+            pair.Group.CategoryId,
+            pair.Group.CategoryId is { } linkedId
+                ? [.. itemsByCategory.GetValueOrDefault(linkedId, []).Select(item =>
+                {
+                    _ = overrides.TryGetValue((pair.Group.Id, item.Id), out var tweak);
+                    return new ModifierCategoryItemDto(
+                        item.Id,
+                        item.Name,
+                        item.ImageUrl,
+                        item.BasePrice,
+                        tweak?.PriceOverride,
+                        tweak?.PriceOverride ?? item.BasePrice,
+                        tweak?.IsExcluded ?? false,
+                        item.IsOutOfStock);
+                })]
+                : null))];
     }
 }

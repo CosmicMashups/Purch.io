@@ -7,6 +7,8 @@ namespace Purch.Application.Catalog;
 
 public sealed class ModifierGroupService(
     IModifierGroupRepository modifierGroupRepository,
+    ICategoryRepository categoryRepository,
+    IItemRepository itemRepository,
     IItemModifierIngredientRepository ingredientRepository,
     IInventoryItemRepository inventoryItemRepository,
     ModifierDtoBuilder dtoBuilder,
@@ -26,12 +28,15 @@ public sealed class ModifierGroupService(
             throw new ValidationException(nameof(request.Name), "Modifier group name is required.");
         }
 
+        await ValidateCategoryAsync(request.CategoryId, cancellationToken);
+
         var group = new ModifierGroup
         {
             TenantId = CurrentTenantId,
             Name = request.Name.Trim(),
             AllowMultipleSelection = request.AllowMultipleSelection,
             IsRequired = request.IsRequired,
+            CategoryId = request.CategoryId,
         };
 
         modifierGroupRepository.Add(group);
@@ -39,6 +44,95 @@ public sealed class ModifierGroupService(
 
         IReadOnlyList<ItemModifier> noModifiers = [];
         return (await dtoBuilder.BuildAsync([(group, noModifiers)], cancellationToken))[0];
+    }
+
+    /// <summary>Renames a group, changes its rules, or links/unlinks its category. Changing the category drops
+    /// the old category's per-item tweaks, since they belonged to items that are no longer offered.</summary>
+    public async Task<ModifierGroupDto> UpdateAsync(Guid groupId, UpdateModifierGroupRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new ValidationException(nameof(request.Name), "Modifier group name is required.");
+        }
+
+        var group = await modifierGroupRepository.GetByIdAsync(groupId, cancellationToken)
+            ?? throw new NotFoundException("Modifier group", groupId);
+
+        await ValidateCategoryAsync(request.CategoryId, cancellationToken);
+
+        if (group.CategoryId != request.CategoryId)
+        {
+            modifierGroupRepository.RemoveCategoryItemOverrides(
+                await modifierGroupRepository.ListCategoryItemOverridesForGroupAsync(groupId, cancellationToken));
+        }
+
+        group.Name = request.Name.Trim();
+        group.AllowMultipleSelection = request.AllowMultipleSelection;
+        group.IsRequired = request.IsRequired;
+        group.CategoryId = request.CategoryId;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await RefreshedGroupAsync(groupId, cancellationToken);
+    }
+
+    /// <summary>Sets a group's price override / exclusion for one item of its category; the defaults (no override, not excluded) remove the row.</summary>
+    public async Task<ModifierGroupDto> UpdateCategoryItemAsync(
+        Guid groupId,
+        Guid itemId,
+        UpdateModifierCategoryItemRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var group = await modifierGroupRepository.GetByIdAsync(groupId, cancellationToken)
+            ?? throw new NotFoundException("Modifier group", groupId);
+
+        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
+            ?? throw new NotFoundException("Item", itemId);
+
+        if (group.CategoryId is null || item.CategoryId != group.CategoryId)
+        {
+            throw new ValidationException(nameof(itemId), "This item is not in the category linked to the group.");
+        }
+
+        if (request.PriceOverride is < 0)
+        {
+            throw new ValidationException(nameof(request.PriceOverride), "Price cannot be negative.");
+        }
+
+        var row = await modifierGroupRepository.GetCategoryItemOverrideAsync(groupId, itemId, cancellationToken);
+        if (request.PriceOverride is null && !request.IsExcluded)
+        {
+            if (row is not null)
+            {
+                modifierGroupRepository.RemoveCategoryItemOverrides([row]);
+            }
+        }
+        else if (row is null)
+        {
+            modifierGroupRepository.AddCategoryItemOverride(new ModifierGroupCategoryItem
+            {
+                TenantId = CurrentTenantId,
+                ModifierGroupId = groupId,
+                ItemId = itemId,
+                PriceOverride = request.PriceOverride,
+                IsExcluded = request.IsExcluded,
+            });
+        }
+        else
+        {
+            row.PriceOverride = request.PriceOverride;
+            row.IsExcluded = request.IsExcluded;
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await RefreshedGroupAsync(groupId, cancellationToken);
+    }
+
+    private async Task ValidateCategoryAsync(Guid? categoryId, CancellationToken cancellationToken)
+    {
+        if (categoryId is { } id && await categoryRepository.GetByIdAsync(id, cancellationToken) is null)
+        {
+            throw new NotFoundException("Category", id);
+        }
     }
 
     public async Task<ModifierGroupDto> AddModifierAsync(

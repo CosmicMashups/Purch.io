@@ -59,6 +59,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<ItemModifierGroup> ItemModifierGroups => Set<ItemModifierGroup>();
 
+    public DbSet<ModifierGroupCategoryItem> ModifierGroupCategoryItems => Set<ModifierGroupCategoryItem>();
+
     public DbSet<Department> Departments => Set<Department>();
 
     public DbSet<CustomerCreditLedger> CustomerCreditLedgers => Set<CustomerCreditLedger>();

@@ -6,6 +6,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../providers/catalog_providers.dart';
 import 'add_modifier_group_screen.dart';
 import 'add_modifier_screen.dart';
+import 'modifier_group_category_screen.dart';
 import '../../../../core/errors/failure.dart';
 
 /// B5's modifier groups half (categories are on their own screen).
@@ -116,6 +117,7 @@ class ModifierGroupListScreen extends ConsumerWidget {
                               ? 'Multiple choices allowed'
                               : 'Single choice only',
                           if (group.isRequired) 'Required',
+                          if (group.categoryId != null) 'Offers a category',
                         ].join(' · '),
                         style: TextStyle(
                           fontSize: 13,
@@ -166,6 +168,67 @@ class ModifierGroupListScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
+                      for (final item in group.categoryItems)
+                        ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 2,
+                          ),
+                          title: Text(
+                            item.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  item.isExcluded
+                                      ? AppColors.textMuted
+                                      : AppColors.textPrimary,
+                              decoration:
+                                  item.isExcluded
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                            ),
+                          ),
+                          subtitle: Text(
+                            item.isExcluded
+                                ? 'Hidden from this group'
+                                : 'From the category'
+                                    '${item.priceOverride != null ? ' · set price' : ''}',
+                          ),
+                          trailing: Text(
+                            '+${formatCurrency(item.price)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdBorder,
+                            ),
+                          ),
+                          onPressed:
+                              () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => ModifierGroupCategoryScreen(
+                                        groupId: group.id,
+                                      ),
+                                ),
+                              ),
+                          icon: const Icon(Icons.category_outlined, size: 18),
+                          label: const Text('Category & prices'),
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,

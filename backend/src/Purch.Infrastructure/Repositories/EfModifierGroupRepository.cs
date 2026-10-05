@@ -68,6 +68,44 @@ public sealed class EfModifierGroupRepository(PurchDbContext dbContext) : IModif
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ModifierGroupCategoryItem>> ListCategoryItemOverridesAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ModifierGroupCategoryItems
+            .AsNoTracking()
+            .Where(row => row.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<ModifierGroupCategoryItem?> GetCategoryItemOverrideAsync(
+        Guid groupId,
+        Guid itemId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.ModifierGroupCategoryItems
+            .FirstOrDefaultAsync(row => row.ModifierGroupId == groupId && row.ItemId == itemId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ModifierGroupCategoryItem>> ListCategoryItemOverridesForGroupAsync(
+        Guid groupId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ModifierGroupCategoryItems
+            .Where(row => row.ModifierGroupId == groupId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public void AddCategoryItemOverride(ModifierGroupCategoryItem row)
+    {
+        _ = dbContext.ModifierGroupCategoryItems.Add(row);
+    }
+
+    public void RemoveCategoryItemOverrides(IEnumerable<ModifierGroupCategoryItem> rows)
+    {
+        dbContext.ModifierGroupCategoryItems.RemoveRange(rows);
+    }
+
     public void Add(ModifierGroup group)
     {
         _ = dbContext.ModifierGroups.Add(group);

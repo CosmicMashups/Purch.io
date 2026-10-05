@@ -6,6 +6,14 @@ public interface IModifierGroupService
 
     Task<ModifierGroupDto> CreateAsync(CreateModifierGroupRequest request, CancellationToken cancellationToken = default);
 
+    Task<ModifierGroupDto> UpdateAsync(Guid groupId, UpdateModifierGroupRequest request, CancellationToken cancellationToken = default);
+
+    Task<ModifierGroupDto> UpdateCategoryItemAsync(
+        Guid groupId,
+        Guid itemId,
+        UpdateModifierCategoryItemRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<ModifierGroupDto> AddModifierAsync(
         Guid groupId,
         CreateItemModifierRequest request,

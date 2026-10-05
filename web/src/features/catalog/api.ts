@@ -8,6 +8,8 @@ import type {
   CreateItemBatchRequest,
   CreateItemComboComponentRequest,
   CreateItemModifierRequest,
+  UpdateModifierCategoryItemRequest,
+  UpdateModifierGroupRequest,
   CreateItemRequest,
   CreateItemVariantRequest,
   CreateModifierGroupRequest,
@@ -45,6 +47,10 @@ export const catalogApi = {
   listModifierGroups: () => apiClient.get<ModifierGroup[]>('/modifier-groups').then((r) => r.data),
   createModifierGroup: (body: CreateModifierGroupRequest) =>
     apiClient.post<ModifierGroup>('/modifier-groups', body).then((r) => r.data),
+  updateModifierGroup: (groupId: string, body: UpdateModifierGroupRequest) =>
+    apiClient.put<ModifierGroup>(`/modifier-groups/${groupId}`, body).then((r) => r.data),
+  updateModifierCategoryItem: (groupId: string, itemId: string, body: UpdateModifierCategoryItemRequest) =>
+    apiClient.put<ModifierGroup>(`/modifier-groups/${groupId}/category-items/${itemId}`, body).then((r) => r.data),
   addModifier: (groupId: string, body: CreateItemModifierRequest) =>
     apiClient.post<ModifierGroup>(`/modifier-groups/${groupId}/modifiers`, body).then((r) => r.data),
 

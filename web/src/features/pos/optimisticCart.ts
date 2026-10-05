@@ -1,6 +1,7 @@
 import { PricingType, type Item, type ItemVariant, type ModifierGroup } from '../catalog/types';
 import { SENIOR_PWD_DISCOUNT_RATE } from './pricing/pricingEngine';
 import type { AddPreview, PendingRow } from './addQueue';
+import { groupOptions } from './options';
 import type { AddLineRequest, Transaction } from './types';
 
 /**
@@ -32,14 +33,14 @@ export function previewFor(
     details.push(...Object.values(variant.attributes));
   }
 
-  const modifierIds = request.selectedModifierIds ?? [];
-  if (modifierIds.length > 0) {
-    const known = new Map((catalog.modifierGroups ?? []).flatMap((g) => g.modifiers).map((m) => [m.id, m] as const));
-    for (const id of modifierIds) {
-      const modifier = known.get(id);
-      if (!modifier) return undefined;
-      unitPrice += modifier.priceDelta;
-      details.push(modifier.name);
+  const pickedIds = [...(request.selectedModifierIds ?? []), ...(request.selectedCategoryItemIds ?? [])];
+  if (pickedIds.length > 0) {
+    const known = new Map((catalog.modifierGroups ?? []).flatMap((g) => groupOptions(g)).map((o) => [o.id, o] as const));
+    for (const id of pickedIds) {
+      const option = known.get(id);
+      if (!option) return undefined;
+      unitPrice += option.priceDelta;
+      details.push(option.name);
     }
   }
 

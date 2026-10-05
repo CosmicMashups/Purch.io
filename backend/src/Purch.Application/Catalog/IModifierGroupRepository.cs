@@ -18,6 +18,26 @@ public interface IModifierGroupRepository
         Guid tenantId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Read-only: every per-item tweak for category-linked groups in the tenant.</summary>
+    Task<IReadOnlyList<ModifierGroupCategoryItem>> ListCategoryItemOverridesAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Tracked, so the tweak can be changed in place.</summary>
+    Task<ModifierGroupCategoryItem?> GetCategoryItemOverrideAsync(
+        Guid groupId,
+        Guid itemId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Tracked: one group's tweaks, for removing them when its category changes.</summary>
+    Task<IReadOnlyList<ModifierGroupCategoryItem>> ListCategoryItemOverridesForGroupAsync(
+        Guid groupId,
+        CancellationToken cancellationToken = default);
+
+    void AddCategoryItemOverride(ModifierGroupCategoryItem row);
+
+    void RemoveCategoryItemOverrides(IEnumerable<ModifierGroupCategoryItem> rows);
+
     void Add(ModifierGroup group);
 
     void AddModifier(ItemModifier modifier);

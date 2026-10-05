@@ -49,6 +49,34 @@ export interface ModifierGroup {
   allowMultipleSelection: boolean;
   isRequired: boolean;
   modifiers: Modifier[];
+  /** When set, every active item of this category is offered in the group, next to its own modifiers. */
+  categoryId?: string | null;
+  categoryItems?: ModifierCategoryItem[] | null;
+}
+
+/** An item offered through a category-linked group. `price` is what the customer pays (the group's override, else the item's own). */
+export interface ModifierCategoryItem {
+  itemId: string;
+  name: string;
+  imageUrl: string | null;
+  basePrice: number;
+  priceOverride: number | null;
+  price: number;
+  /** Hidden from this group. Listed so an admin can bring it back; ordering screens skip it. */
+  isExcluded: boolean;
+  isOutOfStock: boolean;
+}
+
+export interface UpdateModifierGroupRequest {
+  name: string;
+  allowMultipleSelection: boolean;
+  isRequired: boolean;
+  categoryId: string | null;
+}
+
+export interface UpdateModifierCategoryItemRequest {
+  priceOverride: number | null;
+  isExcluded: boolean;
 }
 
 export interface Modifier {
@@ -164,6 +192,7 @@ export interface UpdateItemRequest {
   imageUrl: string | null;
   isActive: boolean;
   departmentId?: string | null;
+  sortOrder?: number;
 }
 
 export interface CreateModifierGroupRequest {

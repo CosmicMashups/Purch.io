@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useAuthStore } from '../../lib/authStore';
 import { PricingType, type Item, type ItemComboComponent, type ItemVariant, type ModifierGroup } from '../catalog/types';
+import { groupOptions } from '../pos/options';
 import { priceCart, type PricingRules } from '../pos/pricing/pricingEngine';
 import type { AddLineRequest, ComboSelection, ModifierSelection, Transaction, TransactionLine } from '../pos/types';
 
@@ -68,7 +69,7 @@ export function resolveAdd(item: Item, request: AddLineRequest, catalog: Resolve
       const entry = bySlot.get(selection.slotId)?.choiceUpcharges?.find((candidate) => candidate.itemId === selection.selectedItemId);
       return sum + (entry?.amount ?? 0);
     }, 0);
-    const { modifierSelections, modifierTotal } = resolveModifiers(request.selectedModifierIds, catalog.modifierGroups);
+    const { modifierSelections, modifierTotal } = resolveModifiers([...(request.selectedModifierIds ?? []), ...(request.selectedCategoryItemIds ?? [])], catalog.modifierGroups);
     return {
       itemId: item.id,
       itemName: item.name,
@@ -91,7 +92,7 @@ export function resolveAdd(item: Item, request: AddLineRequest, catalog: Resolve
     }
   }
 
-  const { modifierSelections, modifierTotal } = resolveModifiers(request.selectedModifierIds, catalog.modifierGroups);
+  const { modifierSelections, modifierTotal } = resolveModifiers([...(request.selectedModifierIds ?? []), ...(request.selectedCategoryItemIds ?? [])], catalog.modifierGroups);
   unitPrice = round2(unitPrice + modifierTotal);
 
   return {
@@ -106,15 +107,23 @@ export function resolveAdd(item: Item, request: AddLineRequest, catalog: Resolve
   };
 }
 
+const selectionId = (m: ModifierSelection): string => (m.itemModifierId ?? m.itemId) as string;
+
 function resolveModifiers(modifierIds: string[] | undefined, groups: ModifierGroup[] | undefined): { modifierSelections: ModifierSelection[]; modifierTotal: number } {
-  const known = new Map((groups ?? []).flatMap((g) => g.modifiers.map((m) => [m.id, { modifier: m, group: g }] as const)));
+  const known = new Map((groups ?? []).flatMap((g) => groupOptions(g).map((o) => [o.id, { option: o, group: g }] as const)));
   const modifierSelections: ModifierSelection[] = [];
   let modifierTotal = 0;
   for (const id of modifierIds ?? []) {
     const found = known.get(id);
     if (!found) continue;
-    modifierSelections.push({ itemModifierId: id, modifierName: found.modifier.name, modifierGroupName: found.group.name, priceDelta: found.modifier.priceDelta });
-    modifierTotal += found.modifier.priceDelta;
+    modifierSelections.push({
+      itemModifierId: found.option.kind === 'modifier' ? id : null,
+      ...(found.option.kind === 'item' ? { itemId: id } : {}),
+      modifierName: found.option.name,
+      modifierGroupName: found.group.name,
+      priceDelta: found.option.priceDelta,
+    });
+    modifierTotal += found.option.priceDelta;
   }
   return { modifierSelections, modifierTotal };
 }
@@ -126,7 +135,7 @@ function resolveModifiers(modifierIds: string[] | undefined, groups: ModifierGro
  */
 export function mergeKey(line: Pick<LocalCartLine, 'itemId' | 'itemVariantId' | 'modifierSelections' | 'comboSelections'>): string | null {
   if (line.comboSelections.length > 0) return null;
-  const modifiers = line.modifierSelections.map((m) => m.itemModifierId).sort().join(',');
+  const modifiers = line.modifierSelections.map(selectionId).sort().join(',');
   return `${line.itemId}:${line.itemVariantId ?? ''}:${modifiers}`;
 }
 

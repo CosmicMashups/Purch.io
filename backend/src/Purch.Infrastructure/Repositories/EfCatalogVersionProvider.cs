@@ -58,6 +58,10 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
             await StampAsync(dbContext.ItemModifiers, cancellationToken),
             await StampAsync(dbContext.ItemModifierIngredients, cancellationToken),
             await StampAsync(dbContext.InventoryItems, cancellationToken),
+            // Category-linked groups list the category's items live, with their prices and stock.
+            await StampAsync(dbContext.ModifierGroupCategoryItems, cancellationToken),
+            await StampAsync(dbContext.Items, cancellationToken),
+            await StampAsync(dbContext.ItemRecipeLines, cancellationToken),
         };
         return Hash(parts);
     }

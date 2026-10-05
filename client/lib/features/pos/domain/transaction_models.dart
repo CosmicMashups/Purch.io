@@ -262,7 +262,8 @@ class TransactionLine {
 /// pick on a line for cart and receipt display.
 class TransactionLineModifierSelection {
   const TransactionLineModifierSelection({
-    required this.itemModifierId,
+    this.itemModifierId,
+    this.itemId,
     required this.modifierName,
     required this.modifierGroupName,
     required this.priceDelta,
@@ -270,17 +271,36 @@ class TransactionLineModifierSelection {
 
   factory TransactionLineModifierSelection.fromJson(Map<String, dynamic> json) {
     return TransactionLineModifierSelection(
-      itemModifierId: json['itemModifierId'] as String,
+      itemModifierId: json['itemModifierId'] as String?,
+      itemId: json['itemId'] as String?,
       modifierName: json['modifierName'] as String,
       modifierGroupName: json['modifierGroupName'] as String,
       priceDelta: (json['priceDelta'] as num).toDouble(),
     );
   }
 
-  final String itemModifierId;
+  /// Set for an ordinary modifier; null for a category item, which has [itemId] instead.
+  final String? itemModifierId;
+
+  /// The category item chosen through a category-linked modifier group.
+  final String? itemId;
   final String modifierName;
   final String modifierGroupName;
   final double priceDelta;
+}
+
+/// Splits a line's resolved picks back into the two id lists the server takes.
+extension ModifierSelectionIds on List<TransactionLineModifierSelection> {
+  /// Null when there are none, so the request leaves the field out.
+  List<String>? get modifierIdsOrNull {
+    final ids = [for (final m in this) m.itemModifierId].nonNulls.toList();
+    return ids.isEmpty ? null : ids;
+  }
+
+  List<String>? get categoryItemIdsOrNull {
+    final ids = [for (final m in this) m.itemId].nonNulls.toList();
+    return ids.isEmpty ? null : ids;
+  }
 }
 
 /// Mirrors Purch.Application.Pos.ComboSelectionDto — a resolved slot/item pick
@@ -317,6 +337,7 @@ class AddTransactionLineRequest {
     required this.quantity,
     this.comboSelections,
     this.selectedModifierIds,
+    this.selectedCategoryItemIds,
   });
 
   factory AddTransactionLineRequest.fromJson(Map<String, dynamic> json) {
@@ -333,6 +354,10 @@ class AddTransactionLineRequest {
           (json['selectedModifierIds'] as List<dynamic>?)
               ?.cast<String>()
               .toList(),
+      selectedCategoryItemIds:
+          (json['selectedCategoryItemIds'] as List<dynamic>?)
+              ?.cast<String>()
+              .toList(),
     );
   }
 
@@ -342,12 +367,16 @@ class AddTransactionLineRequest {
   final List<ComboSelectionRequest>? comboSelections;
   final List<String>? selectedModifierIds;
 
+  /// Items chosen through a category-linked modifier group.
+  final List<String>? selectedCategoryItemIds;
+
   Map<String, dynamic> toJson() => {
     'itemId': itemId,
     'itemVariantId': itemVariantId,
     'quantity': quantity,
     'comboSelections': comboSelections?.map((s) => s.toJson()).toList(),
     'selectedModifierIds': selectedModifierIds,
+    'selectedCategoryItemIds': selectedCategoryItemIds,
   };
 }
 

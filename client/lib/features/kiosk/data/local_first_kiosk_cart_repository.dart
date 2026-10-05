@@ -223,6 +223,7 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
     final modifiers = await _resolveModifiers(
       item,
       request.selectedModifierIds,
+      request.selectedCategoryItemIds,
     );
     unitPrice += modifiers.fold<double>(0, (sum, m) => sum + m.priceDelta);
 
@@ -232,10 +233,8 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
         itemId: request.itemId,
         itemVariantId: request.itemVariantId,
         quantity: request.quantity,
-        selectedModifierIds:
-            modifiers.isEmpty
-                ? null
-                : [for (final m in modifiers) m.itemModifierId],
+        selectedModifierIds: modifiers.modifierIdsOrNull,
+        selectedCategoryItemIds: modifiers.categoryItemIdsOrNull,
       ),
       itemName: item.name,
       unitPrice: unitPrice,
@@ -294,6 +293,7 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
     final modifiers = await _resolveModifiers(
       item,
       request.selectedModifierIds,
+      request.selectedCategoryItemIds,
     );
     final unitPrice =
         item.basePrice +
@@ -309,10 +309,8 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
         itemId: request.itemId,
         quantity: request.quantity,
         comboSelections: request.comboSelections,
-        selectedModifierIds:
-            modifiers.isEmpty
-                ? null
-                : [for (final m in modifiers) m.itemModifierId],
+        selectedModifierIds: modifiers.modifierIdsOrNull,
+        selectedCategoryItemIds: modifiers.categoryItemIdsOrNull,
       ),
       itemName: item.name,
       unitPrice: unitPrice,
@@ -323,9 +321,13 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
 
   Future<List<TransactionLineModifierSelection>> _resolveModifiers(
     Item item,
-    List<String>? selectedIds,
+    List<String>? selectedModifierIds,
+    List<String>? selectedCategoryItemIds,
   ) async {
-    final selected = selectedIds ?? const <String>[];
+    final selected = [
+      ...?selectedModifierIds,
+      ...?selectedCategoryItemIds,
+    ];
     final groups = await _modifierGroupsFor(item.id);
 
     if (groups.isEmpty) {
@@ -340,7 +342,7 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
 
     final recognized = {
       for (final group in groups)
-        for (final m in group.modifiers) m.id,
+        for (final m in group.options) m.id,
     };
     if (selected.any((id) => !recognized.contains(id))) {
       throw _invalid(
@@ -352,7 +354,7 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
     final result = <TransactionLineModifierSelection>[];
     for (final group in groups) {
       final picked =
-          group.modifiers.where((m) => selected.contains(m.id)).toList();
+          group.options.where((m) => selected.contains(m.id)).toList();
       if (group.isRequired && picked.isEmpty) {
         throw _invalid(
           'Choose an option for "${group.name}".',
@@ -368,7 +370,8 @@ class LocalFirstKioskCartRepository implements KioskCartRepository {
       for (final m in picked) {
         result.add(
           TransactionLineModifierSelection(
-            itemModifierId: m.id,
+            itemModifierId: m.isCategoryItem ? null : m.id,
+            itemId: m.isCategoryItem ? m.id : null,
             modifierName: m.name,
             modifierGroupName: group.name,
             priceDelta: m.priceDelta,

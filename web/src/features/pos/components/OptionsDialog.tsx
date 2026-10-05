@@ -7,7 +7,7 @@ import { userMessage } from '../../../lib/apiError';
 import { useComboComponents, useItemModifierGroups, useVariants } from '../../catalog/queries';
 import { PricingType, type Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
-import { buildAddLine, isFixedSlot, missingOption, slotChoices, toggleModifier, unorderableReason, type OptionPicks, type OptionShape } from '../options';
+import { buildAddLine, groupOptions, isFixedSlot, missingOption, slotChoices, toggleModifier, unorderableReason, type OptionPicks, type OptionShape } from '../options';
 import type { AddLineRequest } from '../types';
 
 interface OptionsDialogProps {
@@ -135,9 +135,9 @@ export function OptionsDialog({ item, items, busy, onAdd, onClose }: OptionsDial
                 {group.name}
                 <span className="ml-2 text-sm font-normal text-ink-soft">{group.isRequired ? 'Required' : 'Optional'}</span>
               </legend>
-              {group.modifiers.map((modifier) => {
+              {groupOptions(group).map((modifier) => {
                 const selected = (picks.groups[group.id] ?? []).includes(modifier.id);
-                const soldOut = Boolean(modifier.isOutOfStock);
+                const soldOut = modifier.soldOut;
                 return (
                   <label
                     key={modifier.id}

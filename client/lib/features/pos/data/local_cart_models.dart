@@ -36,6 +36,10 @@ class LocalCartLine {
             (request['selectedModifierIds'] as List<dynamic>?)
                 ?.cast<String>()
                 .toList(),
+        selectedCategoryItemIds:
+            (request['selectedCategoryItemIds'] as List<dynamic>?)
+                ?.cast<String>()
+                .toList(),
       ),
       itemName: json['itemName'] as String,
       unitPrice: (json['unitPrice'] as num).toDouble(),
@@ -73,6 +77,7 @@ class LocalCartLine {
 
   bool get isMergeable =>
       (request.selectedModifierIds?.isEmpty ?? true) &&
+      (request.selectedCategoryItemIds?.isEmpty ?? true) &&
       (request.comboSelections?.isEmpty ?? true);
 
   LocalCartLine withQuantity(double quantity) => LocalCartLine(
@@ -83,6 +88,7 @@ class LocalCartLine {
       quantity: quantity,
       comboSelections: request.comboSelections,
       selectedModifierIds: request.selectedModifierIds,
+      selectedCategoryItemIds: request.selectedCategoryItemIds,
     ),
     itemName: itemName,
     unitPrice: unitPrice,
@@ -101,6 +107,7 @@ class LocalCartLine {
       for (final m in modifiers)
         {
           'itemModifierId': m.itemModifierId,
+          'itemId': m.itemId,
           'modifierName': m.modifierName,
           'modifierGroupName': m.modifierGroupName,
           'priceDelta': m.priceDelta,

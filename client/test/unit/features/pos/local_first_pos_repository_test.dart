@@ -363,6 +363,107 @@ void main() {
     },
   );
 
+  group('category-linked modifier groups', () {
+    const sides = ModifierGroup(
+      id: 'g-sides',
+      name: 'Add fries & sides',
+      allowMultipleSelection: true,
+      isRequired: false,
+      modifiers: [
+        ItemModifierOption(id: 'm-ketchup', name: 'Extra ketchup', priceDelta: 5),
+      ],
+      categoryId: 'cat-sides',
+      categoryItems: [
+        ModifierCategoryItem(
+          itemId: 'fries',
+          name: 'Large Fries',
+          basePrice: 80,
+          price: 60,
+          priceOverride: 60,
+        ),
+        ModifierCategoryItem(
+          itemId: 'gravy',
+          name: 'Gravy',
+          basePrice: 15,
+          price: 15,
+          isExcluded: true,
+        ),
+      ],
+    );
+
+    LocalFirstPosRepository buildWithSides() => LocalFirstPosRepository(
+      lastIssuedReceiptNumber: lastIssued,
+      recordReceiptNumber: record,
+      remote: remote,
+      catalog: catalog,
+      loadItems: () async => items,
+      loadRules: () async => rules,
+      store: store,
+      identity: () async => null,
+      modifierGroupsFor: (_) async => const [sides],
+    );
+
+    test('a picked category item is priced at the group price, next to a modifier', () async {
+      final cart = await buildWithSides().addLine(
+        const AddTransactionLineRequest(
+          itemId: 'coffee',
+          quantity: 1,
+          selectedModifierIds: ['m-ketchup'],
+          selectedCategoryItemIds: ['fries'],
+        ),
+      );
+      final line = cart.lines.single;
+      expect(line.unitPrice, 100 + 5 + 60);
+      expect(line.modifierSelections.map((m) => m.modifierName), ['Extra ketchup', 'Large Fries']);
+      expect(line.modifierSelections.last.itemId, 'fries');
+      expect(line.modifierSelections.last.itemModifierId, isNull);
+    });
+
+    test('a hidden category item cannot be picked', () async {
+      await expectLater(
+        buildWithSides().addLine(
+          const AddTransactionLineRequest(
+            itemId: 'coffee',
+            quantity: 1,
+            selectedCategoryItemIds: ['gravy'],
+          ),
+        ),
+        throwsA(isA<ValidationFailure>()),
+      );
+    });
+
+    test('the request replayed at checkout carries the category items separately', () async {
+      final repo = buildWithSides();
+      await repo.addLine(
+        const AddTransactionLineRequest(
+          itemId: 'coffee',
+          quantity: 1,
+          selectedModifierIds: ['m-ketchup'],
+          selectedCategoryItemIds: ['fries'],
+        ),
+      );
+      final json = (await repo.getOrCreateOpenCart()).lines.single;
+      expect(json.modifierSelections, hasLength(2));
+      final stored = AddTransactionLineRequest.fromJson(
+        const AddTransactionLineRequest(
+          itemId: 'coffee',
+          quantity: 1,
+          selectedModifierIds: ['m-ketchup'],
+          selectedCategoryItemIds: ['fries'],
+        ).toJson(),
+      );
+      expect(stored.selectedModifierIds, ['m-ketchup']);
+      expect(stored.selectedCategoryItemIds, ['fries']);
+    });
+
+    test('lines with different category items do not merge', () async {
+      final repo = buildWithSides();
+      await repo.addLine(const AddTransactionLineRequest(itemId: 'coffee', quantity: 1, selectedCategoryItemIds: ['fries']));
+      final cart = await repo.addLine(const AddTransactionLineRequest(itemId: 'coffee', quantity: 1));
+      expect(cart.lines, hasLength(2));
+    });
+  });
+
   test(
     'overlapping adds (a double scan) are all kept, none overwrites another',
     () async {

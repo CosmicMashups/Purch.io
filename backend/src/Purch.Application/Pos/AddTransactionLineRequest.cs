@@ -5,7 +5,8 @@ public sealed record AddTransactionLineRequest(
     Guid? ItemVariantId,
     decimal Quantity,
     IReadOnlyList<ComboSelectionRequest>? ComboSelections = null,
-    IReadOnlyList<Guid>? SelectedModifierIds = null);
+    IReadOnlyList<Guid>? SelectedModifierIds = null,
+    IReadOnlyList<Guid>? SelectedCategoryItemIds = null);
 
 /// <summary>Free on an ordinary cart. On a cart already sent to the kitchen (a claimed kiosk order) whose
 /// item hasn't been prepared yet, a Cashier/Warehouse staff member needs an Admin/Manager's

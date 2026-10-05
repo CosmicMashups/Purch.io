@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, ItemComboComponent, ItemVariant, ModifierGroup } from '../catalog/types';
-import { buildAddLine, missingOption, slotChoices, toggleModifier, unorderableReason, type OptionPicks, type OptionShape } from './options';
+import { buildAddLine, groupOptions, missingOption, slotChoices, toggleModifier, unorderableReason, type OptionPicks, type OptionShape } from './options';
 
 const variant = { id: 'v1', itemId: 'i', attributes: { Size: 'L' }, sku: null, priceOverride: null, imageUrl: null } as ItemVariant;
 const slot = { id: 's1', componentCategoryId: 'c', slotLabel: 'Drink', quantity: 2, substitutionUpchargeAmount: 0 } as ItemComboComponent;
@@ -133,5 +133,47 @@ describe('buildAddLine', () => {
       ],
       selectedModifierIds: ['m1', 'm2', 'm3'],
     });
+  });
+});
+
+describe('category-linked groups', () => {
+  const sides: ModifierGroup = {
+    id: 'g-sides',
+    name: 'Add fries & sides',
+    allowMultipleSelection: true,
+    isRequired: false,
+    modifiers: [{ id: 'ketchup', name: 'Extra ketchup', priceDelta: 5 }],
+    categoryId: 'cat-sides',
+    categoryItems: [
+      { itemId: 'fries', name: 'Large Fries', imageUrl: null, basePrice: 80, priceOverride: 60, price: 60, isExcluded: false, isOutOfStock: false },
+      { itemId: 'rings', name: 'Onion Rings', imageUrl: null, basePrice: 70, priceOverride: null, price: 70, isExcluded: false, isOutOfStock: true },
+      { itemId: 'gravy', name: 'Gravy', imageUrl: null, basePrice: 15, priceOverride: null, price: 15, isExcluded: true, isOutOfStock: false },
+    ],
+  };
+  const shape: OptionShape = { ...empty, groups: [sides] };
+
+  it('offers the modifiers then the visible category items at the group price', () => {
+    expect(groupOptions(sides).map((o) => [o.name, o.priceDelta, o.soldOut, o.kind])).toEqual([
+      ['Extra ketchup', 5, false, 'modifier'],
+      ['Large Fries', 60, false, 'item'],
+      ['Onion Rings', 70, true, 'item'],
+    ]);
+  });
+
+  it('will not pick a sold-out category item', () => {
+    expect(toggleModifier(sides, [], 'rings')).toEqual([]);
+    expect(toggleModifier(sides, [], 'fries')).toEqual(['fries']);
+  });
+
+  it('sends modifiers and category items in their own lists', () => {
+    const request = buildAddLine('burger', shape, picks({ groups: { 'g-sides': ['ketchup', 'fries'] } }));
+    expect(request.selectedModifierIds).toEqual(['ketchup']);
+    expect(request.selectedCategoryItemIds).toEqual(['fries']);
+  });
+
+  it('leaves both lists out when nothing was picked', () => {
+    const request = buildAddLine('burger', shape, picks({ groups: { 'g-sides': [] } }));
+    expect(request.selectedModifierIds).toBeUndefined();
+    expect(request.selectedCategoryItemIds).toBeUndefined();
   });
 });

@@ -53,9 +53,11 @@ public sealed record ComboSelectionDto(
 
 /// <summary>Mirrors Purch.Domain.Entities.TransactionLineModifierSelection, resolved
 /// to readable modifier/group names and the price delta actually charged for
-/// receipt display.</summary>
+/// receipt display. A category item chosen through a category-linked group carries
+/// ItemId instead of ItemModifierId, and its PriceDelta is the price frozen at sale time.</summary>
 public sealed record ModifierSelectionDto(
-    Guid ItemModifierId,
+    Guid? ItemModifierId,
     string ModifierName,
     string ModifierGroupName,
-    decimal PriceDelta);
+    decimal PriceDelta,
+    Guid? ItemId = null);

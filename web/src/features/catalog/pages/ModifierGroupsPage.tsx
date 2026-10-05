@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { modifierGroupSchema, modifierSchema } from '../schemas';
-import { useAddModifier, useCreateModifierGroup, useModifierGroups, useReplaceModifierIngredients, useUpdateModifier } from '../queries';
+import { useAddModifier, useCategories, useCreateModifierGroup, useModifierGroups, useReplaceModifierIngredients, useUpdateModifier, useUpdateModifierCategoryItem, useUpdateModifierGroup } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
@@ -13,7 +13,7 @@ import { useInventoryItems } from '../../inventory/queries';
 import { useTenantSettings } from '../../tenant/queries';
 import { IngredientSelector } from '../components/IngredientSelector';
 import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
-import type { Modifier } from '../types';
+import type { Modifier, ModifierCategoryItem, ModifierGroup } from '../types';
 import { useState } from 'react';
 
 type GroupFormValues = z.infer<typeof modifierGroupSchema>;
@@ -23,6 +23,8 @@ export function ModifierGroupsPage() {
   const { data: groups, isLoading, isError, error, refetch } = useModifierGroups();
   const createModifierGroup = useCreateModifierGroup();
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [categoryGroupId, setCategoryGroupId] = useState<string | null>(null);
+  const categories = useCategories();
   // Ingredients only mean something when the business tracks its stock as ingredients.
   const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
 
@@ -33,12 +35,12 @@ export function ModifierGroupsPage() {
     formState: { errors: groupErrors },
   } = useForm<GroupFormValues>({
     resolver: zodResolver(modifierGroupSchema),
-    defaultValues: { name: '', allowMultipleSelection: false, isRequired: false },
+    defaultValues: { name: '', allowMultipleSelection: false, isRequired: false, categoryId: null },
   });
 
   async function onCreateGroup(values: GroupFormValues) {
     await createModifierGroup.mutateAsync(values);
-    resetGroup({ name: '', allowMultipleSelection: false, isRequired: false });
+    resetGroup({ name: '', allowMultipleSelection: false, isRequired: false, categoryId: null });
   }
 
   return (
@@ -57,6 +59,16 @@ export function ModifierGroupsPage() {
           <input type="checkbox" {...registerGroup('isRequired')} />
           Required
         </label>
+        <Field label="Offer items from a category (optional)" error={groupErrors.categoryId?.message}>
+          <select {...registerGroup('categoryId')} className={inputClass}>
+            <option value="">None, only the modifiers below</option>
+            {(categories.data ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <button
           type="submit"
           disabled={createModifierGroup.isPending}
@@ -80,13 +92,29 @@ export function ModifierGroupsPage() {
                   {g.isRequired ? 'Required' : 'Optional'}
                 </p>
               </div>
-              <button
-                onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}
-                className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
-              >
-                {activeGroupId === g.id ? 'Close' : 'Add Modifier'}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCategoryGroupId(categoryGroupId === g.id ? null : g.id)}
+                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
+                >
+                  {categoryGroupId === g.id ? 'Close category' : `Category of ${g.name}`}
+                </button>
+                <button
+                  onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}
+                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
+                >
+                  {activeGroupId === g.id ? 'Close' : 'Add Modifier'}
+                </button>
+              </div>
             </div>
+
+            {g.categoryId && (
+              <p className="mt-1 text-xs text-gray-500">
+                Also offers every item in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
+              </p>
+            )}
+            {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
 
             {g.modifiers.length > 0 && (
               <ul className="mt-2 flex flex-col divide-y divide-gray-100" aria-label={`${g.name} modifiers`}>
@@ -245,5 +273,112 @@ function AddModifierForm({ groupId }: { groupId: string }) {
         {addModifier.isPending ? 'Saving…' : 'Add'}
       </button>
     </form>
+  );
+}
+
+/** Links the group to a category (or unlinks it) and tunes each of that category's items for this group. */
+function CategoryPanel({ group, categories }: { group: ModifierGroup; categories: { id: string; name: string }[] }) {
+  const update = useUpdateModifierGroup(group.id);
+  const [categoryId, setCategoryId] = useState(group.categoryId ?? '');
+
+  async function onSave() {
+    try {
+      await update.mutateAsync({
+        name: group.name,
+        allowMultipleSelection: group.allowMultipleSelection,
+        isRequired: group.isRequired,
+        categoryId: categoryId === '' ? null : categoryId,
+      });
+      toast.success('Category saved');
+    } catch (error) {
+      toast.error(userMessage(error));
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-3 rounded-md bg-gray-50 p-3">
+      <div className="flex max-w-md flex-wrap items-end gap-3">
+        <Field label={`Category offered in ${group.name}`}>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
+            <option value="">None</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <button
+          type="button"
+          onClick={() => void onSave()}
+          disabled={update.isPending || categoryId === (group.categoryId ?? '')}
+          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {update.isPending ? 'Saving…' : 'Save category'}
+        </button>
+      </div>
+      {group.categoryId && (
+        <>
+          <p className="text-xs text-gray-500">
+            Every active item in the category is offered at its own price. Set a price here to charge something else in this group, or hide an item from it. Changing the category clears these.
+          </p>
+          {(group.categoryItems ?? []).length === 0 && <p className="text-sm text-gray-500">This category has no active items yet.</p>}
+          <ul className="flex flex-col divide-y divide-gray-200" aria-label={`${group.name} category items`}>
+            {(group.categoryItems ?? []).map((entry) => (
+              <CategoryItemRow key={`${entry.itemId}:${entry.priceOverride}:${entry.isExcluded}`} groupId={group.id} entry={entry} />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CategoryItemRow({ groupId, entry }: { groupId: string; entry: ModifierCategoryItem }) {
+  const update = useUpdateModifierCategoryItem(groupId);
+  const [price, setPrice] = useState(entry.priceOverride === null ? '' : String(entry.priceOverride));
+  const [hidden, setHidden] = useState(entry.isExcluded);
+  const changed = price !== (entry.priceOverride === null ? '' : String(entry.priceOverride)) || hidden !== entry.isExcluded;
+
+  async function onSave() {
+    try {
+      await update.mutateAsync({ itemId: entry.itemId, body: { priceOverride: price.trim() === '' ? null : Number(price), isExcluded: hidden } });
+    } catch (error) {
+      toast.error(userMessage(error));
+    }
+  }
+
+  return (
+    <li className="flex flex-wrap items-center gap-3 py-2">
+      <span className="min-w-40 flex-1 text-sm font-medium text-gray-900">
+        {entry.name} <span className="font-normal text-gray-600">(₱{entry.basePrice.toFixed(2)})</span>
+      </span>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        Price in group
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={price}
+          aria-label={`Price of ${entry.name} in this group`}
+          placeholder={entry.basePrice.toFixed(2)}
+          onChange={(e) => setPrice(e.target.value)}
+          className={`${inputClass} w-28`}
+        />
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} aria-label={`Hide ${entry.name} from this group`} />
+        Hide
+      </label>
+      <button
+        type="button"
+        onClick={() => void onSave()}
+        disabled={!changed || update.isPending}
+        aria-label={`Save ${entry.name}`}
+        className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+      >
+        Save
+      </button>
+    </li>
   );
 }

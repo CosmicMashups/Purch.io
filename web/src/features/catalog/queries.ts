@@ -8,6 +8,8 @@ import type {
   CreateItemBatchRequest,
   CreateItemComboComponentRequest,
   CreateItemModifierRequest,
+  UpdateModifierCategoryItemRequest,
+  UpdateModifierGroupRequest,
   CreateItemRequest,
   CreateItemVariantRequest,
   CreateModifierGroupRequest,
@@ -87,6 +89,23 @@ export function useCreateModifierGroup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateModifierGroupRequest) => catalogApi.createModifierGroup(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.modifierGroups }),
+  });
+}
+
+export function useUpdateModifierGroup(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateModifierGroupRequest) => catalogApi.updateModifierGroup(groupId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.modifierGroups }),
+  });
+}
+
+export function useUpdateModifierCategoryItem(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, body }: { itemId: string; body: UpdateModifierCategoryItemRequest }) =>
+      catalogApi.updateModifierCategoryItem(groupId, itemId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.modifierGroups }),
   });
 }

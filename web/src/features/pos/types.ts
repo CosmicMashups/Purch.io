@@ -31,7 +31,9 @@ export interface ComboSelection {
 }
 
 export interface ModifierSelection {
-  itemModifierId: string;
+  /** Null for an item chosen through a category-linked group; that one carries `itemId` instead. */
+  itemModifierId: string | null;
+  itemId?: string | null;
   modifierName: string;
   modifierGroupName: string;
   priceDelta: number;
@@ -96,6 +98,8 @@ export interface AddLineRequest {
   quantity: number;
   comboSelections?: { slotId: string; selectedItemId: string }[];
   selectedModifierIds?: string[];
+  /** Items chosen through a category-linked modifier group. */
+  selectedCategoryItemIds?: string[];
 }
 
 export interface RecordPaymentRequest {

@@ -79,7 +79,7 @@ class _ItemModifierCustomizationDialogState
     for (final group in groups) {
       final selected = _selectedModifierIdsByGroup[group.id];
       if (selected != null && selected.isNotEmpty) {
-        for (final modifier in group.modifiers) {
+        for (final modifier in group.options) {
           if (selected.contains(modifier.id)) {
             deltaSum += modifier.priceDelta;
           }
@@ -90,12 +90,21 @@ class _ItemModifierCustomizationDialogState
     return basePrice + deltaSum;
   }
 
-  List<String> _collectSelectedModifierIds() {
-    final ids = <String>[];
-    for (final set in _selectedModifierIdsByGroup.values) {
-      ids.addAll(set);
+  /// The picked ids, split into the group's own modifiers and category items
+  /// (which the server takes as two separate lists).
+  ({List<String> modifiers, List<String> categoryItems}) _collectSelected(
+    List<ModifierGroup> groups,
+  ) {
+    final modifiers = <String>[];
+    final categoryItems = <String>[];
+    for (final group in groups) {
+      final selected = _selectedModifierIdsByGroup[group.id] ?? const <String>{};
+      for (final option in group.options) {
+        if (!selected.contains(option.id)) continue;
+        (option.isCategoryItem ? categoryItems : modifiers).add(option.id);
+      }
     }
-    return ids;
+    return (modifiers: modifiers, categoryItems: categoryItems);
   }
 
   Future<void> _submit(List<ModifierGroup> groups) async {
@@ -103,7 +112,7 @@ class _ItemModifierCustomizationDialogState
 
     setState(() => _isSubmitting = true);
 
-    final selectedIds = _collectSelectedModifierIds();
+    final selected = _collectSelected(groups);
     final add =
         widget.addLine ??
         (request) => ref.read(cartNotifierProvider.notifier).addLine(request);
@@ -113,7 +122,10 @@ class _ItemModifierCustomizationDialogState
         itemId: widget.item.id,
         itemVariantId: widget.itemVariant?.id,
         quantity: _quantity.toDouble(),
-        selectedModifierIds: selectedIds.isNotEmpty ? selectedIds : null,
+        selectedModifierIds:
+            selected.modifiers.isNotEmpty ? selected.modifiers : null,
+        selectedCategoryItemIds:
+            selected.categoryItems.isNotEmpty ? selected.categoryItems : null,
       ),
     );
 
@@ -298,7 +310,7 @@ class _ItemModifierCustomizationDialogState
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final option in group.modifiers)
+                                for (final option in group.options)
                                   _buildOptionChip(
                                     option: option,
                                     isSelected: selected.contains(option.id),
@@ -444,8 +456,10 @@ class _ItemModifierCustomizationDialogState
             ? ' (-${formatCurrencyAbs(option.priceDelta)})'
             : '');
 
-    return InkWell(
-      onTap: onTap,
+    return Opacity(
+      opacity: option.isOutOfStock ? 0.5 : 1,
+      child: InkWell(
+      onTap: option.isOutOfStock ? null : onTap,
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -474,7 +488,7 @@ class _ItemModifierCustomizationDialogState
             ),
             const SizedBox(width: 6),
             Text(
-              '${option.name}$priceText',
+              '${option.name}$priceText${option.isOutOfStock ? ' (sold out)' : ''}',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -483,6 +497,7 @@ class _ItemModifierCustomizationDialogState
             ),
           ],
         ),
+      ),
       ),
     );
   }

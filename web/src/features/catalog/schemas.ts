@@ -69,6 +69,7 @@ export const modifierGroupSchema = z.object({
   name: z.string().trim().min(1, 'Required'),
   allowMultipleSelection: z.boolean(),
   isRequired: z.boolean(),
+  categoryId: optionalTrimmed,
 });
 
 export const modifierSchema = z.object({

@@ -40,6 +40,26 @@ export const isFixedSlot = (slot: ItemComboComponent): boolean => Boolean(slot.c
 
 export const isModifierAvailable = (modifier: Modifier): boolean => !modifier.isOutOfStock;
 
+/** One thing a group offers: a modifier of its own or, for a category-linked group, an item of the category. */
+export interface GroupOption {
+  id: string;
+  name: string;
+  priceDelta: number;
+  soldOut: boolean;
+  kind: 'modifier' | 'item';
+  imageUrl?: string | null;
+}
+
+/** Everything a group offers, its own modifiers first, then the linked category's items that the group has not hidden. */
+export function groupOptions(group: ModifierGroup): GroupOption[] {
+  return [
+    ...group.modifiers.map((modifier): GroupOption => ({ id: modifier.id, name: modifier.name, priceDelta: modifier.priceDelta, soldOut: !isModifierAvailable(modifier), kind: 'modifier' })),
+    ...(group.categoryItems ?? [])
+      .filter((entry) => !entry.isExcluded)
+      .map((entry): GroupOption => ({ id: entry.itemId, name: entry.name, priceDelta: entry.price, soldOut: entry.isOutOfStock, kind: 'item', imageUrl: entry.imageUrl })),
+  ];
+}
+
 /** The first thing still missing, in plain words, or null when the picks are complete. */
 export function missingOption(shape: OptionShape, picks: OptionPicks, settings: MissingOptionSettings = {}): string | null {
   if (shape.needsVariant && !picks.variantId) return 'Choose a variant';
@@ -63,7 +83,8 @@ export function missingOption(shape: OptionShape, picks: OptionPicks, settings: 
  */
 export function unorderableReason(shape: OptionShape, items: Item[]): string | null {
   for (const group of shape.groups) {
-    if (group.isRequired && group.modifiers.length > 0 && group.modifiers.every((modifier) => !isModifierAvailable(modifier))) {
+    const options = groupOptions(group);
+    if (group.isRequired && options.length > 0 && options.every((option) => option.soldOut)) {
       return `${group.name} is sold out`;
     }
   }
@@ -76,8 +97,8 @@ export function unorderableReason(shape: OptionShape, items: Item[]): string | n
 
 /** Toggling a modifier: a single-select group holds one at a time, a multi-select group holds any number. */
 export function toggleModifier(group: ModifierGroup, current: string[], modifierId: string): string[] {
-  const modifier = group.modifiers.find((candidate) => candidate.id === modifierId);
-  if (modifier && !isModifierAvailable(modifier) && !current.includes(modifierId)) return current;
+  const option = groupOptions(group).find((candidate) => candidate.id === modifierId);
+  if (option?.soldOut && !current.includes(modifierId)) return current;
   if (current.includes(modifierId)) return current.filter((id) => id !== modifierId);
   return group.allowMultipleSelection ? [...current, modifierId] : [modifierId];
 }
@@ -102,12 +123,16 @@ export function buildAddLine(itemId: string, shape: OptionShape, picks: OptionPi
   const comboSelections = shape.slots
     .filter((slot) => !isFixedSlot(slot))
     .flatMap((slot) => (picks.slots[slot.id] ?? []).filter(Boolean).map((selectedItemId) => ({ slotId: slot.id, selectedItemId })));
-  const modifierIds = Object.values(picks.groups).flat();
+  const pickedIds = Object.values(picks.groups).flat();
+  const categoryItemIds = new Set(shape.groups.flatMap((group) => (group.categoryItems ?? []).map((entry) => entry.itemId)));
+  const categoryPicks = pickedIds.filter((id) => categoryItemIds.has(id));
+  const modifierIds = pickedIds.filter((id) => !categoryItemIds.has(id));
   return {
     itemId,
     itemVariantId: shape.needsVariant ? picks.variantId : null,
     quantity: picks.quantity,
     ...(comboSelections.length > 0 ? { comboSelections } : {}),
     ...(modifierIds.length > 0 ? { selectedModifierIds: modifierIds } : {}),
+    ...(categoryPicks.length > 0 ? { selectedCategoryItemIds: categoryPicks } : {}),
   };
 }

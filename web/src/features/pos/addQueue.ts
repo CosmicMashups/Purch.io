@@ -27,7 +27,7 @@ export const MAX_BATCH_LINES = 50;
 
 /** A plain add (no variant, combo or modifiers) of the same item is the same as one add of the summed quantity. */
 export function mergeKey(request: AddLineRequest): string | null {
-  const plain = request.itemVariantId === null && !request.comboSelections?.length && !request.selectedModifierIds?.length;
+  const plain = request.itemVariantId === null && !request.comboSelections?.length && !request.selectedModifierIds?.length && !request.selectedCategoryItemIds?.length;
   return plain ? request.itemId : null;
 }
 

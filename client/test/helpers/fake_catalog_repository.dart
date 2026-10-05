@@ -186,6 +186,64 @@ class FakeCatalogRepository implements CatalogRepository {
   @override
   Future<List<ModifierGroup>> listModifierGroups() async => modifierGroups;
 
+  UpdateModifierGroupRequest? lastUpdateModifierGroupRequest;
+  UpdateModifierCategoryItemRequest? lastUpdateModifierCategoryItemRequest;
+
+  @override
+  Future<ModifierGroup> updateModifierGroup(
+    String groupId,
+    UpdateModifierGroupRequest request,
+  ) async {
+    lastUpdateModifierGroupRequest = request;
+    final index = modifierGroups.indexWhere((g) => g.id == groupId);
+    final current = modifierGroups[index];
+    final updated = ModifierGroup(
+      id: current.id,
+      name: request.name,
+      allowMultipleSelection: request.allowMultipleSelection,
+      isRequired: request.isRequired,
+      modifiers: current.modifiers,
+      categoryId: request.categoryId,
+      categoryItems: request.categoryId == current.categoryId ? current.categoryItems : const [],
+    );
+    modifierGroups[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<ModifierGroup> updateModifierCategoryItem(
+    String groupId,
+    String itemId,
+    UpdateModifierCategoryItemRequest request,
+  ) async {
+    lastUpdateModifierCategoryItemRequest = request;
+    final index = modifierGroups.indexWhere((g) => g.id == groupId);
+    final current = modifierGroups[index];
+    final updated = ModifierGroup(
+      id: current.id,
+      name: current.name,
+      allowMultipleSelection: current.allowMultipleSelection,
+      isRequired: current.isRequired,
+      modifiers: current.modifiers,
+      categoryId: current.categoryId,
+      categoryItems: [
+        for (final item in current.categoryItems)
+          item.itemId == itemId
+              ? ModifierCategoryItem(
+                itemId: item.itemId,
+                name: item.name,
+                basePrice: item.basePrice,
+                price: request.priceOverride ?? item.basePrice,
+                priceOverride: request.priceOverride,
+                isExcluded: request.isExcluded,
+              )
+              : item,
+      ],
+    );
+    modifierGroups[index] = updated;
+    return updated;
+  }
+
   @override
   Future<ModifierGroup> createModifierGroup(
     CreateModifierGroupRequest request,

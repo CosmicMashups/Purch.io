@@ -85,6 +85,31 @@ class CatalogRepositoryImpl implements CatalogRepository {
   }
 
   @override
+  Future<ModifierGroup> updateModifierGroup(
+    String groupId,
+    UpdateModifierGroupRequest request,
+  ) {
+    return _put(
+      '/modifier-groups/$groupId',
+      request.toJson(),
+      ModifierGroup.fromJson,
+    );
+  }
+
+  @override
+  Future<ModifierGroup> updateModifierCategoryItem(
+    String groupId,
+    String itemId,
+    UpdateModifierCategoryItemRequest request,
+  ) {
+    return _put(
+      '/modifier-groups/$groupId/category-items/$itemId',
+      request.toJson(),
+      ModifierGroup.fromJson,
+    );
+  }
+
+  @override
   Future<ModifierGroup> addModifier(
     String groupId,
     CreateItemModifierRequest request,

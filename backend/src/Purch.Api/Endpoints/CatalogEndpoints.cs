@@ -81,6 +81,23 @@ public static class CatalogEndpoints
             Results.Ok(await modifierGroupService.CreateAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        _ = app.MapPut("/modifier-groups/{groupId:guid}", async (
+            Guid groupId,
+            UpdateModifierGroupRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.UpdateAsync(groupId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapPut("/modifier-groups/{groupId:guid}/category-items/{itemId:guid}", async (
+            Guid groupId,
+            Guid itemId,
+            UpdateModifierCategoryItemRequest request,
+            IModifierGroupService modifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await modifierGroupService.UpdateCategoryItemAsync(groupId, itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         _ = app.MapPost("/modifier-groups/{groupId:guid}/modifiers", async (
             Guid groupId,
             CreateItemModifierRequest request,

@@ -10,7 +10,8 @@ export function toRequestLines(lines: LocalCartLine[]): AddLineRequest[] {
     itemVariantId: line.itemVariantId,
     quantity: line.quantity,
     ...(line.comboSelections.length > 0 ? { comboSelections: line.comboSelections.map((c) => ({ slotId: c.slotId, selectedItemId: c.selectedItemId })) } : {}),
-    ...(line.modifierSelections.length > 0 ? { selectedModifierIds: line.modifierSelections.map((m) => m.itemModifierId) } : {}),
+    ...(line.modifierSelections.some((m) => m.itemModifierId) ? { selectedModifierIds: line.modifierSelections.flatMap((m) => (m.itemModifierId ? [m.itemModifierId] : [])) } : {}),
+    ...(line.modifierSelections.some((m) => m.itemId) ? { selectedCategoryItemIds: line.modifierSelections.flatMap((m) => (m.itemId ? [m.itemId] : [])) } : {}),
   }));
 }
 
