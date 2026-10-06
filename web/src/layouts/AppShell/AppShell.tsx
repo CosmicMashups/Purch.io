@@ -6,7 +6,6 @@ import { BrandMark } from '../../components/brand/Brand';
 import { signOut } from '../../features/auth/signOut';
 import { useSession } from '../../features/auth/useSession';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
-import { useAutoLock } from '../../hooks/useAutoLock';
 import { IDLE_STATE } from '../../hardware/display/channel';
 import { publishToCustomerDisplay } from '../../hardware/display/serverFeed';
 import { readDeviceCredential } from '../../features/kiosk/deviceCredential';
@@ -38,14 +37,13 @@ export function AppShell() {
   const tabs = tabsForRole(role);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // On a paired till or warehouse device the session belongs to whoever unlocked it, so it locks itself when left alone.
+  // On a paired till or warehouse device the session belongs to whoever unlocked it; it locks only when they choose to.
   const onPairedDevice = !!claims?.deviceId && !!readDeviceCredential();
   function lock() {
     // The next customer should not see the last order while the till waits for the next person.
     publishToCustomerDisplay(IDLE_STATE);
     void signOut().then(() => navigate('/unlock', { replace: true }));
   }
-  useAutoLock(onPairedDevice, lock);
 
   // Phones keep the navigation in a drawer: it closes when a page is chosen or Escape is pressed.
   useEffect(() => setMenuOpen(false), [pathname]);
