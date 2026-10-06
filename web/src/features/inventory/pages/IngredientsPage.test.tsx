@@ -188,6 +188,8 @@ describe('IngredientsPage', () => {
     vi.mocked(inventoryApi.createInventoryCategory).mockResolvedValue({ id: 'c', name: 'Dry goods', sortOrder: 2 });
     renderPage(<IngredientsPage />);
     fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
+    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add category' }));
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Dry goods' } });
     fireEvent.change(screen.getByLabelText('Position'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -200,7 +202,7 @@ describe('IngredientsPage', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Categories' }));
     expect(await screen.findByText('Dairy')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add category' })).not.toBeInTheDocument();
   });
 
   it('deletes a category after confirming', async () => {

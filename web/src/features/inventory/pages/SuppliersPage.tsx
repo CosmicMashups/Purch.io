@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useFieldArray, useForm, type Control, type UseFormRegister } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormDialog } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
 import { emptyContact, emptySupplierForm, supplierSchema, type SupplierForm } from '../purchasing';
@@ -50,106 +50,110 @@ function toForm(s: Supplier): SupplierForm {
 
 export function SuppliersPage() {
   const suppliers = useSuppliers();
+  // null: closed; 'new': adding; otherwise the supplier being edited.
+  const [dialog, setDialog] = useState<'new' | Supplier | null>(null);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Suppliers"
+        backTo={{ to: '/inventory', label: 'Inventory' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setDialog('new')}>
+            Add supplier
+          </PrimaryButton>
+        }
+      />
+      <QueryList
+        query={suppliers}
+        errorTitle="Suppliers could not be loaded"
+        emptyMessage="No suppliers yet. Add the first one to start ordering stock."
+        renderRow={(s) => (
+          <ListCard key={s.id}>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold">{s.name}</p>
+              {s.specialization && <p className="text-sm text-ink-soft">{s.specialization}</p>}
+              {s.address && <p className="text-sm text-ink-soft">{s.address}</p>}
+              {s.contactInfo && <p className="text-base text-ink-soft">{s.contactInfo}</p>}
+              <button type="button" onClick={() => setDialog(s)} className="mt-2 h-12 text-base font-semibold text-brand underline">
+                Edit {s.name}
+              </button>
+            </div>
+            {!s.isActive && <Pill>Inactive</Pill>}
+          </ListCard>
+        )}
+      />
+      {dialog && <SupplierDialog supplier={dialog === 'new' ? null : dialog} onClose={() => setDialog(null)} />}
+    </div>
+  );
+}
+
+function SupplierDialog({ supplier, onClose }: { supplier: Supplier | null; onClose: () => void }) {
   const create = useCreateSupplier();
   const update = useUpdateSupplier();
-  const [editing, setEditing] = useState<Supplier | null>(null);
   const {
     register,
     control,
     handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<SupplierForm>({ resolver: zodResolver(supplierSchema), defaultValues: emptySupplierForm() });
+  } = useForm<SupplierForm>({ resolver: zodResolver(supplierSchema), defaultValues: supplier ? toForm(supplier) : emptySupplierForm() });
   const { fields, append, remove } = useFieldArray({ control, name: 'contacts' });
 
-  function startEdit(s: Supplier) {
-    setEditing(s);
-    reset(toForm(s));
-  }
-
-  function stopEdit() {
-    setEditing(null);
-    reset(emptySupplierForm());
-  }
-
   const submit = handleSubmit(async (v) => {
-    if (editing) {
-      await update.mutateAsync({ id: editing.id, body: { ...toRequest(v), isActive: editing.isActive } });
+    if (supplier) {
+      await update.mutateAsync({ id: supplier.id, body: { ...toRequest(v), isActive: supplier.isActive } });
       toast.success('Supplier updated');
     } else {
       await create.mutateAsync(toRequest(v));
       toast.success('Supplier added');
     }
-    stopEdit();
+    onClose();
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title="Suppliers" backTo={{ to: '/inventory', label: 'Inventory' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
-        <QueryList
-          query={suppliers}
-          errorTitle="Suppliers could not be loaded"
-          emptyMessage="No suppliers yet. Add the first one to start ordering stock."
-          renderRow={(s) => (
-            <ListCard key={s.id}>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold">{s.name}</p>
-                {s.specialization && <p className="text-sm text-ink-soft">{s.specialization}</p>}
-                {s.address && <p className="text-sm text-ink-soft">{s.address}</p>}
-                {s.contactInfo && <p className="text-base text-ink-soft">{s.contactInfo}</p>}
-                <button type="button" onClick={() => startEdit(s)} className="mt-2 h-12 text-base font-semibold text-brand underline">
-                  Edit {s.name}
-                </button>
-              </div>
-              {!s.isActive && <Pill>Inactive</Pill>}
-            </ListCard>
-          )}
-        />
-        <EditorCard
-          title="supplier"
-          editing={editing !== null}
-          busy={create.isPending || update.isPending}
-          onSubmit={submit}
-          onCancel={stopEdit}
-        >
-          <FormField label="Name" error={errors.name?.message}>
-            <input {...register('name')} className={controlClass} />
-          </FormField>
-          <FormField label="Specialization (optional)" hint="What they mainly supply">
-            <input {...register('specialization')} className={controlClass} />
-          </FormField>
-          <FormField label="Address (optional)">
-            <input {...register('address')} className={controlClass} />
-          </FormField>
-          <FormField label="TIN (optional)">
-            <input {...register('tin')} className={controlClass} />
-          </FormField>
+    <FormDialog
+      title={supplier ? 'Edit supplier' : 'Add supplier'}
+      wide
+      busy={create.isPending || update.isPending}
+      submitLabel={supplier ? 'Save changes' : 'Add'}
+      onSubmit={submit}
+      onClose={onClose}
+    >
+      <FormField label="Name" error={errors.name?.message}>
+        <input {...register('name')} className={controlClass} />
+      </FormField>
+      <FormField label="Specialization (optional)" hint="What they mainly supply">
+        <input {...register('specialization')} className={controlClass} />
+      </FormField>
+      <FormField label="Address (optional)">
+        <input {...register('address')} className={controlClass} />
+      </FormField>
+      <FormField label="TIN (optional)">
+        <input {...register('tin')} className={controlClass} />
+      </FormField>
 
-          <fieldset className="flex flex-col gap-4">
-            <legend className="text-base font-semibold">Contacts</legend>
-            {fields.map((field, index) => (
-              <ContactFields
-                key={field.id}
-                index={index}
-                control={control}
-                register={register}
-                emailErrors={errors.contacts?.[index]?.emails}
-                canRemove={fields.length > 1}
-                onRemove={() => remove(index)}
-              />
-            ))}
-            <SecondaryButton type="button" onClick={() => append(emptyContact())}>
-              Add another contact
-            </SecondaryButton>
-          </fieldset>
+      <fieldset className="flex flex-col gap-4">
+        <legend className="text-base font-semibold">Contacts</legend>
+        {fields.map((field, index) => (
+          <ContactFields
+            key={field.id}
+            index={index}
+            control={control}
+            register={register}
+            emailErrors={errors.contacts?.[index]?.emails}
+            canRemove={fields.length > 1}
+            onRemove={() => remove(index)}
+          />
+        ))}
+        <SecondaryButton type="button" onClick={() => append(emptyContact())}>
+          Add another contact
+        </SecondaryButton>
+      </fieldset>
 
-          <FormField label="Remarks (optional)">
-            <textarea {...register('remarks')} rows={3} className={controlClass} />
-          </FormField>
-        </EditorCard>
-      </div>
-    </div>
+      <FormField label="Remarks (optional)">
+        <textarea {...register('remarks')} rows={3} className={controlClass} />
+      </FormField>
+    </FormDialog>
   );
 }
 

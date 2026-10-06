@@ -10,5 +10,7 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
     {
         _ = builder.HasIndex(m => new { m.TenantId, m.BranchId, m.ItemId, m.CreatedAt })
             .HasDatabaseName("IX_InventoryMovements_Branch_Item_CreatedAt");
+        _ = builder.HasIndex(m => new { m.TenantId, m.InventoryItemId, m.CreatedAt })
+            .HasDatabaseName("IX_InventoryMovements_InventoryItem_CreatedAt");
     }
 }

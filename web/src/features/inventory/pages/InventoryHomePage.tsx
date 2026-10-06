@@ -34,7 +34,7 @@ export function InventoryHomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Inventory" action={<LinkButton to="/inventory/movements/new" primary>Record movement</LinkButton>} />
+      <PageHeader title="Inventory" action={<LinkButton to="/inventory/movements?record=1" primary>Record movement</LinkButton>} />
       <StockOverview scope={scope} onScopeChange={setScope} />
       <RestockList scope={scope} onScopeChange={setScope} />
       <HubGroups groups={groups} stats={stats} idPrefix="inventory-hub" />

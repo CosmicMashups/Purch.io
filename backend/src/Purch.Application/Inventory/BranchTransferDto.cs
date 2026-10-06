@@ -13,7 +13,8 @@ public sealed record BranchTransferDto(
 
 public sealed record BranchTransferLineDto(
     Guid Id,
-    Guid ItemId,
+    Guid? ItemId,
+    Guid? InventoryItemId,
     string ItemName,
     decimal Quantity);
 
@@ -22,4 +23,4 @@ public sealed record CreateBranchTransferRequest(
     Guid DestinationBranchId,
     IReadOnlyList<CreateBranchTransferLineRequest> Lines);
 
-public sealed record CreateBranchTransferLineRequest(Guid ItemId, decimal Quantity);
+public sealed record CreateBranchTransferLineRequest(Guid? ItemId, decimal Quantity, Guid? InventoryItemId = null);

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../../test/render';
 import { branchesApi } from '../../branches/api';
@@ -84,11 +84,14 @@ describe('IncomingReceivingPage', () => {
     vi.mocked(inventoryApi.createIncomingReceiving).mockResolvedValue({} as never);
     renderPage(<IncomingReceivingPage />);
     await screen.findByText('Not linked');
-    fireEvent.change(screen.getByLabelText('Supplier'), { target: { value: 's1' } });
-    fireEvent.change(screen.getByLabelText('Item'), { target: { value: 'milk' } });
-    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '5' } });
-    fireEvent.change(screen.getByLabelText('Unit price (PHP)'), { target: { value: '12' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save report' }));
+    expect(screen.queryByLabelText('Supplier')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Record a delivery' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Record a delivery' });
+    fireEvent.change(await within(dialog).findByLabelText('Supplier'), { target: { value: 's1' } });
+    fireEvent.change(within(dialog).getByLabelText('Item'), { target: { value: 'milk' } });
+    fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '5' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit price (PHP)'), { target: { value: '12' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save report' }));
     await waitFor(() => expect(inventoryApi.createIncomingReceiving).toHaveBeenCalledTimes(1));
     expect(vi.mocked(inventoryApi.createIncomingReceiving).mock.calls[0][0]).toMatchObject({
       purchaseOrderId: null,
@@ -101,7 +104,8 @@ describe('IncomingReceivingPage', () => {
   it('prefills supplier, branch and lines when a purchase order is chosen', async () => {
     renderPage(<IncomingReceivingPage />);
     await screen.findByText('Not linked');
-    fireEvent.change(screen.getByLabelText('Purchase order (optional)'), { target: { value: 'po1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record a delivery' }));
+    fireEvent.change(await screen.findByLabelText('Purchase order (optional)'), { target: { value: 'po1' } });
     await waitFor(() => expect(screen.getByLabelText('Supplier')).toHaveValue('s1'));
     expect(screen.getByLabelText('Quantity')).toHaveValue(10);
   });

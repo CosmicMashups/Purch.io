@@ -17,6 +17,7 @@ public sealed class BranchTransferService(
     IBranchTransferRepository branchTransferRepository,
     IInventoryMovementRepository movementRepository,
     IItemRepository itemRepository,
+    IInventoryItemRepository inventoryItemRepository,
     IItemStockService itemStockService,
     IBranchRepository branchRepository,
     IBranchScopeGuard branchScopeGuard,
@@ -63,8 +64,21 @@ public sealed class BranchTransferService(
                 throw new ValidationException(nameof(line.Quantity), "Quantity must be greater than zero.");
             }
 
-            _ = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
-                ?? throw new NotFoundException("Item", line.ItemId);
+            if ((line.ItemId is null) == (line.InventoryItemId is null))
+            {
+                throw new ValidationException(nameof(line.ItemId), "Each line needs either an item or an ingredient.");
+            }
+
+            if (line.ItemId is { } lineItemId)
+            {
+                _ = await itemRepository.GetByIdAsync(lineItemId, cancellationToken)
+                    ?? throw new NotFoundException("Item", lineItemId);
+            }
+            else
+            {
+                _ = await inventoryItemRepository.GetByIdAsync(line.InventoryItemId!.Value, cancellationToken)
+                    ?? throw new NotFoundException("Ingredient", line.InventoryItemId.Value);
+            }
         }
 
         var transfer = new BranchTransfer
@@ -83,6 +97,7 @@ public sealed class BranchTransferService(
                 TenantId = CurrentTenantId,
                 BranchTransferId = transfer.Id,
                 ItemId = line.ItemId,
+                InventoryItemId = line.InventoryItemId,
                 Quantity = line.Quantity,
             });
         }
@@ -107,19 +122,8 @@ public sealed class BranchTransferService(
         var lines = await branchTransferRepository.ListLinesAsync(transfer.Id, cancellationToken);
         foreach (var line in lines)
         {
-            var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
-                ?? throw new NotFoundException("Item", line.ItemId);
-
             // Can't ship what isn't there: the total would go negative and the count stop meaning anything.
-            var onHand = await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken);
-            if (onHand.TryGetValue(item.Id, out var available) && available < line.Quantity)
-            {
-                throw new ValidationException(
-                    nameof(line.Quantity),
-                    $"Only {available:0.##} of {item.Name} on hand; can't ship {line.Quantity:0.##}.");
-            }
-
-            var shippedFrom = await itemStockService.AdjustAsync(item, -line.Quantity, cancellationToken);
+            var shippedFrom = await AdjustLineAsync(line, -line.Quantity, checkOnHand: true, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
             {
@@ -155,10 +159,7 @@ public sealed class BranchTransferService(
         var lines = await branchTransferRepository.ListLinesAsync(transfer.Id, cancellationToken);
         foreach (var line in lines)
         {
-            var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
-                ?? throw new NotFoundException("Item", line.ItemId);
-
-            var receivedInto = await itemStockService.AdjustAsync(item, line.Quantity, cancellationToken);
+            var receivedInto = await AdjustLineAsync(line, line.Quantity, checkOnHand: false, cancellationToken);
 
             movementRepository.Add(new InventoryMovement
             {
@@ -196,10 +197,7 @@ public sealed class BranchTransferService(
             // It already left the source's count when it shipped; put it back.
             foreach (var line in await branchTransferRepository.ListLinesAsync(transfer.Id, cancellationToken))
             {
-                var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
-                    ?? throw new NotFoundException("Item", line.ItemId);
-
-                var returnedTo = await itemStockService.AdjustAsync(item, line.Quantity, cancellationToken);
+                var returnedTo = await AdjustLineAsync(line, line.Quantity, checkOnHand: false, cancellationToken);
 
                 movementRepository.Add(new InventoryMovement
                 {
@@ -221,6 +219,42 @@ public sealed class BranchTransferService(
         return await ToDtoAsync(transfer, cancellationToken);
     }
 
+    /// <summary>Applies a transfer leg to the line's stock count (an item's, or a standalone ingredient's) and returns the
+    /// InventoryItem id to record on the movement, or null when Item.StockOnHand was changed.</summary>
+    private async Task<Guid?> AdjustLineAsync(BranchTransferLine line, decimal delta, bool checkOnHand, CancellationToken cancellationToken)
+    {
+        if (line.InventoryItemId is { } ingredientId)
+        {
+            var ingredient = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken)
+                ?? throw new NotFoundException("Ingredient", ingredientId);
+            if (checkOnHand && ingredient.QuantityOnHand + delta < 0)
+            {
+                throw new ValidationException(
+                    nameof(line.Quantity),
+                    $"Only {ingredient.QuantityOnHand:0.##} of {ingredient.Name} on hand; can't ship {line.Quantity:0.##}.");
+            }
+
+            ingredient.QuantityOnHand += delta;
+            return ingredient.Id;
+        }
+
+        var itemId = line.ItemId ?? throw new InvalidOperationException("A transfer line has neither an item nor an ingredient.");
+        var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
+            ?? throw new NotFoundException("Item", itemId);
+        if (checkOnHand)
+        {
+            var onHand = await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken);
+            if (onHand.TryGetValue(item.Id, out var available) && available < line.Quantity)
+            {
+                throw new ValidationException(
+                    nameof(line.Quantity),
+                    $"Only {available:0.##} of {item.Name} on hand; can't ship {line.Quantity:0.##}.");
+            }
+        }
+
+        return await itemStockService.AdjustAsync(item, delta, cancellationToken);
+    }
+
     private async Task<BranchTransferDto> ToDtoAsync(BranchTransfer transfer, CancellationToken cancellationToken)
     {
         var sourceBranch = await branchRepository.GetByIdAsync(transfer.SourceBranchId, cancellationToken);
@@ -230,8 +264,17 @@ public sealed class BranchTransferService(
         var lineDtos = new List<BranchTransferLineDto>();
         foreach (var line in lines)
         {
-            var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken);
-            lineDtos.Add(new BranchTransferLineDto(line.Id, line.ItemId, item?.Name ?? "(deleted item)", line.Quantity));
+            string? name = null;
+            if (line.ItemId is { } lineItemId)
+            {
+                name = (await itemRepository.GetByIdAsync(lineItemId, cancellationToken))?.Name;
+            }
+            else if (line.InventoryItemId is { } ingredientId)
+            {
+                name = (await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken))?.Name;
+            }
+
+            lineDtos.Add(new BranchTransferLineDto(line.Id, line.ItemId, line.InventoryItemId, name ?? "(deleted item)", line.Quantity));
         }
 
         return new BranchTransferDto(

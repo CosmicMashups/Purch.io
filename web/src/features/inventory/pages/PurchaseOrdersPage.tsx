@@ -4,11 +4,10 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
-import { FormLoader } from '../../../components/forms/FormLoader';
 import { useSelectableBranches } from '../../branches/queries';
 import type { Branch } from '../../branches/types';
 import { useItems } from '../../catalog/queries';
@@ -35,6 +34,7 @@ export function PurchaseOrdersPage() {
   const send = useMarkPurchaseOrderSent();
   const cancel = useCancelPurchaseOrder();
   const [cancelling, setCancelling] = useState<PurchaseOrder | null>(null);
+  const [creating, setCreating] = useState(false);
 
   async function onSend(order: PurchaseOrder) {
     await send.mutateAsync(order.id);
@@ -54,8 +54,16 @@ export function PurchaseOrdersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Purchase orders" backTo={{ to: '/inventory', label: 'Inventory' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+      <PageHeader
+        title="Purchase orders"
+        backTo={{ to: '/inventory', label: 'Inventory' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setCreating(true)}>
+            New purchase order
+          </PrimaryButton>
+        }
+      />
+      <div>
         <QueryList
           query={orders}
           errorTitle="Purchase orders could not be loaded"
@@ -106,13 +114,20 @@ export function PurchaseOrdersPage() {
           }}
         />
 
-        <FormLoader
-            failed={suppliers.isError ? suppliers : items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
-            ready={!!(suppliers.data && items.data && branches)}
-          >
-            {suppliers.data && items.data && branches && <PurchaseOrderForm suppliers={suppliers.data} branches={branches} items={items.data} />}
-        </FormLoader>
       </div>
+
+      {creating && (
+        <FormDialogLoader
+          title="New purchase order"
+          failed={suppliers.isError ? suppliers : items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
+          ready={!!(suppliers.data && items.data && branches)}
+          onClose={() => setCreating(false)}
+        >
+          {suppliers.data && items.data && branches && (
+            <PurchaseOrderDialog suppliers={suppliers.data} branches={branches} items={items.data} onClose={() => setCreating(false)} />
+          )}
+        </FormDialogLoader>
+      )}
 
       <ConfirmModal
         open={cancelling !== null}
@@ -128,13 +143,22 @@ export function PurchaseOrdersPage() {
   );
 }
 
-function PurchaseOrderForm({ suppliers, branches, items }: { suppliers: { id: string; name: string }[]; branches: Branch[]; items: Item[] }) {
+function PurchaseOrderDialog({
+  suppliers,
+  branches,
+  items,
+  onClose,
+}: {
+  suppliers: { id: string; name: string }[];
+  branches: Branch[];
+  items: Item[];
+  onClose: () => void;
+}) {
   const create = useCreatePurchaseOrder();
   const {
     register,
     control,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<PurchaseOrderForm>({
     resolver: zodResolver(purchaseOrderSchema),
@@ -145,11 +169,11 @@ function PurchaseOrderForm({ suppliers, branches, items }: { suppliers: { id: st
   const submit = handleSubmit(async (v) => {
     await create.mutateAsync(v);
     toast.success('Purchase order created as a draft');
-    reset({ supplierId: '', branchId: v.branchId, lines: [{ itemId: '' }] as PurchaseOrderForm['lines'] });
+    onClose();
   });
 
   return (
-    <EditorCard title="purchase order" editing={false} busy={create.isPending} submitLabel="Create draft" onSubmit={submit} onCancel={() => reset()}>
+    <FormDialog title="New purchase order" wide busy={create.isPending} submitLabel="Create draft" onSubmit={submit} onClose={onClose}>
       <FormField label="Supplier" error={errors.supplierId?.message}>
         <select {...register('supplierId')} className={controlClass}>
           <option value="">Choose a supplier</option>
@@ -209,6 +233,6 @@ function PurchaseOrderForm({ suppliers, branches, items }: { suppliers: { id: st
           Add another item
         </SecondaryButton>
       </fieldset>
-    </EditorCard>
+    </FormDialog>
   );
 }

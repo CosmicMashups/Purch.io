@@ -19,6 +19,7 @@ public static class InventoryEndpoints
         // --- C2/C3 — the stock movement log and the form that records into it ---
         _ = app.MapGet("/inventory/movements", async (
             Guid? itemId,
+            Guid? inventoryItemId,
             Guid? branchId,
             MovementType? type,
             DateTimeOffset? before,
@@ -26,7 +27,7 @@ public static class InventoryEndpoints
             int? limit,
             IInventoryMovementService movementService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await movementService.ListAsync(itemId, branchId, type, before, limit, beforeId, cancellationToken)))
+            Results.Ok(await movementService.ListAsync(itemId, branchId, type, before, limit, beforeId, inventoryItemId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
         _ = app.MapPost("/inventory/movements", async (

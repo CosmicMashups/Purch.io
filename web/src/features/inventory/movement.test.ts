@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FILTERABLE_TYPES, RECORDABLE_TYPES, movementLabel, movementSchema } from './movement';
 import { MovementType } from './types';
 
-const base = { itemId: 'i', branchId: 'b', type: MovementType.StockIn as number, quantity: 5, reasonCategory: '', supplierReference: '', note: '' };
+const base = { stockRef: 'item:i', branchId: 'b', type: MovementType.StockIn as number, quantity: 5, reasonCategory: '', supplierReference: '', note: '' };
 const message = (v: object) => {
   const r = movementSchema.safeParse(v);
   return r.success ? null : r.error.issues[0].message;

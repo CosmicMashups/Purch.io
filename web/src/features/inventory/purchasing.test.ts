@@ -36,7 +36,7 @@ describe('purchaseOrderSchema', () => {
 });
 
 describe('transferSchema', () => {
-  const base = { sourceBranchId: 'a', destinationBranchId: 'b', lines: [{ itemId: 'i', quantity: 3 }] };
+  const base = { sourceBranchId: 'a', destinationBranchId: 'b', lines: [{ stockRef: 'item:i', quantity: 3 }] };
 
   it('accepts a valid transfer', () => {
     expect(transferSchema.safeParse(base).success).toBe(true);
@@ -47,7 +47,7 @@ describe('transferSchema', () => {
   });
 
   it('requires a positive quantity and at least one line', () => {
-    expect(first(transferSchema.safeParse({ ...base, lines: [{ itemId: 'i', quantity: 0 }] }))).toBe('Must be more than 0');
-    expect(first(transferSchema.safeParse({ ...base, lines: [] }))).toBe('Add at least one item');
+    expect(first(transferSchema.safeParse({ ...base, lines: [{ stockRef: 'item:i', quantity: 0 }] }))).toBe('Must be more than 0');
+    expect(first(transferSchema.safeParse({ ...base, lines: [] }))).toBe('Add at least one line');
   });
 });

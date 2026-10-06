@@ -59,14 +59,16 @@ class BranchTransferLine {
   factory BranchTransferLine.fromJson(Map<String, dynamic> json) {
     return BranchTransferLine(
       id: json['id'] as String,
-      itemId: json['itemId'] as String,
+      itemId: json['itemId'] as String?,
       itemName: json['itemName'] as String,
       quantity: (json['quantity'] as num).toDouble(),
     );
   }
 
   final String id;
-  final String itemId;
+
+  /// Null for a line that moves a standalone ingredient (the name is then the ingredient's).
+  final String? itemId;
   final String itemName;
   final double quantity;
 }

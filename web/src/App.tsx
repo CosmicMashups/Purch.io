@@ -13,7 +13,7 @@ import { IncomingReceivingPage } from './features/inventory/pages/IncomingReceiv
 import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
 import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
 import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPage';
-import { RecordMovementPage } from './features/inventory/pages/RecordMovementPage';
+import { LegacyRecordMovementRedirect } from './features/inventory/pages/LegacyRecordMovementRedirect';
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { ReportsPage } from './features/reports/ReportsPage';
@@ -119,7 +119,7 @@ export function App() {
           <Route element={<RequireTab tab="inventory" />}>
             <Route path="/inventory" element={<InventoryHomePage />} />
             <Route path="/inventory/movements" element={<MovementLogPage />} />
-            <Route path="/inventory/movements/new" element={<RecordMovementPage />} />
+            <Route path="/inventory/movements/new" element={<LegacyRecordMovementRedirect />} />
             <Route path="/inventory/ingredients" element={<IngredientsPage />} />
             <Route path="/inventory/suppliers" element={<SuppliersPage />} />
             <Route path="/inventory/purchase-orders" element={<PurchaseOrdersPage />} />

@@ -3,9 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { FormLoader } from '../../../components/forms/FormLoader';
+import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
 import { useSession } from '../../auth/useSession';
@@ -41,33 +40,50 @@ export function IncomingReceivingPage() {
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
   const { role } = useSession();
   const canLink = role === 'Admin' || role === 'Manager';
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  // Arriving from a purchase order's "Record delivery" button opens the dialog already filled from that order.
+  const [dialog, setDialog] = useState<{ orderId: string } | null>(params.get('po') ? { orderId: params.get('po') ?? '' } : null);
+  function closeDialog() {
+    setDialog(null);
+    if (params.has('po')) {
+      const next = new URLSearchParams(params);
+      next.delete('po');
+      setParams(next, { replace: true });
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Incoming receiving report" backTo={{ to: '/inventory', label: 'Inventory' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+      <PageHeader
+        title="Incoming receiving report"
+        backTo={{ to: '/inventory', label: 'Inventory' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setDialog({ orderId: '' })}>
+            Record a delivery
+          </PrimaryButton>
+        }
+      />
+      <div>
         <QueryList
           query={reports}
           errorTitle="Receiving reports could not be loaded"
           emptyMessage="No deliveries recorded yet."
           renderRow={(report) => <ReportRow key={report.id} report={report} orders={orders.data ?? []} canLink={canLink} />}
         />
-        <FormLoader
+      </div>
+
+      {dialog && (
+        <FormDialogLoader
+          title="Record a delivery"
           failed={suppliers.isError ? suppliers : items.isError ? items : orders.isError ? orders : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
           ready={!!(suppliers.data && items.data && orders.data && branches)}
+          onClose={closeDialog}
         >
           {suppliers.data && items.data && orders.data && branches && (
-            <ReportForm
-              suppliers={suppliers.data}
-              branches={branches}
-              items={items.data}
-              orders={orders.data}
-              initialOrderId={params.get('po') ?? ''}
-            />
+            <ReportDialog suppliers={suppliers.data} branches={branches} items={items.data} orders={orders.data} initialOrderId={dialog.orderId} onClose={closeDialog} />
           )}
-        </FormLoader>
-      </div>
+        </FormDialogLoader>
+      )}
     </div>
   );
 }
@@ -135,18 +151,20 @@ function ReportRow({ report, orders, canLink }: { report: IncomingReceiving; ord
   );
 }
 
-function ReportForm({
+function ReportDialog({
   suppliers,
   branches,
   items,
   orders,
   initialOrderId,
+  onClose,
 }: {
   suppliers: { id: string; name: string }[];
   branches: Branch[];
   items: Item[];
   orders: PurchaseOrder[];
   initialOrderId: string;
+  onClose: () => void;
 }) {
   const create = useCreateIncomingReceiving();
   const openOrders = orders.filter((o) => o.status === PurchaseOrderStatus.Sent || o.status === PurchaseOrderStatus.PartiallyReceived);
@@ -155,7 +173,6 @@ function ReportForm({
     register,
     control,
     handleSubmit,
-    reset,
     setValue,
     formState: { errors },
   } = useForm<IncomingReceivingForm>({ resolver: zodResolver(incomingReceivingSchema), defaultValues: blankForm(soleBranch) });
@@ -206,11 +223,11 @@ function ReportForm({
       })),
     });
     toast.success('Delivery recorded');
-    reset(blankForm(v.branchId));
+    onClose();
   });
 
   return (
-    <EditorCard title="delivery" heading="Record a delivery" editing={false} busy={create.isPending} submitLabel="Save report" onSubmit={submit} onCancel={() => reset(blankForm(soleBranch))}>
+    <FormDialog title="Record a delivery" wide busy={create.isPending} submitLabel="Save report" onSubmit={submit} onClose={onClose}>
       <FormField label="Purchase order (optional)" hint="Leave blank if the order has not been created yet. An admin can link it later.">
         <select {...register('purchaseOrderId', { onChange: (e) => fillFromOrder(e.target.value) })} className={controlClass}>
           <option value="">Not linked to an order</option>
@@ -304,6 +321,6 @@ function ReportForm({
       <FormField label="Notes (optional)">
         <textarea {...register('remarks')} rows={2} className={controlClass} />
       </FormField>
-    </EditorCard>
+    </FormDialog>
   );
 }

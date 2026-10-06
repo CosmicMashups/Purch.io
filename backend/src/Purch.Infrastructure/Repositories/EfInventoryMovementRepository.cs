@@ -17,6 +17,7 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
         DateTimeOffset? before = null,
         int? limit = null,
         Guid? beforeId = null,
+        Guid? inventoryItemId = null,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.InventoryMovements
@@ -26,6 +27,11 @@ public sealed class EfInventoryMovementRepository(PurchDbContext dbContext) : II
         if (itemId is { } requiredItemId)
         {
             query = query.Where(movement => movement.ItemId == requiredItemId);
+        }
+
+        if (inventoryItemId is { } requiredInventoryItemId)
+        {
+            query = query.Where(movement => movement.InventoryItemId == requiredInventoryItemId);
         }
 
         if (branchId is { } requiredBranchId)

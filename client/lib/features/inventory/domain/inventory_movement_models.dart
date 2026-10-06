@@ -68,7 +68,7 @@ class InventoryMovement {
   factory InventoryMovement.fromJson(Map<String, dynamic> json) {
     return InventoryMovement(
       id: json['id'] as String,
-      itemId: json['itemId'] as String,
+      itemId: json['itemId'] as String?,
       itemName: json['itemName'] as String,
       branchId: json['branchId'] as String,
       branchName: json['branchName'] as String,
@@ -85,7 +85,9 @@ class InventoryMovement {
   }
 
   final String id;
-  final String itemId;
+
+  /// Null for a movement against a standalone ingredient (the name is then the ingredient's).
+  final String? itemId;
   final String itemName;
   final String branchId;
   final String branchName;

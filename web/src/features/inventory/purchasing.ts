@@ -52,11 +52,11 @@ export const transferSchema = z
     lines: z
       .array(
         z.object({
-          itemId: z.string().min(1, 'Choose an item'),
+          stockRef: z.string().min(1, 'Choose an item or ingredient'),
           quantity: num('Enter a quantity').gt(0, 'Must be more than 0'),
         }),
       )
-      .min(1, 'Add at least one item'),
+      .min(1, 'Add at least one line'),
   })
   .superRefine((v, ctx) => {
     if (v.sourceBranchId && v.sourceBranchId === v.destinationBranchId) {

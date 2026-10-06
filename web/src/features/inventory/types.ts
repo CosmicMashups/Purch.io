@@ -60,8 +60,13 @@ export type MovementType = (typeof MovementType)[keyof typeof MovementType];
 
 export interface InventoryMovement {
   id: string;
-  itemId: string;
+  /** Null for a movement against a standalone ingredient. */
+  itemId: string | null;
+  /** The ingredient's name for an ingredient movement; otherwise the item's. */
   itemName: string;
+  /** Set when the movement was against an ingredient (including one consumed by a recipe sale). */
+  inventoryItemId: string | null;
+  inventoryItemName: string | null;
   branchId: string;
   branchName: string;
   type: MovementType;
@@ -76,7 +81,9 @@ export interface InventoryMovement {
 }
 
 export interface RecordMovementRequest {
-  itemId: string;
+  /** Exactly one of itemId and inventoryItemId is set. */
+  itemId: string | null;
+  inventoryItemId?: string | null;
   branchId: string;
   type: MovementType;
   quantity: number;
@@ -88,6 +95,7 @@ export interface RecordMovementRequest {
 
 export interface MovementFilter {
   itemId?: string;
+  inventoryItemId?: string;
   branchId?: string;
   type?: MovementType;
 }
@@ -225,11 +233,11 @@ export interface BranchTransfer {
   destinationBranchId: string;
   destinationBranchName: string;
   status: BranchTransferStatus;
-  lines: { id: string; itemId: string; itemName: string; quantity: number }[];
+  lines: { id: string; itemId: string | null; inventoryItemId?: string | null; itemName: string; quantity: number }[];
 }
 
 export interface CreateBranchTransferRequest {
   sourceBranchId: string;
   destinationBranchId: string;
-  lines: { itemId: string; quantity: number }[];
+  lines: { itemId: string | null; inventoryItemId: string | null; quantity: number }[];
 }

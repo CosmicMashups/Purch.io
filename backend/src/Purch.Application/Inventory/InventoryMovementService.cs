@@ -43,9 +43,10 @@ public sealed class InventoryMovementService(
         DateTimeOffset? before = null,
         int? limit = null,
         Guid? beforeId = null,
+        Guid? inventoryItemId = null,
         CancellationToken cancellationToken = default)
     {
-        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, before, limit, beforeId, cancellationToken);
+        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, before, limit, beforeId, inventoryItemId, cancellationToken);
 
         var dtos = new List<InventoryMovementDto>();
         foreach (var movement in movements)
@@ -86,15 +87,41 @@ public sealed class InventoryMovementService(
 
         await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
 
-        var item = await itemRepository.GetByIdAsync(request.ItemId, cancellationToken)
-            ?? throw new NotFoundException("Item", request.ItemId);
+        if ((request.ItemId is null) == (request.InventoryItemId is null))
+        {
+            throw new ValidationException(nameof(request.ItemId), "Choose either an item or an ingredient.");
+        }
 
         _ = await branchRepository.GetByIdAsync(request.BranchId, cancellationToken)
             ?? throw new NotFoundException("Branch", request.BranchId);
 
-        // Captured before AdjustAsync mutates it in place, so the audit entry below records the actual
-        // before/after transition rather than the same (already-updated) value twice.
-        var stockOnHandBeforeAdjustment = item.StockOnHand;
+        Item? item = null;
+        InventoryItem? ingredient = null;
+        decimal stockOnHandBeforeAdjustment;
+        Guid? routedTo;
+        var delta = StockDelta(request.Type, request.Quantity);
+        if (request.InventoryItemId is { } ingredientId)
+        {
+            ingredient = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken)
+                ?? throw new NotFoundException("Ingredient", ingredientId);
+            stockOnHandBeforeAdjustment = ingredient.QuantityOnHand;
+            if (ingredient.QuantityOnHand + delta < 0)
+            {
+                throw new ValidationException(nameof(request.Quantity), $"Only {ingredient.QuantityOnHand:0.##} of {ingredient.Name} on hand.");
+            }
+
+            ingredient.QuantityOnHand += delta;
+            routedTo = ingredient.Id;
+        }
+        else
+        {
+            item = await itemRepository.GetByIdAsync(request.ItemId!.Value, cancellationToken)
+                ?? throw new NotFoundException("Item", request.ItemId.Value);
+            // Captured before AdjustAsync mutates it in place, so the audit entry below records the actual
+            // before/after transition rather than the same (already-updated) value twice.
+            stockOnHandBeforeAdjustment = item.StockOnHand;
+            routedTo = await itemStockService.AdjustAsync(item, delta, cancellationToken);
+        }
 
         var movement = new InventoryMovement
         {
@@ -108,7 +135,7 @@ public sealed class InventoryMovementService(
             ReasonCategory = request.ReasonCategory,
             PhotoUrl = request.PhotoUrl,
             SupplierReference = request.SupplierReference,
-            InventoryItemId = await itemStockService.AdjustAsync(item, StockDelta(request.Type, request.Quantity), cancellationToken)
+            InventoryItemId = routedTo
         };
 
         movementRepository.Add(movement);
@@ -124,10 +151,10 @@ public sealed class InventoryMovementService(
                 TenantId = CurrentTenantId,
                 ActorUserId = CurrentUserId,
                 ActionType = AuditActionType.InventoryAdjustment,
-                TargetEntityType = nameof(Item),
-                TargetEntityId = item.Id,
+                TargetEntityType = ingredient is null ? nameof(Item) : nameof(InventoryItem),
+                TargetEntityId = ingredient?.Id ?? item!.Id,
                 BeforeStateJson = JsonSerializer.Serialize(new { stockOnHand = stockOnHandBeforeAdjustment }),
-                AfterStateJson = JsonSerializer.Serialize(new { stockOnHand = item.StockOnHand, delta = request.Quantity, note = request.Note }),
+                AfterStateJson = JsonSerializer.Serialize(new { stockOnHand = ingredient?.QuantityOnHand ?? item!.StockOnHand, delta = request.Quantity, note = request.Note }),
             });
         }
 
@@ -149,8 +176,10 @@ public sealed class InventoryMovementService(
 
     private async Task<InventoryMovementDto> ToDtoAsync(InventoryMovement movement, CancellationToken cancellationToken)
     {
-        var item = await itemRepository.GetByIdAsync(movement.ItemId, cancellationToken);
-        var inventoryItem = item is null && movement.InventoryItemId is { } inventoryItemId
+        var item = movement.ItemId is { } movementItemId
+            ? await itemRepository.GetByIdAsync(movementItemId, cancellationToken)
+            : null;
+        var inventoryItem = movement.InventoryItemId is { } inventoryItemId
             ? await inventoryItemRepository.GetByIdAsync(inventoryItemId, cancellationToken)
             : null;
         var branch = await branchRepository.GetByIdAsync(movement.BranchId, cancellationToken);
@@ -160,6 +189,8 @@ public sealed class InventoryMovementService(
             movement.Id,
             movement.ItemId,
             item?.Name ?? inventoryItem?.Name ?? "(deleted item)",
+            movement.InventoryItemId,
+            inventoryItem?.Name,
             movement.BranchId,
             branch?.Name ?? "(deleted branch)",
             movement.Type,

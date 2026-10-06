@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, controlClass } from '../../../components/forms/FormField';
+import { FormDialog } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
 import { ListCard, QueryList } from '../../../components/lists/QueryList';
 import { userMessage } from '../../../lib/apiError';
 import {
@@ -29,7 +29,8 @@ const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
 export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
   const categories = useInventoryCategories();
   const ingredients = useInventoryItems();
-  const [editing, setEditing] = useState<InventoryCategory | null>(null);
+  // null: closed; 'new': adding; otherwise the category being edited.
+  const [dialog, setDialog] = useState<'new' | InventoryCategory | null>(null);
   const [deleting, setDeleting] = useState<InventoryCategory | null>(null);
   const remove = useDeleteInventoryCategory();
 
@@ -40,7 +41,7 @@ export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
     try {
       await remove.mutateAsync(deleting.id);
       toast.success(`${deleting.name} removed`);
-      if (editing?.id === deleting.id) setEditing(null);
+      if (dialog !== 'new' && dialog?.id === deleting.id) setDialog(null);
     } catch (error) {
       toast.error(userMessage(error));
     }
@@ -48,7 +49,14 @@ export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+    <div className="flex flex-col gap-4">
+      {canEdit && (
+        <div>
+          <PrimaryButton type="button" onClick={() => setDialog('new')}>
+            Add category
+          </PrimaryButton>
+        </div>
+      )}
       <QueryList
         query={categories}
         errorTitle="Categories could not be loaded"
@@ -62,7 +70,7 @@ export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
               </p>
               {canEdit && (
                 <div className="mt-2 flex flex-wrap gap-x-5">
-                  <button type="button" className={linkButton} onClick={() => setEditing(category)}>
+                  <button type="button" className={linkButton} onClick={() => setDialog(category)}>
                     Edit
                   </button>
                   <button type="button" className={linkButton} onClick={() => setDeleting(category)}>
@@ -74,7 +82,7 @@ export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
           </ListCard>
         )}
       />
-      {canEdit && <CategoryEditor key={editing?.id ?? 'new'} category={editing} onDone={() => setEditing(null)} />}
+      {canEdit && dialog && <CategoryDialog category={dialog === 'new' ? null : dialog} onClose={() => setDialog(null)} />}
       <ConfirmModal
         open={deleting !== null}
         destructive
@@ -89,13 +97,12 @@ export function IngredientCategories({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-function CategoryEditor({ category, onDone }: { category: InventoryCategory | null; onDone: () => void }) {
+function CategoryDialog({ category, onClose }: { category: InventoryCategory | null; onClose: () => void }) {
   const create = useCreateInventoryCategory();
   const update = useUpdateInventoryCategory();
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<CategoryForm>({
     resolver: zodResolver(categorySchema),
@@ -106,18 +113,23 @@ function CategoryEditor({ category, onDone }: { category: InventoryCategory | nu
     if (category) await update.mutateAsync({ id: category.id, body: v });
     else await create.mutateAsync(v);
     toast.success(category ? 'Category updated' : 'Category added');
-    reset({ name: '', sortOrder: 0 });
-    onDone();
+    onClose();
   });
 
   return (
-    <EditorCard title="category" editing={!!category} busy={create.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
+    <FormDialog
+      title={category ? 'Edit category' : 'Add category'}
+      busy={create.isPending || update.isPending}
+      submitLabel={category ? 'Save changes' : 'Add'}
+      onSubmit={submit}
+      onClose={onClose}
+    >
       <FormField label="Name" error={errors.name?.message}>
         <input {...register('name')} className={controlClass} />
       </FormField>
       <FormField label="Position" hint="Lower numbers come first" error={errors.sortOrder?.message}>
         <input type="number" inputMode="numeric" {...register('sortOrder', { valueAsNumber: true })} className={controlClass} />
       </FormField>
-    </EditorCard>
+    </FormDialog>
   );
 }

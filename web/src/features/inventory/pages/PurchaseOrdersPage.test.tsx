@@ -93,12 +93,15 @@ describe('PurchaseOrdersPage', () => {
     vi.mocked(inventoryApi.createPurchaseOrder).mockResolvedValue({} as never);
     renderPage(<PurchaseOrdersPage />);
     await screen.findByText('Deliver to Katipunan');
+    expect(screen.queryByLabelText('Supplier')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New purchase order' });
 
-    fireEvent.change(screen.getByLabelText('Supplier'), { target: { value: 's1' } });
-    fireEvent.change(screen.getByLabelText('Item'), { target: { value: 'milk' } });
-    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '24' } });
-    fireEvent.change(screen.getByLabelText('Unit cost (PHP)'), { target: { value: '80.5' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create draft' }));
+    fireEvent.change(await within(dialog).findByLabelText('Supplier'), { target: { value: 's1' } });
+    fireEvent.change(within(dialog).getByLabelText('Item'), { target: { value: 'milk' } });
+    fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '24' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit cost (PHP)'), { target: { value: '80.5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create draft' }));
 
     await waitFor(() => expect(inventoryApi.createPurchaseOrder).toHaveBeenCalledTimes(1));
     expect(inventoryApi.createPurchaseOrder).toHaveBeenCalledWith({
@@ -111,7 +114,8 @@ describe('PurchaseOrdersPage', () => {
   it('will not create an order without a supplier', async () => {
     renderPage(<PurchaseOrdersPage />);
     await screen.findByText('Deliver to Katipunan');
-    fireEvent.click(screen.getByRole('button', { name: 'Create draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create draft' }));
     expect(await screen.findByText('Choose a supplier')).toBeInTheDocument();
     expect(inventoryApi.createPurchaseOrder).not.toHaveBeenCalled();
   });

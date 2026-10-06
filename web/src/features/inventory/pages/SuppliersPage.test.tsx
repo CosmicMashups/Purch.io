@@ -17,13 +17,15 @@ describe('SuppliersPage', () => {
     renderPage(<SuppliersPage />);
     expect(await screen.findByText('Metro Foods')).toBeInTheDocument();
     expect(screen.getByText('0917 555 0101')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 
   it('adds a supplier and sends blank details as null', async () => {
     vi.mocked(inventoryApi.createSupplier).mockResolvedValue({} as never);
     renderPage(<SuppliersPage />);
     await screen.findByText('Metro Foods');
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Puregold Wholesale' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add supplier' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Puregold Wholesale' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(inventoryApi.createSupplier).toHaveBeenCalledTimes(1));
     expect(vi.mocked(inventoryApi.createSupplier).mock.calls[0][0]).toEqual({ name: 'Puregold Wholesale', specialization: null, address: null, tin: null, remarks: null, contacts: [] });
@@ -33,7 +35,8 @@ describe('SuppliersPage', () => {
     vi.mocked(inventoryApi.createSupplier).mockResolvedValue({} as never);
     renderPage(<SuppliersPage />);
     await screen.findByText('Metro Foods');
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add supplier' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Acme' } });
     fireEvent.change(screen.getByLabelText('Contact person'), { target: { value: 'Ben' } });
     fireEvent.click(screen.getByLabelText('Viber'));
     fireEvent.change(screen.getByLabelText('Contact number'), { target: { value: '0917 111 2222' } });
@@ -51,6 +54,7 @@ describe('SuppliersPage', () => {
     vi.mocked(inventoryApi.updateSupplier).mockResolvedValue({} as never);
     renderPage(<SuppliersPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Metro Foods' }));
+    expect(await screen.findByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toHaveValue('Metro Foods');
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Metro Foods Inc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -62,7 +66,8 @@ describe('SuppliersPage', () => {
   it('requires a name', async () => {
     renderPage(<SuppliersPage />);
     await screen.findByText('Metro Foods');
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add supplier' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Enter the supplier name')).toBeInTheDocument();
     expect(inventoryApi.createSupplier).not.toHaveBeenCalled();
   });

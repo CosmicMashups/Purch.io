@@ -48,7 +48,7 @@ export function RestockList({ scope, onScopeChange }: { scope: StockScope; onSco
       onHand: i.stockOnHand,
       threshold: i.lowStockThreshold,
       unit: '',
-      addStockTo: `/inventory/movements/new?itemId=${i.itemId}&type=${MovementType.StockIn}`,
+      addStockTo: `/inventory/movements?record=1&stockRef=item:${i.itemId}&recordType=${MovementType.StockIn}`,
     }));
   }
 

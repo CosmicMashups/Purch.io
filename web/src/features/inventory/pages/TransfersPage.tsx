@@ -3,15 +3,14 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { EditorCard } from '../../../components/forms/EditorCard';
-import { FormField, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormCombobox, type ComboboxGroup } from '../../../components/forms/GroupedCombobox';
 import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
-import { FormLoader } from '../../../components/forms/FormLoader';
 import { useBranches, useSelectableBranches } from '../../branches/queries';
 import type { Branch } from '../../branches/types';
-import { useItems } from '../../catalog/queries';
-import type { Item } from '../../catalog/types';
+import { stockRefFields, useStockOptions } from '../stockOptions';
 import { transferSchema, type TransferForm } from '../purchasing';
 import { useCancelTransfer, useCreateTransfer, useMarkTransferInTransit, useMarkTransferReceived, useTransfers } from '../queries';
 import type { BranchTransfer } from '../types';
@@ -42,7 +41,8 @@ const CONFIRM_COPY: Record<TransferAction, { title: string; verb: string; descri
 
 export function TransfersPage() {
   const transfers = useTransfers();
-  const items = useItems();
+  const stock = useStockOptions();
+  const [creating, setCreating] = useState(false);
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
   const allBranches = useBranches();
   const ship = useMarkTransferInTransit();
@@ -66,8 +66,16 @@ export function TransfersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Stock transfers" backTo={{ to: '/inventory', label: 'Inventory' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+      <PageHeader
+        title="Stock transfers"
+        backTo={{ to: '/inventory', label: 'Inventory' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setCreating(true)}>
+            New transfer
+          </PrimaryButton>
+        }
+      />
+      <div>
         <QueryList
           query={transfers}
           errorTitle="Transfers could not be loaded"
@@ -109,13 +117,20 @@ export function TransfersPage() {
             );
           }}
         />
-        <FormLoader
-          failed={items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
-          ready={!!(branches && allBranches.data && items.data)}
-        >
-          {branches && allBranches.data && items.data && <TransferForm sourceOptions={branches} destinationOptions={allBranches.data} items={items.data} />}
-        </FormLoader>
       </div>
+
+      {creating && (
+        <FormDialogLoader
+          title="New transfer"
+          failed={stock.failed ? stock.failed : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
+          ready={!!(branches && allBranches.data && stock.ready)}
+          onClose={() => setCreating(false)}
+        >
+          {branches && allBranches.data && (
+            <TransferDialog sourceOptions={branches} destinationOptions={allBranches.data} groups={stock.groups} onClose={() => setCreating(false)} />
+          )}
+        </FormDialogLoader>
+      )}
 
       <ConfirmModal
         open={pending !== null}
@@ -131,32 +146,45 @@ export function TransfersPage() {
   );
 }
 
-function TransferForm({ sourceOptions, destinationOptions, items }: { sourceOptions: Branch[]; destinationOptions: Branch[]; items: Item[] }) {
+function TransferDialog({
+  sourceOptions,
+  destinationOptions,
+  groups,
+  onClose,
+}: {
+  sourceOptions: Branch[];
+  destinationOptions: Branch[];
+  groups: ComboboxGroup[];
+  onClose: () => void;
+}) {
   const create = useCreateTransfer();
   const {
     register,
     control,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<TransferForm>({
     resolver: zodResolver(transferSchema),
     defaultValues: {
       sourceBranchId: sourceOptions.length === 1 ? sourceOptions[0].id : '',
       destinationBranchId: '',
-      lines: [{ itemId: '' }] as TransferForm['lines'],
+      lines: [{ stockRef: '' }] as TransferForm['lines'],
     },
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
   const submit = handleSubmit(async (v) => {
-    await create.mutateAsync(v);
+    await create.mutateAsync({
+      sourceBranchId: v.sourceBranchId,
+      destinationBranchId: v.destinationBranchId,
+      lines: v.lines.map((l) => ({ ...stockRefFields(l.stockRef), quantity: l.quantity })),
+    });
     toast.success('Transfer created');
-    reset({ sourceBranchId: v.sourceBranchId, destinationBranchId: '', lines: [{ itemId: '' }] as TransferForm['lines'] });
+    onClose();
   });
 
   return (
-    <EditorCard title="transfer" editing={false} busy={create.isPending} submitLabel="Create transfer" onSubmit={submit} onCancel={() => reset()}>
+    <FormDialog title="New transfer" wide busy={create.isPending} submitLabel="Create transfer" onSubmit={submit} onClose={onClose}>
       <FormField label="Send from" error={errors.sourceBranchId?.message}>
         <select {...register('sourceBranchId')} className={controlClass}>
           <option value="">Choose a branch</option>
@@ -179,18 +207,11 @@ function TransferForm({ sourceOptions, destinationOptions, items }: { sourceOpti
       </FormField>
 
       <fieldset className="flex flex-col gap-4">
-        <legend className="text-base font-semibold">Items</legend>
+        <legend className="text-base font-semibold">Stock to send</legend>
         {fields.map((field, index) => (
           <div key={field.id} className="flex flex-col gap-3 rounded-control border border-line p-3">
-            <FormField label="Item" error={errors.lines?.[index]?.itemId?.message}>
-              <select {...register(`lines.${index}.itemId`)} className={controlClass}>
-                <option value="">Choose an item</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+            <FormField label="Item or ingredient" error={errors.lines?.[index]?.stockRef?.message}>
+              <FormCombobox control={control} name={`lines.${index}.stockRef`} groups={groups} placeholder="Search items and ingredients" />
             </FormField>
             <FormField label="Quantity" error={errors.lines?.[index]?.quantity?.message}>
               <input type="number" inputMode="decimal" step="any" {...register(`lines.${index}.quantity`, { valueAsNumber: true })} className={controlClass} />
@@ -207,10 +228,10 @@ function TransferForm({ sourceOptions, destinationOptions, items }: { sourceOpti
             {errors.lines?.message ?? errors.lines?.root?.message}
           </p>
         )}
-        <SecondaryButton type="button" onClick={() => append({ itemId: '' } as TransferForm['lines'][number])}>
+        <SecondaryButton type="button" onClick={() => append({ stockRef: '' } as TransferForm['lines'][number])}>
           Add another item
         </SecondaryButton>
       </fieldset>
-    </EditorCard>
+    </FormDialog>
   );
 }

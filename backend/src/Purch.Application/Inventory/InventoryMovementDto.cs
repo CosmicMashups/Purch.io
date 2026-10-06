@@ -4,8 +4,10 @@ namespace Purch.Application.Inventory;
 
 public sealed record InventoryMovementDto(
     Guid Id,
-    Guid ItemId,
+    Guid? ItemId,
     string ItemName,
+    Guid? InventoryItemId,
+    string? InventoryItemName,
     Guid BranchId,
     string BranchName,
     MovementType Type,
@@ -23,11 +25,12 @@ public sealed record InventoryMovementDto(
 /// upward — every other type's direction is implied by its Type (see
 /// InventoryMovementService.StockDelta).</summary>
 public sealed record RecordMovementRequest(
-    Guid ItemId,
+    Guid? ItemId,
     Guid BranchId,
     MovementType Type,
     decimal Quantity,
     string? Note,
     string? ReasonCategory,
     string? PhotoUrl,
-    string? SupplierReference);
+    string? SupplierReference,
+    Guid? InventoryItemId = null);

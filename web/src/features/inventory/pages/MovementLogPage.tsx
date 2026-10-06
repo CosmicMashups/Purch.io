@@ -1,22 +1,25 @@
 import { useSearchParams } from 'react-router-dom';
 import { ErrorState } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
-import { FormField, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { ListCard, Pill } from '../../../components/lists/QueryList';
-import { LinkButton, PageHeader } from '../../../components/PageHeader';
+import { PageHeader } from '../../../components/PageHeader';
+import { GroupedCombobox } from '../../../components/forms/GroupedCombobox';
 import { formatDateTime } from '../../../lib/dates';
 import { userMessage } from '../../../lib/apiError';
 import { useBranches } from '../../branches/queries';
-import { useItems } from '../../catalog/queries';
-import { FILTERABLE_TYPES, movementLabel } from '../movement';
+import { FILTERABLE_TYPES, initialMovementType, movementLabel } from '../movement';
 import { useMovementLog } from '../queries';
 import { MovementType, type MovementFilter } from '../types';
+import { ingredientRef, itemRef, parseStockRef, useStockOptions } from '../stockOptions';
+import { RecordMovementDialog } from './RecordMovementDialog';
 
 function readFilter(params: URLSearchParams): MovementFilter {
   const type = params.get('type');
   const parsedType = type === null ? NaN : Number(type);
   return {
     itemId: params.get('itemId') || undefined,
+    inventoryItemId: params.get('inventoryItemId') || undefined,
     branchId: params.get('branchId') || undefined,
     type: (FILTERABLE_TYPES as readonly number[]).includes(parsedType) ? (parsedType as MovementType) : undefined,
   };
@@ -26,13 +29,32 @@ export function MovementLogPage() {
   const [params, setParams] = useSearchParams();
   const filter = readFilter(params);
   const log = useMovementLog(filter);
-  const items = useItems();
+  const stock = useStockOptions();
   const branches = useBranches();
 
-  function setFilter(key: 'itemId' | 'branchId' | 'type', value: string) {
+  function setFilter(key: 'branchId' | 'type', value: string) {
     const next = new URLSearchParams(params);
     if (value === '') next.delete(key);
     else next.set(key, value);
+    setParams(next, { replace: true });
+  }
+
+  function setStockFilter(value: string) {
+    const next = new URLSearchParams(params);
+    next.delete('itemId');
+    next.delete('inventoryItemId');
+    const ref = parseStockRef(value);
+    if (ref) next.set(ref.kind === 'item' ? 'itemId' : 'inventoryItemId', ref.id);
+    setParams(next, { replace: true });
+  }
+
+  // Links from elsewhere (the Inventory home, the restock list) open the dialog with `?record=1`.
+  const recording = params.get('record') !== null;
+  function closeRecording() {
+    const next = new URLSearchParams(params);
+    next.delete('record');
+    next.delete('stockRef');
+    next.delete('recordType');
     setParams(next, { replace: true });
   }
 
@@ -43,7 +65,18 @@ export function MovementLogPage() {
       <PageHeader
         title="Stock movements"
         backTo={{ to: '/inventory', label: 'Inventory' }}
-        action={<LinkButton to="/inventory/movements/new" primary>Record movement</LinkButton>}
+        action={
+          <PrimaryButton
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('record', '1');
+              setParams(next, { replace: true });
+            }}
+          >
+            Record movement
+          </PrimaryButton>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -57,15 +90,14 @@ export function MovementLogPage() {
             ))}
           </select>
         </FormField>
-        <FormField label="Item">
-          <select value={filter.itemId ?? ''} onChange={(e) => setFilter('itemId', e.target.value)} className={controlClass}>
-            <option value="">All items</option>
-            {(items.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+        <FormField label="Item or ingredient">
+          <GroupedCombobox
+            groups={stock.groups}
+            value={filter.itemId ? itemRef(filter.itemId) : filter.inventoryItemId ? ingredientRef(filter.inventoryItemId) : ''}
+            onChange={setStockFilter}
+            emptyLabel="All items and ingredients"
+            placeholder="All items and ingredients"
+          />
         </FormField>
         <FormField label="Branch">
           <select value={filter.branchId ?? ''} onChange={(e) => setFilter('branchId', e.target.value)} className={controlClass}>
@@ -89,7 +121,10 @@ export function MovementLogPage() {
           {rows.map((row) => (
             <ListCard key={row.id}>
               <div className="min-w-0">
-                <p className="text-base font-semibold">{row.itemName}</p>
+                <p className="text-base font-semibold">{row.inventoryItemName ?? row.itemName}</p>
+                {row.inventoryItemName && row.inventoryItemName !== row.itemName && row.itemId && (
+                  <p className="text-sm text-ink-soft">For {row.itemName}</p>
+                )}
                 <p className="text-base tabular-nums">
                   {movementLabel(row.type)}: {row.quantity}
                 </p>
@@ -108,6 +143,12 @@ export function MovementLogPage() {
             </ListCard>
           ))}
         </ul>
+      )}
+      {recording && (
+        <RecordMovementDialog
+          prefill={{ stockRef: params.get('stockRef') ?? undefined, type: initialMovementType(params.get('recordType')) }}
+          onClose={closeRecording}
+        />
       )}
       {log.hasNextPage && (
         <div>

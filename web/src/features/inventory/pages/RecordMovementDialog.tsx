@@ -1,53 +1,77 @@
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorState } from '../../../components/ErrorState';
-import { Skeleton } from '../../../components/Skeleton';
 import { toast } from '../../../components/feedback/toastStore';
-import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
-import { PageHeader } from '../../../components/PageHeader';
+import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
+import { FormCombobox, type ComboboxGroup } from '../../../components/forms/GroupedCombobox';
+import { Modal } from '../../../components/Modal';
+import { Skeleton } from '../../../components/Skeleton';
 import { userMessage } from '../../../lib/apiError';
-import type { Branch } from '../../branches/types';
 import { useSelectableBranches } from '../../branches/queries';
-import { useItems } from '../../catalog/queries';
-import type { Item } from '../../catalog/types';
+import type { Branch } from '../../branches/types';
 import { RECORDABLE_TYPES, movementLabel, movementSchema, quantityHint, type MovementForm } from '../movement';
 import { useRecordMovement } from '../queries';
+import { stockRefFields, useStockOptions } from '../stockOptions';
 import { MovementType } from '../types';
 
-function initialType(raw: string | null): number {
-  const parsed = raw === null ? NaN : Number(raw);
-  return (RECORDABLE_TYPES as readonly number[]).includes(parsed) ? parsed : MovementType.StockIn;
+const FORM_ID = 'record-movement-form';
+
+export interface MovementPrefill {
+  /** `item:<id>` or `ingredient:<id>`. */
+  stockRef?: string;
+  type?: number;
 }
 
-export function RecordMovementPage() {
-  const items = useItems();
+/** Records one stock movement against an item or an ingredient. Opened from the movement log and the Inventory home. */
+export function RecordMovementDialog({ prefill, onClose }: { prefill: MovementPrefill; onClose: () => void }) {
+  const stock = useStockOptions();
+  const record = useRecordMovement();
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
-  const loadFailed = items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null;
+  const loadFailed = stock.failed ? { error: stock.failed.error, refetch: stock.failed.refetch } : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null;
 
   return (
-    <div className="flex max-w-xl flex-col gap-6">
-      <PageHeader title="Record movement" backTo={{ to: '/inventory', label: 'Inventory' }} />
+    <Modal open title="Record movement" onClose={onClose} footer={<Footer onClose={onClose} busy={record.isPending} ready={stock.ready && !!branches && !loadFailed} />}>
       {loadFailed ? (
         <ErrorState title="The form could not be loaded" message={userMessage(loadFailed.error)} onRetry={() => void loadFailed.refetch()} />
-      ) : !items.data || !branches ? (
+      ) : !stock.ready || !branches ? (
         <div className="flex flex-col gap-3" aria-busy="true">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
       ) : (
-        <RecordMovementForm items={items.data} branches={branches} />
+        <RecordMovementForm record={record} groups={stock.groups} branches={branches} prefill={prefill} onDone={onClose} />
       )}
+    </Modal>
+  );
+}
+
+function Footer({ onClose, ready, busy }: { onClose: () => void; ready: boolean; busy: boolean }) {
+  return (
+    <div className="flex justify-end gap-3">
+      <SecondaryButton type="button" onClick={onClose}>
+        Cancel
+      </SecondaryButton>
+      <PrimaryButton type="submit" form={FORM_ID} busy={busy} disabled={!ready}>
+        {busy ? 'Saving...' : 'Record movement'}
+      </PrimaryButton>
     </div>
   );
 }
 
-function RecordMovementForm({ items, branches }: { items: Item[]; branches: Branch[] }) {
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const record = useRecordMovement();
-
+function RecordMovementForm({
+  record,
+  groups,
+  branches,
+  prefill,
+  onDone,
+}: {
+  record: ReturnType<typeof useRecordMovement>;
+  groups: ComboboxGroup[];
+  branches: Branch[];
+  prefill: MovementPrefill;
+  onDone: () => void;
+}) {
   const {
     register,
     handleSubmit,
@@ -56,10 +80,10 @@ function RecordMovementForm({ items, branches }: { items: Item[]; branches: Bran
   } = useForm<MovementForm>({
     resolver: zodResolver(movementSchema),
     defaultValues: {
-      itemId: params.get('itemId') ?? '',
+      stockRef: prefill.stockRef ?? '',
       // A single option (a branch-scoped account) needs no choosing.
       branchId: branches.length === 1 ? branches[0].id : '',
-      type: initialType(params.get('type')),
+      type: prefill.type ?? MovementType.StockIn,
       reasonCategory: '',
       supplierReference: '',
       note: '',
@@ -69,7 +93,7 @@ function RecordMovementForm({ items, branches }: { items: Item[]; branches: Bran
 
   const submit = handleSubmit(async (v) => {
     await record.mutateAsync({
-      itemId: v.itemId,
+      ...stockRefFields(v.stockRef),
       branchId: v.branchId,
       type: v.type as MovementType,
       quantity: v.quantity,
@@ -79,20 +103,13 @@ function RecordMovementForm({ items, branches }: { items: Item[]; branches: Bran
       supplierReference: v.supplierReference.trim() || null,
     });
     toast.success('Movement recorded');
-    navigate('/inventory/movements');
+    onDone();
   });
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <FormField label="Item" error={errors.itemId?.message}>
-        <select {...register('itemId')} className={controlClass}>
-          <option value="">Choose an item</option>
-          {items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
+    <form id={FORM_ID} onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <FormField label="Item or ingredient" error={errors.stockRef?.message}>
+        <FormCombobox control={control} name="stockRef" groups={groups} placeholder="Search items and ingredients" />
       </FormField>
 
       <FormField label="Branch" error={errors.branchId?.message}>
@@ -135,12 +152,6 @@ function RecordMovementForm({ items, branches }: { items: Item[]; branches: Bran
       <FormField label="Note (optional)">
         <input {...register('note')} className={controlClass} />
       </FormField>
-
-      <div>
-        <PrimaryButton type="submit" busy={record.isPending}>
-          {record.isPending ? 'Saving...' : 'Record movement'}
-        </PrimaryButton>
-      </div>
     </form>
   );
 }

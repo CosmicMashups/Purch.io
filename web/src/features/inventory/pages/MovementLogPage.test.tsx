@@ -9,13 +9,18 @@ import type { InventoryMovement } from '../types';
 import { MovementLogPage } from './MovementLogPage';
 
 vi.mock('../../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
-vi.mock('../../catalog/api', () => ({ catalogApi: { listItems: vi.fn() } }));
-vi.mock('../api', () => ({ MOVEMENT_PAGE_SIZE: 2, inventoryApi: { listMovements: vi.fn() } }));
+vi.mock('../../catalog/api', () => ({ catalogApi: { listItems: vi.fn(), listCategories: vi.fn() } }));
+vi.mock('../api', () => ({
+  MOVEMENT_PAGE_SIZE: 2,
+  inventoryApi: { listMovements: vi.fn(), listInventoryItems: vi.fn(), listInventoryCategories: vi.fn(), recordMovement: vi.fn() },
+}));
 
 const movement = (id: string, over: Partial<InventoryMovement> = {}): InventoryMovement => ({
   id,
   itemId: 'latte',
   itemName: `Latte ${id}`,
+  inventoryItemId: null,
+  inventoryItemName: null,
   branchId: 'kat',
   branchName: 'Katipunan',
   type: 0,
@@ -35,6 +40,9 @@ describe('MovementLogPage', () => {
     vi.clearAllMocks();
     signInAs('Manager');
     vi.mocked(catalogApi.listItems).mockResolvedValue([{ id: 'latte', name: 'Latte' }] as Item[]);
+    vi.mocked(catalogApi.listCategories).mockResolvedValue([]);
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([]);
+    vi.mocked(inventoryApi.listInventoryCategories).mockResolvedValue([]);
     vi.mocked(branchesApi.list).mockResolvedValue([{ id: 'kat', name: 'Katipunan', address: null }]);
   });
 
@@ -66,6 +74,22 @@ describe('MovementLogPage', () => {
 
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: '5' } });
     await waitFor(() => expect(vi.mocked(inventoryApi.listMovements).mock.calls.at(-1)?.[0]).toMatchObject({ type: 5 }));
+  });
+
+  it('names the ingredient on a consumption row and says which item it was used for', async () => {
+    vi.mocked(inventoryApi.listMovements).mockResolvedValue([
+      movement('1', { type: 2, itemName: 'Flat White', inventoryItemId: 'beans', inventoryItemName: 'Coffee Beans' }),
+    ]);
+    renderPage(<MovementLogPage />);
+    expect(await screen.findByText('Coffee Beans')).toBeInTheDocument();
+    expect(screen.getByText('For Flat White')).toBeInTheDocument();
+  });
+
+  it('opens the record dialog from the button and from a ?record link', async () => {
+    vi.mocked(inventoryApi.listMovements).mockResolvedValue([]);
+    renderPage(<MovementLogPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record movement' }));
+    expect(await screen.findByRole('dialog', { name: 'Record movement' })).toBeInTheDocument();
   });
 
   it('shows a retryable error instead of an empty log', async () => {

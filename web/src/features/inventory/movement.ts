@@ -34,7 +34,7 @@ export function movementLabel(type: number): string {
 
 export const movementSchema = z
   .object({
-    itemId: z.string().min(1, 'Choose an item'),
+    stockRef: z.string().min(1, 'Choose an item or ingredient'),
     branchId: z.string().min(1, 'Choose a branch'),
     type: z.number().int().min(0).max(7),
     quantity: z.number({ invalid_type_error: 'Enter a quantity', required_error: 'Enter a quantity' }),
@@ -63,4 +63,10 @@ export function quantityHint(type: MovementType): string {
   return type === MovementType.Adjustment
     ? 'Use a negative number to correct stock down, positive to correct it up'
     : 'How many units moved';
+}
+
+/** The movement type a `?recordType=` link asks for, falling back to Stock-In. */
+export function initialMovementType(raw: string | null): number {
+  const parsed = raw === null ? NaN : Number(raw);
+  return (RECORDABLE_TYPES as readonly number[]).includes(parsed) ? parsed : MovementType.StockIn;
 }

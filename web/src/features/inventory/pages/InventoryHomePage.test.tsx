@@ -33,7 +33,7 @@ describe('InventoryHomePage', () => {
     signInAs('Warehouse');
     renderPage(<InventoryHomePage />);
     const links = await screen.findAllByRole('link', { name: 'Add stock' });
-    expect(links[0]).toHaveAttribute('href', '/inventory/movements/new?itemId=b&type=0');
+    expect(links[0]).toHaveAttribute('href', '/inventory/movements?record=1&stockRef=item:b&recordType=0');
   });
 
   it('hides the catalog tiles from Warehouse but shows them to a Manager', async () => {
