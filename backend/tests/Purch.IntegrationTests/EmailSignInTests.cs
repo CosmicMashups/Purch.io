@@ -41,7 +41,7 @@ public sealed class EmailSignInTests(PostgresContainerFixture postgres)
     {
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"{name} {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234", email, password));
+            new BootstrapTenantRequest($"{name} {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "123412", email, password));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
     }
@@ -138,7 +138,7 @@ public sealed class EmailSignInTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Other {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Someone Else", "1234", email, "a different password"));
+            new BootstrapTenantRequest($"Other {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Someone Else", "123412", email, "a different password"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

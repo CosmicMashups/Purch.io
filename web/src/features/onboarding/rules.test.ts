@@ -6,7 +6,7 @@ const good: BootstrapForm = {
   businessType: 2,
   branchName: 'Main',
   adminName: 'Mario Cruz',
-  adminPin: '4321',
+  adminPin: '432112',
   adminEmail: 'mario@kape.ph',
   adminPassword: 'longenough1',
   agreed: true,
@@ -42,7 +42,7 @@ describe('bootstrapSchema', () => {
   });
 
   it('applies the PIN rule', () => {
-    expect(messages({ ...good, adminPin: '12' })).toContain('Use 4 to 8 digits');
+    expect(messages({ ...good, adminPin: '12' })).toContain('Use 6 to 8 digits');
     expect(messages({ ...good, adminPin: '' })).toContain('Enter a PIN');
   });
 
@@ -64,12 +64,12 @@ describe('STEP_FIELDS', () => {
 
 describe('toBootstrapBody', () => {
   it('trims the text fields and sends the email and password', () => {
-    expect(toBootstrapBody({ ...good, tenantName: ' Kape ', adminPin: ' 4321 ', adminEmail: ' mario@kape.ph ' })).toEqual({
+    expect(toBootstrapBody({ ...good, tenantName: ' Kape ', adminPin: ' 432112 ', adminEmail: ' mario@kape.ph ' })).toEqual({
       tenantName: 'Kape',
       businessType: 2,
       branchName: 'Main',
       adminName: 'Mario Cruz',
-      adminPin: '4321',
+      adminPin: '432112',
       adminEmail: 'mario@kape.ph',
       adminPassword: 'longenough1',
     });

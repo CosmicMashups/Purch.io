@@ -78,7 +78,7 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Choose a PIN'),
-      '1234',
+      '123456',
     );
     await tester.tap(find.byType(Checkbox));
     await tester.pump();
@@ -115,7 +115,7 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Choose a PIN'),
-      '1234',
+      '123456',
     );
     await tester.tap(find.byType(Checkbox));
     await tester.pump();
@@ -147,7 +147,7 @@ void main() {
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Choose a PIN'),
-        '1234',
+        '123456',
       );
       await tester.tap(find.text('Create Business'));
       await tester.pump();

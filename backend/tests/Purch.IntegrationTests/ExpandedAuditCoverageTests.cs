@@ -26,7 +26,7 @@ public sealed class ExpandedAuditCoverageTests(PostgresContainerFixture postgres
         using var admin = await AuthenticatedAdminClientAsync(factory);
 
         var shop = TestSessions.ShopOf(admin);
-        var cashierId = await TestSessions.AddPersonAsync(admin, "Cash Ier", MembershipRole.Staff, StaffDuty.Cashier, "5678");
+        var cashierId = await TestSessions.AddPersonAsync(admin, "Cash Ier", MembershipRole.Staff, StaffDuty.Cashier, "567812");
 
         // A save that changes nothing must not add a spurious entry.
         _ = await admin.PutAsJsonAsync($"/staff/members/{cashierId}", new UpdateMemberRequest(MembershipRole.Staff, StaffDuty.Cashier, [shop.Tenant.BranchId], true));
@@ -121,7 +121,7 @@ public sealed class ExpandedAuditCoverageTests(PostgresContainerFixture postgres
         // This tenant has only one Admin account, so it may approve its own refund.
         var refundResponse = await admin.PostAsJsonAsync(
             $"/transactions/{sale.Id}/refund",
-            new RefundTransactionRequest("Wrong order prepared", "1234"));
+            new RefundTransactionRequest("Wrong order prepared", "123412"));
         Assert.True(refundResponse.IsSuccessStatusCode);
 
         var logs = await admin.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);

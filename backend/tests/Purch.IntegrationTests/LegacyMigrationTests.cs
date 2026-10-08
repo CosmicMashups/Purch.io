@@ -43,8 +43,8 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
         var newDeviceToken = $"new-device-token-{Guid.NewGuid():N}";
         _ = db.Tenants.Add(new Tenant { Id = tenantId, Name = $"Old Shop {tenantId:N}", BusinessType = BusinessType.ConvenienceStore });
         var branch = new Branch { TenantId = tenantId, Name = "Main" };
-        var owner = new User { TenantId = tenantId, Name = "Old Owner", Email = email, Role = Role.Admin, ScopeType = ScopeType.Tenant, PinHash = new BCryptPinHasher().Hash("1234"), PasswordHash = new BCryptPasswordHasher().Hash(OwnerPassword) };
-        var cashier = new User { TenantId = tenantId, Name = "Old Cashier", Role = Role.Cashier, ScopeType = ScopeType.Tenant, BranchId = branch.Id, PinHash = new BCryptPinHasher().Hash("5678") };
+        var owner = new User { TenantId = tenantId, Name = "Old Owner", Email = email, Role = Role.Admin, ScopeType = ScopeType.Tenant, PinHash = new BCryptPinHasher().Hash("123412"), PasswordHash = new BCryptPasswordHasher().Hash(OwnerPassword) };
+        var cashier = new User { TenantId = tenantId, Name = "Old Cashier", Role = Role.Cashier, ScopeType = ScopeType.Tenant, BranchId = branch.Id, PinHash = new BCryptPinHasher().Hash("567812") };
         var legacyDevice = new Device { TenantId = tenantId, BranchId = branch.Id, PairingCode = $"OLD-{Guid.NewGuid():N}"[..12], DeviceType = DeviceType.Register };
         var newDevice = new Device { TenantId = tenantId, BranchId = branch.Id, PairingCode = string.Empty, DeviceType = DeviceType.Kiosk, Name = "New kiosk", PairedAt = DateTimeOffset.UtcNow };
         _ = db.Branches.Add(branch);
@@ -86,7 +86,7 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
         Assert.Equal(MembershipRole.Admin, membership.Role);
         Assert.Equal(seeded.OwnerId, membership.LegacyUserId);
         Assert.Equal(seeded.OwnerEmail, membership.Account!.Email);
-        Assert.True(new BCryptPinHasher().Verify("1234", membership.PinHash!));
+        Assert.True(new BCryptPinHasher().Verify("123412", membership.PinHash!));
 
         // Sessions of the old sign-in end; a device paired the new way keeps its own.
         var tokens = await db.RefreshTokens.ToListAsync();
@@ -142,7 +142,7 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
 
         var email = $"{Guid.NewGuid():N}@example.com";
         var invite = (await (await admin.PostAsJsonAsync("/staff/invites", new CreateInviteRequest("Old Cashier", email, MembershipRole.Staff, StaffDuty.Cashier, [seeded.BranchId], seeded.CashierId))).Content.ReadFromJsonAsync<InviteLinkDto>(JsonOptions))!;
-        var redeemed = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, "a fresh passphrase", "4821"));
+        var redeemed = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, "a fresh passphrase", "482112"));
         Assert.Equal(HttpStatusCode.OK, redeemed.StatusCode);
 
         // Their earlier sales and shifts stay theirs through the carried-over id, and they drop off the list.
@@ -171,7 +171,7 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
         await using (var db = NewContext(tenantId))
         {
             _ = db.Tenants.Add(new Tenant { Id = tenantId, Name = $"Pin Shop {tenantId:N}", BusinessType = BusinessType.ConvenienceStore });
-            var owner = new User { TenantId = tenantId, Name = "Pin Owner", Role = Role.Admin, ScopeType = ScopeType.Tenant, PinHash = new BCryptPinHasher().Hash("1234") };
+            var owner = new User { TenantId = tenantId, Name = "Pin Owner", Role = Role.Admin, ScopeType = ScopeType.Tenant, PinHash = new BCryptPinHasher().Hash("123412") };
             ownerId = owner.Id;
             _ = db.Users.Add(owner);
             _ = await db.SaveChangesAsync();
@@ -186,10 +186,10 @@ public sealed class LegacyMigrationTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
 
         // The link needs an email, since none was ever on file.
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "4821"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "482112"))).StatusCode);
 
         var email = $"{Guid.NewGuid():N}@example.com";
-        var redeemed = await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "4821", email));
+        var redeemed = await client.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(link.Token, "a fresh passphrase", "482112", email));
         Assert.Equal(HttpStatusCode.OK, redeemed.StatusCode);
 
         await using var check = NewContext(tenantId);

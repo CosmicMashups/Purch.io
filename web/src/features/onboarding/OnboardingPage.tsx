@@ -86,7 +86,7 @@ export function OnboardingPage() {
             <FormField label="Your name" error={errors.adminName?.message}>
               <input {...register('adminName')} autoComplete="name" className={controlClass} />
             </FormField>
-            <FormField label="Choose a PIN" hint="4 to 8 digits. You sign in on registers with it." error={errors.adminPin?.message}>
+            <FormField label="Choose a PIN" hint="6 to 8 digits. You sign in on registers with it." error={errors.adminPin?.message}>
               <input type="password" inputMode="numeric" autoComplete="new-password" {...register('adminPin')} className={controlClass} />
             </FormField>
             <fieldset className="flex flex-col gap-4 rounded-panel border border-line p-4">

@@ -33,10 +33,10 @@ public sealed class BranchScopeEnforcementTests(PostgresContainerFixture postgre
 
         // Staff are confined to the branch their device is in. Warehouse staff at the second branch, on that branch's own
         // Warehouse device, stand in for the branch-limited manager the old sign-in allowed.
-        var staffId = await TestSessions.AddPersonAsync(admin, "Bea Branch", MembershipRole.Staff, StaffDuty.Warehouse, "5678", own.Id);
+        var staffId = await TestSessions.AddPersonAsync(admin, "Bea Branch", MembershipRole.Staff, StaffDuty.Warehouse, "567812", own.Id);
         using var anonymous = factory.CreateClient();
         var (_, credential) = await TestSessions.PairAsync(admin, anonymous, own.Id, DeviceType.WarehouseOfficer, "Second branch stock room");
-        var manager = await TestSessions.UnlockAsync(admin, staffId, "5678", credential);
+        var manager = await TestSessions.UnlockAsync(admin, staffId, "567812", credential);
 
         var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Canned Goods", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         _ = await admin.PostAsJsonAsync(

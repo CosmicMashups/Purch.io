@@ -71,8 +71,8 @@ export function EnrolPage() {
     } else if (!password) {
       return setError('Enter your existing password.');
     }
-    if (!reset && !/^\d{4,8}$/.test(pin)) return setError('Choose a PIN of 4 to 8 digits.');
-    if (reset && pin && !/^\d{4,8}$/.test(pin)) return setError('A PIN is 4 to 8 digits.');
+    if (!reset && !/^\d{6,8}$/.test(pin)) return setError('Choose a PIN of 6 to 8 digits.');
+    if (reset && pin && !/^\d{6,8}$/.test(pin)) return setError('A PIN is 6 to 8 digits.');
 
     setError(null);
     setBusy(true);
@@ -124,7 +124,7 @@ export function EnrolPage() {
         <label className="flex flex-col gap-1 text-base font-semibold">
           {reset ? 'New PIN (optional)' : 'Choose a PIN'}
           <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="off" className={inputClass} />
-          <span className="text-sm font-normal text-ink-soft">4 to 8 digits. You type it at the till to unlock it.</span>
+          <span className="text-sm font-normal text-ink-soft">6 to 8 digits. You type it at the till to unlock it.</span>
         </label>
         {error && (
           <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-3 py-2 text-base font-medium text-danger">

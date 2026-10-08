@@ -15,7 +15,7 @@ public static class TestSessions
 {
     public const string Password = "correct horse battery";
 
-    public const string AdminPin = "1234";
+    public const string AdminPin = "123412";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -135,9 +135,9 @@ public static class TestSessions
         return await UnlockAsync(admin, id, pin, warehouseOnly ? await WarehouseCredentialAsync(admin) : null);
     }
 
-    public static Task<HttpClient> CashierClientAsync(HttpClient admin, string pin = "6789", string name = "Cal Cashier")
+    public static Task<HttpClient> CashierClientAsync(HttpClient admin, string pin = "678912", string name = "Cal Cashier")
         => StaffClientAsync(admin, name, MembershipRole.Staff, StaffDuty.Cashier, pin);
 
-    public static Task<HttpClient> ManagerClientAsync(HttpClient admin, string pin = "5678", string name = "Mae Manager")
+    public static Task<HttpClient> ManagerClientAsync(HttpClient admin, string pin = "567812", string name = "Mae Manager")
         => StaffClientAsync(admin, name, MembershipRole.Manager, StaffDuty.None, pin);
 }

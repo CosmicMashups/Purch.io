@@ -46,7 +46,7 @@ public sealed class CustomerDisplayTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var bootstrap = await anonymous.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "1234", email, Password));
+            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "123412", email, Password));
         var business = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password, business.TenantId))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         var admin = factory.CreateClient();
@@ -67,9 +67,9 @@ public sealed class CustomerDisplayTests(PostgresContainerFixture postgres)
         var (deviceId, credential) = await PairAsync(shop, DeviceType.Register, name);
         var email = $"{Guid.NewGuid():N}@example.com";
         var invite = (await (await shop.Admin.PostAsJsonAsync("/staff/invites", new CreateInviteRequest("Ben", email, MembershipRole.Staff, StaffDuty.Cashier, [shop.Business.BranchId]))).Content.ReadFromJsonAsync<InviteLinkDto>(JsonOptions))!;
-        _ = await shop.Anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "4821"));
+        _ = await shop.Anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "482112"));
         var members = (await shop.Admin.GetFromJsonAsync<List<MemberDto>>("/staff/members", JsonOptions))!;
-        var unlocked = (await (await shop.Anonymous.PostAsJsonAsync("/devices/unlock", new UnlockRequest(credential, members.Single(m => m.Email == email).Id, "4821"))).Content.ReadFromJsonAsync<Unlocked>(JsonOptions))!;
+        var unlocked = (await (await shop.Anonymous.PostAsJsonAsync("/devices/unlock", new UnlockRequest(credential, members.Single(m => m.Email == email).Id, "482112"))).Content.ReadFromJsonAsync<Unlocked>(JsonOptions))!;
         var client = shop.Factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", unlocked.AccessToken);
         return new Till(deviceId, client);

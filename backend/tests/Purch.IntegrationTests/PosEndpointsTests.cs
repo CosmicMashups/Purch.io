@@ -484,9 +484,9 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
     private static async Task<(StaffLogin Staff, HttpClient Admin)> ManagerAndCashierAsync(PurchApiFactory factory)
     {
         var admin = await AuthenticatedAdminClientAsync(factory);
-        var managerId = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
-        var cashierId = await TestSessions.AddPersonAsync(admin, "Cal Cashier", MembershipRole.Staff, StaffDuty.Cashier, "6789");
-        var cashier = await TestSessions.UnlockAsync(admin, cashierId, "6789");
+        var managerId = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        var cashierId = await TestSessions.AddPersonAsync(admin, "Cal Cashier", MembershipRole.Staff, StaffDuty.Cashier, "678912");
+        var cashier = await TestSessions.UnlockAsync(admin, cashierId, "678912");
 
         return (new StaffLogin(cashier, managerId, cashierId), admin);
     }
@@ -571,7 +571,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
 
         // This tenant has only one Admin account, so it may approve its own void — see
         // ApproverAuthorizationServiceTests for the case where a second approver exists.
-        var voided = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
+        var voided = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("123412"));
         Assert.Equal(HttpStatusCode.OK, voided.StatusCode);
 
         Assert.Contains(await VoidAuditEntriesAsync(client), entry => entry.TargetEntityId == cart.Id && entry.TargetEntityType == "Transaction");

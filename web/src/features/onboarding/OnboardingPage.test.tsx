@@ -56,7 +56,7 @@ describe('OnboardingPage', () => {
   it('creates the business with the owner email and password and points to sign in', async () => {
     await toStepThree();
     type('Your name', 'Mario Cruz');
-    type('Choose a PIN', '4321');
+    type('Choose a PIN', '432112');
     type('Email', 'mario@kape.ph');
     type('Password', 'longenough1');
     fireEvent.click(screen.getByRole('checkbox'));
@@ -68,7 +68,7 @@ describe('OnboardingPage', () => {
       businessType: 0,
       branchName: 'Main',
       adminName: 'Mario Cruz',
-      adminPin: '4321',
+      adminPin: '432112',
       adminEmail: 'mario@kape.ph',
       adminPassword: 'longenough1',
     });
@@ -81,7 +81,7 @@ describe('OnboardingPage', () => {
     type('Your name', 'Mario Cruz');
     type('Choose a PIN', '12');
     fireEvent.click(screen.getByRole('button', { name: 'Create my business' }));
-    expect(await screen.findByText('Use 4 to 8 digits')).toBeInTheDocument();
+    expect(await screen.findByText('Use 6 to 8 digits')).toBeInTheDocument();
     expect(screen.getByText('Enter your email')).toBeInTheDocument();
     expect(screen.getByText('Enter a password')).toBeInTheDocument();
     expect(screen.getByText('Please review and accept to continue')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('OnboardingPage', () => {
     vi.mocked(onboardingApi.bootstrap).mockRejectedValue(new ApiError('validation', 'Admin PIN is already in use.'));
     await toStepThree();
     type('Your name', 'Mario Cruz');
-    type('Choose a PIN', '4321');
+    type('Choose a PIN', '432112');
     type('Email', 'mario@kape.ph');
     type('Password', 'longenough1');
     fireEvent.click(screen.getByRole('checkbox'));

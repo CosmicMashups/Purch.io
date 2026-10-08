@@ -45,7 +45,7 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
         using var anonymous = factory.CreateClient();
         var response = await anonymous.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana", "1234", email, Password));
+            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana", "123412", email, Password));
         var result = (await response.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password, result.TenantId))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         return new Business(As(factory, tokens.AccessToken), result, email);
@@ -61,7 +61,7 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
         return (await response.Content.ReadFromJsonAsync<InviteLinkDto>(JsonOptions))!;
     }
 
-    private static Task<HttpResponseMessage> RedeemAsync(HttpClient anonymous, string token, string password = Password, string? pin = "4821")
+    private static Task<HttpResponseMessage> RedeemAsync(HttpClient anonymous, string token, string password = Password, string? pin = "482112")
         => anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(token, password, pin));
 
     private static JwtSecurityToken Read(string accessToken) => new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
@@ -130,6 +130,9 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
 
         Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, link.Token, "short")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, link.Token, pin: "12")).StatusCode);
+        // Four and five digits were fine under the old rule; a PIN being set now needs six.
+        Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, link.Token, pin: "4821")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, link.Token, pin: "48211")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, link.Token, pin: null)).StatusCode);
 
         // Nothing was used up by the refusals.
@@ -259,7 +262,7 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
         Assert.Equal(InvitePurpose.PasswordReset, reset.Invite.Purpose);
 
         const string newPassword = "a brand new passphrase";
-        var done = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(reset.Token, newPassword, "9034"));
+        var done = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(reset.Token, newPassword, "903412"));
         Assert.Equal(HttpStatusCode.OK, done.StatusCode);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password))).StatusCode);

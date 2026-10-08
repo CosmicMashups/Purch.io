@@ -47,7 +47,7 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var bootstrap = await anonymous.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "1234", email, Password));
+            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "123412", email, Password));
         var business = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password, business.TenantId))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         var admin = factory.CreateClient();
@@ -97,12 +97,12 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
-        _ = await AddPersonAsync(shop, "Wally Cruz", MembershipRole.Staff, StaffDuty.Warehouse, "5532");
-        _ = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "6643");
+        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
+        _ = await AddPersonAsync(shop, "Wally Cruz", MembershipRole.Staff, StaffDuty.Warehouse, "553212");
+        _ = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "664312");
         var otherBranch = (await (await shop.Admin.PostAsJsonAsync("/branches", new CreateBranchRequest("Other branch", null))).Content.ReadFromJsonAsync<BranchDto>(JsonOptions))!;
-        _ = await AddPersonAsync(shop, "Faraway Fay", MembershipRole.Staff, StaffDuty.Cashier, "7754", otherBranch.Id);
-        var inactive = await AddPersonAsync(shop, "Gone Gina", MembershipRole.Staff, StaffDuty.Cashier, "8865");
+        _ = await AddPersonAsync(shop, "Faraway Fay", MembershipRole.Staff, StaffDuty.Cashier, "775412", otherBranch.Id);
+        var inactive = await AddPersonAsync(shop, "Gone Gina", MembershipRole.Staff, StaffDuty.Cashier, "886512");
         _ = await shop.Admin.PutAsJsonAsync($"/staff/members/{inactive.MembershipId}", new UpdateMemberRequest(MembershipRole.Staff, StaffDuty.Cashier, [shop.Business.BranchId], false));
         var (_, credential) = await PairAsync(shop, DeviceType.Register);
 
@@ -138,7 +138,7 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
+        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
         var (deviceId, credential) = await PairAsync(shop, DeviceType.Register);
 
         var response = await UnlockAsync(shop, credential, cashier);
@@ -168,9 +168,9 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var warehouse = await AddPersonAsync(shop, "Wally Cruz", MembershipRole.Staff, StaffDuty.Warehouse, "5532");
-        var allRounder = await AddPersonAsync(shop, "Rhea Dela Cruz", MembershipRole.Staff, StaffDuty.Cashier | StaffDuty.Warehouse, "9976");
-        var manager = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "6643");
+        var warehouse = await AddPersonAsync(shop, "Wally Cruz", MembershipRole.Staff, StaffDuty.Warehouse, "553212");
+        var allRounder = await AddPersonAsync(shop, "Rhea Dela Cruz", MembershipRole.Staff, StaffDuty.Cashier | StaffDuty.Warehouse, "997612");
+        var manager = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "664312");
         var (_, register) = await PairAsync(shop, DeviceType.Register);
         var (_, warehouseDevice) = await PairAsync(shop, DeviceType.WarehouseOfficer);
 
@@ -188,8 +188,8 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
-        var cara = await AddPersonAsync(shop, "Cara Uy", MembershipRole.Staff, StaffDuty.Cashier, "3309");
+        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
+        var cara = await AddPersonAsync(shop, "Cara Uy", MembershipRole.Staff, StaffDuty.Cashier, "330912");
         var (_, credential) = await PairAsync(shop, DeviceType.Register);
 
         for (var left = 4; left >= 1; left--)
@@ -221,11 +221,30 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_pin_made_under_the_old_four_digit_rule_still_unlocks_a_till()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var shop = await NewShopAsync(factory);
+        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
+        var (_, credential) = await PairAsync(shop, DeviceType.Register);
+
+        // Set the way a version before the six-digit rule would have: straight into the person's record.
+        await using (var db = NewContext(shop.Business.TenantId))
+        {
+            var row = await db.Memberships.SingleAsync(m => m.Id == ben.MembershipId);
+            row.PinHash = new Purch.Infrastructure.Auth.BCryptPinHasher().Hash("4821");
+            _ = await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await UnlockAsync(shop, credential, ben, "4821")).StatusCode);
+    }
+
+    [Fact]
     public async Task Parallel_wrong_pins_cannot_outrun_the_lockout()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
+        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
         var (_, credential) = await PairAsync(shop, DeviceType.Register);
 
         // 40 simultaneous guesses. Each answer that says "wrong PIN" is a persisted attempt, so no more than
@@ -243,7 +262,7 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
+        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
         var (deviceId, credential) = await PairAsync(shop, DeviceType.Register);
         var unlocked = (await (await UnlockAsync(shop, credential, ben)).Content.ReadFromJsonAsync<Unlocked>(JsonOptions))!;
         using var till = factory.CreateClient();
@@ -261,8 +280,8 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var shop = await NewShopAsync(factory);
-        var manager = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "6643");
-        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
+        var manager = await AddPersonAsync(shop, "Manny Lopez", MembershipRole.Manager, StaffDuty.None, "664312");
+        var cashier = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "482112");
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -270,7 +289,7 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
             var approvers = (await users.GetActiveActorsAsync(shop.Business.TenantId)).Where(u => u.Role is Role.Admin or Role.Manager).ToList();
             var projected = approvers.Single(u => u.Id == manager.MembershipId);
             Assert.Equal("Manny Lopez", projected.Name);
-            Assert.True(BCrypt.Net.BCrypt.Verify("6643", projected.PinHash));
+            Assert.True(BCrypt.Net.BCrypt.Verify("664312", projected.PinHash));
 
             var everyone = await users.ListActorsAsync(shop.Business.TenantId);
             var projectedCashier = everyone.Single(u => u.Id == cashier.MembershipId);

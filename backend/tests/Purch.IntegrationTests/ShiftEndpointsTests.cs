@@ -183,13 +183,13 @@ public sealed class ShiftEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = await AuthenticatedAdminClientAsync(factory);
 
-        var managerId = await TestSessions.AddPersonAsync(client, "Manager Mae", MembershipRole.Manager, StaffDuty.None, "5678");
+        var managerId = await TestSessions.AddPersonAsync(client, "Manager Mae", MembershipRole.Manager, StaffDuty.None, "567812");
 
         _ = await client.PostAsJsonAsync("/shifts/open", new OpenShiftRequest(1000m));
 
         var closeResponse = await client.PostAsJsonAsync(
             "/shifts/close",
-            new CloseShiftRequest(950m, "Short by 50.", "5678"));
+            new CloseShiftRequest(950m, "Short by 50.", "567812"));
 
         Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
         var closed = await closeResponse.Content.ReadFromJsonAsync<ShiftDto>(JsonOptions);

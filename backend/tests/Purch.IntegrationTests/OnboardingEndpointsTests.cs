@@ -24,7 +24,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var bootstrapResponse = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234", email, "correct horse battery"));
+            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "123412", email, "correct horse battery"));
 
         Assert.Equal(HttpStatusCode.OK, bootstrapResponse.StatusCode);
         var result = (await bootstrapResponse.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
@@ -47,7 +47,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "1234", email, password));
+            new BootstrapTenantRequest("Ana's Sari-Sari", BusinessType.ConvenienceStore, "Main Branch", "Ana Reyes", "123412", email, password));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -60,7 +60,7 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest(string.Empty, BusinessType.ConvenienceStore, string.Empty, "Ana", "1234"));
+            new BootstrapTenantRequest(string.Empty, BusinessType.ConvenienceStore, string.Empty, "Ana", "123412"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -70,8 +70,8 @@ public sealed class OnboardingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await TestSessions.AdminClientAsync(factory);
-        using var cashier = await TestSessions.CashierClientAsync(admin, "5678", "Cash Ier");
-        using var warehouse = await TestSessions.StaffClientAsync(admin, "Ware House", MembershipRole.Staff, StaffDuty.Warehouse, "6789");
+        using var cashier = await TestSessions.CashierClientAsync(admin, "567812", "Cash Ier");
+        using var warehouse = await TestSessions.StaffClientAsync(admin, "Ware House", MembershipRole.Staff, StaffDuty.Warehouse, "678912");
 
         // The staff list (names, roles, scopes) is for managers only.
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/staff/members")).StatusCode);

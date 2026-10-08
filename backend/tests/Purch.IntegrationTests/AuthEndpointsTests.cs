@@ -27,7 +27,7 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var bootstrap = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Owner", "1234", email, Password));
+            new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main Branch", "Owner", "123412", email, Password));
         var tenant = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await client.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         return (tokens, tenant.TenantId, email);
@@ -130,7 +130,7 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
         {
             var response = await client.PostAsJsonAsync(
                 "/onboarding/bootstrap",
-                new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Admin", "1234", $"{Guid.NewGuid():N}@example.com", Password));
+                new BootstrapTenantRequest($"Tenant-{Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Admin", "123412", $"{Guid.NewGuid():N}@example.com", Password));
             statuses.Add(response.StatusCode);
         }
 

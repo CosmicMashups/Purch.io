@@ -32,7 +32,7 @@ public sealed class DevicePairingTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var bootstrap = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana", "1234", email, Password));
+            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana", "123412", email, Password));
         var business = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await client.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);

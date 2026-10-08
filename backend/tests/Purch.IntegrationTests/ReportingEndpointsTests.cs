@@ -237,7 +237,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
             "/transactions/cart/lines",
             new AddTransactionLineRequest(item!.Id, null, 1m));
         // This tenant has only one Admin account, so it may approve its own void.
-        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
+        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("123412"));
 
         var response = await client.PostAsync("/reports/x-reading", null);
         var reading = await response.Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
@@ -257,7 +257,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
             new CheckoutRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], false, null, null, new RecordPaymentRequest(PaymentMethod.Cash, 100m))))
             .Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
 
-        var refundResponse = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Wrong order", "1234"));
+        var refundResponse = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Wrong order", "123412"));
         Assert.Equal(HttpStatusCode.OK, refundResponse.StatusCode);
 
         var reading = await (await client.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
@@ -284,7 +284,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(100m, firstReading!.NetSales);
         Assert.Equal(100m, firstReading.NewGrandAccumulatedSales);
 
-        _ = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Customer changed their mind", "1234"));
+        _ = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Customer changed their mind", "123412"));
 
         var secondReading = await (await client.PostAsync("/reports/z-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
 
@@ -317,7 +317,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
                 [new ReturnLineRequest(ramenLine.Id, 1m)],
                 [new ReplacementLineRequest(katsudon.Id, null, 1m)],
                 "Customer wanted katsudon instead",
-                "1234",
+                "123412",
                 PaymentMethod.Cash,
                 30m));
         Assert.Equal(HttpStatusCode.OK, exchangeResponse.StatusCode);
@@ -494,7 +494,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
 
         var voidedItem = await CreateItemAsync(client, "Voided Item", 40m);
         _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(voidedItem.Id, null, 1m));
-        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("1234"));
+        _ = await client.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("123412"));
 
         var from = DateTimeOffset.UtcNow.AddDays(-1);
         var to = DateTimeOffset.UtcNow.AddDays(1);
@@ -546,15 +546,15 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
-        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
-        using var cashier = await TestSessions.CashierClientAsync(admin, "6789", "Cal Cashier");
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin, "678912", "Cal Cashier");
 
         var itemResponse = await admin.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit));
         var item = (await itemResponse.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         var addResponse = await cashier.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
         Assert.Equal(HttpStatusCode.OK, addResponse.StatusCode);
 
-        var voidResponse = await cashier.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("5678"));
+        var voidResponse = await cashier.PostAsJsonAsync("/transactions/cart/void", new VoidCartRequest("567812"));
         Assert.Equal(HttpStatusCode.OK, voidResponse.StatusCode);
 
         // No date given: the service's own default (today, in Philippine local time) is what should
@@ -587,7 +587,7 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await AuthenticatedAdminClientAsync(factory);
-        using var cashier = await TestSessions.CashierClientAsync(admin, "6789", "Cal Cashier");
+        using var cashier = await TestSessions.CashierClientAsync(admin, "678912", "Cal Cashier");
 
         var response = await cashier.GetAsync("/reports/approvals-review");
 

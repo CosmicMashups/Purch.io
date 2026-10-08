@@ -566,7 +566,7 @@ class _AdminStep extends StatelessWidget {
             enabled: !isLoading,
             decoration: const InputDecoration(
               labelText: 'Choose a PIN',
-              helperText: '4-8 digits',
+              helperText: '6-8 digits',
               prefixIcon: Icon(Icons.lock_rounded, size: 20),
             ),
             keyboardType: TextInputType.number,

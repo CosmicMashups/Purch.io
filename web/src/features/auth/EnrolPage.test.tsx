@@ -30,11 +30,11 @@ describe('EnrolPage', () => {
     fill('Your email', 'owner@example.com');
     fill('Choose a password', 'long enough pass');
     fill('Type it again', 'long enough pass');
-    fill('Choose a PIN', '4821');
+    fill('Choose a PIN', '482112');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
 
     expect(await screen.findByText('Home')).toBeInTheDocument();
-    expect(redeem).toHaveBeenCalledWith('tok', 'long enough pass', '4821', 'owner@example.com');
+    expect(redeem).toHaveBeenCalledWith('tok', 'long enough pass', '482112', 'owner@example.com');
   });
 
   it('says plainly when the link cannot be used', async () => {
@@ -52,11 +52,11 @@ describe('EnrolPage', () => {
 
     fill('Choose a password', 'long enough pass');
     fill('Type it again', 'long enough pass');
-    fill('Choose a PIN', '4821');
+    fill('Choose a PIN', '482112');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
 
     expect(await screen.findByText('Home')).toBeInTheDocument();
-    expect(redeem).toHaveBeenCalledWith('tok', 'long enough pass', '4821', null);
+    expect(redeem).toHaveBeenCalledWith('tok', 'long enough pass', '482112', null);
     expect(useAuthStore.getState().accessToken).toBe('a1');
   });
 
@@ -78,7 +78,7 @@ describe('EnrolPage', () => {
     fill('Type it again', 'long enough pass');
     fill('Choose a PIN', '12');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
-    expect(await screen.findByText('Choose a PIN of 4 to 8 digits.')).toBeInTheDocument();
+    expect(await screen.findByText('Choose a PIN of 6 to 8 digits.')).toBeInTheDocument();
     expect(redeem).not.toHaveBeenCalled();
   });
 
@@ -90,9 +90,9 @@ describe('EnrolPage', () => {
     expect(screen.queryByLabelText(/^Type it again/)).not.toBeInTheDocument();
 
     fill('Your existing password', 'what they already use');
-    fill('Choose a PIN', '9034');
+    fill('Choose a PIN', '903412');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
-    await waitFor(() => expect(redeem).toHaveBeenCalledWith('tok', 'what they already use', '9034', null));
+    await waitFor(() => expect(redeem).toHaveBeenCalledWith('tok', 'what they already use', '903412', null));
   });
 
   it('chooses a new password for a reset link, with the PIN optional', async () => {
@@ -114,7 +114,7 @@ describe('EnrolPage', () => {
     await screen.findByRole('heading', { name: "Join Ana's Store" });
     fill('Choose a password', 'long enough pass');
     fill('Type it again', 'long enough pass');
-    fill('Choose a PIN', '4821');
+    fill('Choose a PIN', '482112');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/just used or has expired/);
     expect(useAuthStore.getState().accessToken).toBeNull();

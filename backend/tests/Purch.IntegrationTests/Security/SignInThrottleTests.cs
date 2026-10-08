@@ -32,7 +32,7 @@ public sealed class SignInThrottleTests(PostgresContainerFixture postgres)
         var email = NewEmail();
         var response = await client.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Shop {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "1234", email, Password));
+            new BootstrapTenantRequest($"Shop {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "123412", email, Password));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return email;
     }

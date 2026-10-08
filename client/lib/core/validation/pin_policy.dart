@@ -1,6 +1,6 @@
-/// What a staff PIN may look like — mirrors backend PinPolicy (4-8 digits), so a bad PIN is caught on the
+/// What a staff PIN may look like — mirrors backend PinPolicy (6-8 digits for a PIN being set; older 4-digit PINs still sign in), so a bad PIN is caught on the
 /// form instead of coming back from the server as a 400.
-const pinMinLength = 4;
+const pinMinLength = 6;
 const pinMaxLength = 8;
 
 /// A form-field validator: null when [value] is an acceptable PIN.

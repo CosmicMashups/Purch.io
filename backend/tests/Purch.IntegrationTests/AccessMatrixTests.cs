@@ -60,7 +60,7 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var bootstrap = await anonymous.PostAsJsonAsync(
             "/onboarding/bootstrap",
-            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "1234", email, Password));
+            new BootstrapTenantRequest($"Store {Guid.NewGuid():N}", BusinessType.ConvenienceStore, "Main", "Ana Reyes", "123412", email, Password));
         var business = (await bootstrap.Content.ReadFromJsonAsync<BootstrapTenantResult>(JsonOptions))!;
         var tokens = (await (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password, business.TenantId))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
         return (factory, Bearer(factory, tokens.AccessToken), business, anonymous);
@@ -71,9 +71,9 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
         var email = $"{Guid.NewGuid():N}@example.com";
         var branches = role == MembershipRole.Staff ? new[] { business.BranchId } : null;
         var invite = (await (await admin.PostAsJsonAsync("/staff/invites", new CreateInviteRequest("Person", email, role, duties, branches))).Content.ReadFromJsonAsync<InviteLinkDto>(JsonOptions))!;
-        _ = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "4821"));
+        _ = await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "482112"));
         var members = (await admin.GetFromJsonAsync<List<MemberDto>>("/staff/members", JsonOptions))!;
-        return (members.Single(m => m.Email == email).Id, "4821");
+        return (members.Single(m => m.Email == email).Id, "482112");
     }
 
     private static async Task<string> PairAsync(HttpClient admin, HttpClient anonymous, BootstrapTenantResult business, DeviceType type)
@@ -174,7 +174,7 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
         await using var _ = factory;
         var email = $"{Guid.NewGuid():N}@example.com";
         var invite = (await (await admin.PostAsJsonAsync("/staff/invites", new CreateInviteRequest("Ben", email, MembershipRole.Staff, StaffDuty.Cashier, [business.BranchId]))).Content.ReadFromJsonAsync<InviteLinkDto>(JsonOptions))!;
-        var tokens = (await (await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "4821"))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
+        var tokens = (await (await anonymous.PostAsJsonAsync("/enrol/redeem", new RedeemInviteRequest(invite.Token, Password, "482112"))).Content.ReadFromJsonAsync<Tokens>(JsonOptions))!;
 
         var open = await OpenAreasAsync(Bearer(factory, tokens.AccessToken));
 

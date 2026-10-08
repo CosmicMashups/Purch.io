@@ -103,7 +103,7 @@ public sealed class CatalogEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
 
-        using var cashierClient = await TestSessions.CashierClientAsync(adminClient, "5678", "Cashier One");
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient, "567812", "Cashier One");
 
         var listResponse = await cashierClient.GetAsync("/items");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);

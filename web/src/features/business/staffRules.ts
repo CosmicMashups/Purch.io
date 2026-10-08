@@ -1,7 +1,7 @@
-export const PIN_MIN = 4;
+export const PIN_MIN = 6;
 export const PIN_MAX = 8;
 
-/** Same rule as the API and the Flutter client: 4 to 8 digits. */
+/** Same rule as the API and the Flutter client: 6 to 8 digits for a PIN being set now. Existing 4-digit PINs still sign in. */
 export function pinProblem(pin: string): string | null {
   const trimmed = pin.trim();
   if (trimmed === '') return 'Enter a PIN';

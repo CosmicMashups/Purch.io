@@ -164,7 +164,7 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         var (admin, _) = await AdminClientAsync(factory, "Role Shop");
         using var _admin = admin;
-        using var cashier = await TestSessions.CashierClientAsync(admin, "5678", "Cash Ier");
+        using var cashier = await TestSessions.CashierClientAsync(admin, "567812", "Cash Ier");
 
         using var form = ImageForm([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46], "banner.jpg");
         var response = await cashier.PostAsync("/uploads/image", form);

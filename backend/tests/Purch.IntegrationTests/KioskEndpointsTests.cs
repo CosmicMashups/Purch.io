@@ -304,7 +304,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
         using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var (claimed, item) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
         var lineId = claimed.Lines.Single().Id;
@@ -316,7 +316,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var wrongPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m, "0000"));
         Assert.Equal(HttpStatusCode.BadRequest, wrongPin.StatusCode);
 
-        var withManagerPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m, "5678"));
+        var withManagerPin = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(2m, "567812"));
         Assert.Equal(HttpStatusCode.OK, withManagerPin.StatusCode);
         var updated = await withManagerPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
         Assert.Equal(2m, updated!.Lines.Single().Quantity);
@@ -350,7 +350,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
         using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
         var lineId = claimed.Lines.Single().Id;
@@ -358,7 +358,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
         var noPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}");
         Assert.Equal(HttpStatusCode.BadRequest, noPin.StatusCode);
 
-        var withPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}?approverPin=5678");
+        var withPin = await cashierClient.DeleteAsync($"/transactions/cart/lines/{lineId}?approverPin=567812");
         Assert.Equal(HttpStatusCode.OK, withPin.StatusCode);
         Assert.Empty((await withPin.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!.Lines);
 
@@ -392,7 +392,7 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var adminClient = await AuthenticatedAdminClientAsync(factory);
-        _ = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "5678");
+        _ = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
         using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
         var item = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Soda", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
         var addResponse = await cashierClient.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));

@@ -2,10 +2,12 @@ namespace Purch.Application.Auth;
 
 /// <summary>What a staff PIN may look like. The PIN is the only credential a cashier types at the
 /// counter, so it has to be all digits and long enough to not be trivially guessable; a PIN that
-/// another staff member already uses is refused by the caller (it needs the tenant's users).</summary>
+/// another staff member already uses is refused by the caller (it needs the tenant's users).
+/// Six digits is the minimum for a PIN being set now. A PIN made under the old four-digit rule still works at
+/// sign-in (nothing there checks its length) until its owner next changes it.</summary>
 public static class PinPolicy
 {
-    public const int MinLength = 4;
+    public const int MinLength = 6;
     public const int MaxLength = 8;
 
     /// <summary>Returns a message describing what is wrong with the PIN, or null if it is acceptable.</summary>

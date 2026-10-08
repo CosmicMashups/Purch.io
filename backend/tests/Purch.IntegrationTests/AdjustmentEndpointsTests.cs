@@ -46,7 +46,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
                 [new ReturnLineRequest(ramenLine.Id, 1m)],
                 [new ReplacementLineRequest(katsudon.Id, null, 1m)],
                 "Customer wanted katsudon instead",
-                "1234"));
+                "123412"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var adjustment = await response.Content.ReadFromJsonAsync<AdjustmentDto>(JsonOptions);
@@ -74,7 +74,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         var refused = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Upgrade", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Upgrade", "123412"));
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
 
         var response = await client.PostAsJsonAsync(
@@ -83,7 +83,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
                 [new ReturnLineRequest(ramenLine.Id, 1m)],
                 [new ReplacementLineRequest(katsudon.Id, null, 1m)],
                 "Upgrade",
-                "1234",
+                "123412",
                 PaymentMethod.Cash,
                 50m));
 
@@ -107,7 +107,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
                 [new ReturnLineRequest(ramenLine.Id, 1m)],
                 [new ReplacementLineRequest(katsudon.Id, null, 1m)],
                 "Customer wanted something cheaper",
-                "1234",
+                "123412",
                 PaymentMethod.Cash));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -145,11 +145,11 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
         var ramenLine = sale.Lines.Single(l => l.ItemId == ramen.Id);
         var exchange = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap", "123412"));
         Assert.Equal(HttpStatusCode.OK, exchange.StatusCode);
 
         // Refunding the whole sale now would pay for the returned ramen a second time.
-        var refund = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Changed my mind", "1234"));
+        var refund = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Changed my mind", "123412"));
 
         Assert.Equal(HttpStatusCode.BadRequest, refund.StatusCode);
     }
@@ -164,19 +164,19 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         var first = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "First exchange", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "First exchange", "123412"));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
         // Only 1 ramen is left on that line (2 bought, 1 already returned).
         var second = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 2m)], [new ReplacementLineRequest(katsudon.Id, null, 2m)], "Trying to return too much", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 2m)], [new ReplacementLineRequest(katsudon.Id, null, 2m)], "Trying to return too much", "123412"));
 
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
 
         var thirdWithinLimit = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Second exchange, within what's left", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Second exchange, within what's left", "123412"));
         Assert.Equal(HttpStatusCode.OK, thirdWithinLimit.StatusCode);
     }
 
@@ -193,7 +193,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         var exchange = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap one", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap one", "123412"));
         Assert.Equal(HttpStatusCode.OK, exchange.StatusCode);
 
         var after = await client.GetFromJsonAsync<List<ReturnableLineDto>>($"/transactions/{sale.Id}/returnable-lines", JsonOptions);
@@ -211,7 +211,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(haircut.Id, null, 1m)], "Not supported yet", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(haircut.Id, null, 1m)], "Not supported yet", "123412"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -227,7 +227,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         var response = await client.PostAsJsonAsync(
             $"/transactions/{cart.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(line.Id, 1m)], [new ReplacementLineRequest(item.Id, null, 1m)], "Still open", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(line.Id, 1m)], [new ReplacementLineRequest(item.Id, null, 1m)], "Still open", "123412"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -242,7 +242,7 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
 
         _ = await client.PostAsJsonAsync(
             $"/transactions/{sale.Id}/exchange",
-            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Audited exchange", "1234"));
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Audited exchange", "123412"));
 
         var logs = await client.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);
         var entry = Assert.Single(logs!, log => log.ActionType == AuditActionType.Exchange);

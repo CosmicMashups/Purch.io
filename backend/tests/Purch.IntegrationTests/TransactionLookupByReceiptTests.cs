@@ -75,7 +75,7 @@ public sealed class TransactionLookupByReceiptTests(PostgresContainerFixture pos
 
         var found = (await admin.GetFromJsonAsync<List<TransactionDto>>($"/transactions/by-receipt/{sale.ReceiptNumber}", JsonOptions))!.Single();
 
-        var refundResponse = await admin.PostAsJsonAsync($"/transactions/{found.Id}/refund", new RefundTransactionRequest("Customer changed their mind", "1234"));
+        var refundResponse = await admin.PostAsJsonAsync($"/transactions/{found.Id}/refund", new RefundTransactionRequest("Customer changed their mind", "123412"));
 
         Assert.Equal(HttpStatusCode.OK, refundResponse.StatusCode);
     }
