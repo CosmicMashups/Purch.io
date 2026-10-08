@@ -32,7 +32,8 @@ public sealed class AccountService(
     IIdentityProvider identityProvider,
     IAccountRepository accountRepository,
     IJwtTokenService jwtTokenService,
-    IRefreshTokenService refreshTokenService) : IAccountService
+    IRefreshTokenService refreshTokenService,
+    ISignInThrottleRepository signInThrottle) : IAccountService
 {
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 
@@ -52,9 +53,19 @@ public sealed class AccountService(
         var existing = await accountRepository.FindByEmailAsync(normalized, cancellationToken);
         if (existing is not null)
         {
+            // Proving the password of an existing login is a password-guessing surface just like sign-in, so it
+            // shares the same per-email backoff.
+            var emailHash = SignInThrottlePolicy.HashEmail(normalized);
+            var hadFailures = await RequireNotBlockedAsync(emailHash, cancellationToken);
             if (await identityProvider.VerifyPasswordAsync(normalized, password, cancellationToken) != existing.SupabaseUserId)
             {
-                throw new ValidationException(nameof(email), "That email already has an account. Use its password to add another business.");
+                await signInThrottle.RecordFailureAsync(emailHash, cancellationToken);
+                throw new ValidationException(nameof(email), "That email can't be used with the details given. If it's yours, use its existing password.");
+            }
+
+            if (hadFailures)
+            {
+                await signInThrottle.ClearAsync(emailHash, cancellationToken);
             }
 
             return existing;
@@ -80,11 +91,22 @@ public sealed class AccountService(
 
         var email = NormalizeEmail(request.Email);
 
+        // Throttled per email, known or not, so guessing a password is slowed however many addresses it comes from
+        // and the throttle itself says nothing about whether an account exists.
+        var emailHash = SignInThrottlePolicy.HashEmail(email);
+        var hadFailures = await RequireNotBlockedAsync(emailHash, cancellationToken);
+
         // Always ask the provider, even for an unknown email, so a wrong password and an unknown account look the same.
         var providerUserId = await identityProvider.VerifyPasswordAsync(email, request.Password, cancellationToken);
         if (providerUserId is null)
         {
+            await signInThrottle.RecordFailureAsync(emailHash, cancellationToken);
             return new SignInResult.Invalid();
+        }
+
+        if (hadFailures)
+        {
+            await signInThrottle.ClearAsync(emailHash, cancellationToken);
         }
 
         var account = await accountRepository.FindByProviderUserIdAsync(providerUserId.Value, cancellationToken);
@@ -124,5 +146,17 @@ public sealed class AccountService(
         var accessToken = jwtTokenService.IssueMembershipAccessToken(chosen.Membership);
         var refreshToken = await refreshTokenService.IssueForMembershipAsync(chosen.Membership.TenantId, chosen.Membership.Id, null, cancellationToken);
         return new SignInResult.Success(accessToken, refreshToken);
+    }
+
+    /// <summary>Throws if attempts for this email are blocked right now; otherwise says whether any failures are on record.</summary>
+    private async Task<bool> RequireNotBlockedAsync(string emailHash, CancellationToken cancellationToken)
+    {
+        var state = await signInThrottle.GetAsync(emailHash, cancellationToken);
+        if (state?.BlockedUntil is { } until && until > DateTimeOffset.UtcNow)
+        {
+            throw new TooManyRequestsException("Too many sign-in attempts. Wait a little and try again.", until - DateTimeOffset.UtcNow);
+        }
+
+        return state is not null;
     }
 }

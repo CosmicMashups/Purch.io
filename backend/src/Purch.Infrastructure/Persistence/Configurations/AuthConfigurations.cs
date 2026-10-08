@@ -25,6 +25,15 @@ public class LocalCredentialConfiguration : IEntityTypeConfiguration<LocalCreden
     }
 }
 
+public class SignInThrottleConfiguration : IEntityTypeConfiguration<SignInThrottle>
+{
+    public void Configure(EntityTypeBuilder<SignInThrottle> builder)
+    {
+        _ = builder.HasIndex(t => t.EmailHash).IsUnique();
+        _ = builder.Property(t => t.EmailHash).HasMaxLength(64);
+    }
+}
+
 public class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
     public void Configure(EntityTypeBuilder<Membership> builder)

@@ -26,6 +26,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # The API runs as an unprivileged user, but a Docker volume made by an earlier (root-running) version is owned
+  # by root. This one-shot step hands the uploads volume to the API's user before it starts, so upgrades keep
+  # working and uploaded images are never lost. 1654 is the APP_UID of the .NET runtime image.
+  storage-init:
+    image: busybox:1.36
+    user: "0:0"
+    command: ["sh", "-c", "chown -R 1654:1654 /uploads"]
+    volumes:
+      - purch_storage_data:/uploads
+    restart: "no"
+
   backend:
     build:
       context: ../backend
@@ -34,6 +45,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     ports:
       # The port every POS device's "Connect to a local server" address
       # points at, e.g. 192.168.1.50:8080.
@@ -45,7 +58,8 @@ services:
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env.local}
       JWT_ISSUER: purch.io
     volumes:
-      - purch_storage_data:/data/storage
+      # Uploaded images live in the API's wwwroot/uploads, so the persistent volume is mounted there.
+      - purch_storage_data:/app/wwwroot/uploads
 
 volumes:
   purch_postgres_data:

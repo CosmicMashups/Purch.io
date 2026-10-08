@@ -137,6 +137,7 @@ builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(SupabaseIdentityProvider.HttpClientName),
             serviceProvider.GetRequiredService<IDeploymentContext>()));
 builder.Services.AddScoped<IAccountRepository, EfAccountRepository>();
+builder.Services.AddScoped<ISignInThrottleRepository, EfSignInThrottleRepository>();
 builder.Services.AddScoped<LegacyMigration>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IMembershipRepository, EfMembershipRepository>();

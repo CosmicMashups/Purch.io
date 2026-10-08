@@ -22,6 +22,10 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
         LogException(exception, statusCode, httpContext);
 
         httpContext.Response.StatusCode = statusCode;
+        if (exception is TooManyRequestsException tooMany)
+        {
+            httpContext.Response.Headers.RetryAfter = Math.Ceiling(tooMany.RetryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         // Serialize using the *runtime* type (ValidationProblemDetails vs plain
         // ProblemDetails), not the switch expression's common compile-time type —
@@ -51,6 +55,10 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
             ConflictException conflictException => (
                 StatusCodes.Status409Conflict,
                 BuildProblemDetails(StatusCodes.Status409Conflict, "Conflict.", conflictException.Message, httpContext)),
+
+            TooManyRequestsException tooMany => (
+                StatusCodes.Status429TooManyRequests,
+                BuildProblemDetails(StatusCodes.Status429TooManyRequests, "Too many attempts.", tooMany.Message, httpContext)),
 
             ForbiddenException forbiddenException => (
                 StatusCodes.Status403Forbidden,

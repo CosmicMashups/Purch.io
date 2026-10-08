@@ -22,6 +22,7 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<LocalCredential> LocalCredentials => Set<LocalCredential>();
+    public DbSet<SignInThrottle> SignInThrottles => Set<SignInThrottle>();
 
     public DbSet<Membership> Memberships => Set<Membership>();
 

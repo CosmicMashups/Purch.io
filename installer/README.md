@@ -35,6 +35,14 @@ containers, both restarting automatically if the machine reboots. Data lives
 in named Docker volumes (`purch_postgres_data`, `purch_storage_data`), not
 inside the containers, so `docker compose down` never loses data.
 
+The backend runs as an unprivileged user, not root. A one-shot `storage-init`
+container fixes the ownership of the uploads volume each time you start the
+stack, so upgrading from an older version needs no manual step. Uploaded
+images are stored in `purch_storage_data` (mounted at `/app/wwwroot/uploads`).
+Images uploaded by older versions were kept inside the backend container
+itself and are lost whenever that container is rebuilt, so re-upload any you
+still need after upgrading.
+
 Useful commands (run from `installer/`):
 
 ```powershell

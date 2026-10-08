@@ -141,13 +141,14 @@ public sealed class AuthEndpointsTests(PostgresContainerFixture postgres)
     [Fact]
     public async Task Email_sign_in_attempts_are_capped_per_client()
     {
+        // A different email each time, so this isolates the per-client cap from the per-email throttle (SignInThrottleTests).
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var client = factory.CreateClient();
 
         var statuses = new List<HttpStatusCode>();
         for (var attempt = 0; attempt < 11; attempt++)
         {
-            statuses.Add((await client.PostAsJsonAsync("/auth/sign-in", new SignInRequest("nobody@example.com", $"guess-{attempt}-guess"))).StatusCode);
+            statuses.Add((await client.PostAsJsonAsync("/auth/sign-in", new SignInRequest($"nobody-{attempt}@example.com", $"guess-{attempt}-guess"))).StatusCode);
         }
 
         Assert.All(statuses.Take(10), status => Assert.Equal(HttpStatusCode.Unauthorized, status));

@@ -37,3 +37,25 @@ Status key: **Fixed** (code + test), **Mitigated** (reduced, not removed), **Ope
 ## Repository note
 `.git/config` and `refs/remotes/origin/main` were NUL-filled on Oct 7 and were rebuilt. Backups: `.git/config.corrupt.bak`,
 `.git/origin-main.corrupt.bak`. Remote URL was reconstructed from `FETCH_HEAD`.
+
+## Decisions on the open items (2026-10-08)
+
+| Item | Decision | Implementation notes |
+|------|----------|----------------------|
+| PIN length | New and changed PINs must be **6 digits**; existing 4-digit PINs keep working until changed. | `PinPolicy.MinLength`; many tests and seed data use 4-digit PINs and need updating. |
+| Utang repayment | Any POS role may collect, but it must be on a device with an **open shift**, and it counts toward that shift's expected cash. | Link `CreditTransaction` to shift/device; include in shift close totals. |
+| Offline Senior/PWD discount | Server verifies a **signed, device-bound supervisor attestation** (valid 12 h) issued when a manager/admin unlocks the till online. Replaces trusting `RungByStaffId`. | `/devices/unlock` returns it for supervisors; the app attaches it to offline discount sales; the server checks signature, device, expiry. |
+| Return value | Returned items are worth **what the customer actually paid** (pro-rated share of all discounts). | `AdjustmentService`. |
+| Return scope | **Same branch only**, **30-day window** (tenant-wide admin may override), and a refund **reverses stock, the utang balance and the drawer**. | `RefundTransactionAsync`, `AdjustmentService`, shift cash totals. |
+| Web tokens | **Keep `localStorage`** for now; revisit with a same-site API domain, then an HttpOnly cookie. | The API is on `vercel.app` and the web app on Cloudflare, so a cookie would be third-party. |
+| Device database | **Wipe on sign-out/tenant change and add an HMAC tamper check** on queued sales; SQLCipher deferred. | Key in secure storage; reject mismatching rows before upload. |
+| Sign-in throttling | **Per-email backoff** (no hard lockout), plus a uniform response from onboarding sign-up. | New limiter keyed by email and IP. |
+| Docker | **Non-root image plus an init step** that fixes ownership of the storage volume. | `backend/Dockerfile`, `installer/docker-compose.local.yml`; test against an old root-owned volume. |
+
+## Implementation log for the decisions
+
+| Item | Status |
+|------|--------|
+| Sign-in throttling | **Done.** Per-email backoff (five free misses in 15 min, then a block doubling from 1 to 15 min), database-backed so it works across serverless instances, applies to unknown emails identically, also guards the "existing email" path of onboarding. Table `SignInThrottles` (RLS on). Tests: `SignInThrottleTests`. Onboarding still cannot hide whether an email is registered, because creating an account either succeeds or does not; only email verification would fix that. |
+| Docker non-root | **Done and tested end to end** with a throwaway compose stack: runs as uid 1654, a pre-existing root-owned volume was fixed by `storage-init`, upload and serve work, stop takes 0.6 s (`exec` entrypoint). Also fixes a data-loss bug: uploads were stored inside the container, not the volume. |
+| 6-digit PINs, utang/shift link, return rules, supervisor attestation, device DB wipe + HMAC | **Not started.** |

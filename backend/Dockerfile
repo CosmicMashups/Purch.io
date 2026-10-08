@@ -20,11 +20,17 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Local-mode data (LOCAL_STORAGE_PATH) is expected to live on a mounted
-# volume outside the container — see docker-compose.local.yml.
+# Runs as the image's unprivileged user (APP_UID) — a bug in the API must not be a root shell in the container.
+# Local mode writes uploads under wwwroot/uploads, so that one directory is made writable and is where the
+# installer mounts its persistent volume (see docker-compose.local.yml, which also fixes a mounted volume's
+# ownership so volumes created by earlier, root-running versions keep working).
+RUN mkdir -p /app/wwwroot/uploads && chown -R $APP_UID:$APP_UID /app/wwwroot
+USER $APP_UID
+
 EXPOSE 8080
 
 # Render injects its own $PORT and expects the container to listen on it;
 # the Local installer's docker-compose doesn't set one, so this falls back
 # to 8080 either way — one image, no per-deployment-mode build variant.
-ENTRYPOINT ["/bin/sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet Purch.Api.dll"]
+# `exec` so the API is PID 1's direct child process and receives SIGTERM on shutdown.
+ENTRYPOINT ["/bin/sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet Purch.Api.dll"]
