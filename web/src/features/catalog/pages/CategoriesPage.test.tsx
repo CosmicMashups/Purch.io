@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogApi } from '../api';
@@ -35,9 +35,11 @@ describe('CategoriesPage', () => {
     vi.mocked(catalogApi.createCategory).mockResolvedValue({ id: 'c', name: 'Drinks', sortOrder: 3, imageUrl: null });
     renderPage();
     await screen.findByText('Coffee');
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Drinks' } });
-    fireEvent.change(screen.getByLabelText('Sort order'), { target: { value: '3' } });
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add Category' }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Drinks' } });
+    fireEvent.change(screen.getByLabelText('Sort order'), { target: { value: '3' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add Category' }));
     await waitFor(() => expect(catalogApi.createCategory).toHaveBeenCalledTimes(1));
     expect(catalogApi.createCategory).toHaveBeenCalledWith({ name: 'Drinks', sortOrder: 3, imageUrl: null });
   });
@@ -46,6 +48,7 @@ describe('CategoriesPage', () => {
     renderPage();
     await screen.findByText('Coffee');
     fireEvent.click(screen.getByRole('button', { name: 'Add Category' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Add Category' }));
     expect(await screen.findByText('Required')).toBeInTheDocument();
     expect(catalogApi.createCategory).not.toHaveBeenCalled();
   });
