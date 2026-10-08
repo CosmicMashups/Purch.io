@@ -12,7 +12,7 @@ export const apiClient = axios.create({
 // Separate instance for refresh calls so the 401 interceptor below never recurses on itself.
 const refreshClient = axios.create({ baseURL, timeout: 15000 });
 
-const NO_AUTH_REFRESH_PATHS = ['/auth/login', '/auth/admin-login', '/auth/refresh', '/kiosk/session', '/kitchen-display/session', '/order-board/session'];
+const NO_AUTH_REFRESH_PATHS = ['/auth/login', '/auth/admin-login', '/auth/refresh', '/kiosk/session', '/kitchen-display/session', '/order-board/session', '/devices/unlock', '/devices/roster'];
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;

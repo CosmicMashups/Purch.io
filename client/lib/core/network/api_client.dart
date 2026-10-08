@@ -16,6 +16,9 @@ const _tokenIssuingPaths = [
   '/kiosk/session',
   '/order-board/session',
   '/kitchen-display/session',
+  // A wrong PIN is a genuine 401, and each retry would count as another miss toward the lockout.
+  '/devices/unlock',
+  '/devices/roster',
 ];
 
 /// The single configured Dio instance the whole app talks to the backend
