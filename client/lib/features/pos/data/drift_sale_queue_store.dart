@@ -1,11 +1,13 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 
 import '../../../core/db/app_database.dart';
 import '../../../core/db/daos/device_identity_dao.dart';
 import '../../../core/db/daos/queued_sale_dao.dart';
 import '../domain/transaction_models.dart';
 import 'sale_queue.dart';
+import 'sale_queue_integrity.dart';
 
 /// Keeps queued offline sales in the app's local SQLite database, scoped to the
 /// signed-in tenant and this terminal.
@@ -13,11 +15,18 @@ class DriftSaleQueueStore implements SaleQueueStore {
   DriftSaleQueueStore({
     required QueuedSaleDao dao,
     required DeviceIdentityDao identityDao,
+    required SaleQueueIntegrity integrity,
   }) : _dao = dao,
-       _identityDao = identityDao;
+       _identityDao = identityDao,
+       _integrity = integrity;
 
   final QueuedSaleDao _dao;
   final DeviceIdentityDao _identityDao;
+  final SaleQueueIntegrity _integrity;
+
+  /// Shown against a sale whose stored record no longer matches the seal made when it was queued.
+  static const tamperedMessage =
+      'This sale record was changed after it was saved, so it was not sent. A manager should check it.';
 
   Future<DeviceIdentityData> _identity() async {
     final identity = await _identityDao.getIdentity();
@@ -32,6 +41,16 @@ class DriftSaleQueueStore implements SaleQueueStore {
   @override
   Future<void> enqueue(SaleQueueEntry entry) async {
     final identity = await _identity();
+    await _integrity.sealLegacyOnce(_dao);
+    final seal = await _integrity.sign(
+      id: entry.saleId,
+      tenantId: identity.tenantId,
+      deviceId: identity.deviceId,
+      receiptNumber: entry.receiptNumber,
+      totalAmount: entry.totalAmount,
+      requestJson: entry.requestJson,
+      soldAt: entry.soldAt,
+    );
     await _dao.enqueue(
       QueuedSalesCompanion.insert(
         id: entry.saleId,
@@ -41,6 +60,7 @@ class DriftSaleQueueStore implements SaleQueueStore {
         totalAmount: entry.totalAmount,
         requestJson: entry.requestJson,
         soldAt: entry.soldAt,
+        integrity: Value(seal),
       ),
     );
   }
@@ -48,10 +68,17 @@ class DriftSaleQueueStore implements SaleQueueStore {
   @override
   Future<List<SaleQueueEntry>> pending() async {
     final identity = await _identity();
-    return (await _dao.listPending(
-      identity.tenantId,
-      identity.deviceId,
-    )).map(_toEntry).toList();
+    await _integrity.sealLegacyOnce(_dao);
+    final trusted = <SaleQueueEntry>[];
+    for (final row in await _dao.listPending(identity.tenantId, identity.deviceId)) {
+      if (await _integrity.verify(row)) {
+        trusted.add(_toEntry(row));
+      } else {
+        // Never sent: it goes to the review list with the reason, like any sale the server would refuse.
+        await markRejected(row.id, tamperedMessage);
+      }
+    }
+    return trusted;
   }
 
   @override

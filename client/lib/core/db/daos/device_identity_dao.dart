@@ -30,6 +30,11 @@ class DeviceIdentityDao extends DatabaseAccessor<AppDatabase>
     final keptReceiptNumber =
         sameTerminal ? existing.lastKnownReceiptNumber : null;
 
+    // A different business or terminal is now using this app install: nothing cached for the previous one may linger.
+    if (existing != null && !sameTerminal) {
+      await attachedDatabase.wipeCachedData();
+    }
+
     await delete(deviceIdentity).go();
     await into(deviceIdentity).insert(
       DeviceIdentityCompanion.insert(
@@ -41,6 +46,9 @@ class DeviceIdentityDao extends DatabaseAccessor<AppDatabase>
       ),
     );
   }
+
+  /// See [AppDatabase.wipeCachedData]; used when a terminal is unpaired.
+  Future<void> wipeCachedData() => attachedDatabase.wipeCachedData();
 
   Future<DeviceIdentityData?> getIdentity() {
     return select(deviceIdentity).getSingleOrNull();

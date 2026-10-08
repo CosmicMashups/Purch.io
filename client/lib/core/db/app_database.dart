@@ -46,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor) : super();
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,8 +82,24 @@ class AppDatabase extends _$AppDatabase {
         // v6 → v7: last-known copy of the item and category lists, for ETag revalidation and offline start.
         await m.createTable(cachedCatalogLists);
       }
+      if (from < 8) {
+        // v7 → v8: a tamper check on queued sales (see QueuedSales.integrity).
+        await m.addColumn(queuedSales, queuedSales.integrity);
+      }
     },
   );
+
+  /// Clears what belongs to whoever used this terminal before: the cached branding and catalog, unfinished carts, and
+  /// sales that are already finished. Never removes a sale the server has not acknowledged (pending, syncing or
+  /// rejected-and-awaiting-review), and keeps the terminal's identity and its receipt-number anchor: a sale that was
+  /// paid for at the counter must not be lost to housekeeping.
+  Future<void> wipeCachedData() => transaction(() async {
+    await delete(cachedBranding).go();
+    await delete(cachedCatalogLists).go();
+    await delete(localCartDrafts).go();
+    await (delete(pendingSyncQueue)..where((t) => t.syncStatus.equals('synced'))).go();
+    await (delete(queuedSales)..where((t) => t.status.isIn(['synced', 'dismissed']))).go();
+  });
 }
 
 LazyDatabase _openConnection() {

@@ -33,6 +33,11 @@ class QueuedSales extends Table {
   TextColumn get lastError => text().nullable()();
   DateTimeColumn get syncedAt => dateTime().nullable()();
 
+  /// HMAC over the fields above, made with a key that lives in the platform keystore and never in this database. Checked
+  /// before the sale is sent, so a row edited on disk (a lower total, a changed discount or payment) is refused instead
+  /// of being replayed to the server. Null only for rows made before this existed, which are sealed once on first use.
+  TextColumn get integrity => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

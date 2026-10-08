@@ -233,6 +233,9 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> unpair() async {
     await logout();
     await _tokenStorage.clearDeviceCredential();
+    // The terminal may go to someone else: drop what it cached for this business. Sales not yet sent stay, so they are
+    // never lost.
+    await _deviceIdentityDao.wipeCachedData();
   }
 
   Future<String> _requireCredential() async {

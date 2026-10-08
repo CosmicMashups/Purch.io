@@ -15,6 +15,7 @@ import '../../data/drift_cart_draft_store.dart';
 import '../../data/drift_sale_queue_store.dart';
 import '../../data/local_first_pos_repository.dart';
 import '../../data/sale_queue.dart';
+import '../../data/sale_queue_integrity.dart';
 import '../../data/sale_sync_coordinator.dart';
 import '../../data/pos_repository_impl.dart';
 import '../../domain/item_promo_models.dart';
@@ -40,6 +41,7 @@ SaleQueueStore saleQueueStore(Ref ref) {
   return DriftSaleQueueStore(
     dao: ref.watch(queuedSaleDaoProvider),
     identityDao: ref.watch(deviceIdentityDaoProvider),
+    integrity: SaleQueueIntegrity.fromStorage(ref.watch(secureTokenStorageProvider)),
   );
 }
 

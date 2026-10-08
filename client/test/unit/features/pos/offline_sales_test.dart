@@ -16,6 +16,7 @@ import 'package:purch_client/features/pos/domain/pricing_engine.dart';
 import 'package:purch_client/features/pos/domain/transaction_models.dart';
 
 import '../../../helpers/fake_catalog_repository.dart';
+import '../../../helpers/fake_sale_queue_integrity.dart';
 
 Item _coffee() => const Item(
   id: 'coffee',
@@ -558,9 +559,11 @@ void main() {
   group('DriftSaleQueueStore', () {
     late AppDatabase database;
 
+    final seals = InMemorySealStore();
     DriftSaleQueueStore storeFor() => DriftSaleQueueStore(
       dao: database.queuedSaleDao,
       identityDao: database.deviceIdentityDao,
+      integrity: seals.build(),
     );
 
     Future<void> signInAs(String tenant, {String device = 'd1'}) =>

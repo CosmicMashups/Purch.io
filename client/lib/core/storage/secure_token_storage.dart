@@ -13,6 +13,8 @@ class SecureTokenStorage {
   static const _refreshTokenKey = 'purch_refresh_token';
   static const _deviceCredentialKey = 'purch_device_credential';
   static const _supervisorAttestationKey = 'purch_supervisor_attestation';
+  static const _queueIntegrityKeyKey = 'purch_queue_integrity_key';
+  static const _queueSealedKey = 'purch_queue_sealed';
 
   final FlutterSecureStorage _storage;
 
@@ -70,6 +72,26 @@ class SecureTokenStorage {
 
   Future<void> clearSupervisorAttestation() {
     return _storage.delete(key: _supervisorAttestationKey);
+  }
+
+  /// The secret that seals queued offline sales (see QueuedSales.integrity). Made once per install and deliberately kept
+  /// across sign-outs and unpairing: losing it would make every unsent sale look tampered with.
+  Future<String?> readQueueIntegrityKey() {
+    return _storage.read(key: _queueIntegrityKeyKey);
+  }
+
+  Future<void> saveQueueIntegrityKey(String key) {
+    return _storage.write(key: _queueIntegrityKeyKey, value: key);
+  }
+
+  /// Whether the sales queued before sealing existed have been sealed. Set once; afterwards an unsealed row is a
+  /// tampered row, not an old one.
+  Future<bool> readQueueSealed() async {
+    return await _storage.read(key: _queueSealedKey) == '1';
+  }
+
+  Future<void> markQueueSealed() {
+    return _storage.write(key: _queueSealedKey, value: '1');
   }
 
   Future<void> clear() async {

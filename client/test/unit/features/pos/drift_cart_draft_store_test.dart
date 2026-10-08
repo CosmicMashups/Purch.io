@@ -46,11 +46,13 @@ void main() {
     );
     expect(await storeFor().read(), isNull);
 
+    // Switching the install to another business also clears what the first one left behind (see
+    // AppDatabase.wipeCachedData), so it is gone when the first business signs back in.
     await database.deviceIdentityDao.saveIdentity(
       deviceId: 'd1',
       tenantId: 'tenant-a',
       branchId: 'b1',
     );
-    expect(await storeFor().read(), 'tenant A cart');
+    expect(await storeFor().read(), isNull);
   });
 }

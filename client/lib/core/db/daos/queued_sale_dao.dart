@@ -55,6 +55,17 @@ class QueuedSaleDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
+  /// Rows that were queued before sealing existed (see QueuedSales.integrity).
+  Future<List<QueuedSale>> listUnsealed() {
+    return (select(queuedSales)..where((t) => t.integrity.isNull())).get();
+  }
+
+  Future<void> setIntegrity(String id, String integrity) async {
+    await (update(queuedSales)..where((t) => t.id.equals(id))).write(
+      QueuedSalesCompanion(integrity: Value(integrity)),
+    );
+  }
+
   Future<QueuedSale?> byId(String id) {
     return (select(queuedSales)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
