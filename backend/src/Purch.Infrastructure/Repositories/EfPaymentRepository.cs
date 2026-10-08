@@ -30,6 +30,20 @@ public sealed class EfPaymentRepository(PurchDbContext dbContext) : IPaymentRepo
         return await query.SumAsync(cancellationToken);
     }
 
+    public async Task<decimal> SumCashRefundedByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var query =
+            from payment in dbContext.Payments.AsNoTracking()
+            join transaction in dbContext.Transactions.AsNoTracking() on payment.TransactionId equals transaction.Id
+            where transaction.RefundedOnDeviceId == deviceId
+                && transaction.RefundedAt >= since
+                && payment.Method == PaymentMethod.Cash
+                && payment.Status == PaymentStatus.Confirmed
+            select payment.Amount;
+
+        return await query.SumAsync(cancellationToken);
+    }
+
     public void Add(Payment payment)
     {
         _ = dbContext.Payments.Add(payment);

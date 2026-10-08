@@ -21,6 +21,10 @@ public interface IAdjustmentRepository
     /// <summary>Exchanges processed on this device since the given time — what BirReadingService folds
     /// into a reading's net sales (see BirReadingDto.ExchangeAdjustmentsTotal).</summary>
     Task<AdjustmentTotals> GetTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
+
+    /// <summary>Net cash an exchange settlement moved through this device's drawer since the given time: what customers paid
+    /// in (positive differences settled in cash) minus what was handed back (negative ones).</summary>
+    Task<decimal> SumCashSettlementsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
 }
 
 public sealed record AdjustmentTotals(int Count, decimal PriceDifferenceTotal);

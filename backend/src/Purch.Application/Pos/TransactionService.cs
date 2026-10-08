@@ -864,11 +864,24 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(transaction.Status), "Items from this sale were already returned in an exchange, so it can't be refunded in full.");
         }
 
+        var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
+        ReturnPolicy.EnsureAllowed(
+            transaction,
+            currentActorProvider.BranchId,
+            ReturnPolicy.IsTenantWideAdmin(caller?.Role, currentActorProvider.ScopeType),
+            DateTimeOffset.UtcNow);
+
         var approver = await approverAuthorizationService.AuthorizeAsync(request.ApproverPin, cancellationToken);
 
         var beforeState = new { status = transaction.Status.ToString(), total = transaction.TotalAmount };
         transaction.Status = TransactionStatus.Refunded;
         transaction.RefundedAt = DateTimeOffset.UtcNow;
+        transaction.RefundedOnDeviceId = currentActorProvider.DeviceId;
+
+        // A refund undoes the sale: the stock goes back on the shelf, a sale charged to utang comes off the customer's
+        // balance, and (via RefundedOnDeviceId) any cash paid out is deducted from this register's shift.
+        await RestockRefundedSaleAsync(transaction, cancellationToken);
+        var creditReversed = await ReverseCreditChargeAsync(transaction, cancellationToken);
 
         auditLogRepository.Add(new AuditLog
         {
@@ -883,6 +896,7 @@ public sealed class TransactionService(
                 status = nameof(TransactionStatus.Refunded),
                 reason = request.Reason,
                 total = transaction.TotalAmount,
+                creditReversed,
                 approvedByUserId = approver.Id,
                 approvedByRole = approver.Role.ToString(),
             }),
@@ -1017,6 +1031,73 @@ public sealed class TransactionService(
     /// UseSeparateInventoryTracking: for them, stock lives on InventoryItem and is maintained by
     /// ConsumeInventoryForCompletedSaleAsync/ReceiveStockAsync instead — StockOnHand would
     /// otherwise drift negative forever since nothing replenishes it once a tenant switches over.</summary>
+    /// <summary>The mirror image of <see cref="DecrementStockForCompletedSaleAsync"/>: puts back the units the sale took off
+    /// the shelf, under the same condition (a tenant tracking ingredients separately never took item stock, and food already
+    /// made from ingredients is not put back).</summary>
+    private async Task RestockRefundedSaleAsync(Transaction sale, CancellationToken cancellationToken)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        if (tenant is not null && tenant.UseSeparateInventoryTracking)
+        {
+            return;
+        }
+
+        foreach (var (itemId, quantity) in await SoldUnitsAsync(sale, cancellationToken))
+        {
+            var item = await itemRepository.GetByIdAsync(itemId, cancellationToken);
+            if (item is null)
+            {
+                continue;
+            }
+
+            item.StockOnHand += quantity;
+            inventoryMovementRepository.Add(new InventoryMovement
+            {
+                TenantId = CurrentTenantId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ItemId = item.Id,
+                BranchId = sale.BranchId,
+                Type = MovementType.ForReturn,
+                Quantity = quantity,
+                StaffUserId = CurrentUserId,
+                Note = $"Refund — receipt #{sale.ReceiptNumber}",
+            });
+        }
+    }
+
+    /// <summary>Takes back what a refunded sale added to a customer's utang balance. If they have already repaid some of
+    /// it, only what is still owed comes off (the balance never goes below zero) and the note says how much was already paid.
+    /// Returns the total taken off.</summary>
+    private async Task<decimal> ReverseCreditChargeAsync(Transaction sale, CancellationToken cancellationToken)
+    {
+        var reversed = 0m;
+        foreach (var charge in await creditLedgerRepository.ListChargesByTransactionAsync(sale.Id, cancellationToken))
+        {
+            var ledger = await creditLedgerRepository.GetByIdAsync(charge.CustomerCreditLedgerId, cancellationToken);
+            if (ledger is null)
+            {
+                continue;
+            }
+
+            var taken = Math.Min(charge.Amount, ledger.Balance);
+            ledger.Balance -= taken;
+            reversed += taken;
+            var alreadyRepaid = charge.Amount - taken;
+            creditLedgerRepository.AddTransaction(new CreditTransaction
+            {
+                TenantId = CurrentTenantId,
+                CustomerCreditLedgerId = ledger.Id,
+                TransactionId = sale.Id,
+                Amount = -taken,
+                Note = alreadyRepaid > 0
+                    ? $"Refund of receipt #{sale.ReceiptNumber} ({alreadyRepaid:0.00} of it was already repaid)"
+                    : $"Refund of receipt #{sale.ReceiptNumber}",
+            });
+        }
+
+        return reversed;
+    }
+
     private async Task DecrementStockForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
     {
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);

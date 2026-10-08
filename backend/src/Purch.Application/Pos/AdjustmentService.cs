@@ -69,7 +69,15 @@ public sealed class AdjustmentService(
             throw new ValidationException(nameof(transaction.Status), "Only a completed sale can be exchanged against.");
         }
 
-        var originalLines = (await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken)).ToDictionary(line => line.Id);
+        var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
+        ReturnPolicy.EnsureAllowed(
+            transaction,
+            currentActorProvider.BranchId,
+            ReturnPolicy.IsTenantWideAdmin(caller?.Role, currentActorProvider.ScopeType),
+            DateTimeOffset.UtcNow);
+
+        var originalLineList = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
+        var originalLines = originalLineList.ToDictionary(line => line.Id);
         var alreadyReturned = (await adjustmentRepository.ListReturnLinesByTransactionAsync(transaction.Id, cancellationToken))
             .GroupBy(line => line.OriginalLineId)
             .ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
@@ -104,7 +112,11 @@ public sealed class AdjustmentService(
                 ItemVariantId = originalLine.ItemVariantId,
                 Quantity = requested.Quantity,
                 UnitPrice = originalLine.UnitPrice,
-                LineTotal = originalLine.UnitPrice * requested.Quantity,
+
+                // What the customer actually paid for these units: the line's own promotion and its share of
+                // whole-sale discounts (Senior/PWD, promo code) come off, so a buy-1-take-1 item or a discounted
+                // sale cannot be returned at full list price toward a pricier replacement.
+                LineTotal = ReturnPolicy.PaidValue(transaction, originalLineList, originalLine, requested.Quantity),
             });
         }
 

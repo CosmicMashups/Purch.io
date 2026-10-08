@@ -33,6 +33,22 @@ public sealed class EfCustomerCreditLedgerRepository(PurchDbContext dbContext) :
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CreditTransaction>> ListChargesByTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.CreditTransactions
+            .Where(credit => credit.TransactionId == transactionId && credit.Amount > 0)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<decimal> SumRepaymentsByShiftAsync(Guid shiftId, CancellationToken cancellationToken = default)
+    {
+        // Repayments are stored as negative amounts; the drawer gained what they total.
+        return -await dbContext.CreditTransactions
+            .AsNoTracking()
+            .Where(credit => credit.ShiftId == shiftId)
+            .SumAsync(credit => credit.Amount, cancellationToken);
+    }
+
     public void Add(CustomerCreditLedger ledger)
     {
         _ = dbContext.CustomerCreditLedgers.Add(ledger);

@@ -7,6 +7,7 @@ using Purch.Application.Catalog;
 using Purch.Application.CreditLedger;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
+using Purch.Application.Shifts;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
@@ -124,6 +125,7 @@ public sealed class CreditLedgerEndpointsTests(PostgresContainerFixture postgres
             "/transactions/cart/payments",
             new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger!.Id));
 
+        _ = await client.PostAsJsonAsync("/shifts/open", new OpenShiftRequest(100m));
         var overpayResponse = await client.PostAsJsonAsync(
             $"/credit-ledger/{ledger.Id}/payments",
             new RecordCreditPaymentRequest(500m, null));
@@ -153,6 +155,7 @@ public sealed class CreditLedgerEndpointsTests(PostgresContainerFixture postgres
         _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item!.Id, null, 1m));
         _ = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger!.Id));
 
+        _ = await client.PostAsJsonAsync("/shifts/open", new OpenShiftRequest(100m));
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/credit-ledger/{ledger.Id}/payments", new RecordCreditPaymentRequest(150m, "Partial"))).StatusCode);
 
         var audit = await client.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);

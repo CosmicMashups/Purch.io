@@ -2,6 +2,7 @@ using System.Text.Json;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
+using Purch.Application.Shifts;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
@@ -9,6 +10,7 @@ namespace Purch.Application.CreditLedger;
 
 public sealed class CustomerCreditLedgerService(
     ICustomerCreditLedgerRepository creditLedgerRepository,
+    IShiftRepository shiftRepository,
     ITenantRepository tenantRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -51,6 +53,13 @@ public sealed class CustomerCreditLedgerService(
             throw new ValidationException(nameof(request.Amount), "Payment amount must be greater than zero.");
         }
 
+        // The cash a customer hands over has to end up in a drawer that gets counted, so a repayment is only taken on
+        // a register with a shift open; it is then part of that shift's expected cash.
+        var deviceId = currentActorProvider.DeviceId
+            ?? throw new ValidationException(nameof(request.Amount), "Take utang payments on a register: open a shift there first.");
+        var shift = await shiftRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
+            ?? throw new ValidationException(nameof(request.Amount), "Open a shift on this register before taking an utang payment.");
+
         var ledger = await creditLedgerRepository.GetByIdAsync(ledgerId, cancellationToken);
         if (ledger is null || ledger.TenantId != CurrentTenantId)
         {
@@ -73,7 +82,7 @@ public sealed class CustomerCreditLedgerService(
             TargetEntityType = nameof(CustomerCreditLedger),
             TargetEntityId = ledger.Id,
             BeforeStateJson = JsonSerializer.Serialize(new { balance = balanceBefore }),
-            AfterStateJson = JsonSerializer.Serialize(new { balance = ledger.Balance, paid = request.Amount, note = request.Note }),
+            AfterStateJson = JsonSerializer.Serialize(new { balance = ledger.Balance, paid = request.Amount, note = request.Note, shiftId = shift.Id }),
         });
         creditLedgerRepository.AddTransaction(new CreditTransaction
         {
@@ -81,6 +90,7 @@ public sealed class CustomerCreditLedgerService(
             CustomerCreditLedgerId = ledger.Id,
             Amount = -request.Amount,
             Note = request.Note,
+            ShiftId = shift.Id,
         });
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

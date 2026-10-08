@@ -13,6 +13,12 @@ public interface ICustomerCreditLedgerRepository
     /// the caller decides the lookahead date, the service flags which is which).</summary>
     Task<IReadOnlyList<CustomerCreditLedger>> ListDueOnOrBeforeAsync(Guid tenantId, DateOnly onOrBefore, CancellationToken cancellationToken = default);
 
+    /// <summary>What a sale charged to credit (positive rows tied to that sale) — what a refund of the sale takes back.</summary>
+    Task<IReadOnlyList<CreditTransaction>> ListChargesByTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
+    /// <summary>Total repaid in this shift, counted as cash taken into the drawer.</summary>
+    Task<decimal> SumRepaymentsByShiftAsync(Guid shiftId, CancellationToken cancellationToken = default);
+
     void Add(CustomerCreditLedger ledger);
 
     void AddTransaction(CreditTransaction transaction);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Common;
+using Purch.Application.CreditLedger;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
@@ -14,6 +15,8 @@ namespace Purch.Application.Shifts;
 public sealed class ShiftService(
     IShiftRepository shiftRepository,
     IPaymentRepository paymentRepository,
+    IAdjustmentRepository adjustmentRepository,
+    ICustomerCreditLedgerRepository creditLedgerRepository,
     IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
     IPinHasher pinHasher,
@@ -71,8 +74,13 @@ public sealed class ShiftService(
         var shift = await shiftRepository.GetOpenByDeviceAsync(deviceId, cancellationToken)
             ?? throw new NotFoundException("Open shift", deviceId);
 
+        // What the drawer should hold: the float, plus cash taken for sales and for utang repayments, plus the net
+        // cash of exchange settlements, minus cash handed back for refunds.
         var cashCollected = await paymentRepository.SumCashCollectedByDeviceSinceAsync(deviceId, shift.OpenedAt, cancellationToken);
-        var expectedCashAmount = shift.OpeningCashAmount + cashCollected;
+        var repaymentsCollected = await creditLedgerRepository.SumRepaymentsByShiftAsync(shift.Id, cancellationToken);
+        var cashRefunded = await paymentRepository.SumCashRefundedByDeviceSinceAsync(deviceId, shift.OpenedAt, cancellationToken);
+        var exchangeCash = await adjustmentRepository.SumCashSettlementsByDeviceSinceAsync(deviceId, shift.OpenedAt, cancellationToken);
+        var expectedCashAmount = shift.OpeningCashAmount + cashCollected + repaymentsCollected - cashRefunded + exchangeCash;
         var varianceAmount = request.ClosingCashAmount - expectedCashAmount;
 
         Guid? approvedByUserId = null;

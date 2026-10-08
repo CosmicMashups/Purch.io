@@ -27,7 +27,7 @@ public class Adjustment : TenantScopedEntity
 
     public string Reason { get; set; } = string.Empty;
 
-    /// <summary>What the returned line(s) were worth at the original sale's price.</summary>
+    /// <summary>What the returned line(s) were worth: what the customer actually paid for them, after promotions and discounts.</summary>
     public decimal ReturnedTotal { get; set; }
 
     /// <summary>What the replacement line(s) cost at today's price.</summary>

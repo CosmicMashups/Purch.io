@@ -40,6 +40,9 @@ public class Transaction : TenantScopedEntity
     /// after the sale's own CreatedAt and often after the sale was already reported on an earlier reading.</summary>
     public DateTimeOffset? RefundedAt { get; set; }
 
+    /// <summary>The terminal that paid the refund out, whose cash drawer it came from. Null for older refunds.</summary>
+    public Guid? RefundedOnDeviceId { get; set; }
+
     /// <summary>When the sale was paid and its receipt issued, or null while it is still an open cart. CreatedAt is when the
     /// cart was started, which can be long before; a receipt shows this moment.</summary>
     public DateTimeOffset? CompletedAt { get; set; }

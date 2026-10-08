@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Purch.Application.Pos;
 using Purch.Domain.Entities;
+using Purch.Domain.Enums;
 using Purch.Infrastructure.Persistence;
 
 namespace Purch.Infrastructure.Repositories;
@@ -40,6 +41,16 @@ public sealed class EfAdjustmentRepository(PurchDbContext dbContext) : IAdjustme
     public async Task<IReadOnlyList<AdjustmentReplacementLine>> ListReplacementLinesAsync(Guid adjustmentId, CancellationToken cancellationToken = default)
     {
         return await dbContext.AdjustmentReplacementLines.AsNoTracking().Where(line => line.AdjustmentId == adjustmentId).ToListAsync(cancellationToken);
+    }
+
+    public async Task<decimal> SumCashSettlementsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Adjustments
+            .AsNoTracking()
+            .Where(adjustment => adjustment.DeviceId == deviceId
+                && adjustment.CreatedAt >= since
+                && adjustment.SettlementMethod == PaymentMethod.Cash)
+            .SumAsync(adjustment => adjustment.PriceDifference, cancellationToken);
     }
 
     public async Task<AdjustmentTotals> GetTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
