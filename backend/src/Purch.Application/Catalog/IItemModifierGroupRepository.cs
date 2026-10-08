@@ -8,5 +8,7 @@ public interface IItemModifierGroupRepository
 
     Task<bool> ExistsAsync(Guid itemId, Guid modifierGroupId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Guid>> ListItemIdsForGroupAsync(Guid modifierGroupId, CancellationToken cancellationToken = default);
+
     void Add(ItemModifierGroup link);
 }

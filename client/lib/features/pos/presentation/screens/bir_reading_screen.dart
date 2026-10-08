@@ -223,6 +223,10 @@ class _ReadingReport extends StatelessWidget {
             ),
             _Row('VAT (12%)', formatCurrency(reading.vatAmount)),
             _Row(
+              'VAT-exempt sales (Senior/PWD)',
+              formatCurrency(reading.vatExemptSales),
+            ),
+            _Row(
               'Senior/PWD discounts',
               formatCurrency(reading.seniorPwdDiscountTotal),
             ),

@@ -6,7 +6,7 @@ import { toast } from '../../components/feedback/toastStore';
 import { formatPeso } from '../dashboard/format';
 import { paymentSummary } from '../kiosk/tickets';
 import { useHardwareConfig } from '../../hardware/config';
-import { IDLE_STATE, stateForReceipt, vatIncluded } from '../../hardware/display/channel';
+import { IDLE_STATE, stateForReceipt, vatOf } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { posApi } from './api';
 import { usePosStore } from './posStore';
@@ -63,7 +63,8 @@ export function ReceiptPage() {
   const payment = receipt.payments[0];
   const refunded = receipt.status === TransactionStatus.Refunded;
   const receiptId = receipt.id;
-  const vat = vatIncluded(receipt.totalAmount);
+  const vat = vatOf(receipt);
+  const vatExempt = receipt.vatExemptAmount > 0;
   const printedAt = new Date(receipt.completedAt ?? receipt.createdAt ?? shownAt);
 
   function newSale() {
@@ -140,7 +141,8 @@ export function ReceiptPage() {
           <Row label="Total Sales (VAT Inclusive)" value={receipt.subtotal} />
           {receipt.itemPromoDiscountAmount > 0 && <Row label="Less: Item promotions" value={-receipt.itemPromoDiscountAmount} />}
           {receipt.promoDiscountAmount > 0 && <Row label={`Less: Promo ${receipt.promoCode ?? ''}`.trim()} value={-receipt.promoDiscountAmount} />}
-          {receipt.discountAmount > 0 && <Row label="Less: SC/PWD Discount" value={-receipt.discountAmount} />}
+          {vatExempt && <Row label="Less: VAT (12%)" value={-receipt.vatExemptAmount} />}
+          {receipt.discountAmount > 0 && <Row label="Less: SC/PWD Discount (20%)" value={-receipt.discountAmount} />}
           <div className="mt-1 flex items-baseline justify-between border-y border-ink-soft py-1 text-base font-bold">
             <dt>TOTAL AMOUNT DUE</dt>
             <dd className="tabular-nums">{formatPeso(receipt.totalAmount)}</dd>
@@ -154,8 +156,8 @@ export function ReceiptPage() {
         </dl>
 
         <dl className="mt-3 flex flex-col gap-0.5 border-t border-dashed border-ink-soft pt-2">
-          <Row label="VATable Sales" value={receipt.totalAmount - vat} />
-          <Row label="VAT-Exempt Sales" value={0} />
+          <Row label="VATable Sales" value={vatExempt ? 0 : receipt.totalAmount - vat} />
+          <Row label="VAT-Exempt Sales" value={vatExempt ? receipt.totalAmount + receipt.discountAmount : 0} />
           <Row label="Zero-Rated Sales" value={0} />
           <Row label="VAT Amount (12%)" value={vat} />
         </dl>

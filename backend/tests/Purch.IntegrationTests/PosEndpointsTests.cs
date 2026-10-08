@@ -329,8 +329,10 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         Assert.Equal(HttpStatusCode.OK, discountResponse.StatusCode);
         var discounted = await discountResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
         Assert.True(discounted!.SeniorPwdDiscountApplied);
-        Assert.Equal(20m, discounted.DiscountAmount);
-        Assert.Equal(80m, discounted.TotalAmount);
+        // VAT comes off the 100 first (10.71), then 20% of the VAT-exclusive 89.29.
+        Assert.Equal(10.71m, discounted.VatExemptAmount);
+        Assert.Equal(17.86m, discounted.DiscountAmount);
+        Assert.Equal(71.43m, discounted.TotalAmount);
     }
 
     [Fact]
@@ -356,8 +358,9 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
             new AddTransactionLineRequest(item.Id, null, 1m));
         var cart = await secondAddResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
 
-        Assert.Equal(20m, cart!.DiscountAmount);
-        Assert.Equal(80m, cart.TotalAmount);
+        Assert.Equal(10.71m, cart!.VatExemptAmount);
+        Assert.Equal(17.86m, cart.DiscountAmount);
+        Assert.Equal(71.43m, cart.TotalAmount);
     }
 
     [Fact]
@@ -384,6 +387,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var cart = await offResponse.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
 
         Assert.False(cart!.SeniorPwdDiscountApplied);
+        Assert.Equal(0m, cart.VatExemptAmount);
         Assert.Equal(0m, cart.DiscountAmount);
         Assert.Equal(40m, cart.TotalAmount);
     }
@@ -829,11 +833,11 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
 
         var cart = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/promo-code", new ApplyPromoCodeRequest("SAVE10")));
 
-        // Only the 20% Senior/PWD discount applies; the code is kept on the cart but gives nothing.
+        // Only the Senior/PWD VAT exemption and 20% discount apply; the code is kept on the cart but gives nothing.
         Assert.Equal("SAVE10", cart.PromoCode);
         Assert.Equal(0m, cart.PromoDiscountAmount);
-        Assert.Equal(20m, cart.DiscountAmount);
-        Assert.Equal(80m, cart.TotalAmount);
+        Assert.Equal(17.86m, cart.DiscountAmount);
+        Assert.Equal(71.43m, cart.TotalAmount);
     }
 
     [Fact]
@@ -869,10 +873,10 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
 
         var senior = await ReadCartAsync(await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true)));
 
-        // 20% of the REGULAR 100, not of the promo price; the promo is suppressed entirely.
+        // Worked on the REGULAR 100, not of the promo price; the promo is suppressed entirely.
         Assert.Equal(0m, senior.ItemPromoDiscountAmount);
-        Assert.Equal(20m, senior.DiscountAmount);
-        Assert.Equal(80m, senior.TotalAmount);
+        Assert.Equal(17.86m, senior.DiscountAmount);
+        Assert.Equal(71.43m, senior.TotalAmount);
         Assert.Equal(0m, Assert.Single(senior.Lines).PromoDiscountAmount);
         Assert.Null(senior.Lines[0].AppliedPromoLabel);
     }
@@ -928,14 +932,14 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
                 PromoCode: "SAVE10",
                 OrderType: null,
                 Payment: new RecordPaymentRequest(PaymentMethod.Cash, 100m),
-                // What the device shows: Senior/PWD only. Stacking would make it 70 and trip the 409.
-                ExpectedTotal: 80m));
+                // What the device shows: Senior/PWD only. Stacking would change it and trip the 409.
+                ExpectedTotal: 71.43m));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var sale = await ReadCartAsync(response);
-        Assert.Equal(80m, sale.TotalAmount);
+        Assert.Equal(71.43m, sale.TotalAmount);
         Assert.Equal(0m, sale.PromoDiscountAmount);
-        Assert.Equal(20m, sale.DiscountAmount);
+        Assert.Equal(17.86m, sale.DiscountAmount);
     }
 
     [Fact]

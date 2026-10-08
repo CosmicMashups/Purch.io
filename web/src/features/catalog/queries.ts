@@ -4,6 +4,7 @@ import { departmentsApi } from '../departments/api';
 import type {
   Item,
   AttachModifierGroupRequest,
+  AttachModifierGroupToItemsRequest,
   CreateBundlePromoRuleRequest,
   CreateCategoryRequest,
   CreateItemBatchRequest,
@@ -153,6 +154,15 @@ export function useAttachModifierGroup(itemId: string) {
   return useMutation({
     mutationFn: (body: AttachModifierGroupRequest) => catalogApi.attachModifierGroup(itemId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.itemModifierGroups(itemId) }),
+  });
+}
+
+export function useAttachModifierGroupToItems(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AttachModifierGroupToItemsRequest) => catalogApi.attachModifierGroupToItems(groupId, body),
+    // Each item's own list of groups changed, whichever items they were.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['items'] }),
   });
 }
 

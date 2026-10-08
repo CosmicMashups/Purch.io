@@ -1759,6 +1759,11 @@ class _CartFooter extends ConsumerWidget {
                     label: 'Item promos',
                     amount: -cart.itemPromoDiscountAmount,
                   ),
+                if (cart.vatExemptAmount > 0)
+                  _TotalsRow(
+                    label: 'VAT exemption (12%)',
+                    amount: -cart.vatExemptAmount,
+                  ),
                 if (cart.discountAmount > 0)
                   _TotalsRow(
                     label: _discountLabel(cart),

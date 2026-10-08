@@ -1,4 +1,5 @@
 using Purch.Application.Common;
+using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
@@ -29,6 +30,8 @@ public interface IRegisterSessionService
 public sealed class RegisterSessionService(
     IAccountRepository accountRepository,
     IDeviceRepository deviceRepository,
+    IBranchRepository branchRepository,
+    IUnitOfWork unitOfWork,
     IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService) : IRegisterSessionService
 {
@@ -44,6 +47,30 @@ public sealed class RegisterSessionService(
             .Where(d => d.DeviceType == DeviceType.Register && d.Status == DeviceStatus.Active)
             .OrderBy(d => d.Name)
             .ToList();
+
+        // An Admin or Manager never has to pair a device: a business with no Register gets one made for them.
+        if (registers.Count == 0)
+        {
+            var branch = (await branchRepository.ListByTenantAsync(member.TenantId, cancellationToken)).OrderBy(b => b.Name).FirstOrDefault();
+            if (branch is null)
+            {
+                return new RegisterSessionResult.NoRegister();
+            }
+
+            var created = new Device
+            {
+                TenantId = member.TenantId,
+                BranchId = branch.Id,
+                DeviceType = DeviceType.Register,
+                Name = "Admin register",
+                Status = DeviceStatus.Active,
+                PairedAt = DateTimeOffset.UtcNow,
+                PairingCode = string.Empty,
+            };
+            deviceRepository.Add(created);
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+            registers.Add(created);
+        }
 
         Device? device;
         if (request.DeviceId is { } id)

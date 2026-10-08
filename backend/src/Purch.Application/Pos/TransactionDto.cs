@@ -24,7 +24,8 @@ public sealed record TransactionDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
     string? KioskPaymentPreference = null,
-    string? KioskDiscountHint = null);
+    string? KioskDiscountHint = null,
+    decimal VatExemptAmount = 0m);
 
 /// <summary>Kitchen Display's request to advance a kiosk order's kitchen-prep state.</summary>
 public sealed record UpdateKitchenStatusRequest(KitchenStatus KitchenStatus);

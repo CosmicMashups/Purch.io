@@ -10,6 +10,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
     {
         _ = builder.Property(t => t.TotalAmount).HasPrecision(12, 2);
         _ = builder.Property(t => t.DiscountAmount).HasPrecision(12, 2);
+        _ = builder.Property(t => t.VatExemptAmount).HasPrecision(12, 2);
 
         // Matches ReceiptSequence's own per-(branch,device) uniqueness. Filtered to
         // issued receipts only — Postgres already treats NULLs as distinct for a

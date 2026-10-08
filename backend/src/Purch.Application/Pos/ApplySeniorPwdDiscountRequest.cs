@@ -10,10 +10,9 @@ namespace Purch.Application.Pos;
 /// code or any promotional discount, so while it is on every promotion on the
 /// cart is suppressed (see TransactionService.RecalculateTotalAsync), and it
 /// is taken off the regular, pre-promo subtotal.
-/// The 20%-of-subtotal computation is a pragmatic best-effort:
-/// full BIR VAT-exemption treatment (the discount is computed off the
-/// VAT-exclusive price, not gross) needs accountant/BIR review before this
-/// is treated as accreditation-ready — same caveat as ADR 0005's Z/X-reading
-/// format.
+/// Prices include 12% VAT. The sale is VAT-exempt (the VAT comes off first,
+/// stored as Transaction.VatExemptAmount) and the 20% is then taken off the
+/// VAT-exclusive price. Still best-effort until an accountant/BIR reviews it —
+/// same caveat as ADR 0005's Z/X-reading format.
 /// </summary>
 public sealed record ApplySeniorPwdDiscountRequest(bool Apply);

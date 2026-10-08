@@ -145,6 +145,14 @@ class ReceiptEscPosFormatter {
     }
 
     if (transaction.seniorPwdDiscountApplied && transaction.discountAmount > 0) {
+      // The sale is VAT-exempt: the VAT comes off first, then the 20% is taken
+      // off the VAT-exclusive price (RA 9994, RA 10754).
+      if (transaction.vatExemptAmount > 0) {
+        builder.twoColumn(
+          'Less: VAT (12%)',
+          '-PHP ${transaction.vatExemptAmount.toStringAsFixed(2)}',
+        );
+      }
       builder.twoColumn(
         'Senior/PWD Discount (20%)',
         '-PHP ${transaction.discountAmount.toStringAsFixed(2)}',
@@ -175,7 +183,9 @@ class ReceiptEscPosFormatter {
     final isSeniorPwd = transaction.seniorPwdDiscountApplied;
     final vatableSales = isSeniorPwd ? 0.0 : (transaction.totalAmount / 1.12);
     final vatAmount = isSeniorPwd ? 0.0 : (transaction.totalAmount - vatableSales);
-    final vatExemptSales = isSeniorPwd ? transaction.totalAmount : 0.0;
+    // The VAT-exclusive price, before the 20% discount.
+    final vatExemptSales =
+        isSeniorPwd ? transaction.totalAmount + transaction.discountAmount : 0.0;
     const zeroRatedSales = 0.0;
 
     builder.twoColumn('VATable Sales:', 'PHP ${vatableSales.toStringAsFixed(2)}');

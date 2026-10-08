@@ -86,12 +86,17 @@ public sealed class BirReadingService(
         var exchangeAdjustmentsTotal = adjustmentTotals.PriceDifferenceTotal;
         var refundsTotal = refundedTotals.Amount;
         var netSales = salesTotal + exchangeAdjustmentsTotal - refundsTotal;
-        var grossSales = netSales + totalDiscounts;
+        var vatExemptionTotal = transactions.Sum(t => t.VatExemptAmount);
+        var grossSales = netSales + totalDiscounts + vatExemptionTotal;
 
-        // VAT computed off net sales (post-Senior/PWD discount, which is VAT-exempt under RA 9994) —
-        // see the TODO(BIR-ACCREDITATION) on BirReadingDto for why this is best-effort, not final.
-        var vatableSales = netSales / (1 + VatRate);
-        var vatAmount = netSales - vatableSales;
+        // A Senior/PWD sale is VAT-exempt (RA 9994, RA 10754): its VAT-exclusive price is reported as exempt sales
+        // (the 20% discount is already counted above) and carries no VAT. Everything else is VAT-inclusive.
+        // See the TODO(BIR-ACCREDITATION) on BirReadingDto for why this is best-effort, not final.
+        var seniorPwdSales = transactions.Where(t => t.SeniorPwdDiscountApplied).ToList();
+        var vatExemptSales = seniorPwdSales.Sum(t => t.TotalAmount + t.DiscountAmount);
+        var vatableNet = netSales - seniorPwdSales.Sum(t => t.TotalAmount);
+        var vatableSales = vatableNet / (1 + VatRate);
+        var vatAmount = vatableNet - vatableSales;
 
         var oldGrandAccumulatedSales = sequence.GrandAccumulatedSales;
         var newGrandAccumulatedSales = oldGrandAccumulatedSales + netSales;
@@ -138,7 +143,9 @@ public sealed class BirReadingService(
             newGrandAccumulatedSales,
             resetCounter,
             lateReceiptNumbers,
-            missingReceiptNumbers);
+            missingReceiptNumbers,
+            vatExemptSales,
+            vatExemptionTotal);
     }
 
     /// <summary>The most missing numbers listed on one reading — a bound, not a limit on the data.</summary>

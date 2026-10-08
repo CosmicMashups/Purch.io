@@ -3,7 +3,7 @@ import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { formatPeso } from '../../dashboard/format';
-import { vatIncluded } from '../../../hardware/display/channel';
+import { vatOf } from '../../../hardware/display/channel';
 import { posApi } from '../api';
 import { useApplyPromoCode, useApplySeniorPwd, useSetOrderType } from '../queries';
 import { useApproverGatedAction } from '../useApproverGatedAction';
@@ -206,8 +206,9 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
           <Row label="Subtotal" value={cart.subtotal} />
           {cart.itemPromoDiscountAmount > 0 && <Row label="Item promotions" value={-cart.itemPromoDiscountAmount} />}
           {cart.promoDiscountAmount > 0 && <Row label={`Promo code ${cart.promoCode ?? ''}`.trim()} value={-cart.promoDiscountAmount} />}
-          {cart.discountAmount > 0 && <Row label="Senior / PWD" value={-cart.discountAmount} />}
-          <Row label="VAT (12%)" value={vatIncluded(cart.totalAmount)} />
+          {cart.vatExemptAmount > 0 && <Row label="VAT exemption (12%)" value={-cart.vatExemptAmount} />}
+          {cart.discountAmount > 0 && <Row label="Senior / PWD (20%)" value={-cart.discountAmount} />}
+          <Row label="VAT (12%)" value={vatOf(cart)} />
           <div className="mt-1 flex items-baseline justify-between border-t border-line pt-1 text-lg font-bold">
             <dt>Total</dt>
             <dd className="tabular-nums" data-testid="cart-total">

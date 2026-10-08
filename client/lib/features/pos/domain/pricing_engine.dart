@@ -9,8 +9,9 @@ import 'promo_code_models.dart';
 /// Discounts do NOT stack (RA 9994): the statutory Senior Citizen/PWD 20% cannot
 /// be combined with a promo code or any promotional discount, and only one
 /// promotion applies at a time. The cashier chooses via the Senior/PWD switch:
-///  - Senior/PWD on: 20% of the regular (pre-promo) subtotal; every promotion is
-///    suppressed.
+///  - Senior/PWD on: the sale is VAT-exempt (RA 9994, RA 10754), so the 12% VAT
+///    comes off the regular (pre-promo) subtotal first, then 20% of that
+///    VAT-exclusive price; every promotion is suppressed.
 ///  - Otherwise: ONE promotion — the automatic item promos (BOGO/combo/item
 ///    discount) or the promo code, whichever is larger (a tie goes to the item
 ///    promos).
@@ -26,6 +27,9 @@ class PricingEngine {
 
   /// RA 9994/RA 10754 Senior Citizen/PWD discount rate (same as the backend).
   static const seniorPwdDiscountRate = 0.20;
+
+  /// Prices include 12% VAT; a Senior/PWD sale is exempt from it.
+  static const vatRate = 0.12;
 
   static PricingResult price({
     required List<PricingLineInput> lines,
@@ -70,9 +74,18 @@ class PricingEngine {
       }
     }
 
-    final seniorPwdSavings = _round2(gross * seniorPwdDiscountRate);
+    // VAT comes off first; the 20% is worked on the VAT-exclusive price.
+    final vatExclusive = _round2(gross / (1 + vatRate));
+    final vatExemptIfSenior = _round2(gross - vatExclusive);
+    final seniorPwdDiscountIfSenior = _round2(
+      vatExclusive * seniorPwdDiscountRate,
+    );
+    final seniorPwdSavings = _round2(
+      vatExemptIfSenior + seniorPwdDiscountIfSenior,
+    );
 
     var seniorPwdAmount = 0.0;
+    var vatExemptAmount = 0.0;
     var appliedItemPromoAmount = 0.0;
     var appliedCodeAmount = 0.0;
     var side = PromoSide.none;
@@ -84,7 +97,8 @@ class PricingEngine {
 
     if (seniorPwdApplied) {
       // On the regular price, not on a price already reduced by a promotion.
-      seniorPwdAmount = seniorPwdSavings;
+      vatExemptAmount = vatExemptIfSenior;
+      seniorPwdAmount = seniorPwdDiscountIfSenior;
       if (retainedCode != null) {
         codeReason = PromoCodeNotApplied.suppressedBySeniorPwd;
       }
@@ -107,10 +121,13 @@ class PricingEngine {
       lineDiscounts: lineDiscounts,
       grossSubtotal: gross,
       itemPromoDiscountAmount: appliedItemPromoAmount,
+      vatExemptAmount: vatExemptAmount,
       seniorPwdDiscountAmount: seniorPwdAmount,
       promoDiscountAmount: appliedCodeAmount,
       discountAmount: discountAmount,
-      totalAmount: gross - appliedItemPromoAmount - discountAmount,
+      totalAmount: _round2(
+        gross - appliedItemPromoAmount - vatExemptAmount - discountAmount,
+      ),
       appliedPromoCode: side == PromoSide.promoCode ? retainedCode : null,
       retainedPromoCode: retainedCode,
       promoCodeNotApplied: codeReason,
@@ -370,6 +387,7 @@ class PricingResult {
     required this.lineDiscounts,
     required this.grossSubtotal,
     required this.itemPromoDiscountAmount,
+    required this.vatExemptAmount,
     required this.seniorPwdDiscountAmount,
     required this.promoDiscountAmount,
     required this.discountAmount,
@@ -393,6 +411,9 @@ class PricingResult {
   /// chosen or the promo code is the larger promotion).
   final double itemPromoDiscountAmount;
   final double seniorPwdDiscountAmount;
+
+  /// The VAT taken off a Senior/PWD sale (0 otherwise).
+  final double vatExemptAmount;
 
   /// The promo code's discount that actually applies.
   final double promoDiscountAmount;

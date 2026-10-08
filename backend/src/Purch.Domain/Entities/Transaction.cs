@@ -50,6 +50,11 @@ public class Transaction : TenantScopedEntity
 
     public bool SeniorPwdDiscountApplied { get; set; }
 
+    /// <summary>The 12% VAT taken off a Senior Citizen/PWD sale (RA 9994, RA 10754): prices include VAT, and the 20% discount
+    /// is then worked on the VAT-exclusive price. TotalAmount = gross - VatExemptAmount - DiscountAmount. Zero for any other sale,
+    /// including sales rung up before this existed.</summary>
+    public decimal VatExemptAmount { get; set; }
+
     /// <summary>The applied PromoCode.Code, or null if none — re-resolved against
     /// PromoCode on every recalculation rather than caching the discount rule.</summary>
     public string? PromoCode { get; set; }

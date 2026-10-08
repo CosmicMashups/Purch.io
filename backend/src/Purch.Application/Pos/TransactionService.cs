@@ -60,6 +60,9 @@ public sealed class TransactionService(
     /// <summary>RA 9994/RA 10754 Senior Citizen/PWD discount — see ApplySeniorPwdDiscountRequest for the VAT-treatment caveat.</summary>
     private const decimal SeniorPwdDiscountRate = 0.20m;
 
+    /// <summary>Prices are VAT-inclusive; a Senior/PWD sale is exempt from this (RA 9994, RA 10754).</summary>
+    private const decimal VatRate = 0.12m;
+
     /// <summary>How far past the terminal's last recorded number a device-issued receipt number may
     /// jump — wide enough for a long offline stretch, tight enough that a typo or a bad client
     /// can't burn the sequence.</summary>
@@ -608,6 +611,7 @@ public sealed class TransactionService(
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
+        Guid? unverifiedApproverId = null;
         if (request.OfflineSale && request.RungByStaffId is { } rungByStaffId)
         {
             // Tenant-scoped lookup, so an id from another tenant simply isn't found. The role comes from
@@ -619,10 +623,38 @@ public sealed class TransactionService(
             }
 
             staffOverride = rungBy?.Id;
+            unverifiedApproverId = request.SeniorPwdDiscountApplied && rungBy is not null
+                && rungBy.Id != currentActorProvider.UserId ? rungBy.Id : null;
         }
 
         var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
         cart.ClientSaleId = request.SaleId;
+
+        if (unverifiedApproverId is { } claimedApprover)
+        {
+            // The server cannot verify a PIN entered offline, and a paid sale must still sync. But the
+            // claimed manager id is knowable by anyone with a till's roster, so record who actually
+            // submitted the sale and who they named, for review under the audit log.
+            var submitter = currentActorProvider.UserId
+                ?? throw new InvalidOperationException("The POS requires an authenticated staff user.");
+            auditLogRepository.Add(new AuditLog
+            {
+                TenantId = CurrentTenantId,
+                ActorUserId = submitter,
+                ActionType = AuditActionType.DiscountOverride,
+                TargetEntityType = nameof(Transaction),
+                TargetEntityId = cart.Id,
+                BeforeStateJson = JsonSerializer.Serialize(new { seniorPwdDiscount = false }),
+                AfterStateJson = JsonSerializer.Serialize(new
+                {
+                    seniorPwdDiscount = true,
+                    offlineSale = true,
+                    claimedApproverUserId = claimedApprover,
+                    submittedByUserId = submitter,
+                    approvalVerified = false,
+                }),
+            });
+        }
         if (request.OfflineSale && request.SoldAt is { } soldAt)
         {
             var now = DateTimeOffset.UtcNow;
@@ -1654,7 +1686,8 @@ public sealed class TransactionService(
     /// and a cart carries only one promotional discount at a time. The cashier chooses which one the
     /// customer gets — via the Senior/PWD switch — so this applies exactly one of:
     ///
-    ///  - Senior/PWD chosen: 20% of the regular (pre-promo) subtotal. Every promotion is suppressed.
+    ///  - Senior/PWD chosen: the 12% VAT comes off the regular (pre-promo) subtotal, then 20% of what is left.
+    ///    Every promotion is suppressed.
     ///  - Otherwise: ONE promotion — the automatic item promos (BOGO/combo/item discount) or the promo
     ///    code, whichever gives the larger discount (a tie goes to the item promos).
     ///
@@ -1682,13 +1715,17 @@ public sealed class TransactionService(
         var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, grossSubtotal, cancellationToken);
 
         var seniorPwdAmount = 0m;
+        var vatExemptAmount = 0m;
         var appliedItemPromoAmount = 0m;
         var appliedPromoCodeAmount = 0m;
 
         if (transaction.SeniorPwdDiscountApplied)
         {
-            // On the regular price, not on a price already reduced by a promotion.
-            seniorPwdAmount = Math.Round(grossSubtotal * SeniorPwdDiscountRate, 2);
+            // Prices include 12% VAT. A Senior/PWD sale is VAT-exempt, so the VAT comes off first, and the 20% is
+            // then taken off the VAT-exclusive regular price (not off a price already reduced by a promotion).
+            var vatExclusive = Math.Round(grossSubtotal / (1 + VatRate), 2);
+            vatExemptAmount = grossSubtotal - vatExclusive;
+            seniorPwdAmount = Math.Round(vatExclusive * SeniorPwdDiscountRate, 2);
         }
         else if (itemPromoAmount >= promoCodeAmount)
         {
@@ -1711,7 +1748,8 @@ public sealed class TransactionService(
         transaction.ItemPromoDiscountAmount = appliedItemPromoAmount;
         transaction.PromoDiscountAmount = appliedPromoCodeAmount;
         transaction.DiscountAmount = seniorPwdAmount + appliedPromoCodeAmount;
-        transaction.TotalAmount = grossSubtotal - appliedItemPromoAmount - transaction.DiscountAmount;
+        transaction.VatExemptAmount = vatExemptAmount;
+        transaction.TotalAmount = grossSubtotal - appliedItemPromoAmount - vatExemptAmount - transaction.DiscountAmount;
     }
 
     /// <summary>The discount the cart's promo code WOULD give on the regular subtotal (0 if there is no code).
@@ -1904,7 +1942,8 @@ public sealed class TransactionService(
             transaction.CreatedAt,
             transaction.CompletedAt,
             transaction.KioskPaymentPreference,
-            transaction.KioskDiscountHint);
+            transaction.KioskDiscountHint,
+            transaction.VatExemptAmount);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

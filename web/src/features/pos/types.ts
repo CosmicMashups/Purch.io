@@ -72,6 +72,8 @@ export interface Transaction {
   subtotal: number;
   discountAmount: number;
   seniorPwdDiscountApplied: boolean;
+  /** The 12% VAT taken off a Senior/PWD sale (RA 9994, RA 10754); 0 for any other sale. */
+  vatExemptAmount: number;
   promoCode: string | null;
   promoDiscountAmount: number;
   itemPromoDiscountAmount: number;

@@ -53,6 +53,56 @@ public sealed class ItemModifierGroupService(
         return (await dtoBuilder.BuildAsync([pair], cancellationToken))[0];
     }
 
+    public async Task<AttachModifierGroupToItemsResult> AttachToItemsAsync(
+        Guid groupId,
+        AttachModifierGroupToItemsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var group = await modifierGroupRepository.GetByIdAsync(groupId, cancellationToken)
+            ?? throw new NotFoundException("Modifier group", groupId);
+
+        var chosen = request.ItemIds?.Distinct().ToList() ?? [];
+        if ((request.CategoryId is null) == (chosen.Count == 0))
+        {
+            throw new ValidationException(nameof(request.CategoryId), "Choose a category, or choose items, but not both.");
+        }
+
+        IReadOnlyList<Item> items;
+        if (request.CategoryId is { } categoryId)
+        {
+            items = [.. (await itemRepository.ListByTenantAsync(CurrentTenantId, cancellationToken))
+                .Where(item => item.CategoryId == categoryId && item.IsActive)];
+        }
+        else
+        {
+            items = await itemRepository.ListByIdsAsync(chosen, cancellationToken);
+            if (items.Count != chosen.Count)
+            {
+                throw new NotFoundException("Item", chosen.First(id => items.All(item => item.Id != id)));
+            }
+        }
+
+        var already = (await itemModifierGroupRepository.ListItemIdsForGroupAsync(group.Id, cancellationToken)).ToHashSet();
+        var attached = 0;
+        foreach (var item in items.Where(item => !already.Contains(item.Id)))
+        {
+            itemModifierGroupRepository.Add(new ItemModifierGroup
+            {
+                TenantId = CurrentTenantId,
+                ItemId = item.Id,
+                ModifierGroupId = group.Id,
+            });
+            attached++;
+        }
+
+        if (attached > 0)
+        {
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return new AttachModifierGroupToItemsResult(attached, items.Count - attached);
+    }
+
     private Guid CurrentTenantId => currentTenantProvider.TenantId
         ?? throw new InvalidOperationException("Modifier group management requires an authenticated tenant context.");
 }

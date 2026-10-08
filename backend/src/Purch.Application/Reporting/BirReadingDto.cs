@@ -45,4 +45,8 @@ public sealed record BirReadingDto(
     IReadOnlyList<long> LateReceiptNumbers,
     // Numbers between the previous reading and this one's ending number that have no completed sale on
     // the server — not yet synced, refused, or voided. Capped, for a gap-auditable trail.
-    IReadOnlyList<long> MissingReceiptNumbers);
+    IReadOnlyList<long> MissingReceiptNumbers,
+    // Senior/PWD sales at their VAT-exclusive price (before the 20% discount), which carry no VAT.
+    decimal VatExemptSales = 0m,
+    // The VAT taken off those sales. Already counted in GrossSales so that gross - discounts - this = net.
+    decimal VatExemptionTotal = 0m);

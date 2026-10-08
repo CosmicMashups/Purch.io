@@ -31,6 +31,8 @@ class BirReading {
     required this.resetCounter,
     this.lateReceiptNumbers = const [],
     this.missingReceiptNumbers = const [],
+    this.vatExemptSales = 0,
+    this.vatExemptionTotal = 0,
   });
 
   factory BirReading.fromJson(Map<String, dynamic> json) {
@@ -64,6 +66,8 @@ class BirReading {
       resetCounter: json['resetCounter'] as int,
       lateReceiptNumbers: _intList(json['lateReceiptNumbers']),
       missingReceiptNumbers: _intList(json['missingReceiptNumbers']),
+      vatExemptSales: (json['vatExemptSales'] as num?)?.toDouble() ?? 0,
+      vatExemptionTotal: (json['vatExemptionTotal'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -107,4 +111,11 @@ class BirReading {
   /// Numbers up to this reading's ending number with no completed sale on the
   /// server: not synced yet, refused, or voided.
   final List<int> missingReceiptNumbers;
+
+  /// Senior/PWD sales at their VAT-exclusive price (before the 20% discount);
+  /// they carry no VAT.
+  final double vatExemptSales;
+
+  /// The VAT taken off those sales, already inside [grossSales].
+  final double vatExemptionTotal;
 }

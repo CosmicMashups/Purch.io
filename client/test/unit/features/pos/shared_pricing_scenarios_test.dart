@@ -111,6 +111,7 @@ void main() {
       final actual = <String, Object?>{
         'grossSubtotal': result.grossSubtotal,
         'itemPromoDiscountAmount': result.itemPromoDiscountAmount,
+        'vatExemptAmount': result.vatExemptAmount,
         'seniorPwdDiscountAmount': result.seniorPwdDiscountAmount,
         'promoDiscountAmount': result.promoDiscountAmount,
         'discountAmount': result.discountAmount,

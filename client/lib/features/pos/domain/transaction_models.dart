@@ -19,6 +19,7 @@ class Transaction {
     required this.subtotal,
     required this.discountAmount,
     required this.seniorPwdDiscountApplied,
+    this.vatExemptAmount = 0,
     required this.promoCode,
     required this.promoDiscountAmount,
     this.itemPromoDiscountAmount = 0,
@@ -50,6 +51,7 @@ class Transaction {
       subtotal: (json['subtotal'] as num).toDouble(),
       discountAmount: (json['discountAmount'] as num).toDouble(),
       seniorPwdDiscountApplied: json['seniorPwdDiscountApplied'] as bool,
+      vatExemptAmount: (json['vatExemptAmount'] as num?)?.toDouble() ?? 0,
       promoCode: json['promoCode'] as String?,
       promoDiscountAmount: (json['promoDiscountAmount'] as num).toDouble(),
       itemPromoDiscountAmount:
@@ -81,6 +83,9 @@ class Transaction {
   final double subtotal;
   final double discountAmount;
   final bool seniorPwdDiscountApplied;
+
+  /// The 12% VAT taken off a Senior/PWD sale (RA 9994, RA 10754); 0 otherwise.
+  final double vatExemptAmount;
   final String? promoCode;
   final double promoDiscountAmount;
   final double itemPromoDiscountAmount;

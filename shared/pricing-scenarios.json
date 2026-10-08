@@ -82,16 +82,16 @@
       "expect": { "itemPromoDiscountAmount": 0 }
     },
     {
-      "name": "Senior/PWD takes 20% of the regular price",
+      "name": "Senior/PWD is VAT-exempt, then takes 20% of the VAT-exclusive price",
       "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 2, "unitPrice": 50 }],
       "seniorPwdApplied": true,
-      "expect": { "seniorPwdDiscountAmount": 20, "discountAmount": 20, "totalAmount": 80 }
+      "expect": { "vatExemptAmount": 10.71, "seniorPwdDiscountAmount": 17.86, "discountAmount": 17.86, "totalAmount": 71.43 }
     },
     {
       "name": "item promo alone, Senior/PWD off",
       "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 100 }],
       "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 50 }] },
-      "expect": { "itemPromoDiscountAmount": 50, "totalAmount": 50, "appliedPromoSide": "itemPromos", "seniorPwdSavings": 20, "promoSavings": 50 }
+      "expect": { "itemPromoDiscountAmount": 50, "totalAmount": 50, "appliedPromoSide": "itemPromos", "seniorPwdSavings": 28.57, "promoSavings": 50 }
     },
     {
       "name": "Senior/PWD is taken on the regular price and suppresses item promos",
@@ -99,10 +99,11 @@
       "rules": { "itemDiscount": [{ "itemId": "item-a", "discountType": "percentage", "discountValue": 50 }] },
       "seniorPwdApplied": true,
       "expect": {
-        "seniorPwdDiscountAmount": 20,
+        "vatExemptAmount": 10.71,
+        "seniorPwdDiscountAmount": 17.86,
         "itemPromoDiscountAmount": 0,
-        "totalAmount": 80,
-        "seniorPwdSavings": 20,
+        "totalAmount": 71.43,
+        "seniorPwdSavings": 28.57,
         "promoSavings": 50,
         "lineDiscounts": { "1": { "discount": 0, "label": null } }
       }
@@ -114,12 +115,13 @@
       "seniorPwdApplied": true,
       "promoCode": "save10",
       "expect": {
-        "seniorPwdDiscountAmount": 20,
+        "vatExemptAmount": 10.71,
+        "seniorPwdDiscountAmount": 17.86,
         "promoDiscountAmount": 0,
         "appliedPromoCode": null,
         "retainedPromoCode": "SAVE10",
         "promoCodeNotApplied": "suppressedBySeniorPwd",
-        "totalAmount": 80
+        "totalAmount": 71.43
       }
     },
     {
@@ -206,10 +208,10 @@
       "expect": { "totalAmount": 50, "retainedPromoCode": null }
     },
     {
-      "name": "rounding halves to even like the server",
+      "name": "Senior/PWD amounts are rounded to the centavo like the server",
       "lines": [{ "lineId": "1", "itemId": "item-a", "quantity": 1, "unitPrice": 0.625 }],
       "seniorPwdApplied": true,
-      "expect": { "seniorPwdDiscountAmount": 0.12 }
+      "expect": { "vatExemptAmount": 0.07, "seniorPwdDiscountAmount": 0.11 }
     }
   ]
 }

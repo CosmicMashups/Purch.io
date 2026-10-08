@@ -604,8 +604,8 @@ void main() {
       expect(cart.itemPromoDiscountAmount, 100);
       expect(cart.lines.single.appliedPromoLabel, 'B1T1');
       expect(cart.totalAmount, 100);
-      // Both options are visible to the cashier: Senior/PWD would save 40, promos 100.
-      expect(cart.seniorPwdSavings, 40);
+      // Both options are visible to the cashier: Senior/PWD would save 57.14 (VAT 21.43 + 20% of 178.57), promos 100.
+      expect(cart.seniorPwdSavings, 57.14);
       expect(cart.promoSavings, 100);
 
       // Senior/PWD is chosen INSTEAD of the promos (they never combine), on the regular price.
@@ -614,8 +614,9 @@ void main() {
       );
       expect(cart.itemPromoDiscountAmount, 0);
       expect(cart.lines.single.appliedPromoLabel, isNull);
-      expect(cart.discountAmount, 40);
-      expect(cart.totalAmount, 160);
+      expect(cart.vatExemptAmount, 21.43);
+      expect(cart.discountAmount, 35.71);
+      expect(cart.totalAmount, 142.86);
 
       // A promo code can be entered while Senior/PWD is on, but gives nothing.
       cart = await repo.applyPromoCode(
@@ -627,7 +628,7 @@ void main() {
         PromoCodeNotApplied.suppressedBySeniorPwd,
       );
       expect(cart.promoDiscountAmount, 0);
-      expect(cart.totalAmount, 160);
+      expect(cart.totalAmount, 142.86);
 
       // Switching Senior/PWD off returns to promotions - and only ONE applies: the
       // item promos (100) beat the code (10% of 200 = 20).

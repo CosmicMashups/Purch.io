@@ -29,6 +29,7 @@ function savingsOf(t: Transaction): CustomerDisplayState['savings'] {
   return [
     ...(t.itemPromoDiscountAmount > 0 ? [{ label: 'Item promotions', amount: t.itemPromoDiscountAmount }] : []),
     ...(t.promoDiscountAmount > 0 ? [{ label: t.promoCode ? `Promo code ${t.promoCode}` : 'Promo code', amount: t.promoDiscountAmount }] : []),
+    ...(t.vatExemptAmount > 0 ? [{ label: 'VAT exemption (Senior / PWD)', amount: t.vatExemptAmount }] : []),
     ...(t.discountAmount > 0 ? [{ label: 'Senior / PWD discount', amount: t.discountAmount }] : []),
   ];
 }
@@ -38,6 +39,11 @@ const VAT_RATE = 0.12;
 /** Prices include VAT, so it is the part of the total above total / 1.12. */
 export function vatIncluded(total: number): number {
   return Math.round((total - total / (1 + VAT_RATE)) * 100) / 100;
+}
+
+/** The VAT inside a sale: none on a Senior/PWD sale, which is VAT-exempt. */
+export function vatOf(t: Pick<Transaction, 'totalAmount' | 'vatExemptAmount'>): number {
+  return t.vatExemptAmount > 0 ? 0 : vatIncluded(t.totalAmount);
 }
 
 /** An empty cart shows the welcome screen; otherwise the running order. */
@@ -50,7 +56,7 @@ export function stateForCart(cart: Transaction | null | undefined): CustomerDisp
     savings: savingsOf(cart),
     subtotal: cart.subtotal,
     total: cart.totalAmount,
-    vat: vatIncluded(cart.totalAmount),
+    vat: vatOf(cart),
   };
 }
 
@@ -65,7 +71,7 @@ export function stateForReceipt(receipt: Transaction): CustomerDisplayState {
     ...stateForCart(receipt),
     mode: 'completed',
     total: receipt.totalAmount,
-    vat: vatIncluded(receipt.totalAmount),
+    vat: vatOf(receipt),
     tendered: payment?.amountTendered ?? null,
     change: payment?.changeGiven ?? null,
     receiptNumber: receipt.receiptNumber,

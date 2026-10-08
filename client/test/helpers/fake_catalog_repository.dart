@@ -364,6 +364,19 @@ class FakeCatalogRepository implements CatalogRepository {
   Future<List<ModifierGroup>> listModifierGroupsForItem(String itemId) async =>
       itemModifierGroups[itemId] ?? [];
 
+  /// Every call made to [attachModifierGroupToItems], for tests to inspect.
+  final List<(String, AttachModifierGroupToItemsRequest)> bulkAttaches = [];
+
+  @override
+  Future<AttachModifierGroupToItemsResult> attachModifierGroupToItems(
+    String groupId,
+    AttachModifierGroupToItemsRequest request,
+  ) async {
+    bulkAttaches.add((groupId, request));
+    final count = request.itemIds?.length ?? 1;
+    return AttachModifierGroupToItemsResult(attached: count, alreadyAttached: 0);
+  }
+
   @override
   Future<ModifierGroup> attachModifierGroup(
     String itemId,

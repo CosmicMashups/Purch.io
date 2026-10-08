@@ -2,8 +2,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { modifierGroupSchema, modifierSchema } from '../schemas';
-import { useAddModifier, useCategories, useCreateModifierGroup, useModifierGroups, useReplaceModifierIngredients, useUpdateModifier, useUpdateModifierCategoryItem, useUpdateModifierGroup } from '../queries';
+import { useAddModifier, useAttachModifierGroupToItems, useCategories, useItems, useCreateModifierGroup, useModifierGroups, useReplaceModifierIngredients, useUpdateModifier, useUpdateModifierCategoryItem, useUpdateModifierGroup } from '../queries';
 import { Field, inputClass } from '../../../components/Field';
+import { FormDialog } from '../../../components/forms/FormDialog';
+import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
@@ -21,62 +23,24 @@ type ModifierFormValues = z.infer<typeof modifierSchema>;
 
 export function ModifierGroupsPage() {
   const { data: groups, isLoading, isError, error, refetch } = useModifierGroups();
-  const createModifierGroup = useCreateModifierGroup();
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  // null: closed; 'new': adding; otherwise the group being edited.
+  const [groupDialog, setGroupDialog] = useState<'new' | ModifierGroup | null>(null);
+  // The group a modifier belongs to, and the modifier being edited (null when adding).
+  const [modifierDialog, setModifierDialog] = useState<{ groupId: string; modifier: Modifier | null } | null>(null);
   const [categoryGroupId, setCategoryGroupId] = useState<string | null>(null);
+  const [applyGroupId, setApplyGroupId] = useState<string | null>(null);
   const categories = useCategories();
   // Ingredients only mean something when the business tracks its stock as ingredients.
   const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
 
-  const {
-    register: registerGroup,
-    handleSubmit: handleGroupSubmit,
-    reset: resetGroup,
-    formState: { errors: groupErrors },
-  } = useForm<GroupFormValues>({
-    resolver: zodResolver(modifierGroupSchema),
-    defaultValues: { name: '', allowMultipleSelection: false, isRequired: false, categoryId: null },
-  });
-
-  async function onCreateGroup(values: GroupFormValues) {
-    await createModifierGroup.mutateAsync(values);
-    resetGroup({ name: '', allowMultipleSelection: false, isRequired: false, categoryId: null });
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold text-gray-900">Modifier Groups</h1>
-
-      <form onSubmit={handleGroupSubmit(onCreateGroup)} className="flex max-w-md flex-col gap-3">
-        <Field label="Group name" error={groupErrors.name?.message}>
-          <input {...registerGroup('name')} className={inputClass} placeholder="Spice Level" />
-        </Field>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input type="checkbox" {...registerGroup('allowMultipleSelection')} />
-          Allow multiple selection
-        </label>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input type="checkbox" {...registerGroup('isRequired')} />
-          Required
-        </label>
-        <Field label="Offer items from a category (optional)" error={groupErrors.categoryId?.message}>
-          <select {...registerGroup('categoryId')} className={inputClass}>
-            <option value="">None, only the modifiers below</option>
-            {(categories.data ?? []).map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <button
-          type="submit"
-          disabled={createModifierGroup.isPending}
-          className="self-start rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {createModifierGroup.isPending ? 'Saving…' : 'Add Group'}
-        </button>
-      </form>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold text-gray-900">Modifier Groups</h1>
+        <PrimaryButton type="button" onClick={() => setGroupDialog('new')}>
+          Add group
+        </PrimaryButton>
+      </div>
 
       {isLoading && <SkeletonList />}
       {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
@@ -101,10 +65,25 @@ export function ModifierGroupsPage() {
                   {categoryGroupId === g.id ? 'Close category' : `Category of ${g.name}`}
                 </button>
                 <button
-                  onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}
+                  type="button"
+                  onClick={() => setApplyGroupId(applyGroupId === g.id ? null : g.id)}
                   className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
                 >
-                  {activeGroupId === g.id ? 'Close' : 'Add Modifier'}
+                  {applyGroupId === g.id ? 'Close apply' : `Apply ${g.name} to items`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupDialog(g)}
+                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
+                >
+                  {`Edit group ${g.name}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
+                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
+                >
+                  Add Modifier
                 </button>
               </div>
             </div>
@@ -115,26 +94,29 @@ export function ModifierGroupsPage() {
               </p>
             )}
             {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
+            {applyGroupId === g.id && <ApplyToItemsPanel group={g} categories={categories.data ?? []} />}
 
             {g.modifiers.length > 0 && (
               <ul className="mt-2 flex flex-col divide-y divide-gray-100" aria-label={`${g.name} modifiers`}>
                 {g.modifiers.map((m) => (
-                  <ModifierRow key={m.id} modifier={m} tracksIngredients={tracksIngredients} />
+                  <ModifierRow key={m.id} modifier={m} tracksIngredients={tracksIngredients} onEdit={() => setModifierDialog({ groupId: g.id, modifier: m })} />
                 ))}
               </ul>
             )}
 
-            {activeGroupId === g.id && <AddModifierForm groupId={g.id} />}
           </li>
         ))}
       </ul>
+
+      {groupDialog && <GroupDialog group={groupDialog === 'new' ? null : groupDialog} categories={categories.data ?? []} onClose={() => setGroupDialog(null)} />}
+      {modifierDialog && <ModifierDialog groupId={modifierDialog.groupId} modifier={modifierDialog.modifier} onClose={() => setModifierDialog(null)} />}
     </div>
   );
 }
 
 /** One modifier: its price and, when stock is tracked, what it uses up. Both can be changed in place. */
-function ModifierRow({ modifier, tracksIngredients }: { modifier: Modifier; tracksIngredients: boolean }) {
-  const [panel, setPanel] = useState<'edit' | 'ingredients' | null>(null);
+function ModifierRow({ modifier, tracksIngredients, onEdit }: { modifier: Modifier; tracksIngredients: boolean; onEdit: () => void }) {
+  const [panel, setPanel] = useState<'ingredients' | null>(null);
   const ingredientNames = (modifier.ingredients ?? []).map((i) => i.inventoryItemName);
 
   return (
@@ -148,8 +130,8 @@ function ModifierRow({ modifier, tracksIngredients }: { modifier: Modifier; trac
           {tracksIngredients && <p className="text-xs text-gray-500">{ingredientNames.length > 0 ? `Uses ${ingredientNames.join(', ')}` : 'Uses no ingredients'}</p>}
         </div>
         <div className="flex gap-3 text-sm">
-          <button type="button" onClick={() => setPanel(panel === 'edit' ? null : 'edit')} className="text-gray-600 underline hover:text-gray-900">
-            {panel === 'edit' ? 'Close' : `Edit ${modifier.name}`}
+          <button type="button" onClick={onEdit} className="text-gray-600 underline hover:text-gray-900">
+            {`Edit ${modifier.name}`}
           </button>
           {tracksIngredients && (
             <button type="button" onClick={() => setPanel(panel === 'ingredients' ? null : 'ingredients')} className="text-gray-600 underline hover:text-gray-900">
@@ -158,41 +140,8 @@ function ModifierRow({ modifier, tracksIngredients }: { modifier: Modifier; trac
           )}
         </div>
       </div>
-      {panel === 'edit' && <EditModifierForm modifier={modifier} onDone={() => setPanel(null)} />}
       {panel === 'ingredients' && <ModifierIngredientsEditor modifier={modifier} onDone={() => setPanel(null)} />}
     </li>
-  );
-}
-
-function EditModifierForm({ modifier, onDone }: { modifier: Modifier; onDone: () => void }) {
-  const update = useUpdateModifier();
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ModifierFormValues>({ resolver: zodResolver(modifierSchema), defaultValues: { name: modifier.name, priceDelta: modifier.priceDelta } });
-
-  async function onSubmit(values: ModifierFormValues) {
-    try {
-      await update.mutateAsync({ modifierId: modifier.id, body: values });
-      onDone();
-    } catch (error) {
-      toast.error(userMessage(error));
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} aria-label={`Edit ${modifier.name}`} className="mt-2 flex max-w-sm flex-col gap-2 rounded-md bg-gray-50 p-3">
-      <Field label="Modifier name" error={errors.name?.message}>
-        <input {...register('name')} className={inputClass} />
-      </Field>
-      <Field label="Price delta" error={errors.priceDelta?.message}>
-        <input type="number" step="0.01" {...register('priceDelta')} className={inputClass} />
-      </Field>
-      <button type="submit" disabled={update.isPending} className="self-start rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-        {update.isPending ? 'Saving…' : 'Save changes'}
-      </button>
-    </form>
   );
 }
 
@@ -243,36 +192,196 @@ function ModifierIngredientsEditor({ modifier, onDone }: { modifier: Modifier; o
   );
 }
 
-function AddModifierForm({ groupId }: { groupId: string }) {
-  const addModifier = useAddModifier(groupId);
+/** Adds a modifier to a group, or edits one. */
+function ModifierDialog({ groupId, modifier, onClose }: { groupId: string; modifier: Modifier | null; onClose: () => void }) {
+  const add = useAddModifier(groupId);
+  const update = useUpdateModifier();
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<ModifierFormValues>({ resolver: zodResolver(modifierSchema), defaultValues: { priceDelta: 0 } });
+  } = useForm<ModifierFormValues>({
+    resolver: zodResolver(modifierSchema),
+    defaultValues: modifier ? { name: modifier.name, priceDelta: modifier.priceDelta } : { name: '', priceDelta: 0 },
+  });
 
   async function onSubmit(values: ModifierFormValues) {
-    await addModifier.mutateAsync(values);
-    reset({ name: '', priceDelta: 0 });
+    try {
+      if (modifier) await update.mutateAsync({ modifierId: modifier.id, body: values });
+      else await add.mutateAsync(values);
+      onClose();
+    } catch (error) {
+      toast.error(userMessage(error));
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="mt-3 flex max-w-sm flex-col gap-2 border-t border-gray-100 pt-3">
-      <Field label="Modifier name" error={errors.name?.message}>
-        <input {...register('name')} className={inputClass} />
-      </Field>
-      <Field label="Price delta" error={errors.priceDelta?.message}>
-        <input type="number" step="0.01" {...register('priceDelta')} className={inputClass} />
-      </Field>
-      <button
-        type="submit"
-        disabled={addModifier.isPending}
-        className="self-start rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {addModifier.isPending ? 'Saving…' : 'Add'}
+    <FormDialog
+      title={modifier ? `Edit ${modifier.name}` : 'Add modifier'}
+      submitLabel={modifier ? 'Save changes' : 'Add'}
+      busy={add.isPending || update.isPending}
+      onSubmit={handleSubmit(onSubmit)}
+      onClose={onClose}
+    >
+      <FormField label="Modifier name" error={errors.name?.message}>
+        <input {...register('name')} className={controlClass} />
+      </FormField>
+      <FormField label="Price delta" hint="Added to the price when chosen. Use a minus for a discount." error={errors.priceDelta?.message}>
+        <input type="number" step="0.01" inputMode="decimal" {...register('priceDelta')} className={controlClass} />
+      </FormField>
+    </FormDialog>
+  );
+}
+
+/** Adds a modifier group, or edits its name, rules and category. */
+function GroupDialog({ group, categories, onClose }: { group: ModifierGroup | null; categories: { id: string; name: string }[]; onClose: () => void }) {
+  const create = useCreateModifierGroup();
+  const update = useUpdateModifierGroup(group?.id ?? '');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<GroupFormValues>({
+    resolver: zodResolver(modifierGroupSchema),
+    defaultValues: group
+      ? { name: group.name, allowMultipleSelection: group.allowMultipleSelection, isRequired: group.isRequired, categoryId: group.categoryId ?? null }
+      : { name: '', allowMultipleSelection: false, isRequired: false, categoryId: null },
+  });
+
+  async function onSubmit(values: GroupFormValues) {
+    try {
+      if (group) await update.mutateAsync({ ...values, categoryId: values.categoryId ?? null });
+      else await create.mutateAsync(values);
+      toast.success(group ? 'Group updated' : 'Group added');
+      onClose();
+    } catch (error) {
+      toast.error(userMessage(error));
+    }
+  }
+
+  return (
+    <FormDialog
+      title={group ? `Edit ${group.name}` : 'Add modifier group'}
+      submitLabel={group ? 'Save changes' : 'Add Group'}
+      busy={create.isPending || update.isPending}
+      onSubmit={handleSubmit(onSubmit)}
+      onClose={onClose}
+    >
+      <FormField label="Group name" error={errors.name?.message}>
+        <input {...register('name')} className={controlClass} placeholder="Spice Level" />
+      </FormField>
+      <label className="flex h-12 items-center gap-3 text-base font-semibold">
+        <input type="checkbox" {...register('allowMultipleSelection')} className="size-6 accent-brand" />
+        Allow multiple selection
+      </label>
+      <label className="flex h-12 items-center gap-3 text-base font-semibold">
+        <input type="checkbox" {...register('isRequired')} className="size-6 accent-brand" />
+        Required
+      </label>
+      <FormField label="Offer items from a category (optional)" error={errors.categoryId?.message}>
+        <select {...register('categoryId')} className={controlClass}>
+          <option value="">None, only the modifiers below</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+    </FormDialog>
+  );
+}
+
+/** Gives the group to every item of a category, or to the items ticked, so it need not be attached item by item. */
+function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; categories: { id: string; name: string }[] }) {
+  const attach = useAttachModifierGroupToItems(group.id);
+  const items = useItems();
+  const [mode, setMode] = useState<'category' | 'items'>('category');
+  const [categoryId, setCategoryId] = useState('');
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
+  const activeItems = (items.data ?? []).filter((item) => item.isActive);
+  const shown = activeItems.filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const categoryCount = activeItems.filter((item) => item.categoryId === categoryId).length;
+  const ready = mode === 'category' ? categoryId !== '' && categoryCount > 0 : chosen.size > 0;
+
+  function toggle(id: string) {
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function onApply() {
+    try {
+      const result = await attach.mutateAsync(mode === 'category' ? { categoryId } : { itemIds: [...chosen] });
+      toast.success(
+        result.alreadyAttached > 0
+          ? `${group.name} added to ${result.attached} items; ${result.alreadyAttached} already had it`
+          : `${group.name} added to ${result.attached} items`,
+      );
+      setChosen(new Set());
+    } catch (error) {
+      toast.error(userMessage(error));
+    }
+  }
+
+  return (
+    <div className="mt-2 flex max-w-lg flex-col gap-3 rounded-md bg-gray-50 p-3">
+      <fieldset className="flex flex-col gap-1 text-sm text-gray-700">
+        <legend className="mb-1 font-medium">Give {group.name} to</legend>
+        <label className="flex items-center gap-2">
+          <input type="radio" name={`apply-${group.id}`} checked={mode === 'category'} onChange={() => setMode('category')} />
+          All items of a category
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="radio" name={`apply-${group.id}`} checked={mode === 'items'} onChange={() => setMode('items')} />
+          Selected items
+        </label>
+      </fieldset>
+
+      {mode === 'category' ? (
+        <Field label="Category">
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass} aria-label={`Category to give ${group.name} to`}>
+            <option value="">Choose a category</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items" aria-label="Search items" className={inputClass} />
+          <ul className="flex max-h-56 flex-col divide-y divide-gray-200 overflow-y-auto rounded-md border border-gray-200 bg-white" aria-label={`Items to give ${group.name} to`}>
+            {shown.length === 0 && <li className="px-3 py-2 text-sm text-gray-500">No items found.</li>}
+            {shown.map((item) => (
+              <li key={item.id}>
+                <label className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900">
+                  <input type="checkbox" checked={chosen.has(item.id)} onChange={() => toggle(item.id)} />
+                  {item.name}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">
+        {mode === 'category'
+          ? categoryId === ''
+            ? 'Every active item in the category gets the group. Items that already have it are left alone.'
+            : `${categoryCount} active ${categoryCount === 1 ? 'item' : 'items'} in this category.`
+          : `${chosen.size} selected.`}
+      </p>
+      <button type="button" onClick={() => void onApply()} disabled={!ready || attach.isPending} className="self-start rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+        {attach.isPending ? 'Applying…' : 'Apply'}
       </button>
-    </form>
+    </div>
   );
 }
 

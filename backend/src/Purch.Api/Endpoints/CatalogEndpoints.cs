@@ -155,6 +155,15 @@ public static class CatalogEndpoints
             Results.Ok(await itemModifierGroupService.AttachAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
+        // Give a modifier group to every item of a category, or to a chosen set of items, in one go.
+        _ = app.MapPost("/modifier-groups/{groupId:guid}/attach-items", async (
+            Guid groupId,
+            AttachModifierGroupToItemsRequest request,
+            IItemModifierGroupService itemModifierGroupService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemModifierGroupService.AttachToItemsAsync(groupId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
         // --- Item recipe (ingredients consumed per order, for UseSeparateInventoryTracking tenants) ---
         _ = app.MapGet("/items/{itemId:guid}/recipe", async (
             Guid itemId,

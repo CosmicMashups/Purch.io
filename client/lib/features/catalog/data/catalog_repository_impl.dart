@@ -178,6 +178,18 @@ class CatalogRepositoryImpl implements CatalogRepository {
   }
 
   @override
+  Future<AttachModifierGroupToItemsResult> attachModifierGroupToItems(
+    String groupId,
+    AttachModifierGroupToItemsRequest request,
+  ) {
+    return _post(
+      '/modifier-groups/$groupId/attach-items',
+      request.toJson(),
+      AttachModifierGroupToItemsResult.fromJson,
+    );
+  }
+
+  @override
   Future<ModifierGroup> attachModifierGroup(
     String itemId,
     AttachModifierGroupRequest request,

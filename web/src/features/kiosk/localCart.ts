@@ -170,6 +170,7 @@ export function toLocalTransaction(lines: LocalCartLine[], rules?: PricingRules)
     subtotal,
     discountAmount: 0,
     seniorPwdDiscountApplied: false,
+    vatExemptAmount: 0,
     promoCode: null,
     promoDiscountAmount: 0,
     itemPromoDiscountAmount: round2(priced.itemPromoDiscountAmount),

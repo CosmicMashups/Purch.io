@@ -69,6 +69,12 @@ abstract class CatalogRepository {
 
   Future<List<ModifierGroup>> listModifierGroupsForItem(String itemId);
 
+  /// Gives a group to every item of a category, or to the chosen items.
+  Future<AttachModifierGroupToItemsResult> attachModifierGroupToItems(
+    String groupId,
+    AttachModifierGroupToItemsRequest request,
+  );
+
   Future<ModifierGroup> attachModifierGroup(
     String itemId,
     AttachModifierGroupRequest request,

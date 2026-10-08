@@ -44,11 +44,54 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       await _storeTokens(body, 'Sign-in');
-      // A person's own session is not tied to a physical terminal, so there is
-      // no device identity to keep here.
+      await _startRegisterSessionIfOwner(body['accessToken'] as String);
       return const SignedIn();
     } on DioException catch (exception) {
       throw mapDioExceptionToFailure(exception);
+    }
+  }
+
+  /// An Admin or Manager signed in by email has no till of their own, so the
+  /// server ties their session to a Register (making one if the business has
+  /// none) — no pairing needed. Best-effort: on failure the personal session
+  /// stays, as before, and simply cannot sell.
+  Future<void> _startRegisterSessionIfOwner(String personalAccessToken) async {
+    final role = roleClaimFromJwt(personalAccessToken);
+    if (role != 'Admin' && role != 'Manager') {
+      return;
+    }
+    try {
+      final oldRefreshToken = await _tokenStorage.readRefreshToken();
+      var response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/auth/register-session',
+        data: <String, dynamic>{},
+      );
+      var body = response.data ?? const <String, dynamic>{};
+      if (body['chooseRegister'] == true) {
+        final registers = body['registers'] as List<dynamic>? ?? const [];
+        if (registers.isEmpty) {
+          return;
+        }
+        response = await _apiClient.dio.post<Map<String, dynamic>>(
+          '/auth/register-session',
+          data: {'deviceId': (registers.first as Map<String, dynamic>)['deviceId']},
+        );
+        body = response.data ?? const <String, dynamic>{};
+      }
+      await _storeTokens(body, 'Register session');
+      await _saveIdentityFrom(body['accessToken'] as String);
+      if (oldRefreshToken != null) {
+        try {
+          await _apiClient.dio.post<void>(
+            '/auth/logout',
+            data: {'refreshToken': oldRefreshToken},
+          );
+        } on DioException {
+          // Best-effort, like logout().
+        }
+      }
+    } on DioException {
+      // Keep the personal session.
     }
   }
 

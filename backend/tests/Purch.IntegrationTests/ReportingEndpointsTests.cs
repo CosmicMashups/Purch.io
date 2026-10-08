@@ -59,6 +59,28 @@ public sealed class ReportingEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_senior_pwd_sale_is_reported_as_vat_exempt_with_no_vat()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Rice", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        _ = await client.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true));
+        _ = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.Cash, 100m));
+
+        var reading = await (await client.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<BirReadingDto>(JsonOptions);
+
+        Assert.Equal(71.43m, reading!.NetSales);
+        Assert.Equal(89.29m, reading.VatExemptSales);
+        Assert.Equal(10.71m, reading.VatExemptionTotal);
+        Assert.Equal(17.86m, reading.SeniorPwdDiscountTotal);
+        Assert.Equal(0m, reading.VatableSales);
+        Assert.Equal(0m, reading.VatAmount);
+        Assert.Equal(100m, reading.GrossSales);
+        Assert.Equal(reading.NetSales, reading.GrossSales - reading.TotalDiscounts - reading.VatExemptionTotal);
+    }
+
+    [Fact]
     public async Task An_x_reading_summarizes_completed_sales_without_advancing_counters()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

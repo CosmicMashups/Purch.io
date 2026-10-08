@@ -5,7 +5,8 @@
  *
  * Discounts do NOT stack (RA 9994): the statutory Senior Citizen/PWD 20% cannot be combined with a promo
  * code or any promotional discount, and only one promotion applies at a time.
- *  - Senior/PWD on: 20% of the regular (pre-promo) subtotal; every promotion is suppressed.
+ *  - Senior/PWD on: the sale is VAT-exempt (RA 9994, RA 10754), so the 12% VAT comes off the regular (pre-promo)
+ *    subtotal first, then 20% of that VAT-exclusive price; every promotion is suppressed.
  *  - Otherwise: ONE promotion, the automatic item promos (BOGO/combo/item discount) or the promo code,
  *    whichever is larger (a tie goes to the item promos).
  *
@@ -15,6 +16,9 @@
  */
 
 export const SENIOR_PWD_DISCOUNT_RATE = 0.2;
+
+/** Prices include 12% VAT; a Senior/PWD sale is exempt from it. */
+export const VAT_RATE = 0.12;
 
 export type PromoDiscountType = 'percentage' | 'fixedAmount' | 'fixedPrice';
 export type PromoSide = 'none' | 'itemPromos' | 'promoCode';
@@ -81,6 +85,8 @@ export interface PricingResult {
   /** Sum of line totals before any discount (the receipt's "subtotal"). */
   grossSubtotal: number;
   itemPromoDiscountAmount: number;
+  /** The VAT taken off a Senior/PWD sale (0 otherwise). */
+  vatExemptAmount: number;
   seniorPwdDiscountAmount: number;
   promoDiscountAmount: number;
   /** Senior/PWD + promo-code discount (item promos are separate, as on the server). */
@@ -92,7 +98,7 @@ export interface PricingResult {
   retainedPromoCode: string | null;
   promoCodeNotApplied: PromoCodeNotApplied;
   appliedPromoSide: PromoSide;
-  /** What Senior/PWD would take off, so the customer can pick the better deal. */
+  /** What Senior/PWD (VAT exemption plus the 20%) would take off, so the customer can pick the better deal. */
   seniorPwdSavings: number;
   /** What the best promotion would take off, whether or not it is the one applied. */
   promoSavings: number;
@@ -287,9 +293,14 @@ export function priceCart(input: {
     }
   }
 
-  const seniorPwdSavings = round2(gross * SENIOR_PWD_DISCOUNT_RATE);
+  // VAT comes off first; the 20% is worked on the VAT-exclusive price.
+  const vatExclusive = round2(gross / (1 + VAT_RATE));
+  const vatExemptIfSenior = round2(gross - vatExclusive);
+  const seniorPwdDiscountIfSenior = round2(vatExclusive * SENIOR_PWD_DISCOUNT_RATE);
+  const seniorPwdSavings = round2(vatExemptIfSenior + seniorPwdDiscountIfSenior);
 
   let seniorPwdAmount = 0;
+  let vatExemptAmount = 0;
   let appliedItemPromoAmount = 0;
   let appliedCodeAmount = 0;
   let side: PromoSide = 'none';
@@ -299,7 +310,8 @@ export function priceCart(input: {
 
   if (seniorPwdApplied) {
     // On the regular price, not on a price already reduced by a promotion.
-    seniorPwdAmount = seniorPwdSavings;
+    vatExemptAmount = vatExemptIfSenior;
+    seniorPwdAmount = seniorPwdDiscountIfSenior;
     if (retainedCode !== null) codeReason = 'suppressedBySeniorPwd';
   } else if (itemPromoAmount >= promoCodeAmount) {
     appliedItemPromoAmount = itemPromoAmount;
@@ -316,10 +328,11 @@ export function priceCart(input: {
     lineDiscounts,
     grossSubtotal: gross,
     itemPromoDiscountAmount: appliedItemPromoAmount,
+    vatExemptAmount,
     seniorPwdDiscountAmount: seniorPwdAmount,
     promoDiscountAmount: appliedCodeAmount,
     discountAmount,
-    totalAmount: gross - appliedItemPromoAmount - discountAmount,
+    totalAmount: round2(gross - appliedItemPromoAmount - vatExemptAmount - discountAmount),
     appliedPromoCode: side === 'promoCode' ? retainedCode : null,
     retainedPromoCode: retainedCode,
     promoCodeNotApplied: codeReason,

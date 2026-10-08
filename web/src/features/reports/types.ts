@@ -54,6 +54,10 @@ export interface BirReading {
   grossSales: number;
   vatableSales: number;
   vatAmount: number;
+  /** Senior/PWD sales at their VAT-exclusive price (before the 20% discount); they carry no VAT. */
+  vatExemptSales: number;
+  /** The VAT taken off those sales, already inside grossSales. */
+  vatExemptionTotal: number;
   seniorPwdDiscountTotal: number;
   promoDiscountTotal: number;
   totalDiscounts: number;

@@ -339,6 +339,31 @@ class ReceiptScreen extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 4),
                                   ],
+                                  if (cart.vatExemptAmount > 0) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'VAT exemption (12%)',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          '-${formatCurrency(cart.vatExemptAmount)}',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.accentEmerald,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                  ],
                                   if (cart.discountAmount > 0) ...[
                                     Row(
                                       mainAxisAlignment:

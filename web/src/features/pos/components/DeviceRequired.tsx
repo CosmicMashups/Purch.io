@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { userMessage } from '../../../lib/apiError';
 import { signOut } from '../../auth/signOut';
 import { startRegisterSession, type RegisterChoice } from '../../auth/registerSessionApi';
@@ -27,6 +27,12 @@ export function DeviceRequired() {
       setBusy(false);
     }
   }
+
+  // An Admin or Manager needs no pairing: open the till straight away (the server makes a Register if there is none).
+  useEffect(() => {
+    if (canPick) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canPick]);
 
   const buttonClass = 'h-12 rounded-control bg-brand px-6 text-base font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-50';
 

@@ -16,6 +16,15 @@ public sealed class EfItemModifierGroupRepository(PurchDbContext dbContext) : II
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> ListItemIdsForGroupAsync(Guid modifierGroupId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ItemModifierGroups
+            .AsNoTracking()
+            .Where(link => link.ModifierGroupId == modifierGroupId)
+            .Select(link => link.ItemId)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> ExistsAsync(Guid itemId, Guid modifierGroupId, CancellationToken cancellationToken = default)
     {
         return dbContext.ItemModifierGroups

@@ -1,6 +1,8 @@
 import { apiClient } from '../../lib/apiClient';
 import type {
   AttachModifierGroupRequest,
+  AttachModifierGroupToItemsRequest,
+  AttachModifierGroupToItemsResult,
   BundlePromoRule,
   Category,
   CreateBundlePromoRuleRequest,
@@ -57,6 +59,8 @@ export const catalogApi = {
 
   listItemModifierGroups: (itemId: string) =>
     apiClient.get<ModifierGroup[]>(`/items/${itemId}/modifier-groups`).then((r) => r.data),
+  attachModifierGroupToItems: (groupId: string, body: AttachModifierGroupToItemsRequest) =>
+    apiClient.post<AttachModifierGroupToItemsResult>(`/modifier-groups/${groupId}/attach-items`, body).then((r) => r.data),
   attachModifierGroup: (itemId: string, body: AttachModifierGroupRequest) =>
     apiClient.post<ModifierGroup>(`/items/${itemId}/modifier-groups`, body).then((r) => r.data),
 

@@ -6,6 +6,7 @@ import '../../../../core/theming/app_tokens.dart';
 import '../providers/catalog_providers.dart';
 import 'add_modifier_group_screen.dart';
 import 'add_modifier_screen.dart';
+import 'apply_modifier_group_screen.dart';
 import 'modifier_group_category_screen.dart';
 import '../../../../core/errors/failure.dart';
 
@@ -227,6 +228,32 @@ class ModifierGroupListScreen extends ConsumerWidget {
                               ),
                           icon: const Icon(Icons.category_outlined, size: 18),
                           label: const Text('Category & prices'),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdBorder,
+                            ),
+                          ),
+                          onPressed:
+                              () => Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => ApplyModifierGroupScreen(
+                                        groupId: group.id,
+                                        groupName: group.name,
+                                      ),
+                                ),
+                              ),
+                          icon: const Icon(Icons.playlist_add, size: 18),
+                          label: const Text('Apply to items'),
                         ),
                       ),
                       Padding(

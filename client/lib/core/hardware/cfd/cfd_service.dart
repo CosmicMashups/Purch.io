@@ -93,7 +93,9 @@ class CfdService {
       // tracked separately. Adding promoDiscountAmount again double-counted the
       // code, so the display's subtotal - discount never matched the total.
       discountAmount:
-          transaction.discountAmount + transaction.itemPromoDiscountAmount,
+          transaction.discountAmount +
+          transaction.itemPromoDiscountAmount +
+          transaction.vatExemptAmount,
       totalAmount: transaction.totalAmount,
       vatableSales: vatableSales,
       vatAmount: vatAmount,

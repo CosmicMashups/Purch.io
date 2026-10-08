@@ -93,10 +93,11 @@ describe('withPending', () => {
     expect(shown.totalAmount).toBe(400);
   });
 
-  it('takes the Senior/PWD share off pending lines when that discount is on', () => {
-    const shown = withPending(cart({ seniorPwdDiscountApplied: true, discountAmount: 40, totalAmount: 160 }), [{ key: 'ramen', label: 'Ramen', quantity: 1, unitPrice: 100 }]);
+  it('takes the VAT and the Senior/PWD share off pending lines when that discount is on', () => {
+    const shown = withPending(cart({ seniorPwdDiscountApplied: true, vatExemptAmount: 21.43, discountAmount: 35.71, totalAmount: 142.86 }), [{ key: 'ramen', label: 'Ramen', quantity: 1, unitPrice: 100 }]);
     expect(shown.subtotal).toBe(300);
-    expect(shown.discountAmount).toBe(60);
-    expect(shown.totalAmount).toBe(240);
+    expect(shown.vatExemptAmount).toBe(32.14);
+    expect(shown.discountAmount).toBe(53.57);
+    expect(shown.totalAmount).toBe(214.29);
   });
 });

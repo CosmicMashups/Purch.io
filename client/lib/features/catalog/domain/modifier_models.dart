@@ -203,6 +203,38 @@ class CreateItemModifierRequest {
 /// Mirrors Purch.Application.Catalog.AttachModifierGroupRequest — attaches an
 /// existing (possibly shared) modifier group to a specific item, e.g.
 /// attaching "Ice Level" to every cold drink.
+/// Mirrors Purch.Application.Catalog.AttachModifierGroupToItemsRequest: gives a
+/// group to every item of [categoryId], or to the [itemIds] chosen - one of the two.
+class AttachModifierGroupToItemsRequest {
+  const AttachModifierGroupToItemsRequest({this.categoryId, this.itemIds});
+
+  final String? categoryId;
+  final List<String>? itemIds;
+
+  Map<String, dynamic> toJson() => {
+    if (categoryId != null) 'categoryId': categoryId,
+    if (itemIds != null) 'itemIds': itemIds,
+  };
+}
+
+/// How many items got the group now, and how many already had it.
+class AttachModifierGroupToItemsResult {
+  const AttachModifierGroupToItemsResult({
+    required this.attached,
+    required this.alreadyAttached,
+  });
+
+  factory AttachModifierGroupToItemsResult.fromJson(Map<String, dynamic> json) {
+    return AttachModifierGroupToItemsResult(
+      attached: (json['attached'] as num).toInt(),
+      alreadyAttached: (json['alreadyAttached'] as num).toInt(),
+    );
+  }
+
+  final int attached;
+  final int alreadyAttached;
+}
+
 class AttachModifierGroupRequest {
   const AttachModifierGroupRequest({required this.modifierGroupId});
 

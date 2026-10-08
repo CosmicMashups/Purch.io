@@ -167,11 +167,13 @@ void main() {
       );
 
   group('discounts do not stack (RA 9994)', () {
-    test('Senior/PWD takes 20% of the regular price', () {
+    test('Senior/PWD is VAT-exempt, then takes 20% of the VAT-exclusive price', () {
       final result = _price([_line('1', _a, 2, 50)], senior: true);
-      expect(result.seniorPwdDiscountAmount, 20);
-      expect(result.discountAmount, 20);
-      expect(result.totalAmount, 80);
+      // 100 includes 12% VAT: 89.29 without it, 10.71 of VAT, 17.86 off.
+      expect(result.vatExemptAmount, 10.71);
+      expect(result.seniorPwdDiscountAmount, 17.86);
+      expect(result.discountAmount, 17.86);
+      expect(result.totalAmount, 71.43);
     });
 
     test('Senior/PWD is taken on the REGULAR price and suppresses item promos', () {
@@ -185,11 +187,11 @@ void main() {
 
       final senior = _price([_line('1', _a, 1, 100)], rules: rules, senior: true);
       // 20% of 100, not of the promo price of 50; the promo is gone entirely.
-      expect(senior.seniorPwdDiscountAmount, 20);
+      expect(senior.seniorPwdDiscountAmount, 17.86);
       expect(senior.itemPromoDiscountAmount, 0);
       expect(senior.lineDiscounts['1']!.discount, 0);
       expect(senior.lineDiscounts['1']!.label, isNull);
-      expect(senior.totalAmount, 80);
+      expect(senior.totalAmount, 71.43);
     });
 
     test('a promo code does not stack with Senior/PWD, but stays on the cart', () {
@@ -198,12 +200,12 @@ void main() {
       );
 
       final senior = _price([_line('1', _a, 1, 100)], rules: rules, senior: true, code: 'save10');
-      expect(senior.seniorPwdDiscountAmount, 20);
+      expect(senior.seniorPwdDiscountAmount, 17.86);
       expect(senior.promoDiscountAmount, 0);
       expect(senior.appliedPromoCode, isNull);
       expect(senior.retainedPromoCode, 'SAVE10');
       expect(senior.promoCodeNotApplied, PromoCodeNotApplied.suppressedBySeniorPwd);
-      expect(senior.totalAmount, 80);
+      expect(senior.totalAmount, 71.43);
 
       // Switching Senior/PWD back off restores the code.
       final off = _price([_line('1', _a, 1, 100)], rules: rules, code: 'save10');
@@ -270,12 +272,12 @@ void main() {
       );
 
       final promosApplied = _price([_line('1', _a, 1, 100)], rules: rules);
-      expect(promosApplied.seniorPwdSavings, 20);
+      expect(promosApplied.seniorPwdSavings, 28.57);
       expect(promosApplied.promoSavings, 50);
 
       // Both figures are still reported once Senior/PWD is chosen.
       final seniorApplied = _price([_line('1', _a, 1, 100)], rules: rules, senior: true);
-      expect(seniorApplied.seniorPwdSavings, 20);
+      expect(seniorApplied.seniorPwdSavings, 28.57);
       expect(seniorApplied.promoSavings, 50);
     });
 
@@ -307,9 +309,9 @@ void main() {
     expect(_price([_line('1', _a, 1, 50)], code: 'NOPE').totalAmount, 50);
   });
 
-  test('rounding halves to even like the server', () {
-    // 0.625 * 20% = 0.125, exactly on a half-cent boundary -> 0.12.
+  test('Senior/PWD amounts are rounded to the centavo like the server', () {
+    // 0.625 / 1.12 = 0.56 (VAT-exclusive); 20% of that is 0.112 -> 0.11.
     final result = _price([_line('1', _a, 1, 0.625)], senior: true);
-    expect(result.seniorPwdDiscountAmount, 0.12);
+    expect(result.seniorPwdDiscountAmount, 0.11);
   });
 }

@@ -38,6 +38,8 @@ const reading = (over: Partial<BirReading> = {}): BirReading => ({
   grossSales: 12345.5,
   vatableSales: 11000,
   vatAmount: 1320,
+  vatExemptSales: 0,
+  vatExemptionTotal: 0,
   seniorPwdDiscountTotal: 200,
   promoDiscountTotal: 150,
   totalDiscounts: 350,

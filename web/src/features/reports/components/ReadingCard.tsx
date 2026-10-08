@@ -43,6 +43,7 @@ export function ReadingCard({ reading }: { reading: BirReading }) {
         <Row label="Gross sales" value={formatPeso(reading.grossSales)} />
         <Row label="VATable sales" value={formatPeso(reading.vatableSales)} />
         <Row label="VAT amount" value={formatPeso(reading.vatAmount)} />
+        <Row label="VAT-exempt sales (Senior/PWD)" value={formatPeso(reading.vatExemptSales)} />
         <Row label="Senior / PWD discounts" value={formatPeso(reading.seniorPwdDiscountTotal)} />
         <Row label="Promo discounts" value={formatPeso(reading.promoDiscountTotal)} />
         <Row label="Total discounts" value={formatPeso(reading.totalDiscounts)} />

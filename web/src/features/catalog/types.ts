@@ -213,6 +213,17 @@ export interface CreateItemModifierRequest {
   priceDelta: number;
 }
 
+/** Give a group to every item of a category, or to the chosen items: one of the two. */
+export interface AttachModifierGroupToItemsRequest {
+  categoryId?: string;
+  itemIds?: string[];
+}
+
+export interface AttachModifierGroupToItemsResult {
+  attached: number;
+  alreadyAttached: number;
+}
+
 export interface AttachModifierGroupRequest {
   modifierGroupId: string;
 }

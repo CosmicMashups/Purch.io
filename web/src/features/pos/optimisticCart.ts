@@ -1,5 +1,5 @@
 import { PricingType, type Item, type ItemVariant, type ModifierGroup } from '../catalog/types';
-import { SENIOR_PWD_DISCOUNT_RATE } from './pricing/pricingEngine';
+import { SENIOR_PWD_DISCOUNT_RATE, VAT_RATE } from './pricing/pricingEngine';
 import type { AddPreview, PendingRow } from './addQueue';
 import { groupOptions } from './options';
 import type { AddLineRequest, Transaction } from './types';
@@ -58,11 +58,13 @@ export function withPending(cart: Transaction, pending: PendingRow[]): Transacti
   const added = pending.reduce((sum, row) => sum + (row.unitPrice === undefined ? 0 : row.unitPrice * row.quantity), 0);
   if (added === 0) return cart;
 
-  const seniorShare = cart.seniorPwdDiscountApplied ? round2(added * SENIOR_PWD_DISCOUNT_RATE) : 0;
-  return {
-    ...cart,
-    subtotal: round2(cart.subtotal + added),
-    discountAmount: round2(cart.discountAmount + seniorShare),
-    totalAmount: round2(cart.totalAmount + added - seniorShare),
-  };
+  const subtotal = round2(cart.subtotal + added);
+  if (cart.seniorPwdDiscountApplied) {
+    // VAT comes off the regular price first, then 20% of what is left, as the server works it out.
+    const vatExclusive = round2(subtotal / (1 + VAT_RATE));
+    const vatExemptAmount = round2(subtotal - vatExclusive);
+    const discountAmount = round2(vatExclusive * SENIOR_PWD_DISCOUNT_RATE);
+    return { ...cart, subtotal, vatExemptAmount, discountAmount, totalAmount: round2(subtotal - vatExemptAmount - discountAmount) };
+  }
+  return { ...cart, subtotal, totalAmount: round2(cart.totalAmount + added) };
 }
