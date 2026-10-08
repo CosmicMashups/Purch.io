@@ -8,7 +8,7 @@ describe('TILE_GROUPS', () => {
   it('lists every tile once, so no link is lost or doubled', () => {
     const ids = TILE_GROUPS.flatMap((g) => g.tiles.map((t) => t.id));
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(13);
   });
 });
 

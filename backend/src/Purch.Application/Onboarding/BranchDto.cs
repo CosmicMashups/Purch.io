@@ -11,4 +11,5 @@ public sealed record BranchDto(
     CashDrawerPolicy CashDrawerPolicy,
     string? ManualGcashQrImageUrl,
     string? ManualGcashAccountName,
-    string? ManualGcashAccountNumber);
+    string? ManualGcashAccountNumber,
+    bool IsActive = true);

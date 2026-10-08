@@ -9,6 +9,8 @@ export interface Branch {
   manualGcashQrImageUrl?: string | null;
   manualGcashAccountName?: string | null;
   manualGcashAccountNumber?: string | null;
+  /** False once the branch is made inactive: kept, but not offered for new work. */
+  isActive?: boolean;
 }
 
 /** Mirrors DepartmentDto. */

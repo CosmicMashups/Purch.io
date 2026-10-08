@@ -16,7 +16,7 @@ public sealed class EfBranchRepository(PurchDbContext dbContext) : IBranchReposi
     {
         return await dbContext.Branches
             .AsNoTracking()
-            .Where(branch => branch.TenantId == tenantId)
+            .Where(branch => branch.TenantId == tenantId && !branch.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

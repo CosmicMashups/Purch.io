@@ -37,6 +37,11 @@ export function limitProblem(text: string): string | null {
 }
 
 /** Anonymizing erases the customer's details for good, so the API only allows it once nothing is owed. */
-export function canAnonymize(ledger: { balance: number; isActive: boolean }): boolean {
-  return ledger.balance === 0 && ledger.isActive;
+export function canAnonymize(ledger: { balance: number; isActive: boolean; customerFullName: string }): boolean {
+  return ledger.balance === 0 && !isErased(ledger);
+}
+
+/** Erasing a customer's details switches the account off AND replaces the name, which is how it is told apart from a customer who was only made inactive. */
+export function isErased(ledger: { isActive: boolean; customerFullName: string }): boolean {
+  return !ledger.isActive && ledger.customerFullName === '[ANONYMIZED]';
 }

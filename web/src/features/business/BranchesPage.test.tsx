@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { chooseFromMenu } from '../../test/menu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../test/render';
 import { branchAdminApi } from '../branches/adminApi';
@@ -45,7 +46,7 @@ describe('BranchesPage', () => {
   it('hides departments when the shop does not monitor them', async () => {
     vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: false } as TenantSettings);
     renderPage(<BranchesPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Manage' }))[0]);
+    await chooseFromMenu('Katipunan', 'Settings');
     await screen.findByRole('form', { name: 'Hardware settings' });
     await waitFor(() => expect(tenantApi.get).toHaveBeenCalled());
     expect(branchAdminApi.listDepartments).not.toHaveBeenCalled();
@@ -56,7 +57,7 @@ describe('BranchesPage', () => {
     signInAs('Manager');
     renderPage(<BranchesPage />);
     expect(await screen.findByText('Katipunan')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Manage' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Katipunan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add branch' })).not.toBeInTheDocument();
   });
 
@@ -87,7 +88,7 @@ describe('BranchesPage', () => {
 describe('managing one branch', () => {
   async function open() {
     renderPage(<BranchesPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Manage' }))[0]);
+    await chooseFromMenu('Katipunan', 'Settings');
   }
 
   it('saves hardware settings as the API expects them', async () => {

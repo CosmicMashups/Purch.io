@@ -35,7 +35,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 var hasSessionVersion = int.TryParse(context.User.FindFirst(JwtClaimTypes.DeviceSessionVersion)?.Value, out var tokenSessionVersion);
                 var device = await deviceRepository.GetByIdAsync(deviceId, context.RequestAborted);
 
-                if (device is null || device.Status == Purch.Domain.Enums.DeviceStatus.Revoked || !hasSessionVersion || device.SessionVersion != tokenSessionVersion)
+                if (device is null || device.Status is Purch.Domain.Enums.DeviceStatus.Revoked or Purch.Domain.Enums.DeviceStatus.Inactive || device.IsDeleted || !hasSessionVersion || device.SessionVersion != tokenSessionVersion)
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     await context.Response.WriteAsync("Device session has been reset.");

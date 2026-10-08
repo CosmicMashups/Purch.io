@@ -14,6 +14,7 @@ public sealed class EfMembershipRepository(PurchDbContext dbContext) : IMembersh
             .AsNoTracking()
             .Include(m => m.Account)
             .Include(m => m.Branches)
+            .Where(m => !m.IsDeleted)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync(cancellationToken);
     }
@@ -33,7 +34,7 @@ public sealed class EfMembershipRepository(PurchDbContext dbContext) : IMembersh
 
     public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default)
     {
-        return dbContext.Memberships.CountAsync(m => m.Role == MembershipRole.Admin && m.IsActive, cancellationToken);
+        return dbContext.Memberships.CountAsync(m => m.Role == MembershipRole.Admin && m.IsActive && !m.IsDeleted, cancellationToken);
     }
 
     public Task<bool> ExistsAsync(Guid tenantId, Guid accountId, CancellationToken cancellationToken = default)

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { chooseFromMenu } from '../../../test/menu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogApi } from '../api';
 import type { Item, ModifierGroup } from '../types';
@@ -22,7 +24,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ModifierGroupsPage />
+      <MemoryRouter>
+        <ModifierGroupsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -38,7 +42,7 @@ describe('ModifierGroupsPage apply to items', () => {
 
   it('gives the group to every item of a category', async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Apply Sweetness to items' }));
+    await chooseFromMenu('Sweetness', 'Apply to items');
     fireEvent.change(await screen.findByLabelText('Category to give Sweetness to'), { target: { value: 'drinks' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(catalogApi.attachModifierGroupToItems).toHaveBeenCalledWith('g1', { categoryId: 'drinks' }));
@@ -46,7 +50,7 @@ describe('ModifierGroupsPage apply to items', () => {
 
   it('gives the group to the items ticked', async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Apply Sweetness to items' }));
+    await chooseFromMenu('Sweetness', 'Apply to items');
     fireEvent.click(screen.getByLabelText('Selected items'));
     fireEvent.click(await screen.findByLabelText('Cake'));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));

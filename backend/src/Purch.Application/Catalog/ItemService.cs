@@ -319,7 +319,10 @@ public sealed class ItemService(
 
         if (!string.IsNullOrWhiteSpace(barcode) && await itemRepository.BarcodeExistsAsync(CurrentTenantId, barcode, cancellationToken))
         {
-            throw new ConflictException($"An item with barcode '{barcode}' already exists.");
+            var deletedName = await itemRepository.GetDeletedNameByBarcodeAsync(CurrentTenantId, barcode, cancellationToken);
+            throw new ConflictException(deletedName is null
+                ? $"An item with barcode '{barcode}' already exists."
+                : $"A deleted item, '{deletedName}', has barcode '{barcode}'. Restore it from Items, Deleted, instead of adding a new one.");
         }
     }
 

@@ -9,14 +9,17 @@ import { formatPeso } from '../../dashboard/format';
 import { useComboRules, useCreateCombo, useUpdateCombo } from '../queries';
 import { comboSchema, type ComboForm } from '../schemas';
 import type { ComboRule } from '../types';
-import { ActiveBadge, ItemSelect, ScheduleFields } from './shared';
+import { ActiveBadge, ItemSelect, PromoRowMenu, ScheduleFields } from './shared';
 import { itemNameOf } from '../format';
+import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
 import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
 
 const EMPTY: ComboForm = { name: '', itemAId: '', itemBId: '', comboPrice: 0, startsAt: '', endsAt: '', isActive: true };
 
-export function ComboPanel({ items }: { items: Item[] }) {
+export function ComboPanel({ items, view }: { items: Item[]; view: StatusView }) {
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const rules = useComboRules();
   const [dialog, setDialog] = useState<'new' | ComboRule | null>(null);
 
@@ -27,10 +30,14 @@ export function ComboPanel({ items }: { items: Item[] }) {
           Add combo deal
         </PrimaryButton>
       </div>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="ComboPromo" noun="combo deals" />
+      ) : (
       <RuleList
         columns
         query={rules}
-        emptyMessage="No combo deals yet."
+        transform={(rows) => rows.filter((r) => (view === 'active' ? r.isActive : !r.isActive))}
+        emptyMessage={view === 'active' ? "No combo deals yet." : "No inactive combo deals."}
         renderRow={(rule) => (
           <RuleCard key={rule.id}>
             <div className="min-w-0">
@@ -39,14 +46,16 @@ export function ComboPanel({ items }: { items: Item[] }) {
                 {itemNameOf(items, rule.itemAId)} + {itemNameOf(items, rule.itemBId)} for {formatPeso(rule.comboPrice)}
               </p>
               <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-              <button type="button" onClick={() => setDialog(rule)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                Edit
-              </button>
             </div>
-            <ActiveBadge active={rule.isActive} />
+            <div className="flex shrink-0 items-center gap-1">
+              <ActiveBadge active={rule.isActive} />
+              <PromoRowMenu subject={rule.name} active={rule.isActive} onEdit={() => setDialog(rule)} onLifecycle={(action) => run({ kind: 'ComboPromo', id: rule.id, name: rule.name }, action)} />
+            </div>
           </RuleCard>
         )}
       />
+      )}
+      {lifecycleDialog}
       {dialog && <ComboDialog rule={dialog === 'new' ? null : dialog} items={items} onClose={() => setDialog(null)} />}
     </div>
   );

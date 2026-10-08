@@ -7,7 +7,8 @@ public sealed record ModifierGroupDto(
     bool IsRequired,
     IReadOnlyList<ItemModifierDto> Modifiers,
     Guid? CategoryId = null,
-    IReadOnlyList<ModifierCategoryItemDto>? CategoryItems = null);
+    IReadOnlyList<ModifierCategoryItemDto>? CategoryItems = null,
+    bool IsActive = true);
 
 /// <summary>A category item offered through a category-linked group. Price is what the customer pays
 /// (the group's override, else the item's own); IsExcluded items are listed so admins can restore them, and
@@ -33,7 +34,8 @@ public sealed record ItemModifierDto(
     string Name,
     decimal PriceDelta,
     bool IsOutOfStock = false,
-    IReadOnlyList<ModifierIngredientDto>? Ingredients = null);
+    IReadOnlyList<ModifierIngredientDto>? Ingredients = null,
+    bool IsActive = true);
 
 public sealed record ModifierIngredientDto(Guid InventoryItemId, string InventoryItemName, decimal? QuantityPerOrder);
 

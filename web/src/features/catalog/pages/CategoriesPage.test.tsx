@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogApi } from '../api';
 import { CategoriesPage } from './CategoriesPage';
@@ -10,7 +11,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <CategoriesPage />
+      <MemoryRouter>
+        <CategoriesPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

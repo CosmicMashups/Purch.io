@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { chooseFromMenu } from '../../test/menu';
 import { renderPage, signInAs } from '../../test/render';
 import { branchesApi } from '../branches/api';
 import { memberApi, type Invite, type Member } from './memberApi';
@@ -87,15 +88,16 @@ describe('StaffPage', () => {
     const role = await screen.findByLabelText('Role');
     expect(within(role).getAllByRole('option').map((o) => o.textContent)).toEqual(['Staff']);
     await screen.findByText('Ben Santos');
-    // Edit and reset buttons exist for the one staff member only.
-    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Password reset link' })).toHaveLength(1);
+    // Only the staff member has a menu: a Manager can't change an Admin or another Manager.
+    expect(screen.getByRole('button', { name: 'Actions for Ben Santos' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Ana Reyes' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Actions for Maria Lopez' })).not.toBeInTheDocument();
   });
 
   it('edits a person: duties, branches and active', async () => {
     vi.mocked(memberApi.update).mockResolvedValue({ ...cashier, duties: 3 });
     renderPage(<StaffPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Edit' }))[2]);
+    await chooseFromMenu('Ben Santos', 'Edit');
     fireEvent.click(await screen.findByLabelText('Warehouse'));
     fireEvent.click(screen.getByLabelText('Cubao'));
     fireEvent.click(screen.getByLabelText('Active'));
@@ -106,7 +108,7 @@ describe('StaffPage', () => {
   it('makes a password reset link without any email', async () => {
     vi.mocked(memberApi.resetLink).mockResolvedValue(linkFor({ ...pending, purpose: 1, name: 'Ben Santos' }, 'reset9'));
     renderPage(<StaffPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Password reset link' }))[2]);
+    await chooseFromMenu('Ben Santos', 'Password reset link');
     await waitFor(() => expect(memberApi.resetLink).toHaveBeenCalledWith('m3'));
     const dialog = await screen.findByRole('dialog', { name: 'Password reset link' });
     expect(within(dialog).getByTestId('invite-url')).toHaveTextContent('/enrol/reset9');

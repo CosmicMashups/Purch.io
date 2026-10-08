@@ -11,7 +11,7 @@ public sealed class EfSupplierRepository(PurchDbContext dbContext) : ISupplierRe
     {
         return await dbContext.Suppliers
             .AsNoTracking()
-            .Where(supplier => supplier.TenantId == tenantId)
+            .Where(supplier => supplier.TenantId == tenantId && !supplier.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

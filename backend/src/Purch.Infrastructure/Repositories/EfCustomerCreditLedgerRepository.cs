@@ -16,7 +16,7 @@ public sealed class EfCustomerCreditLedgerRepository(PurchDbContext dbContext) :
     {
         return await dbContext.CustomerCreditLedgers
             .AsNoTracking()
-            .Where(ledger => ledger.TenantId == tenantId)
+            .Where(ledger => ledger.TenantId == tenantId && !ledger.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

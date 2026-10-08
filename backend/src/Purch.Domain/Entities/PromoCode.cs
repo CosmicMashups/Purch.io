@@ -6,8 +6,14 @@ namespace Purch.Domain.Entities;
 /// <summary>A cart-level code the cashier types in at checkout (D4/FR12) —
 /// distinct from B2b's BundlePromoRule, which is an item-specific "buy N get
 /// bundle price" rule with no code entry.</summary>
-public class PromoCode : TenantScopedEntity
+public class PromoCode : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Code { get; set; } = string.Empty;
 
     public PromoDiscountType DiscountType { get; set; }

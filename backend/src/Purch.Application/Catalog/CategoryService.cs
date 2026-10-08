@@ -60,6 +60,6 @@ public sealed class CategoryService(
 
     private static CategoryDto ToDto(Category category)
     {
-        return new(category.Id, category.Name, category.SortOrder, category.ImageUrl);
+        return new(category.Id, category.Name, category.SortOrder, category.ImageUrl, category.IsActive);
     }
 }

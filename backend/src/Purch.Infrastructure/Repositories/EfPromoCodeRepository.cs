@@ -11,7 +11,7 @@ public sealed class EfPromoCodeRepository(PurchDbContext dbContext) : IPromoCode
     {
         return await dbContext.PromoCodes
             .AsNoTracking()
-            .Where(promoCode => promoCode.TenantId == tenantId)
+            .Where(promoCode => promoCode.TenantId == tenantId && !promoCode.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

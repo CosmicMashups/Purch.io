@@ -5,8 +5,14 @@ namespace Purch.Domain.Entities;
 
 /// <summary>Automatic, no-code rule discounting a single item (percent off,
 /// fixed amount off, or a flat override price) while the rule is active.</summary>
-public class ItemDiscountPromoRule : TenantScopedEntity
+public class ItemDiscountPromoRule : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public Guid ItemId { get; set; }

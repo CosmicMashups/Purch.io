@@ -106,6 +106,7 @@ public sealed class BranchService(
         branch.CashDrawerPolicy,
         branch.ManualGcashQrImageUrl,
         branch.ManualGcashAccountName,
-        branch.ManualGcashAccountNumber);
+        branch.ManualGcashAccountNumber,
+        branch.IsActive);
     }
 }

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { chooseFromMenu } from '../../../test/menu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogApi } from '../api';
 import type { ModifierGroup } from '../types';
@@ -30,7 +32,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ModifierGroupsPage />
+      <MemoryRouter>
+        <ModifierGroupsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -62,7 +66,7 @@ describe('ModifierGroupsPage category link', () => {
   it('sets a price for one category item in the group', async () => {
     vi.mocked(catalogApi.updateModifierCategoryItem).mockResolvedValue(group);
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Category of Add fries & sides' }));
+    await chooseFromMenu('Add fries & sides', 'Offer a category');
     fireEvent.change(await screen.findByLabelText('Price of Large Fries in this group'), { target: { value: '60' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Large Fries' }));
     await waitFor(() => expect(catalogApi.updateModifierCategoryItem).toHaveBeenCalledWith('g1', 'fries', { priceOverride: 60, isExcluded: false }));
@@ -71,7 +75,7 @@ describe('ModifierGroupsPage category link', () => {
   it('hides a category item from the group', async () => {
     vi.mocked(catalogApi.updateModifierCategoryItem).mockResolvedValue(group);
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Category of Add fries & sides' }));
+    await chooseFromMenu('Add fries & sides', 'Offer a category');
     fireEvent.click(await screen.findByLabelText('Hide Large Fries from this group'));
     fireEvent.click(screen.getByRole('button', { name: 'Save Large Fries' }));
     await waitFor(() => expect(catalogApi.updateModifierCategoryItem).toHaveBeenCalledWith('g1', 'fries', { priceOverride: null, isExcluded: true }));
@@ -80,7 +84,7 @@ describe('ModifierGroupsPage category link', () => {
   it('unlinks the category', async () => {
     vi.mocked(catalogApi.updateModifierGroup).mockResolvedValue({ ...group, categoryId: null, categoryItems: null });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Category of Add fries & sides' }));
+    await chooseFromMenu('Add fries & sides', 'Offer a category');
     fireEvent.change(await screen.findByLabelText('Category offered in Add fries & sides'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save category' }));
     await waitFor(() => expect(catalogApi.updateModifierGroup).toHaveBeenCalledWith('g1', { name: 'Add fries & sides', allowMultipleSelection: true, isRequired: false, categoryId: null }));

@@ -9,8 +9,10 @@ import { describeDiscount } from '../format';
 import { useCreateItemDiscount, useItemDiscountRules, useUpdateItemDiscount } from '../queries';
 import { itemDiscountSchema, type ItemDiscountForm } from '../schemas';
 import { PromoDiscountType, type ItemDiscountRule } from '../types';
-import { ActiveBadge, ItemSelect, ScheduleFields } from './shared';
+import { ActiveBadge, ItemSelect, PromoRowMenu, ScheduleFields } from './shared';
 import { itemNameOf } from '../format';
+import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
 import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
 
@@ -24,7 +26,8 @@ const EMPTY: ItemDiscountForm = {
   isActive: true,
 };
 
-export function ItemDiscountPanel({ items }: { items: Item[] }) {
+export function ItemDiscountPanel({ items, view }: { items: Item[]; view: StatusView }) {
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const rules = useItemDiscountRules();
   const [dialog, setDialog] = useState<'new' | ItemDiscountRule | null>(null);
 
@@ -35,10 +38,14 @@ export function ItemDiscountPanel({ items }: { items: Item[] }) {
           Add item discount
         </PrimaryButton>
       </div>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="ItemDiscountPromo" noun="item discounts" />
+      ) : (
       <RuleList
         columns
         query={rules}
-        emptyMessage="No item discounts yet."
+        transform={(rows) => rows.filter((r) => (view === 'active' ? r.isActive : !r.isActive))}
+        emptyMessage={view === 'active' ? "No item discounts yet." : "No inactive item discounts."}
         renderRow={(rule) => (
           <RuleCard key={rule.id}>
             <div className="min-w-0">
@@ -47,14 +54,16 @@ export function ItemDiscountPanel({ items }: { items: Item[] }) {
                 {itemNameOf(items, rule.itemId)}: {describeDiscount(rule.discountType, rule.discountValue)}
               </p>
               <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-              <button type="button" onClick={() => setDialog(rule)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                Edit
-              </button>
             </div>
-            <ActiveBadge active={rule.isActive} />
+            <div className="flex shrink-0 items-center gap-1">
+              <ActiveBadge active={rule.isActive} />
+              <PromoRowMenu subject={rule.name} active={rule.isActive} onEdit={() => setDialog(rule)} onLifecycle={(action) => run({ kind: 'ItemDiscountPromo', id: rule.id, name: rule.name }, action)} />
+            </div>
           </RuleCard>
         )}
       />
+      )}
+      {lifecycleDialog}
       {dialog && <ItemDiscountDialog rule={dialog === 'new' ? null : dialog} items={items} onClose={() => setDialog(null)} />}
     </div>
   );

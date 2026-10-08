@@ -6,8 +6,14 @@ namespace Purch.Domain.Entities;
 /// <summary>One account's place in one business: the role, the duties they are qualified for, their personal PIN for
 /// unlocking a till, and (through <see cref="MembershipBranch"/>) the branches they work at. The same account can have
 /// a membership in several businesses.</summary>
-public class Membership : TenantScopedEntity
+public class Membership : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid AccountId { get; set; }
 
     public Account? Account { get; set; }

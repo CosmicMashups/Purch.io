@@ -36,6 +36,7 @@ export const TILE_GROUPS: readonly TileGroup[] = [
   {
     title: 'Money',
     tiles: [
+      { id: 'orders', label: 'Orders', hint: 'Every sale and its receipt', to: '/business/orders' },
       { id: 'customers', label: 'Customers', hint: 'Utang accounts, payments, reminders', to: '/business/customers' },
       { id: 'reports', label: 'Reports', hint: 'Staff, stock, X and Z readings, exports', to: '/business/reports' },
     ],

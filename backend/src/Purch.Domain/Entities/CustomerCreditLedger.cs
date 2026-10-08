@@ -7,8 +7,14 @@ namespace Purch.Domain.Entities;
 /// No government ID or other NPC "sensitive personal information" collected.
 /// See docs/adr/0006-npc-registration-tracked-externally.md.
 /// </summary>
-public class CustomerCreditLedger : TenantScopedEntity
+public class CustomerCreditLedger : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string CustomerFullName { get; set; } = string.Empty;
 
     public string CustomerPhoneNumber { get; set; } = string.Empty;

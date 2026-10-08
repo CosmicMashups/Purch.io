@@ -6,8 +6,14 @@ namespace Purch.Domain.Entities;
 /// packaged good) used when a tenant opts into UseSeparateInventoryTracking.
 /// May stand alone (managed directly) or be auto-created and paired 1:1 with
 /// an Item via LinkedItemId when the tenant has no recipe defined for it.</summary>
-public class InventoryItem : TenantScopedEntity
+public class InventoryItem : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public string? Sku { get; set; }

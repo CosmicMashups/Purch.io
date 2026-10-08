@@ -20,7 +20,7 @@ public sealed class ItemModifierGroupService(
         var groupIds = await itemModifierGroupRepository.ListGroupIdsForItemAsync(itemId, cancellationToken);
         var groupIdSet = groupIds.ToHashSet();
 
-        var allGroups = await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken);
+        var allGroups = await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, ModifierListScope.Sellable, cancellationToken);
         return await dtoBuilder.BuildAsync(allGroups.Where(pair => groupIdSet.Contains(pair.Group.Id)), cancellationToken);
     }
 

@@ -13,5 +13,8 @@ public interface IItemRepository
 
     Task<bool> BarcodeExistsAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default);
 
+    /// <summary>The name of a deleted item that still holds this barcode, or null. Deleted items keep their barcode so a restore never collides, which means creating a new one with it has to point at the deleted one.</summary>
+    Task<string?> GetDeletedNameByBarcodeAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default);
+
     void Add(Item item);
 }

@@ -14,9 +14,11 @@ import type { Branch } from '../branches/types';
 import type { Device, PairingCode } from './deviceApi';
 import { useCreatePairing, useDevices, useNewPairingCode, useRevokeDevice } from './deviceQueries';
 import { DeviceStatus, DeviceType, deviceTypeLabels, labelOf } from './types';
+import { RowActionsMenu, type RowAction } from '../../components/RowActionsMenu';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
+import { useLifecycle } from '../lifecycle/useLifecycle';
+import { useSession } from '../auth/useSession';
 
-const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
-const dangerLink = 'h-12 text-base font-semibold text-danger underline';
 
 export function DevicesPage() {
   const devices = useDevices();
@@ -27,6 +29,10 @@ export function DevicesPage() {
   const [revokeFor, setRevokeFor] = useState<Device | null>(null);
   const [shown, setShown] = useState<PairingCode | null>(null);
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
+  // Only an Admin deletes a device; the server enforces it, so the choice is simply not offered to anyone else.
+  const isAdmin = useSession().role === 'Admin';
 
   function pairAgain(device: Device) {
     setCodeFor(null);
@@ -52,41 +58,54 @@ export function DevicesPage() {
           </PrimaryButton>
         }
       />
-      <div>
+      <StatusFilter value={view} onChange={setView} canSeeDeleted={isAdmin} />
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="Device" noun="devices" />
+      ) : (
         <QueryList
           columns
           query={devices}
           errorTitle="Devices could not be loaded"
-          emptyMessage="No devices yet. Add one, then enter its code on the device."
-          renderRow={(device) => (
-            <ListCard key={device.id}>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-base font-semibold">{nameOf(device)}</p>
-                  <StatusBadge {...statusOf(device)} />
-                </div>
-                <p className="text-base">
-                  {labelOf(deviceTypeLabels, device.deviceType)}, {branches.data?.find((b) => b.id === device.branchId)?.name ?? 'branch'}
-                </p>
-                {device.linkedRegisterDeviceId && (
-                  <p className="text-sm text-ink-soft">Shows {nameOf(devices.data?.find((d) => d.id === device.linkedRegisterDeviceId))}</p>
-                )}
-                <p className="text-sm text-ink-soft">{device.lastSeenAt ? `Last seen ${formatDateTime(device.lastSeenAt)}` : 'Never seen'}</p>
-                <div className="mt-2 flex flex-wrap gap-x-5">
-                  <button type="button" className={linkButton} onClick={() => (device.status === DeviceStatus.Pending ? pairAgain(device) : setCodeFor(device))}>
-                    New pairing code
-                  </button>
-                  {device.status !== DeviceStatus.Revoked && (
-                    <button type="button" className={dangerLink} onClick={() => setRevokeFor(device)}>
-                      Revoke
-                    </button>
+          emptyMessage={view === 'active' ? 'No devices yet. Add one, then enter its code on the device.' : 'No inactive devices.'}
+          transform={(rows) => rows.filter((d) => (view === 'active' ? d.status !== DeviceStatus.Inactive && d.status !== DeviceStatus.Revoked : d.status === DeviceStatus.Inactive || d.status === DeviceStatus.Revoked))}
+          renderRow={(device) => {
+            const subject = nameOf(device);
+            const actions: RowAction[] = [
+              { label: 'New pairing code', onSelect: () => (device.status === DeviceStatus.Pending ? pairAgain(device) : setCodeFor(device)) },
+            ];
+            if (device.status === DeviceStatus.Active || device.status === DeviceStatus.Pending) {
+              actions.push({ label: 'Make inactive', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'deactivate'), separated: true });
+            }
+            if (device.status === DeviceStatus.Inactive) {
+              actions.push({ label: 'Make active', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'reactivate'), separated: true });
+            }
+            if (device.status !== DeviceStatus.Revoked) {
+              actions.push({ label: 'Revoke (lost or stolen)', danger: true, onSelect: () => setRevokeFor(device) });
+            }
+            if (isAdmin && (device.status === DeviceStatus.Inactive || device.status === DeviceStatus.Revoked)) {
+              actions.push({ label: 'Delete', danger: true, onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'delete') });
+            }
+            return (
+              <ListCard key={device.id}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-semibold">{subject}</p>
+                    <StatusBadge {...statusOf(device)} />
+                  </div>
+                  <p className="text-base">
+                    {labelOf(deviceTypeLabels, device.deviceType)}, {branches.data?.find((b) => b.id === device.branchId)?.name ?? 'branch'}
+                  </p>
+                  {device.linkedRegisterDeviceId && (
+                    <p className="text-sm text-ink-soft">Shows {nameOf(devices.data?.find((d) => d.id === device.linkedRegisterDeviceId))}</p>
                   )}
+                  <p className="text-sm text-ink-soft">{device.lastSeenAt ? `Last seen ${formatDateTime(device.lastSeenAt)}` : 'Never seen'}</p>
                 </div>
-              </div>
-            </ListCard>
-          )}
+                <RowActionsMenu subject={subject} actions={actions} />
+              </ListCard>
+            );
+          }}
         />
-      </div>
+      )}
 
       {adding && (
         <FormDialogLoader title="Add device" failed={branches.isError ? branches : null} ready={!!branches.data} onClose={() => setAdding(false)}>
@@ -122,6 +141,7 @@ export function DevicesPage() {
         onConfirm={confirmRevoke}
         onCancel={() => setRevokeFor(null)}
       />
+      {lifecycleDialog}
       {shown && <PairingCodeDialog pairing={shown} onClose={() => setShown(null)} />}
     </div>
   );
@@ -134,6 +154,7 @@ function nameOf(device: Device | undefined): string {
 
 function statusOf(device: Device): { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' } {
   if (device.status === DeviceStatus.Revoked) return { label: 'Revoked', tone: 'danger' };
+  if (device.status === DeviceStatus.Inactive) return { label: 'Inactive', tone: 'neutral' };
   if (device.status === DeviceStatus.Pending) return { label: 'Waiting for its code', tone: 'warning' };
   return { label: 'Paired', tone: 'success' };
 }

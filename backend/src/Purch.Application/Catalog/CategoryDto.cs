@@ -1,3 +1,3 @@
 namespace Purch.Application.Catalog;
 
-public sealed record CategoryDto(Guid Id, string Name, int SortOrder, string? ImageUrl);
+public sealed record CategoryDto(Guid Id, string Name, int SortOrder, string? ImageUrl, bool IsActive = true);

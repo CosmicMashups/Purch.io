@@ -20,6 +20,8 @@ export interface Category {
   name: string;
   sortOrder: number;
   imageUrl: string | null;
+  /** False once made inactive: kept, but not offered as a category when selling. */
+  isActive?: boolean;
 }
 
 export interface Item {
@@ -54,6 +56,8 @@ export interface ModifierGroup {
   allowMultipleSelection: boolean;
   isRequired: boolean;
   modifiers: Modifier[];
+  /** False once the group is made inactive: it is kept, but no longer offered when selling. */
+  isActive?: boolean;
   /** When set, every active item of this category is offered in the group, next to its own modifiers. */
   categoryId?: string | null;
   categoryItems?: ModifierCategoryItem[] | null;
@@ -88,6 +92,8 @@ export interface Modifier {
   id: string;
   name: string;
   priceDelta: number;
+  /** False once the modifier is made inactive: it is kept, but can't be chosen. */
+  isActive?: boolean;
   /** The server's verdict from the modifier's ingredients. A sold-out modifier cannot be chosen. */
   isOutOfStock?: boolean;
   /** What choosing it uses up. Names only: stock levels are never sent to the till or the kiosk. */

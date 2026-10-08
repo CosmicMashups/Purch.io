@@ -11,7 +11,7 @@ public sealed class EfInventoryItemRepository(PurchDbContext dbContext) : IInven
     {
         return await dbContext.InventoryItems
             .AsNoTracking()
-            .Where(inventoryItem => inventoryItem.TenantId == tenantId)
+            .Where(inventoryItem => inventoryItem.TenantId == tenantId && !inventoryItem.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

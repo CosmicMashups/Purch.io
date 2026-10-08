@@ -434,7 +434,7 @@ public sealed class TransactionService(
                 : ResolvedModifiers.None;
         }
 
-        var attachedGroups = (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken))
+        var attachedGroups = (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, ModifierListScope.Sellable, cancellationToken))
             .Where(pair => attachedGroupIds.Contains(pair.Group.Id))
             .ToList();
 
@@ -935,6 +935,13 @@ public sealed class TransactionService(
         });
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(transaction, cancellationToken);
+    }
+
+    public async Task<TransactionDto> GetFinishedAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        var transaction = await transactionRepository.GetByIdAsync(transactionId, cancellationToken)
+            ?? throw new NotFoundException("Order", transactionId);
         return await ToDtoAsync(transaction, cancellationToken);
     }
 
@@ -1951,7 +1958,7 @@ public sealed class TransactionService(
             .ToDictionary(entry => entry.Modifier.Id);
 
         var groupNamesById = modifierSelections.Any(selection => selection.ItemId is not null)
-            ? (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, cancellationToken))
+            ? (await modifierGroupRepository.ListByTenantWithModifiersAsync(CurrentTenantId, ModifierListScope.History, cancellationToken))
                 .ToDictionary(pair => pair.Group.Id, pair => pair.Group.Name)
             : [];
 

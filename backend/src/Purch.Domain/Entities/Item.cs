@@ -3,8 +3,14 @@ using Purch.Domain.Enums;
 
 namespace Purch.Domain.Entities;
 
-public class Item : TenantScopedEntity
+public class Item : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public string? Sku { get; set; }

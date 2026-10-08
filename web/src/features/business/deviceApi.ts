@@ -8,7 +8,7 @@ export interface Device {
   deviceType: number;
   lastSeenAt: string | null;
   name?: string | null;
-  /** 0 Active, 1 Waiting for its code, 2 Revoked (see DeviceStatus). */
+  /** 0 Active, 1 Waiting for its code, 2 Revoked, 3 Inactive (see DeviceStatus). */
   status?: number;
   pairedAt?: string | null;
   pairingCodeExpiresAt?: string | null;

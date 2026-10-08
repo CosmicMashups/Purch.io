@@ -14,6 +14,11 @@ import { ErrorState, describeQueryError } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
 import { useState } from 'react';
 import type { Category } from '../types';
+import { PageHeader } from '../../../components/PageHeader';
+import { RowActionsMenu } from '../../../components/RowActionsMenu';
+import { StatusBadge } from '../../../components/StatusBadge';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 
 type FormValues = z.infer<typeof categorySchema>;
 
@@ -21,41 +26,66 @@ export function CategoriesPage() {
   const { data: categories, isLoading, isError, error, refetch } = useCategories();
   // null: closed; 'new': adding; otherwise the category being edited.
   const [dialog, setDialog] = useState<'new' | Category | null>(null);
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
+
+  const shown = [...(categories ?? [])]
+    .filter((c) => (view === 'active' ? c.isActive !== false : c.isActive === false))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">Categories</h1>
-        <PrimaryButton type="button" onClick={() => setDialog('new')}>
-          Add Category
-        </PrimaryButton>
-      </div>
+      <PageHeader
+        title="Categories"
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setDialog('new')}>
+            Add Category
+          </PrimaryButton>
+        }
+      />
+      <StatusFilter value={view} onChange={setView} />
 
-      {isLoading && <SkeletonList />}
-      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
-      {!isLoading && !isError && (categories ?? []).length === 0 && <EmptyState title="No categories yet" />}
-      {!isError && (categories ?? []).length > 0 && (
-        <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-          {[...categories!].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => (
-            <li key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
-              <span className="flex items-center gap-3">
-                {c.imageUrl ? (
-                  <PurchImage src={c.imageUrl} alt="" className="h-8 w-8 rounded object-cover" errorNode={<span className="h-8 w-8 rounded bg-gray-100" />} />
-                ) : (
-                  <span className="h-8 w-8 rounded bg-gray-100" />
-                )}
-                <span>
-                  {c.name} <span className="text-gray-400">#{c.sortOrder}</span>
-                </span>
-              </span>
-              <button onClick={() => setDialog(c)} className="text-gray-500 hover:text-gray-900 hover:underline">
-                Edit
-              </button>
-            </li>
-          ))}
-        </ul>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="Category" noun="categories" />
+      ) : (
+        <>
+          {isLoading && <SkeletonList />}
+          {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+          {!isLoading && !isError && shown.length === 0 && <EmptyState title={view === 'active' ? 'No categories yet' : 'No inactive categories'} />}
+          {!isError && shown.length > 0 && (
+            <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
+              {shown.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-2">
+                  <button type="button" onClick={() => setDialog(c)} aria-label={`Edit ${c.name}`} className="flex min-h-12 min-w-0 flex-1 items-center gap-3 text-left">
+                    {c.imageUrl ? (
+                      <PurchImage src={c.imageUrl} alt="" className="size-10 rounded object-cover" errorNode={<span className="size-10 rounded bg-canvas" />} />
+                    ) : (
+                      <span className="size-10 rounded bg-canvas" />
+                    )}
+                    <span className="min-w-0 truncate text-base font-semibold">
+                      {c.name} <span className="font-normal text-ink-soft">#{c.sortOrder}</span>
+                    </span>
+                    {c.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+                  </button>
+                  <RowActionsMenu
+                    subject={c.name}
+                    actions={[
+                      { label: 'Edit', onSelect: () => setDialog(c) },
+                      c.isActive === false
+                        ? { label: 'Make active', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'reactivate'), separated: true }
+                        : { label: 'Make inactive', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'deactivate'), separated: true },
+                      { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'delete') },
+                    ]}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
       {dialog && <CategoryDialog category={dialog === 'new' ? null : dialog} onClose={() => setDialog(null)} />}
+      {lifecycleDialog}
     </div>
   );
 }

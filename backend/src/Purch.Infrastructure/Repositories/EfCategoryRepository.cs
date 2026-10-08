@@ -16,7 +16,7 @@ public sealed class EfCategoryRepository(PurchDbContext dbContext) : ICategoryRe
     {
         return await dbContext.Categories
             .AsNoTracking()
-            .Where(category => category.TenantId == tenantId)
+            .Where(category => category.TenantId == tenantId && !category.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

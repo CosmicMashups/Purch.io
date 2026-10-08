@@ -1,6 +1,8 @@
 import type { FieldErrors, UseFormRegister, FieldValues, Path } from 'react-hook-form';
 import { FormField, controlClass } from '../../../components/forms/FormField';
 import type { Item } from '../../catalog/types';
+import { RowActionsMenu, type RowAction } from '../../../components/RowActionsMenu';
+import type { LifecycleAction } from '../../lifecycle/api';
 
 export function ItemSelect<T extends FieldValues>({
   label,
@@ -68,3 +70,26 @@ export function ActiveBadge({ active }: { active: boolean }) {
   );
 }
 
+
+/** The ⋯ menu at the end of a promotion row: Edit (where the promotion can be edited), switch on or off, delete. */
+export function PromoRowMenu({
+  subject,
+  active,
+  onEdit,
+  onLifecycle,
+}: {
+  subject: string;
+  active: boolean;
+  onEdit?: () => void;
+  onLifecycle: (action: LifecycleAction) => void;
+}) {
+  const actions: RowAction[] = [];
+  if (onEdit) actions.push({ label: 'Edit', onSelect: onEdit });
+  actions.push(
+    active
+      ? { label: 'Make inactive', onSelect: () => onLifecycle('deactivate'), separated: actions.length > 0 }
+      : { label: 'Make active', onSelect: () => onLifecycle('reactivate'), separated: actions.length > 0 },
+    { label: 'Delete', danger: true, onSelect: () => onLifecycle('delete') },
+  );
+  return <RowActionsMenu subject={subject} actions={actions} />;
+}

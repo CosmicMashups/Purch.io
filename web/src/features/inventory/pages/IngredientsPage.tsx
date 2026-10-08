@@ -29,6 +29,9 @@ import {
   useUpdateInventoryItem,
 } from '../queries';
 import type { InventoryItem } from '../types';
+import { RowActionsMenu } from '../../../components/RowActionsMenu';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 
 type Dialog = { mode: 'create' } | { mode: 'edit' | 'receive'; item: InventoryItem };
 
@@ -52,6 +55,8 @@ export function IngredientsPage() {
   // null: all; '': uncategorised; otherwise a category id.
   const [filter, setFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const searching = search.trim() !== '';
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const close = () => setDialog(null);
@@ -82,7 +87,7 @@ export function IngredientsPage() {
     const byOrder = (a: InventoryItem, b: InventoryItem) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
     // An item's own paired stock record is managed on the Items page, not here.
     const q = search.trim().toLowerCase();
-    const rows = (items.data ?? []).filter((i) => !i.isAutoCreatedForItem && (q === '' || i.name.toLowerCase().includes(q) || (i.sku?.toLowerCase().includes(q) ?? false)));
+    const rows = (items.data ?? []).filter((i) => !i.isAutoCreatedForItem && (view === 'active' ? i.isActive : !i.isActive) && (q === '' || i.name.toLowerCase().includes(q) || (i.sku?.toLowerCase().includes(q) ?? false)));
     const known = new Set((categories.data ?? []).map((c) => c.id));
     const result: SortableGroup<InventoryItem>[] = [...(categories.data ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -123,13 +128,18 @@ export function IngredientsPage() {
       header: '',
       className: 'text-right',
       cell: (item) => (
-        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
-          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setDialog({ mode: 'edit', item })}>
-            Edit
-          </button>
-          <button type="button" className="text-gray-500 hover:text-gray-900 hover:underline" onClick={() => setDialog({ mode: 'receive', item })}>
-            Receive delivery
-          </button>
+        <div className="flex justify-end">
+          <RowActionsMenu
+            subject={item.name}
+            actions={[
+              { label: 'Edit', onSelect: () => setDialog({ mode: 'edit', item }) },
+              { label: 'Receive delivery', onSelect: () => setDialog({ mode: 'receive', item }) },
+              item.isActive
+                ? { label: 'Make inactive', onSelect: () => run({ kind: 'Ingredient', id: item.id, name: item.name }, 'deactivate'), separated: true }
+                : { label: 'Make active', onSelect: () => run({ kind: 'Ingredient', id: item.id, name: item.name }, 'reactivate'), separated: true },
+              { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Ingredient', id: item.id, name: item.name }, 'delete') },
+            ]}
+          />
         </div>
       ),
     },
@@ -156,6 +166,11 @@ export function IngredientsPage() {
         </div>
       ) : (
       <div id="ingredients-page-panel" role="tabpanel" className="flex flex-col gap-4">
+      <StatusFilter value={view} onChange={setView} />
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="Ingredient" noun="ingredients" />
+      ) : (
+      <>
       <div className="flex flex-wrap items-center gap-3">
         <SearchBar value={search} onChange={setSearch} placeholder="Search ingredients…" />
         {(categories.data ?? []).length > 0 && (
@@ -197,8 +212,11 @@ export function IngredientsPage() {
             />
           )}
         </div>
+      </>
+      )}
       </div>
       )}
+      {lifecycleDialog}
       {dialog &&
         (dialog.mode === 'receive' ? (
           <ReceiveDialog item={dialog.item} branches={branches ?? []} onDone={close} />

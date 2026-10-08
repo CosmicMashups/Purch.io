@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { PurchImage } from '../../../components/brand/PurchImage';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ItemDialog } from './ItemDialog';
 import { StockBranchPicker, StockStepper, useStockBranch } from '../../../components/StockStepper';
 import { useRecordMovement } from '../../inventory/queries';
@@ -17,11 +17,17 @@ import { SkeletonRows } from '../../../components/Skeleton';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { PricingType, type Item } from '../types';
 import { pricingTypeLabels } from '../labels';
+import { PageHeader } from '../../../components/PageHeader';
+import { RowActionsMenu, type RowAction } from '../../../components/RowActionsMenu';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 
 export function ItemListPage() {
   const { data: items, isLoading, isError, error, refetch, dataUpdatedAt } = useItems();
   const { data: categories } = useCategories();
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const departmentsOn = useDepartmentTracking();
   // null: closed; 'new': adding; otherwise the item being edited (looked up live so its stock stays current).
   const [dialog, setDialog] = useState<'new' | string | null>(null);
@@ -51,14 +57,15 @@ export function ItemListPage() {
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items ?? [];
-    return (items ?? []).filter(
+    const inView = (items ?? []).filter((item) => (view === 'active' ? item.isActive : !item.isActive));
+    if (!q) return inView;
+    return inView.filter(
       (item) =>
         item.name.toLowerCase().includes(q) ||
         item.sku?.toLowerCase().includes(q) ||
         item.barcode?.toLowerCase().includes(q),
     );
-  }, [items, search]);
+  }, [items, search, view]);
 
   // One group per category in the shop's own order, then the items that have none. Within a group, the saved order.
   const groups = useMemo<SortableGroup<Item>[]>(() => {
@@ -108,35 +115,43 @@ export function ItemListPage() {
     {
       header: '',
       className: 'text-right',
-      cell: (item) => <ItemRowActions item={item} showDepartment={departmentsOn} onEdit={() => setDialog(item.id)} />,
+      cell: (item) => <ItemRowActions item={item} showDepartment={departmentsOn} onEdit={() => setDialog(item.id)} onLifecycle={(action) => run({ kind: 'Item', id: item.id, name: item.name }, action)} />,
     },
   ];
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search items…" />
-        <button type="button" onClick={() => setDialog('new')} className="whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">
-          Add Item
-        </button>
+      <PageHeader
+        title="Items"
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <button type="button" onClick={() => setDialog('new')} className="h-12 whitespace-nowrap rounded-control bg-brand px-6 text-base font-semibold text-on-brand hover:bg-brand-strong">
+            Add item
+          </button>
+        }
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusFilter value={view} onChange={setView} />
+        {view !== 'deleted' && <SearchBar value={search} onChange={setSearch} placeholder="Search items…" />}
       </div>
+      {view === 'deleted' && <DeletedRecordsPanel kind="Item" noun="items" />}
 
       <StockBranchPicker branches={stockBranch.branches} branchId={stockBranch.branchId} onChange={stockBranch.setBranchId} />
 
       <StaleDataNotice updatedAt={dataUpdatedAt} what="items" />
 
-      {isLoading && <SkeletonRows columns={5} />}
+      {view !== 'deleted' && isLoading && <SkeletonRows columns={5} />}
 
-      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+      {view !== 'deleted' && isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
 
-      {!isLoading && !isError && filteredItems.length === 0 && (
+      {view !== 'deleted' && !isLoading && !isError && filteredItems.length === 0 && (
         <EmptyState
           title="No items found"
           description={search ? 'Try a different search.' : 'Add your first item to get started.'}
         />
       )}
 
-      {!isError && filteredItems.length > 0 && (
+      {view !== 'deleted' && !isError && filteredItems.length > 0 && (
         <>
           {searching && <p className="text-xs text-gray-500">Clear the search to change the order of items.</p>}
           <SortableGroupedTable
@@ -151,47 +166,48 @@ export function ItemListPage() {
       )}
       {dialog === 'new' && <ItemDialog item={null} onClose={() => setDialog(null)} />}
       {editing && <ItemDialog item={editing} onClose={() => setDialog(null)} />}
+      {lifecycleDialog}
     </div>
   );
 }
 
-function ItemRowActions({ item, showDepartment, onEdit }: { item: Item; showDepartment: boolean; onEdit: () => void }) {
+function ItemRowActions({
+  item,
+  showDepartment,
+  onEdit,
+  onLifecycle,
+}: {
+  item: Item;
+  showDepartment: boolean;
+  onEdit: () => void;
+  onLifecycle: (action: 'deactivate' | 'reactivate' | 'delete') => void;
+}) {
+  const navigate = useNavigate();
   const itemId = item.id;
+  const go = (path: string) => () => navigate(`/catalog/items/${itemId}/${path}`);
   const pricingType = item.pricingType;
-  const links: { to: string; label: string }[] = [];
+  const actions: RowAction[] = [{ label: 'Edit', onSelect: onEdit }];
 
   if (pricingType === PricingType.WeightVolume) {
-    links.push(
-      { to: `/catalog/items/${itemId}/batches`, label: 'Batches' },
-      { to: `/catalog/items/${itemId}/tingi-config`, label: 'Tingi Config' },
-    );
+    actions.push({ label: 'Batches', onSelect: go('batches') }, { label: 'Tingi settings', onSelect: go('tingi-config') });
   }
-  if (pricingType === PricingType.Bundle) {
-    links.push({ to: `/catalog/items/${itemId}/bundle-rules`, label: 'Bundle Rules' });
-  }
-  if (pricingType === PricingType.VariantMatrix) {
-    links.push({ to: `/catalog/items/${itemId}/variants`, label: 'Variants' });
-  }
-  if (pricingType === PricingType.Service) {
-    links.push({ to: `/catalog/items/${itemId}/service-duration`, label: 'Service Duration' });
-  }
-  if (pricingType === PricingType.Combo) {
-    links.push({ to: `/catalog/items/${itemId}/combo-components`, label: 'Combo Components' });
-  }
+  if (pricingType === PricingType.Bundle) actions.push({ label: 'Bundle rules', onSelect: go('bundle-rules') });
+  if (pricingType === PricingType.VariantMatrix) actions.push({ label: 'Variants', onSelect: go('variants') });
+  if (pricingType === PricingType.Service) actions.push({ label: 'Service duration', onSelect: go('service-duration') });
+  if (pricingType === PricingType.Combo) actions.push({ label: 'Combo parts', onSelect: go('combo-components') });
+  actions.push({ label: 'Modifier groups', onSelect: go('modifier-groups') });
+  if (showDepartment) actions.push({ label: 'Department', onSelect: go('department') });
 
-  links.push({ to: `/catalog/items/${itemId}/modifier-groups`, label: 'Modifier Groups' });
-  if (showDepartment) links.push({ to: `/catalog/items/${itemId}/department`, label: 'Assign Department' });
+  actions.push(
+    item.isActive
+      ? { label: 'Make inactive', onSelect: () => onLifecycle('deactivate'), separated: true }
+      : { label: 'Make active', onSelect: () => onLifecycle('reactivate'), separated: true },
+    { label: 'Delete', danger: true, onSelect: () => onLifecycle('delete') },
+  );
 
   return (
-    <div className="flex flex-wrap justify-end gap-x-2 gap-y-1 text-xs">
-      <button type="button" onClick={onEdit} className="text-gray-500 hover:text-gray-900 hover:underline">
-        Edit
-      </button>
-      {links.map((link) => (
-        <Link key={link.to} to={link.to} className="text-gray-500 hover:text-gray-900 hover:underline">
-          {link.label}
-        </Link>
-      ))}
+    <div className="flex justify-end">
+      <RowActionsMenu subject={item.name} actions={actions} />
     </div>
   );
 }

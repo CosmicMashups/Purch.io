@@ -38,7 +38,7 @@ public sealed class EfDeviceRepository(PurchDbContext dbContext) : IDeviceReposi
     {
         return await dbContext.Devices
             .AsNoTracking()
-            .Where(device => device.TenantId == tenantId)
+            .Where(device => device.TenantId == tenantId && !device.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

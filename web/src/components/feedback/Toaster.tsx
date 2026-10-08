@@ -1,4 +1,5 @@
-import { useToastStore, type ToastTone } from './toastStore';
+import { useEffect, useState } from 'react';
+import { useToastStore, type Toast, type ToastTone } from './toastStore';
 
 const TONE_CLASS: Record<ToastTone, string> = {
   success: 'border-ok bg-white text-ink',
@@ -27,6 +28,7 @@ export function Toaster() {
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{TONE_LABEL[t.tone]}</p>
             <p className="text-base">{t.message}</p>
           </div>
+          {t.action && <UndoButton toast={t} onTaken={() => dismiss(t.id)} />}
           <button
             type="button"
             onClick={() => dismiss(t.id)}
@@ -40,5 +42,30 @@ export function Toaster() {
         </div>
       ))}
     </div>
+  );
+}
+
+/** The action on an undoable toast, with the seconds left. The toast itself leaves when the time is up. */
+function UndoButton({ toast, onTaken }: { toast: Toast; onTaken: () => void }) {
+  const total = Math.ceil((toast.durationMs ?? 5000) / 1000);
+  const [left, setLeft] = useState(total);
+
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => setLeft(Math.max(0, total - Math.floor((Date.now() - started) / 1000))), 250);
+    return () => clearInterval(timer);
+  }, [total]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        toast.action?.onAction();
+        onTaken();
+      }}
+      className="h-12 shrink-0 rounded-control border border-line px-4 text-base font-semibold hover:border-brand"
+    >
+      {toast.action?.label} <span className="tabular-nums text-ink-soft">({left})</span>
+    </button>
   );
 }

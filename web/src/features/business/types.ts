@@ -9,7 +9,7 @@ export const DeviceType = { Register: 0, Kiosk: 1, OrderBoard: 2, KitchenDisplay
 export type DeviceType = (typeof DeviceType)[keyof typeof DeviceType];
 
 /** Where a device is in its life: paired and working, waiting for its one-time code, or taken out of service. */
-export const DeviceStatus = { Active: 0, Pending: 1, Revoked: 2 } as const;
+export const DeviceStatus = { Active: 0, Pending: 1, Revoked: 2, Inactive: 3 } as const;
 export type DeviceStatus = (typeof DeviceStatus)[keyof typeof DeviceStatus];
 
 /** A person's standing in one business (MembershipRole). A Staff member is further limited by their duties. */
@@ -63,6 +63,10 @@ export const AuditActionType = {
   StaffAccessChanged: 8,
   CatalogPriceChanged: 9,
   CustomerAnonymized: 10,
+  RecordDeactivated: 14,
+  RecordReactivated: 15,
+  RecordDeleted: 16,
+  RecordRestored: 17,
 } as const;
 export type AuditActionType = (typeof AuditActionType)[keyof typeof AuditActionType];
 
@@ -129,6 +133,10 @@ export const auditActionLabels: Record<number, string> = {
   [AuditActionType.StaffAccessChanged]: 'Staff access changed',
   [AuditActionType.CatalogPriceChanged]: 'Catalog price changed',
   [AuditActionType.CustomerAnonymized]: 'Customer anonymized',
+  [AuditActionType.RecordDeactivated]: 'Made inactive',
+  [AuditActionType.RecordReactivated]: 'Made active again',
+  [AuditActionType.RecordDeleted]: 'Deleted',
+  [AuditActionType.RecordRestored]: 'Restored',
 };
 
 export function labelOf(labels: Record<number, string>, value: number): string {

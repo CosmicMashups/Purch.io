@@ -3,8 +3,16 @@ using Purch.Domain.Enums;
 
 namespace Purch.Domain.Entities;
 
-public class Branch : TenantScopedEntity
+public class Branch : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsActive { get; set; } = true;
+
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public string? Address { get; set; }

@@ -8,14 +8,17 @@ import { describeDiscount } from '../format';
 import { useCreatePromoCode, usePromoCodes } from '../queries';
 import { promoCodeSchema, type PromoCodeForm } from '../schemas';
 import { PromoDiscountType } from '../types';
-import { ActiveBadge, ScheduleFields } from './shared';
+import { ActiveBadge, PromoRowMenu, ScheduleFields } from './shared';
+import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
 import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
 
 const EMPTY: PromoCodeForm = { code: '', discountType: PromoDiscountType.Percentage, discountValue: 0, expiresAt: '' };
 
-/** The API has no update endpoint for promo codes, so this panel lists and creates only. */
-export function PromoCodePanel() {
+/** The API has no update endpoint for promo codes, so this panel lists, creates, switches on or off, and deletes. */
+export function PromoCodePanel({ view }: { view: StatusView }) {
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const codes = usePromoCodes();
   const [adding, setAdding] = useState(false);
 
@@ -26,10 +29,14 @@ export function PromoCodePanel() {
           Add promo code
         </PrimaryButton>
       </div>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="PromoCode" noun="promo codes" />
+      ) : (
       <RuleList
         columns
         query={codes}
-        emptyMessage="No promo codes yet."
+        transform={(rows) => rows.filter((c) => (view === 'active' ? c.isActive : !c.isActive))}
+        emptyMessage={view === 'active' ? 'No promo codes yet.' : 'No inactive promo codes.'}
         renderRow={(code) => (
           <RuleCard key={code.id}>
             <div className="min-w-0">
@@ -37,10 +44,15 @@ export function PromoCodePanel() {
               <p className="text-base">{describeDiscount(code.discountType, code.discountValue)}</p>
               <p className="text-sm text-ink-soft">{code.expiresAt ? `Expires ${formatDateTime(code.expiresAt)}` : 'Never expires'}</p>
             </div>
-            <ActiveBadge active={code.isActive} />
+            <div className="flex shrink-0 items-center gap-1">
+              <ActiveBadge active={code.isActive} />
+              <PromoRowMenu subject={code.code} active={code.isActive} onLifecycle={(action) => run({ kind: 'PromoCode', id: code.id, name: code.code }, action)} />
+            </div>
           </RuleCard>
         )}
       />
+      )}
+      {lifecycleDialog}
       {adding && <PromoCodeDialog onClose={() => setAdding(false)} />}
     </div>
   );

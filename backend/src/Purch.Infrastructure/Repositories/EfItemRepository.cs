@@ -23,7 +23,7 @@ public sealed class EfItemRepository(PurchDbContext dbContext) : IItemRepository
     {
         return await dbContext.Items
             .AsNoTracking()
-            .Where(item => item.TenantId == tenantId)
+            .Where(item => item.TenantId == tenantId && !item.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 
@@ -32,6 +32,15 @@ public sealed class EfItemRepository(PurchDbContext dbContext) : IItemRepository
         return dbContext.Items
             .AsNoTracking()
             .AnyAsync(item => item.TenantId == tenantId && item.Barcode == barcode, cancellationToken);
+    }
+
+    public Task<string?> GetDeletedNameByBarcodeAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Items
+            .AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.Barcode == barcode && item.IsDeleted)
+            .Select(item => item.Name)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public void Add(Item item)

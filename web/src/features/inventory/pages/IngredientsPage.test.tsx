@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { chooseFromMenu } from '../../../test/menu';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../../test/render';
 import { branchesApi } from '../../branches/api';
@@ -81,7 +82,7 @@ describe('IngredientsPage', () => {
   it('edits an existing ingredient with its values preloaded', async () => {
     vi.mocked(inventoryApi.updateInventoryItem).mockResolvedValue(beans);
     renderPage(<IngredientsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await chooseFromMenu('Espresso Beans', 'Edit');
     expect(screen.getByLabelText('Name')).toHaveValue('Espresso Beans');
     expect(screen.getByLabelText('Low stock alert (optional)')).toHaveValue('500');
     fireEvent.change(screen.getByLabelText('Low stock alert (optional)'), { target: { value: '750' } });
@@ -122,7 +123,7 @@ describe('IngredientsPage', () => {
   it('records a delivery in packages', async () => {
     vi.mocked(inventoryApi.receiveStock).mockResolvedValue(beans);
     renderPage(<IngredientsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Receive delivery' }));
+    await chooseFromMenu('Espresso Beans', 'Receive delivery');
     fireEvent.change(await screen.findByLabelText('Packages received (sack)'), { target: { value: '3' } });
     fireEvent.click(screen.getAllByRole('button', { name: 'Receive delivery' }).find((b) => b.getAttribute('type') === 'submit')!);
     await waitFor(() => expect(inventoryApi.receiveStock).toHaveBeenCalledWith('beans', { packagesReceived: 3, branchId: 'kat', supplierReference: null }));

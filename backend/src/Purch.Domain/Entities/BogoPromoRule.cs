@@ -5,8 +5,14 @@ namespace Purch.Domain.Entities;
 /// <summary>Automatic, no-code "Buy N Take M" rule — buying TriggerQuantity of
 /// TriggerItemId earns FreeQuantity of FreeItemId free. FreeItemId may equal
 /// TriggerItemId for a classic same-item BOGO, or differ for a cross-item one.</summary>
-public class BogoPromoRule : TenantScopedEntity
+public class BogoPromoRule : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public Guid TriggerItemId { get; set; }

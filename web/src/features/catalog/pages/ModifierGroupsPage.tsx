@@ -17,6 +17,11 @@ import { IngredientSelector } from '../components/IngredientSelector';
 import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
 import type { Modifier, ModifierCategoryItem, ModifierGroup } from '../types';
 import { useState } from 'react';
+import { PageHeader } from '../../../components/PageHeader';
+import { RowActionsMenu } from '../../../components/RowActionsMenu';
+import { StatusBadge } from '../../../components/StatusBadge';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 
 type GroupFormValues = z.infer<typeof modifierGroupSchema>;
 type ModifierFormValues = z.infer<typeof modifierSchema>;
@@ -29,116 +34,149 @@ export function ModifierGroupsPage() {
   const [modifierDialog, setModifierDialog] = useState<{ groupId: string; modifier: Modifier | null } | null>(null);
   const [categoryGroupId, setCategoryGroupId] = useState<string | null>(null);
   const [applyGroupId, setApplyGroupId] = useState<string | null>(null);
+  const [view, setView] = useState<StatusView>('active');
   const categories = useCategories();
+  const { run, dialog } = useLifecycle();
   // Ingredients only mean something when the business tracks its stock as ingredients.
   const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
 
+  const shown = (groups ?? []).filter((g) => (view === 'active' ? g.isActive !== false : g.isActive === false));
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">Modifier Groups</h1>
-        <PrimaryButton type="button" onClick={() => setGroupDialog('new')}>
-          Add group
-        </PrimaryButton>
-      </div>
+      <PageHeader
+        title="Modifier groups"
+        subtitle="Extras and choices customers can add to an item."
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setGroupDialog('new')}>
+            Add group
+          </PrimaryButton>
+        }
+      />
+      <StatusFilter value={view} onChange={setView} />
 
-      {isLoading && <SkeletonList />}
-      {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
-      {!isLoading && !isError && (groups ?? []).length === 0 && <EmptyState title="No modifier groups yet" />}
-      <ul className="flex flex-col gap-3">
-        {!isError && (groups ?? []).map((g) => (
-          <li key={g.id} className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">{g.name}</p>
-                <p className="text-xs text-gray-500">
-                  {g.allowMultipleSelection ? 'Multiple selection' : 'Single selection'} ·{' '}
-                  {g.isRequired ? 'Required' : 'Optional'}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCategoryGroupId(categoryGroupId === g.id ? null : g.id)}
-                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
-                >
-                  {categoryGroupId === g.id ? 'Close category' : `Category of ${g.name}`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setApplyGroupId(applyGroupId === g.id ? null : g.id)}
-                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
-                >
-                  {applyGroupId === g.id ? 'Close apply' : `Apply ${g.name} to items`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGroupDialog(g)}
-                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
-                >
-                  {`Edit group ${g.name}`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
-                  className="text-sm text-gray-500 hover:text-gray-900 hover:underline"
-                >
-                  Add Modifier
-                </button>
-              </div>
-            </div>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="ModifierGroup" noun="modifier groups" />
+      ) : (
+        <>
+          {isLoading && <SkeletonList />}
+          {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
+          {!isLoading && !isError && shown.length === 0 && <EmptyState title={view === 'active' ? 'No modifier groups yet' : 'No inactive modifier groups'} />}
+          <ul className="flex flex-col gap-3">
+            {!isError &&
+              shown.map((g) => (
+                <li key={g.id} className="rounded-panel border border-line bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+                        {g.name}
+                        {g.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+                      </p>
+                      <p className="text-sm text-ink-soft">
+                        {g.allowMultipleSelection ? 'Choose several' : 'Choose one'} · {g.isRequired ? 'Required' : 'Optional'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={`Add modifier to ${g.name}`}
+                        onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
+                        className="hidden h-12 items-center rounded-control border border-line px-4 text-base font-semibold hover:border-brand sm:inline-flex"
+                      >
+                        Add modifier
+                      </button>
+                      <RowActionsMenu
+                        subject={g.name}
+                        actions={[
+                          { label: 'Edit group', onSelect: () => setGroupDialog(g) },
+                          { label: 'Add modifier', onSelect: () => setModifierDialog({ groupId: g.id, modifier: null }) },
+                          { label: 'Offer a category', onSelect: () => setCategoryGroupId(categoryGroupId === g.id ? null : g.id) },
+                          { label: 'Apply to items', onSelect: () => setApplyGroupId(applyGroupId === g.id ? null : g.id) },
+                          g.isActive === false
+                            ? { label: 'Make active', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'reactivate'), separated: true }
+                            : { label: 'Make inactive', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'deactivate'), separated: true },
+                          { label: 'Delete', danger: true, onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'delete') },
+                        ]}
+                      />
+                    </div>
+                  </div>
 
-            {g.categoryId && (
-              <p className="mt-1 text-xs text-gray-500">
-                Also offers every item in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
-              </p>
-            )}
-            {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
-            {applyGroupId === g.id && <ApplyToItemsPanel group={g} categories={categories.data ?? []} />}
+                  {g.categoryId && (
+                    <p className="mt-1 text-sm text-ink-soft">
+                      Also offers every item in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
+                    </p>
+                  )}
+                  {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
+                  {applyGroupId === g.id && <ApplyToItemsPanel group={g} categories={categories.data ?? []} />}
 
-            {g.modifiers.length > 0 && (
-              <ul className="mt-2 flex flex-col divide-y divide-gray-100" aria-label={`${g.name} modifiers`}>
-                {g.modifiers.map((m) => (
-                  <ModifierRow key={m.id} modifier={m} tracksIngredients={tracksIngredients} onEdit={() => setModifierDialog({ groupId: g.id, modifier: m })} />
-                ))}
-              </ul>
-            )}
-
-          </li>
-        ))}
-      </ul>
+                  {g.modifiers.length > 0 && (
+                    <ul className="mt-2 flex flex-col divide-y divide-line" aria-label={`${g.name} modifiers`}>
+                      {g.modifiers.map((m) => (
+                        <ModifierRow
+                          key={m.id}
+                          modifier={m}
+                          tracksIngredients={tracksIngredients}
+                          onEdit={() => setModifierDialog({ groupId: g.id, modifier: m })}
+                          onLifecycle={(action) => run({ kind: 'Modifier', id: m.id, name: m.name }, action)}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </>
+      )}
 
       {groupDialog && <GroupDialog group={groupDialog === 'new' ? null : groupDialog} categories={categories.data ?? []} onClose={() => setGroupDialog(null)} />}
       {modifierDialog && <ModifierDialog groupId={modifierDialog.groupId} modifier={modifierDialog.modifier} onClose={() => setModifierDialog(null)} />}
+      {dialog}
     </div>
   );
 }
 
-/** One modifier: its price and, when stock is tracked, what it uses up. Both can be changed in place. */
-function ModifierRow({ modifier, tracksIngredients, onEdit }: { modifier: Modifier; tracksIngredients: boolean; onEdit: () => void }) {
+/** One modifier: its price and, when stock is tracked, what it uses up. Tap it to edit; the rest is in the menu. */
+function ModifierRow({
+  modifier,
+  tracksIngredients,
+  onEdit,
+  onLifecycle,
+}: {
+  modifier: Modifier;
+  tracksIngredients: boolean;
+  onEdit: () => void;
+  onLifecycle: (action: 'deactivate' | 'reactivate' | 'delete') => void;
+}) {
   const [panel, setPanel] = useState<'ingredients' | null>(null);
   const ingredientNames = (modifier.ingredients ?? []).map((i) => i.inventoryItemName);
+  const inactive = modifier.isActive === false;
 
   return (
-    <li className="py-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium text-gray-900">
-            {modifier.name} <span className="font-normal text-gray-600">({modifier.priceDelta < 0 ? '-' : '+'}₱{Math.abs(modifier.priceDelta).toFixed(2)})</span>
-            {modifier.isOutOfStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800">Sold out</span>}
-          </p>
-          {tracksIngredients && <p className="text-xs text-gray-500">{ingredientNames.length > 0 ? `Uses ${ingredientNames.join(', ')}` : 'Uses no ingredients'}</p>}
-        </div>
-        <div className="flex gap-3 text-sm">
-          <button type="button" onClick={onEdit} className="text-gray-600 underline hover:text-gray-900">
-            {`Edit ${modifier.name}`}
-          </button>
-          {tracksIngredients && (
-            <button type="button" onClick={() => setPanel(panel === 'ingredients' ? null : 'ingredients')} className="text-gray-600 underline hover:text-gray-900">
-              {panel === 'ingredients' ? 'Close ingredients' : `Ingredients of ${modifier.name}`}
-            </button>
-          )}
-        </div>
+    <li className="py-1">
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={onEdit} aria-label={`Edit ${modifier.name}`} className="min-h-12 min-w-0 flex-1 rounded-control px-2 text-left hover:bg-canvas">
+          <span className="flex flex-wrap items-center gap-2 text-base font-semibold">
+            {modifier.name}
+            <span className="font-normal text-ink-soft">
+              ({modifier.priceDelta < 0 ? '-' : '+'}₱{Math.abs(modifier.priceDelta).toFixed(2)})
+            </span>
+            {modifier.isOutOfStock && <StatusBadge label="Sold out" tone="danger" />}
+            {inactive && <StatusBadge label="Inactive" tone="warning" />}
+          </span>
+          {tracksIngredients && <span className="block text-sm text-ink-soft">{ingredientNames.length > 0 ? `Uses ${ingredientNames.join(', ')}` : 'Uses no ingredients'}</span>}
+        </button>
+        <RowActionsMenu
+          subject={modifier.name}
+          actions={[
+            { label: 'Edit', onSelect: onEdit },
+            ...(tracksIngredients ? [{ label: panel === 'ingredients' ? 'Hide ingredients' : 'Ingredients', onSelect: () => setPanel(panel === 'ingredients' ? null : 'ingredients') }] : []),
+            inactive
+              ? { label: 'Make active', onSelect: () => onLifecycle('reactivate'), separated: true }
+              : { label: 'Make inactive', onSelect: () => onLifecycle('deactivate'), separated: true },
+            { label: 'Delete', danger: true, onSelect: () => onLifecycle('delete') },
+          ]}
+        />
       </div>
       {panel === 'ingredients' && <ModifierIngredientsEditor modifier={modifier} onDone={() => setPanel(null)} />}
     </li>

@@ -8,8 +8,10 @@ import type { Item } from '../../catalog/types';
 import { useBogoRules, useCreateBogo, useUpdateBogo } from '../queries';
 import { bogoSchema, type BogoForm } from '../schemas';
 import type { BogoRule } from '../types';
-import { ActiveBadge, ItemSelect, ScheduleFields } from './shared';
+import { ActiveBadge, ItemSelect, PromoRowMenu, ScheduleFields } from './shared';
 import { itemNameOf } from '../format';
+import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
+import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
 import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
 
@@ -24,7 +26,8 @@ const EMPTY: BogoForm = {
   isActive: true,
 };
 
-export function BogoPanel({ items }: { items: Item[] }) {
+export function BogoPanel({ items, view }: { items: Item[]; view: StatusView }) {
+  const { run, dialog: lifecycleDialog } = useLifecycle();
   const rules = useBogoRules();
   // null: closed; 'new': adding; otherwise the rule being edited.
   const [dialog, setDialog] = useState<'new' | BogoRule | null>(null);
@@ -36,10 +39,14 @@ export function BogoPanel({ items }: { items: Item[] }) {
           Add promotion
         </PrimaryButton>
       </div>
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="BogoPromo" noun="Buy 1 Take 1 promotions" />
+      ) : (
       <RuleList
         columns
         query={rules}
-        emptyMessage="No Buy 1 Take 1 promotions yet."
+        transform={(rows) => rows.filter((r) => (view === 'active' ? r.isActive : !r.isActive))}
+        emptyMessage={view === 'active' ? "No Buy 1 Take 1 promotions yet." : "No inactive Buy 1 Take 1 promotions."}
         renderRow={(rule) => (
           <RuleCard key={rule.id}>
             <div className="min-w-0">
@@ -48,14 +55,16 @@ export function BogoPanel({ items }: { items: Item[] }) {
                 Buy {rule.triggerQuantity} {itemNameOf(items, rule.triggerItemId)}, get {rule.freeQuantity} {itemNameOf(items, rule.freeItemId)} free
               </p>
               <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-              <button type="button" onClick={() => setDialog(rule)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                Edit
-              </button>
             </div>
-            <ActiveBadge active={rule.isActive} />
+            <div className="flex shrink-0 items-center gap-1">
+              <ActiveBadge active={rule.isActive} />
+              <PromoRowMenu subject={rule.name} active={rule.isActive} onEdit={() => setDialog(rule)} onLifecycle={(action) => run({ kind: 'BogoPromo', id: rule.id, name: rule.name }, action)} />
+            </div>
           </RuleCard>
         )}
       />
+      )}
+      {lifecycleDialog}
       {dialog && <BogoDialog rule={dialog === 'new' ? null : dialog} items={items} onClose={() => setDialog(null)} />}
     </div>
   );

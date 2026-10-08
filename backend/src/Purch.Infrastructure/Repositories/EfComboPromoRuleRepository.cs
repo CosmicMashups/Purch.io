@@ -11,7 +11,7 @@ public sealed class EfComboPromoRuleRepository(PurchDbContext dbContext) : IComb
     {
         return await dbContext.ComboPromoRules
             .AsNoTracking()
-            .Where(rule => rule.TenantId == tenantId)
+            .Where(rule => rule.TenantId == tenantId && !rule.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

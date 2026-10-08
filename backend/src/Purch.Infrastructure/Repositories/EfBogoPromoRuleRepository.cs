@@ -11,7 +11,7 @@ public sealed class EfBogoPromoRuleRepository(PurchDbContext dbContext) : IBogoP
     {
         return await dbContext.BogoPromoRules
             .AsNoTracking()
-            .Where(rule => rule.TenantId == tenantId)
+            .Where(rule => rule.TenantId == tenantId && !rule.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

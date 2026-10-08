@@ -56,8 +56,8 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
 
   // The menu is one continuous list, grouped by category. Search narrows every group at once, and the rail
   // follows whichever category is at the top as you scroll.
-  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], categories.data ?? [], query), [items.data, categories.data, query]);
-  const railTiles = useMemo(() => buildRailTiles(categories.data ?? [], sections), [categories.data, sections]);
+  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], (categories.data ?? []).filter((c) => c.isActive !== false), query), [items.data, categories.data, query]);
+  const railTiles = useMemo(() => buildRailTiles((categories.data ?? []).filter((c) => c.isActive !== false), sections), [categories.data, sections]);
   const spy = useSectionSpy(
     useMemo(() => sections.map((section) => section.id), [sections]),
     null,

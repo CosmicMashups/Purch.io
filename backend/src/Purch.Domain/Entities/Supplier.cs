@@ -2,8 +2,14 @@ using Purch.Domain.Common;
 
 namespace Purch.Domain.Entities;
 
-public class Supplier : TenantScopedEntity
+public class Supplier : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Legacy free-text contact line, from before contacts were structured. No longer written.</summary>

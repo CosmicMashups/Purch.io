@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { PageHeader } from '../../components/PageHeader';
+import { StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
 import { userMessage } from '../../lib/apiError';
@@ -26,13 +29,15 @@ export function PromotionsPage() {
   const requested = params.get('type');
   const active: TabId = isTabId(requested) ? requested : 'bogo';
   const items = useItems();
+  const [view, setView] = useState<StatusView>('active');
 
   return (
     <section className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Promotions</h1>
-        <p className="mt-1 text-base text-ink-soft">These apply automatically at the till. The server works out the final price.</p>
-      </div>
+      <PageHeader
+        title="Promotions"
+        subtitle="These apply automatically at the till. The server works out the final price."
+        backTo={{ to: '/business', label: 'Business' }}
+      />
 
       <div role="tablist" aria-label="Promotion type" className="flex flex-wrap gap-2">
         {TABS.map((tab) => {
@@ -54,6 +59,8 @@ export function PromotionsPage() {
         })}
       </div>
 
+      <StatusFilter value={view} onChange={setView} />
+
       <div role="tabpanel" id={`panel-${active}`} aria-labelledby={`tab-${active}`}>
         {items.isPending && <Skeleton className="h-40 w-full" />}
         {items.isError && (
@@ -61,10 +68,10 @@ export function PromotionsPage() {
         )}
         {items.isSuccess && (
           <>
-            {active === 'bogo' && <BogoPanel items={items.data} />}
-            {active === 'combo' && <ComboPanel items={items.data} />}
-            {active === 'discount' && <ItemDiscountPanel items={items.data} />}
-            {active === 'codes' && <PromoCodePanel />}
+            {active === 'bogo' && <BogoPanel items={items.data} view={view} />}
+            {active === 'combo' && <ComboPanel items={items.data} view={view} />}
+            {active === 'discount' && <ItemDiscountPanel items={items.data} view={view} />}
+            {active === 'codes' && <PromoCodePanel view={view} />}
           </>
         )}
       </div>

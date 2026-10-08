@@ -92,7 +92,8 @@ public sealed class ModifierDtoBuilder(
                 [.. ingredientsByModifier[modifier.Id].Select(ingredient => new ModifierIngredientDto(
                     ingredient.InventoryItemId,
                     inventoryById.TryGetValue(ingredient.InventoryItemId, out var inventoryItem) ? inventoryItem.Name : "(deleted inventory item)",
-                    ingredient.QuantityPerOrder))]))],
+                    ingredient.QuantityPerOrder))],
+                modifier.IsActive))],
             pair.Group.CategoryId,
             pair.Group.CategoryId is { } linkedId
                 ? [.. itemsByCategory.GetValueOrDefault(linkedId, []).Select(item =>
@@ -108,6 +109,7 @@ public sealed class ModifierDtoBuilder(
                         tweak?.IsExcluded ?? false,
                         item.IsOutOfStock);
                 })]
-                : null))];
+                : null,
+            pair.Group.IsActive))];
     }
 }

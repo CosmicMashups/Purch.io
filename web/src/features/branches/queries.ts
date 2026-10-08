@@ -11,6 +11,6 @@ export const useBranches = () => useQuery({ queryKey: branchKeys.all, queryFn: b
 export function useSelectableBranches() {
   const query = useBranches();
   const { claims } = useSession();
-  const branches = query.data ? selectableBranches(query.data, claims?.scopeType ?? null, claims?.scopeId ?? null) : undefined;
+  const branches = query.data ? selectableBranches(query.data.filter((b) => b.isActive !== false), claims?.scopeType ?? null, claims?.scopeId ?? null) : undefined;
   return { ...query, branches };
 }

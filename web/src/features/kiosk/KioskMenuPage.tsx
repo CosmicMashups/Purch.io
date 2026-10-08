@@ -25,8 +25,8 @@ export function KioskMenuPage() {
   const categories = useCategories();
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
 
-  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], categories.data ?? []), [items.data, categories.data]);
-  const tiles = useMemo(() => buildRailTiles(categories.data ?? [], sections), [categories.data, sections]);
+  const sections = useMemo(() => groupItemsByCategory(items.data ?? [], (categories.data ?? []).filter((c) => c.isActive !== false)), [items.data, categories.data]);
+  const tiles = useMemo(() => buildRailTiles((categories.data ?? []).filter((c) => c.isActive !== false), sections), [categories.data, sections]);
   const spy = useSectionSpy(
     useMemo(() => sections.map((section) => section.id), [sections]),
     scroller,

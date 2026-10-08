@@ -45,6 +45,8 @@ export function ReceiptPage() {
   const [shownAt] = useState(() => new Date());
   const printedFor = useRef<string | null>(null);
   const justSold = (location.state as { justSold?: boolean } | null)?.justSold === true;
+  // Opened from the back-office Orders list: Done goes back there instead of starting a new sale.
+  const backTo = (location.state as { backTo?: { to: string; label: string } } | null)?.backTo;
 
   // Straight after a sale is paid, once the receipt printer is set up, the print window opens by itself. Looking a sale up
   // later never does, and a re-render never prints twice.
@@ -69,7 +71,7 @@ export function ReceiptPage() {
 
   function newSale() {
     clearReceipt();
-    navigate('/sell', { replace: true });
+    navigate(backTo?.to ?? '/sell', { replace: true });
   }
 
   async function submitRefund(reason: string, approverPin: string) {
@@ -87,7 +89,7 @@ export function ReceiptPage() {
   return (
     <div className="flex max-w-xl flex-col gap-6">
       <div className="flex flex-col gap-1 print:hidden">
-        <h1 className="text-3xl font-bold tracking-tight text-brand-strong">Sale complete</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-brand-strong">{backTo ? 'Receipt' : 'Sale complete'}</h1>
         <p className="text-base text-ink-soft">The payment is recorded. Hand over the receipt.</p>
       </div>
 
@@ -184,7 +186,7 @@ export function ReceiptPage() {
 
       <div className="flex flex-wrap gap-3 print:hidden">
         <button type="button" onClick={newSale} className="h-16 rounded-control bg-brand px-8 text-xl font-bold text-on-brand hover:bg-brand-strong active:translate-y-px">
-          New sale
+          {backTo ? `Back to ${backTo.label}` : 'New sale'}
         </button>
         <button type="button" onClick={() => window.print()} className="h-16 rounded-control border border-line bg-surface px-8 text-xl font-bold hover:border-brand">
           Print

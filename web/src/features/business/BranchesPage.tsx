@@ -16,6 +16,10 @@ import { useDepartmentTracking } from '../tenant/queries';
 import { useBranchDepartments, useCreateBranch, useCreateDepartment, useUpdateGcash, useUpdateHardware } from '../branches/adminQueries';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
+import { StatusBadge } from '../../components/StatusBadge';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
+import { useLifecycle } from '../lifecycle/useLifecycle';
 import { CashDrawerPolicy, ReceiptPrinterProfile, cashDrawerPolicyLabels, printerProfileLabels } from './types';
 
 export function BranchesPage() {
@@ -25,6 +29,8 @@ export function BranchesPage() {
   const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = branches.data?.find((b) => b.id === selectedId) ?? null;
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,25 +46,42 @@ export function BranchesPage() {
           ) : undefined
         }
       />
-      <QueryList
-        columns
-        query={branches}
-        errorTitle="Branches could not be loaded"
-        emptyMessage="No branches yet."
-        renderRow={(branch) => (
-          <ListCard key={branch.id}>
-            <div className="min-w-0">
-              <p className="text-base font-semibold">{branch.name}</p>
-              {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
+      {isAdmin && <StatusFilter value={view} onChange={setView} />}
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="Branch" noun="branches" />
+      ) : (
+        <QueryList
+          columns
+          query={branches}
+          errorTitle="Branches could not be loaded"
+          emptyMessage={view === 'active' ? 'No branches yet.' : 'No inactive branches.'}
+          transform={(rows) => rows.filter((b) => (view === 'active' ? b.isActive !== false : b.isActive === false))}
+          renderRow={(branch) => (
+            <ListCard key={branch.id}>
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                  {branch.name}
+                  {branch.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+                </p>
+                {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
+              </div>
               {isAdmin && (
-                <button type="button" onClick={() => setSelectedId(branch.id)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                  Manage
-                </button>
+                <RowActionsMenu
+                  subject={branch.name}
+                  actions={[
+                    { label: 'Settings', onSelect: () => setSelectedId(branch.id) },
+                    branch.isActive === false
+                      ? { label: 'Make active', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'reactivate'), separated: true }
+                      : { label: 'Make inactive', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'deactivate'), separated: true },
+                    { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'delete') },
+                  ]}
+                />
               )}
-            </div>
-          </ListCard>
-        )}
-      />
+            </ListCard>
+          )}
+        />
+      )}
+      {lifecycleDialog}
       {isAdmin && adding && <BranchDialog onClose={() => setAdding(false)} />}
       {isAdmin && selected && <BranchDetail key={selected.id} branch={selected} onClose={() => setSelectedId(null)} />}
     </div>

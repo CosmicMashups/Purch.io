@@ -18,7 +18,7 @@ interface Created {
  */
 export default async function globalSetup(): Promise<void> {
   const stamp = Date.now().toString(36);
-  const owner = { email: `owner-${stamp}@e2e.test`, password: 'E2e-password-1', pin: '1234' };
+  const owner = { email: `owner-${stamp}@e2e.test`, password: 'E2e-password-1', pin: '123456' };
 
   const boot = await call<{ tenantId: string; branchId: string; adminMembershipId: string }>('POST', '/onboarding/bootstrap', {
     body: { tenantName: `E2E Cafe ${stamp}`, businessType: 2, branchName: 'Main Branch', adminName: 'Olive Owner', adminPin: owner.pin, adminEmail: owner.email, adminPassword: owner.password },
@@ -41,9 +41,9 @@ export default async function globalSetup(): Promise<void> {
 
   // Role 1 Manager, 2 Staff; duties 1 Cashier, 2 Warehouse.
   const people = [
-    { key: 'manager', name: 'Mia Manager', role: 1, duties: 0, branchIds: [] as string[], pin: '2222' },
-    { key: 'cashier', name: 'Carlo Cashier', role: 2, duties: 1, branchIds: [boot.branchId], pin: '3333' },
-    { key: 'warehouse', name: 'Wendy Warehouse', role: 2, duties: 2, branchIds: [boot.branchId], pin: '4444' },
+    { key: 'manager', name: 'Mia Manager', role: 1, duties: 0, branchIds: [] as string[], pin: '222222' },
+    { key: 'cashier', name: 'Carlo Cashier', role: 2, duties: 1, branchIds: [boot.branchId], pin: '333333' },
+    { key: 'warehouse', name: 'Wendy Warehouse', role: 2, duties: 2, branchIds: [boot.branchId], pin: '444444' },
   ] as const;
   const emails = new Map<string, string>();
   for (const person of people) {
@@ -67,7 +67,7 @@ export default async function globalSetup(): Promise<void> {
     register: await device(0, 'E2E Till'),
     warehouse: await device(4, 'E2E Stock Room'),
     members: { admin: boot.adminMembershipId, manager: memberId('manager'), cashier: memberId('cashier'), warehouse: memberId('warehouse') },
-    pins: { admin: owner.pin, manager: '2222', cashier: '3333', warehouse: '4444' },
+    pins: { admin: owner.pin, manager: '222222', cashier: '333333', warehouse: '444444' },
     kiosk: await device(1, 'E2E Kiosk'),
     orderBoard: await device(2, 'E2E Order Board'),
     kitchen: await device(3, 'E2E Kitchen'),

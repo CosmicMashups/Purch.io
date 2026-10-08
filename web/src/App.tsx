@@ -61,6 +61,7 @@ import { KitchenDisplayPage } from './features/kiosk/KitchenDisplayPage';
 import { OrderBoardPage } from './features/kiosk/OrderBoardPage';
 import { RequireDevice } from './features/kiosk/RequireDevice';
 import { ModifierGroupsPage } from './features/catalog/pages/ModifierGroupsPage';
+import { OrdersPage } from './features/orders/OrdersPage';
 
 export function App() {
   return (
@@ -133,6 +134,7 @@ export function App() {
             <Route path="/business/promotions" element={<PromotionsPage />} />
             <Route path="/business/reports" element={<ReportsPage />} />
             <Route path="/business/customers" element={<CustomersPage />} />
+            <Route path="/business/orders" element={<OrdersPage />} />
             <Route path="/business/sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="/business/staff" element={<StaffPage />} />
             <Route path="/business/branches" element={<BranchesPage />} />

@@ -5,8 +5,14 @@ namespace Purch.Domain.Entities;
 /// <summary>Automatic, no-code rule pricing one unit of ItemAId together with
 /// one unit of ItemBId at a fixed ComboPrice. Applies once per matching pair
 /// found in the cart — multiple pairs stack.</summary>
-public class ComboPromoRule : TenantScopedEntity
+public class ComboPromoRule : TenantScopedEntity, ISoftDeletable
 {
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public Guid ItemAId { get; set; }

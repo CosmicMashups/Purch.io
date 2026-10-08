@@ -23,6 +23,9 @@ public interface ITransactionService
     /// <summary>Finds completed sales by receipt number, for refunding or exchanging a sale the cashier
     /// doesn't already have open — e.g. from an earlier day or a different terminal. Receipt numbers are
     /// only unique per device, so this can come back with more than one match.</summary>
+    /// <summary>A finished sale (completed, voided or refunded) by id, for the back-office Orders page. The caller checks branch visibility first.</summary>
+    Task<TransactionDto> GetFinishedAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<TransactionDto>> FindCompletedByReceiptNumberAsync(long receiptNumber, CancellationToken cancellationToken = default);
 
     /// <summary>Toggles the Senior Citizen/PWD 20% discount on the current open cart — a cashier-facing toggle, applied only after the cashier has verified the customer's physical ID.</summary>

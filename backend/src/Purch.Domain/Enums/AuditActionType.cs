@@ -36,4 +36,16 @@ public enum AuditActionType
     /// CustomerCreditLedgerService.RecordPaymentAsync. Any POS role can collect, so who did it and how much
     /// is the only control against a balance being quietly written off.</summary>
     CreditPaymentRecorded,
+
+    /// <summary>A record was switched to Inactive. TargetEntityType names what kind.</summary>
+    RecordDeactivated,
+
+    /// <summary>An Inactive record was switched back to Active.</summary>
+    RecordReactivated,
+
+    /// <summary>A record was soft-deleted. The row stays in the database and can be restored.</summary>
+    RecordDeleted,
+
+    /// <summary>A soft-deleted record was restored.</summary>
+    RecordRestored,
 }

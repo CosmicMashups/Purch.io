@@ -11,10 +11,11 @@ import { PageHeader } from '../../components/PageHeader';
 import { AsyncPanel } from '../dashboard/components/AsyncPanel';
 import { formatPeso } from '../dashboard/format';
 import { useAnonymizeCustomer, useCreateCredit, useCreditLedgers, useCreditReminders, useRecordCreditPayment, useUpdateCreditLimit } from './queries';
-import { availableCredit, canAnonymize, customerSchema, limitProblem, paymentProblem, type CustomerForm } from './rules';
+import { availableCredit, canAnonymize, customerSchema, isErased, limitProblem, paymentProblem, type CustomerForm } from './rules';
 import type { CreditLedger } from './types';
-
-const linkButton = 'h-12 text-base font-semibold text-brand-strong underline disabled:opacity-40 disabled:no-underline';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
+import { useLifecycle } from '../lifecycle/useLifecycle';
 
 export function CustomersPage() {
   const ledgers = useCreditLedgers();
@@ -24,6 +25,8 @@ export function CustomersPage() {
   const [paying, setPaying] = useState<CreditLedger | null>(null);
   const [limiting, setLimiting] = useState<CreditLedger | null>(null);
   const [erasing, setErasing] = useState<CreditLedger | null>(null);
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
 
   function confirmErase() {
     if (!erasing) return;
@@ -72,39 +75,66 @@ export function CustomersPage() {
         )}
       </AsyncPanel>
 
-      <div>
+      <StatusFilter value={view} onChange={setView} />
+      {view === 'deleted' ? (
+        <DeletedRecordsPanel kind="Customer" noun="customers" />
+      ) : (
         <QueryList
           columns
           query={ledgers}
           errorTitle="Customers could not be loaded"
-          emptyMessage="No customer accounts yet."
-          renderRow={(l) => (
-            <ListCard key={l.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{l.customerFullName}</p>
-                <p className="text-sm text-ink-soft">{l.customerPhoneNumber}</p>
-                <p className="text-base tabular-nums">
-                  Owes {formatPeso(l.balance)} of {formatPeso(l.creditLimit)} ({formatPeso(availableCredit(l))} available)
-                </p>
-                {l.dueDate && <p className="text-sm text-ink-soft">Due {l.dueDate}</p>}
-                <div className="mt-2 flex flex-wrap gap-x-5">
-                  <button type="button" className={linkButton} disabled={!l.isActive || l.balance <= 0} onClick={() => setPaying(l)}>
-                    Record payment
-                  </button>
-                  <button type="button" className={linkButton} disabled={!l.isActive} onClick={() => setLimiting(l)}>
-                    Change limit
-                  </button>
-                  <button type="button" className={linkButton} disabled={!canAnonymize(l)} title={l.balance !== 0 ? 'The balance must be zero first' : undefined} onClick={() => setErasing(l)}>
-                    Erase details
-                  </button>
+          emptyMessage={view === 'active' ? 'No customer accounts yet.' : 'No inactive customers.'}
+          transform={(rows) => rows.filter((l) => (view === 'active' ? l.isActive : !l.isActive))}
+          renderRow={(l) => {
+            const erased = isErased(l);
+            const subject = l.customerFullName;
+            return (
+              <ListCard key={l.id}>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                    {l.customerFullName}
+                    {erased ? <Pill>Erased</Pill> : !l.isActive && <Pill>Inactive</Pill>}
+                  </p>
+                  <p className="text-sm text-ink-soft">{l.customerPhoneNumber}</p>
+                  <p className="text-base tabular-nums">
+                    Owes {formatPeso(l.balance)} of {formatPeso(l.creditLimit)} ({formatPeso(availableCredit(l))} available)
+                  </p>
+                  {l.dueDate && <p className="text-sm text-ink-soft">Due {l.dueDate}</p>}
+                  {!l.isActive && !erased && <p className="text-sm text-ink-soft">No new credit. Payments are still accepted.</p>}
                 </div>
-              </div>
-              {!l.isActive && <Pill>Erased</Pill>}
-            </ListCard>
-          )}
+                {!erased && (
+                  <RowActionsMenu
+                    subject={subject}
+                    actions={[
+                      { label: 'Record payment', disabled: l.balance <= 0, hint: l.balance <= 0 ? 'Nothing owed' : undefined, onSelect: () => setPaying(l) },
+                      { label: 'Change limit', disabled: !l.isActive, onSelect: () => setLimiting(l) },
+                      l.isActive
+                        ? { label: 'Make inactive', onSelect: () => run({ kind: 'Customer', id: l.id, name: subject }, 'deactivate'), separated: true }
+                        : { label: 'Make active', onSelect: () => run({ kind: 'Customer', id: l.id, name: subject }, 'reactivate'), separated: true },
+                      {
+                        label: 'Delete',
+                        danger: true,
+                        disabled: l.balance > 0,
+                        hint: l.balance > 0 ? 'Collect the balance first' : undefined,
+                        onSelect: () => run({ kind: 'Customer', id: l.id, name: subject }, 'delete'),
+                      },
+                      {
+                        label: 'Erase details for good',
+                        danger: true,
+                        disabled: !canAnonymize(l),
+                        hint: l.balance !== 0 ? 'The balance must be zero first' : 'Cannot be undone',
+                        onSelect: () => setErasing(l),
+                      },
+                    ]}
+                  />
+                )}
+              </ListCard>
+            );
+          }}
         />
-      </div>
+      )}
 
+      {lifecycleDialog}
       {adding && <CustomerDialog onClose={() => setAdding(false)} />}
 
       {paying && <PaymentDialog ledger={paying} onClose={() => setPaying(null)} />}

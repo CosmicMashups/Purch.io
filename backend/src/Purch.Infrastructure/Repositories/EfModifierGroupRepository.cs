@@ -46,14 +46,24 @@ public sealed class EfModifierGroupRepository(PurchDbContext dbContext) : IModif
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
+        return await ListByTenantWithModifiersAsync(tenantId, ModifierListScope.Manage, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<(ModifierGroup Group, IReadOnlyList<ItemModifier> Modifiers)>> ListByTenantWithModifiersAsync(
+        Guid tenantId,
+        ModifierListScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        var history = scope == ModifierListScope.History;
+        var sellable = scope == ModifierListScope.Sellable;
         var groups = await dbContext.ModifierGroups
             .AsNoTracking()
-            .Where(group => group.TenantId == tenantId)
+            .Where(group => group.TenantId == tenantId && (history || !group.IsDeleted) && (!sellable || group.IsActive))
             .ToListAsync(cancellationToken);
 
         var modifiers = await dbContext.ItemModifiers
             .AsNoTracking()
-            .Where(modifier => modifier.TenantId == tenantId)
+            .Where(modifier => modifier.TenantId == tenantId && (history || !modifier.IsDeleted) && (!sellable || modifier.IsActive))
             .ToListAsync(cancellationToken);
 
         var modifiersByGroup = modifiers.GroupBy(modifier => modifier.ModifierGroupId)

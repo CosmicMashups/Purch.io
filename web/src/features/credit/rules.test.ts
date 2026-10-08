@@ -53,9 +53,13 @@ describe('limitProblem', () => {
 });
 
 describe('canAnonymize', () => {
-  it('only when nothing is owed and the account is still active', () => {
-    expect(canAnonymize({ balance: 0, isActive: true })).toBe(true);
-    expect(canAnonymize({ balance: 10, isActive: true })).toBe(false);
-    expect(canAnonymize({ balance: 0, isActive: false })).toBe(false);
+  it('only when nothing is owed and the details are not already erased', () => {
+    expect(canAnonymize({ balance: 0, isActive: true, customerFullName: 'Ana Cruz' })).toBe(true);
+    expect(canAnonymize({ balance: 10, isActive: true, customerFullName: 'Ana Cruz' })).toBe(false);
+    expect(canAnonymize({ balance: 0, isActive: false, customerFullName: '[ANONYMIZED]' })).toBe(false);
+  });
+
+  it('still allows erasing a customer who was only made inactive', () => {
+    expect(canAnonymize({ balance: 0, isActive: false, customerFullName: 'Ana Cruz' })).toBe(true);
   });
 });

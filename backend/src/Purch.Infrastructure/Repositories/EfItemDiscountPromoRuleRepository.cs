@@ -11,7 +11,7 @@ public sealed class EfItemDiscountPromoRuleRepository(PurchDbContext dbContext) 
     {
         return await dbContext.ItemDiscountPromoRules
             .AsNoTracking()
-            .Where(rule => rule.TenantId == tenantId)
+            .Where(rule => rule.TenantId == tenantId && !rule.IsDeleted)
             .ToListAsync(cancellationToken);
     }
 

@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { chooseFromMenu, menuItemNames } from '../../test/menu';
 import { renderPage, signInAs } from '../../test/render';
 import { branchesApi } from '../branches/api';
 import { deviceApi, type Device } from './deviceApi';
@@ -27,9 +28,13 @@ describe('DevicesPage', () => {
     expect(await screen.findByText('Front counter')).toBeInTheDocument();
     expect(screen.getByText('Paired')).toBeInTheDocument();
     expect(screen.getByText('Waiting for its code')).toBeInTheDocument();
-    expect(screen.getByText('Revoked')).toBeInTheDocument();
     expect(screen.getByText('Register, Katipunan')).toBeInTheDocument();
     expect(screen.getAllByText('Never seen').length).toBeGreaterThan(0);
+    // A revoked device is out of service, so it is under Inactive rather than in the working list.
+    expect(screen.queryByText('Old tablet')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Inactive' }));
+    expect(await screen.findByText('Old tablet')).toBeInTheDocument();
+    expect(screen.getByText('Revoked')).toBeInTheDocument();
   });
 
   it('adds a device and shows its one-time code once', async () => {
@@ -66,7 +71,7 @@ describe('DevicesPage', () => {
   it('warns before pairing an active device again, then shows the new code', async () => {
     vi.mocked(deviceApi.newPairingCode).mockResolvedValue(issued({ ...register, status: 1 }, 'NEWCODE9'));
     renderPage(<DevicesPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'New pairing code' }))[0]);
+    await chooseFromMenu('Front counter', 'New pairing code');
     const confirm = screen.getByRole('dialog', { name: 'Make a new pairing code?' });
     expect(within(confirm).getByText(/signed out/)).toBeInTheDocument();
     expect(deviceApi.newPairingCode).not.toHaveBeenCalled();
@@ -79,7 +84,7 @@ describe('DevicesPage', () => {
   it('gives a device that is still waiting a fresh code without a warning', async () => {
     vi.mocked(deviceApi.newPairingCode).mockResolvedValue(issued(kiosk, 'FRESH222'));
     renderPage(<DevicesPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'New pairing code' }))[1]);
+    await chooseFromMenu('Entrance kiosk', 'New pairing code');
     await waitFor(() => expect(deviceApi.newPairingCode).toHaveBeenCalledWith('d2'));
     expect(await screen.findByLabelText('Pairing code FRESH222')).toBeInTheDocument();
   });
@@ -87,19 +92,23 @@ describe('DevicesPage', () => {
   it('asks before revoking, and backing out changes nothing', async () => {
     vi.mocked(deviceApi.revoke).mockResolvedValue({ ...register, status: 2 });
     renderPage(<DevicesPage />);
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Revoke' }))[0]);
+    await chooseFromMenu('Front counter', 'Revoke');
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Revoke this device?' })).getByRole('button', { name: 'Cancel' }));
     expect(deviceApi.revoke).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Revoke' })[0]);
+    await chooseFromMenu('Front counter', 'Revoke');
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Revoke this device?' })).getByRole('button', { name: 'Revoke' }));
     await waitFor(() => expect(deviceApi.revoke).toHaveBeenCalledWith('d1'));
   });
 
   it('does not offer to revoke a device that is already revoked', async () => {
     renderPage(<DevicesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Inactive' }));
     await screen.findByText('Old tablet');
-    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(2);
+    const items = await menuItemNames('Old tablet');
+    expect(items.some((name) => name.startsWith('Revoke'))).toBe(false);
+    // An Admin may delete a device that is out of service.
+    expect(items).toContain('Delete');
   });
 
   it('shows a retryable error instead of an empty list', async () => {

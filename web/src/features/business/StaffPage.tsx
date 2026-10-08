@@ -12,6 +12,9 @@ import type { Branch } from '../branches/types';
 import { InviteLinkDialog } from './components/InviteLinkDialog';
 import type { Invite, InviteLink, LegacyStaff, Member } from './memberApi';
 import { useCancelInvite, useInvite, useInvites, useLegacyStaff, useMembers, useResetLink, useUpdateMember } from './memberQueries';
+import { RowActionsMenu, type RowAction } from '../../components/RowActionsMenu';
+import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
+import { useLifecycle } from '../lifecycle/useLifecycle';
 import { DUTIES, MembershipRole, StaffDuty, describeDuties, dutyLabels, labelOf, membershipRoleLabels } from './types';
 
 const linkButton = 'h-12 text-base font-semibold text-brand-strong underline';
@@ -40,6 +43,8 @@ export function StaffPage() {
   const [reEnrol, setReEnrol] = useState<LegacyStaff | null>(null);
   const [shown, setShown] = useState<InviteLink | null>(null);
   const [cancelFor, setCancelFor] = useState<Invite | null>(null);
+  const [view, setView] = useState<StatusView>('active');
+  const { run, dialog: lifecycleDialog } = useLifecycle();
 
   const closeDialog = () => {
     setInviting(false);
@@ -64,31 +69,40 @@ export function StaffPage() {
       />
       <div>
         <div className="flex flex-col gap-6">
-          <QueryList
-            query={members}
-            errorTitle="Staff could not be loaded"
-            emptyMessage="No one here yet. Invite your first person."
-            renderRow={(member) => (
-              <ListCard key={member.id}>
-                <div className="min-w-0">
-                  <p className="text-base font-semibold">{member.name}</p>
-                  <p className="text-sm text-ink-soft">{member.email}</p>
-                  <p className="text-base">{describeAccess(member, branches.data ?? [])}</p>
-                  {mayManage(member) && (
-                    <div className="mt-2 flex flex-wrap gap-x-5">
-                      <button type="button" onClick={() => setEditing(member)} className={linkButton}>
-                        Edit
-                      </button>
-                      <button type="button" onClick={() => resetLink.mutate(member.id, { onSuccess: setShown })} className={linkButton}>
-                        Password reset link
-                      </button>
+          <StatusFilter value={view} onChange={setView} />
+          {view === 'deleted' ? (
+            <DeletedRecordsPanel kind="Staff" noun="staff" />
+          ) : (
+            <QueryList
+              query={members}
+              errorTitle="Staff could not be loaded"
+              emptyMessage={view === 'active' ? 'No one here yet. Invite your first person.' : 'No inactive staff.'}
+              transform={(rows) => rows.filter((m) => (view === 'active' ? m.isActive : !m.isActive))}
+              renderRow={(member) => {
+                const actions: RowAction[] = [
+                  { label: 'Edit', onSelect: () => setEditing(member) },
+                  { label: 'Password reset link', onSelect: () => resetLink.mutate(member.id, { onSuccess: setShown }) },
+                  member.isActive
+                    ? { label: 'Make inactive', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'deactivate'), separated: true }
+                    : { label: 'Make active', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'reactivate'), separated: true },
+                  { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'delete') },
+                ];
+                return (
+                  <ListCard key={member.id}>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                        {member.name}
+                        {!member.isActive && <Pill>Inactive</Pill>}
+                      </p>
+                      <p className="text-sm text-ink-soft">{member.email}</p>
+                      <p className="text-base">{describeAccess(member, branches.data ?? [])}</p>
                     </div>
-                  )}
-                </div>
-                {!member.isActive && <Pill>Inactive</Pill>}
-              </ListCard>
-            )}
-          />
+                    {mayManage(member) && <RowActionsMenu subject={member.name} actions={actions} />}
+                  </ListCard>
+                );
+              }}
+            />
+          )}
 
           {(legacy.data?.length ?? 0) > 0 && (
             <section aria-labelledby="legacy-heading" className="flex flex-col gap-2">
@@ -133,6 +147,7 @@ export function StaffPage() {
 
       </div>
 
+      {lifecycleDialog}
       {(inviting || editing || reEnrol) && (
         <FormDialogLoader
           title={editing ? `Edit ${editing.name}` : reEnrol ? `Invite ${reEnrol.name}` : 'Invite someone'}
