@@ -42,6 +42,7 @@ describe('StaffPage', () => {
   it('invites a person and shows the single-use link once, with a QR code', async () => {
     vi.mocked(memberApi.invite).mockResolvedValue(linkFor({ ...pending, id: 'i2', name: 'Dan Uy', email: 'dan@example.com' }));
     renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }));
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: ' Dan Uy ' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'dan@example.com' } });
     fireEvent.click(screen.getByLabelText('Warehouse'));
@@ -57,6 +58,7 @@ describe('StaffPage', () => {
 
   it('needs a name, a valid email, a duty and a branch before inviting', async () => {
     renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }));
     fireEvent.click(await screen.findByLabelText('Cashier'));
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
     expect(await screen.findByText('Enter their name')).toBeInTheDocument();
@@ -69,6 +71,7 @@ describe('StaffPage', () => {
   it('lets an Admin invite a manager, who works every branch so needs no duties or branches', async () => {
     vi.mocked(memberApi.invite).mockResolvedValue(linkFor({ ...pending, role: 1 }));
     renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }));
     fireEvent.change(await screen.findByLabelText('Role'), { target: { value: '1' } });
     expect(screen.queryByLabelText('Warehouse')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Eve Tan' } });
@@ -80,6 +83,7 @@ describe('StaffPage', () => {
   it('only offers a Manager the staff role and only staff to manage', async () => {
     signInAs('Manager');
     renderPage(<StaffPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }));
     const role = await screen.findByLabelText('Role');
     expect(within(role).getAllByRole('option').map((o) => o.textContent)).toEqual(['Staff']);
     await screen.findByText('Ben Santos');

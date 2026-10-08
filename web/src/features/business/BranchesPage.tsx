@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { SAMPLE_IMAGE } from '../../lib/images';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from '../../components/feedback/toastStore';
-import { EditorCard } from '../../components/forms/EditorCard';
+import { FormDialog } from '../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../components/forms/FormField';
 import { ImageUploadField } from '../../components/forms/ImageUploadField';
 import { ListCard, QueryList } from '../../components/lists/QueryList';
+import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { ErrorState } from '../../components/ErrorState';
@@ -21,82 +22,85 @@ export function BranchesPage() {
   const { role } = useSession();
   const isAdmin = role === 'Admin';
   const branches = useBranches();
+  const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = branches.data?.find((b) => b.id === selectedId) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Branches" subtitle={isAdmin ? undefined : 'Only an admin can add or change branches.'} backTo={{ to: '/business', label: 'Business' }} />
-      <div className={isAdmin ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]' : ''}>
-        <QueryList
-          query={branches}
-          errorTitle="Branches could not be loaded"
-          emptyMessage="No branches yet."
-          renderRow={(branch) => (
-            <ListCard key={branch.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{branch.name}</p>
-                {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
-                {isAdmin && (
-                  <button type="button" onClick={() => setSelectedId(branch.id)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
-                    Manage
-                  </button>
-                )}
-              </div>
-            </ListCard>
-          )}
-        />
-        {isAdmin &&
-          (selected ? (
-            <BranchDetail key={selected.id} branch={selected} onClose={() => setSelectedId(null)} />
-          ) : (
-            <NewBranch />
-          ))}
-      </div>
+      <PageHeader
+        title="Branches"
+        subtitle={isAdmin ? undefined : 'Only an admin can add or change branches.'}
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          isAdmin ? (
+            <PrimaryButton type="button" onClick={() => setAdding(true)}>
+              Add branch
+            </PrimaryButton>
+          ) : undefined
+        }
+      />
+      <QueryList
+        columns
+        query={branches}
+        errorTitle="Branches could not be loaded"
+        emptyMessage="No branches yet."
+        renderRow={(branch) => (
+          <ListCard key={branch.id}>
+            <div className="min-w-0">
+              <p className="text-base font-semibold">{branch.name}</p>
+              {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
+              {isAdmin && (
+                <button type="button" onClick={() => setSelectedId(branch.id)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
+                  Manage
+                </button>
+              )}
+            </div>
+          </ListCard>
+        )}
+      />
+      {isAdmin && adding && <BranchDialog onClose={() => setAdding(false)} />}
+      {isAdmin && selected && <BranchDetail key={selected.id} branch={selected} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }
 
-function NewBranch() {
+function BranchDialog({ onClose }: { onClose: () => void }) {
   const create = useCreateBranch();
   const {
     register,
     handleSubmit,
-    reset,
     setError,
     formState: { errors },
   } = useForm<{ name: string; address: string }>({ defaultValues: { name: '', address: '' } });
 
   const submit = handleSubmit((v) => {
     if (v.name.trim() === '') return setError('name', { message: 'Enter the branch name' });
-    create.mutate({ name: v.name.trim(), address: v.address.trim() || null }, { onSuccess: () => { toast.success('Branch added'); reset(); } });
+    create.mutate({ name: v.name.trim(), address: v.address.trim() || null }, { onSuccess: () => { toast.success('Branch added'); onClose(); } });
   });
 
   return (
-    <EditorCard title="branch" editing={false} busy={create.isPending} onSubmit={submit} onCancel={() => reset()}>
+    <FormDialog title="Add branch" submitLabel="Add" busy={create.isPending} onSubmit={submit} onClose={onClose}>
       <FormField label="Name" error={errors.name?.message}>
         <input {...register('name')} className={controlClass} />
       </FormField>
       <FormField label="Address (optional)">
         <input {...register('address')} className={controlClass} />
       </FormField>
-    </EditorCard>
+    </FormDialog>
   );
 }
 
+/** A branch's hardware, GCash QR and departments. Each part saves on its own, so the dialog only closes. */
 function BranchDetail({ branch, onClose }: { branch: Branch; onClose: () => void }) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-bold">{branch.name}</h2>
-        <SecondaryButton type="button" onClick={onClose}>
-          Close
-        </SecondaryButton>
+    <Modal open wide title={branch.name} onClose={onClose} footer={<div className="flex justify-end"><SecondaryButton type="button" onClick={onClose}>Done</SecondaryButton></div>}>
+      <div className="flex flex-col gap-6">
+        <HardwareForm branch={branch} />
+        <GcashForm branch={branch} />
+        {useDepartmentTracking() && <Departments branchId={branch.id} />}
       </div>
-      <HardwareForm branch={branch} />
-      <GcashForm branch={branch} />
-      {useDepartmentTracking() && <Departments branchId={branch.id} />}
-    </div>
+    </Modal>
   );
 }
 

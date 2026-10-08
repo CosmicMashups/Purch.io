@@ -57,6 +57,8 @@ describe('PromotionsPage', () => {
     vi.mocked(promotionsApi.createBogo).mockResolvedValue({} as never);
     renderPage();
     await screen.findByText('No Buy 1 Take 1 promotions yet.');
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add promotion' }));
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coffee deal' } });
     fireEvent.change(screen.getByLabelText('Buy this item'), { target: { value: 'latte' } });
@@ -78,6 +80,7 @@ describe('PromotionsPage', () => {
   it('blocks submit and explains what is missing', async () => {
     renderPage();
     await screen.findByText('No Buy 1 Take 1 promotions yet.');
+    fireEvent.click(screen.getByRole('button', { name: 'Add promotion' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Enter a name')).toBeInTheDocument();
     expect(screen.getAllByText('Choose an item')).not.toHaveLength(0);

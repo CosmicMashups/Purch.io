@@ -35,6 +35,7 @@ describe('DevicesPage', () => {
   it('adds a device and shows its one-time code once', async () => {
     vi.mocked(deviceApi.createPairing).mockResolvedValue(issued({ ...kiosk, id: 'd9', name: 'Back till', deviceType: 0 }, 'K4RT7WQ2'));
     renderPage(<DevicesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add device' }));
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: ' Back till ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
@@ -46,6 +47,7 @@ describe('DevicesPage', () => {
 
   it('needs a name, and a customer display needs the Register it shows', async () => {
     renderPage(<DevicesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add device' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Give the device a name')).toBeInTheDocument();
 

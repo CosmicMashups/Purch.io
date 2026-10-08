@@ -4,9 +4,8 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { Modal } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { toast } from '../../components/feedback/toastStore';
-import { EditorCard } from '../../components/forms/EditorCard';
-import { FormField, controlClass } from '../../components/forms/FormField';
-import { FormLoader } from '../../components/forms/FormLoader';
+import { FormDialog, FormDialogLoader } from '../../components/forms/FormDialog';
+import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
 import { ListCard, QueryList } from '../../components/lists/QueryList';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/dates';
@@ -27,6 +26,7 @@ export function DevicesPage() {
   const [codeFor, setCodeFor] = useState<Device | null>(null);
   const [revokeFor, setRevokeFor] = useState<Device | null>(null);
   const [shown, setShown] = useState<PairingCode | null>(null);
+  const [adding, setAdding] = useState(false);
 
   function pairAgain(device: Device) {
     setCodeFor(null);
@@ -42,9 +42,19 @@ export function DevicesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Devices" subtitle="Registers, kiosks and displays paired to a branch" backTo={{ to: '/business', label: 'Business' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <PageHeader
+        title="Devices"
+        subtitle="Registers, kiosks and displays paired to a branch"
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setAdding(true)}>
+            Add device
+          </PrimaryButton>
+        }
+      />
+      <div>
         <QueryList
+          columns
           query={devices}
           errorTitle="Devices could not be loaded"
           emptyMessage="No devices yet. Add one, then enter its code on the device."
@@ -76,10 +86,23 @@ export function DevicesPage() {
             </ListCard>
           )}
         />
-        <FormLoader failed={branches.isError ? branches : null} ready={!!branches.data}>
-          {branches.data && <DeviceForm branches={branches.data} registers={(devices.data ?? []).filter((d) => d.deviceType === DeviceType.Register && d.status !== DeviceStatus.Revoked)} onCreated={setShown} />}
-        </FormLoader>
       </div>
+
+      {adding && (
+        <FormDialogLoader title="Add device" failed={branches.isError ? branches : null} ready={!!branches.data} onClose={() => setAdding(false)}>
+          {branches.data && (
+            <DeviceDialog
+              branches={branches.data}
+              registers={(devices.data ?? []).filter((d) => d.deviceType === DeviceType.Register && d.status !== DeviceStatus.Revoked)}
+              onCreated={(pairing) => {
+                setAdding(false);
+                setShown(pairing);
+              }}
+              onClose={() => setAdding(false)}
+            />
+          )}
+        </FormDialogLoader>
+      )}
 
       <ConfirmModal
         open={codeFor !== null}
@@ -115,9 +138,9 @@ function statusOf(device: Device): { label: string; tone: 'success' | 'warning' 
   return { label: 'Paired', tone: 'success' };
 }
 
-function DeviceForm({ branches, registers, onCreated }: { branches: Branch[]; registers: Device[]; onCreated: (pairing: PairingCode) => void }) {
+function DeviceDialog({ branches, registers, onCreated, onClose }: { branches: Branch[]; registers: Device[]; onCreated: (pairing: PairingCode) => void; onClose: () => void }) {
   const create = useCreatePairing();
-  const { register, control, handleSubmit, reset, setError, formState: { errors } } = useForm({
+  const { register, control, handleSubmit, setError, formState: { errors } } = useForm({
     defaultValues: { branchId: branches.length === 1 ? branches[0].id : '', name: '', deviceType: DeviceType.Register as number, linkedRegisterDeviceId: '' },
   });
   const type = Number(useWatch({ control, name: 'deviceType' }));
@@ -132,16 +155,13 @@ function DeviceForm({ branches, registers, onCreated }: { branches: Branch[]; re
     create.mutate(
       { branchId: v.branchId, name: v.name.trim(), deviceType: Number(v.deviceType), linkedRegisterDeviceId: linksToRegister ? v.linkedRegisterDeviceId : null },
       {
-        onSuccess: (pairing) => {
-          onCreated(pairing);
-          reset({ branchId: v.branchId, name: '', deviceType: DeviceType.Register, linkedRegisterDeviceId: '' });
-        },
+        onSuccess: onCreated,
       },
     );
   });
 
   return (
-    <EditorCard title="device" editing={false} busy={create.isPending} onSubmit={submit} onCancel={() => reset()}>
+    <FormDialog title="Add device" submitLabel="Add" busy={create.isPending} onSubmit={submit} onClose={onClose}>
       <FormField label="Branch" error={errors.branchId?.message}>
         <select {...register('branchId')} className={controlClass}>
           <option value="">Choose a branch</option>
@@ -176,7 +196,7 @@ function DeviceForm({ branches, registers, onCreated }: { branches: Branch[]; re
           </select>
         </FormField>
       )}
-    </EditorCard>
+    </FormDialog>
   );
 }
 

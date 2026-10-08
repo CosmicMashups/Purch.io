@@ -11,6 +11,7 @@ export function QueryList<T>({
   emptyMessage,
   renderRow,
   transform,
+  columns = false,
 }: {
   query: UseQueryResult<T[]>;
   errorTitle?: string;
@@ -18,6 +19,8 @@ export function QueryList<T>({
   renderRow: (row: T) => ReactNode;
   /** Reorders or filters the rows for display without changing the cached data. */
   transform?: (rows: T[]) => T[];
+  /** Two columns on wide screens, so a full-width list of short rows uses the space. */
+  columns?: boolean;
 }) {
   if (query.isPending) return <SkeletonList />;
   if (query.isError) {
@@ -27,7 +30,7 @@ export function QueryList<T>({
   if (rows.length === 0) {
     return <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">{emptyMessage}</p>;
   }
-  return <ul className="flex flex-col gap-3">{rows.map(renderRow)}</ul>;
+  return <ul className={columns ? 'grid gap-3 xl:grid-cols-2' : 'flex flex-col gap-3'}>{rows.map(renderRow)}</ul>;
 }
 
 export function ListCard({ children }: { children: ReactNode }) {

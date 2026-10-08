@@ -66,6 +66,7 @@ describe('CustomersPage list', () => {
 describe('adding a customer', () => {
   it('sends blanks as null and the due date as a plain date', async () => {
     renderPage(<CustomersPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add customer' }));
     fireEvent.change(await screen.findByLabelText('Full name'), { target: { value: 'Ate Rose' } });
     fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '0920 111 2222' } });
     fireEvent.change(screen.getByLabelText('Credit limit (PHP)'), { target: { value: '750' } });
@@ -77,6 +78,7 @@ describe('adding a customer', () => {
   it('needs a name, a phone and a limit', async () => {
     renderPage(<CustomersPage />);
     await card('Aling Nena');
+    fireEvent.click(screen.getByRole('button', { name: 'Add customer' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Enter the customer name')).toBeInTheDocument();
     expect(screen.getByText('Enter a phone number')).toBeInTheDocument();

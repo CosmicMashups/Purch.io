@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { Modal } from '../../components/Modal';
 import { toast } from '../../components/feedback/toastStore';
-import { EditorCard } from '../../components/forms/EditorCard';
+import { FormDialog } from '../../components/forms/FormDialog';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
 import { ListCard, Pill, QueryList } from '../../components/lists/QueryList';
 import { PageHeader } from '../../components/PageHeader';
@@ -20,6 +20,7 @@ export function CustomersPage() {
   const ledgers = useCreditLedgers();
   const reminders = useCreditReminders(7);
   const anonymize = useAnonymizeCustomer();
+  const [adding, setAdding] = useState(false);
   const [paying, setPaying] = useState<CreditLedger | null>(null);
   const [limiting, setLimiting] = useState<CreditLedger | null>(null);
   const [erasing, setErasing] = useState<CreditLedger | null>(null);
@@ -33,7 +34,16 @@ export function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Customers" subtitle="Customer credit (utang) accounts" backTo={{ to: '/business', label: 'Business' }} />
+      <PageHeader
+        title="Customers"
+        subtitle="Customer credit (utang) accounts"
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <PrimaryButton type="button" onClick={() => setAdding(true)}>
+            Add customer
+          </PrimaryButton>
+        }
+      />
 
       <AsyncPanel
         title="Payments due soon"
@@ -62,8 +72,9 @@ export function CustomersPage() {
         )}
       </AsyncPanel>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <div>
         <QueryList
+          columns
           query={ledgers}
           errorTitle="Customers could not be loaded"
           emptyMessage="No customer accounts yet."
@@ -92,8 +103,9 @@ export function CustomersPage() {
             </ListCard>
           )}
         />
-        <NewCustomer />
       </div>
+
+      {adding && <CustomerDialog onClose={() => setAdding(false)} />}
 
       {paying && <PaymentDialog ledger={paying} onClose={() => setPaying(null)} />}
       {limiting && <LimitDialog ledger={limiting} onClose={() => setLimiting(null)} />}
@@ -110,9 +122,9 @@ export function CustomersPage() {
   );
 }
 
-function NewCustomer() {
+function CustomerDialog({ onClose }: { onClose: () => void }) {
   const create = useCreateCredit();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CustomerForm>({
+  const { register, handleSubmit, formState: { errors } } = useForm<CustomerForm>({
     resolver: zodResolver(customerSchema),
     defaultValues: { customerFullName: '', customerPhoneNumber: '', customerAddress: '', dueDate: '' },
   });
@@ -126,12 +138,12 @@ function NewCustomer() {
         creditLimit: v.creditLimit,
         dueDate: v.dueDate || null,
       },
-      { onSuccess: () => { toast.success('Customer added'); reset(); } },
+      { onSuccess: () => { toast.success('Customer added'); onClose(); } },
     ),
   );
 
   return (
-    <EditorCard title="customer" editing={false} busy={create.isPending} onSubmit={submit} onCancel={() => reset()}>
+    <FormDialog title="Add customer" submitLabel="Add" busy={create.isPending} onSubmit={submit} onClose={onClose}>
       <FormField label="Full name" error={errors.customerFullName?.message}>
         <input {...register('customerFullName')} className={controlClass} />
       </FormField>
@@ -147,7 +159,7 @@ function NewCustomer() {
       <FormField label="Due date (optional)" error={errors.dueDate?.message}>
         <input type="date" {...register('dueDate')} className={controlClass} />
       </FormField>
-    </EditorCard>
+    </FormDialog>
   );
 }
 

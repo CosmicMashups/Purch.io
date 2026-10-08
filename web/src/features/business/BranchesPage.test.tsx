@@ -57,11 +57,12 @@ describe('BranchesPage', () => {
     renderPage(<BranchesPage />);
     expect(await screen.findByText('Katipunan')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Manage' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add branch' })).not.toBeInTheDocument();
   });
 
   it('adds a branch, sending a blank address as null', async () => {
     renderPage(<BranchesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add branch' }));
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Timog' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(branchAdminApi.create).toHaveBeenCalledWith({ name: 'Timog', address: null }));
@@ -70,6 +71,7 @@ describe('BranchesPage', () => {
   it('needs a branch name', async () => {
     renderPage(<BranchesPage />);
     await screen.findByText('Katipunan');
+    fireEvent.click(screen.getByRole('button', { name: 'Add branch' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByText('Enter the branch name')).toBeInTheDocument();
     expect(branchAdminApi.create).not.toHaveBeenCalled();
@@ -128,9 +130,9 @@ describe('managing one branch', () => {
     expect(branchAdminApi.createDepartment).not.toHaveBeenCalled();
   });
 
-  it('closes back to the new-branch form', async () => {
+  it('closes the dialog from Done', async () => {
     await open();
-    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
-    expect(await screen.findByLabelText('Name')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });

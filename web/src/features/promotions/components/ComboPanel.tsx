@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FormField, controlClass } from '../../../components/forms/FormField';
+import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
 import { toast } from '../../../components/feedback/toastStore';
 import { describeWindow, isoToLocalInput, localInputToIso } from '../../../lib/dates';
 import type { Item } from '../../catalog/types';
@@ -11,59 +11,24 @@ import { comboSchema, type ComboForm } from '../schemas';
 import type { ComboRule } from '../types';
 import { ActiveBadge, ItemSelect, ScheduleFields } from './shared';
 import { itemNameOf } from '../format';
-import { EditorCard } from '../../../components/forms/EditorCard';
+import { FormDialog } from '../../../components/forms/FormDialog';
 import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
 
 const EMPTY: ComboForm = { name: '', itemAId: '', itemBId: '', comboPrice: 0, startsAt: '', endsAt: '', isActive: true };
 
 export function ComboPanel({ items }: { items: Item[] }) {
   const rules = useComboRules();
-  const create = useCreateCombo();
-  const update = useUpdateCombo();
-  const [editing, setEditing] = useState<ComboRule | null>(null);
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ComboForm>({ resolver: zodResolver(comboSchema), defaultValues: EMPTY });
-
-  function startEdit(rule: ComboRule) {
-    setEditing(rule);
-    reset({
-      name: rule.name,
-      itemAId: rule.itemAId,
-      itemBId: rule.itemBId,
-      comboPrice: rule.comboPrice,
-      startsAt: isoToLocalInput(rule.startsAt),
-      endsAt: isoToLocalInput(rule.endsAt),
-      isActive: rule.isActive,
-    });
-  }
-
-  function clear() {
-    setEditing(null);
-    reset(EMPTY);
-  }
-
-  const submit = handleSubmit(async (v) => {
-    const body = {
-      name: v.name,
-      itemAId: v.itemAId,
-      itemBId: v.itemBId,
-      comboPrice: v.comboPrice,
-      startsAt: localInputToIso(v.startsAt),
-      endsAt: localInputToIso(v.endsAt),
-    };
-    if (editing) await update.mutateAsync({ id: editing.id, body: { ...body, isActive: v.isActive } });
-    else await create.mutateAsync(body);
-    toast.success(editing ? 'Combo updated' : 'Combo added');
-    clear();
-  });
+  const [dialog, setDialog] = useState<'new' | ComboRule | null>(null);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+    <div className="flex flex-col gap-4">
+      <div>
+        <PrimaryButton type="button" onClick={() => setDialog('new')}>
+          Add combo deal
+        </PrimaryButton>
+      </div>
       <RuleList
+        columns
         query={rules}
         emptyMessage="No combo deals yet."
         renderRow={(rule) => (
@@ -74,7 +39,7 @@ export function ComboPanel({ items }: { items: Item[] }) {
                 {itemNameOf(items, rule.itemAId)} + {itemNameOf(items, rule.itemBId)} for {formatPeso(rule.comboPrice)}
               </p>
               <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-              <button type="button" onClick={() => startEdit(rule)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
+              <button type="button" onClick={() => setDialog(rule)} className="mt-2 h-12 text-base font-semibold text-brand-strong underline">
                 Edit
               </button>
             </div>
@@ -82,24 +47,74 @@ export function ComboPanel({ items }: { items: Item[] }) {
           </RuleCard>
         )}
       />
+      {dialog && <ComboDialog rule={dialog === 'new' ? null : dialog} items={items} onClose={() => setDialog(null)} />}
+    </div>
+  );
+}
 
-      <EditorCard title="combo deal" editing={!!editing} busy={create.isPending || update.isPending} onSubmit={submit} onCancel={clear}>
-        <FormField label="Name" error={errors.name?.message}>
-          <input {...register('name')} className={controlClass} />
-        </FormField>
+function ComboDialog({ rule, items, onClose }: { rule: ComboRule | null; items: Item[]; onClose: () => void }) {
+  const create = useCreateCombo();
+  const update = useUpdateCombo();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ComboForm>({
+    resolver: zodResolver(comboSchema),
+    defaultValues: rule
+      ? {
+          name: rule.name,
+          itemAId: rule.itemAId,
+          itemBId: rule.itemBId,
+          comboPrice: rule.comboPrice,
+          startsAt: isoToLocalInput(rule.startsAt),
+          endsAt: isoToLocalInput(rule.endsAt),
+          isActive: rule.isActive,
+        }
+      : EMPTY,
+  });
+
+  const submit = handleSubmit(async (v) => {
+    const body = {
+      name: v.name,
+      itemAId: v.itemAId,
+      itemBId: v.itemBId,
+      comboPrice: v.comboPrice,
+      startsAt: localInputToIso(v.startsAt),
+      endsAt: localInputToIso(v.endsAt),
+    };
+    if (rule) await update.mutateAsync({ id: rule.id, body: { ...body, isActive: v.isActive } });
+    else await create.mutateAsync(body);
+    toast.success(rule ? 'Combo updated' : 'Combo added');
+    onClose();
+  });
+
+  return (
+    <FormDialog
+      title={rule ? 'Edit combo deal' : 'Add combo deal'}
+      wide
+      submitLabel={rule ? 'Save changes' : 'Add'}
+      busy={create.isPending || update.isPending}
+      onSubmit={submit}
+      onClose={onClose}
+    >
+      <FormField label="Name" error={errors.name?.message}>
+        <input {...register('name')} className={controlClass} />
+      </FormField>
+      <div className="grid gap-4 sm:grid-cols-2">
         <ItemSelect label="First item" name="itemAId" register={register} errors={errors} items={items} />
         <ItemSelect label="Second item" name="itemBId" register={register} errors={errors} items={items} />
-        <FormField label="Combo price (PHP)" error={errors.comboPrice?.message}>
-          <input type="number" inputMode="decimal" step="0.01" {...register('comboPrice', { valueAsNumber: true })} className={controlClass} />
-        </FormField>
-        <ScheduleFields register={register} errors={errors} startName="startsAt" endName="endsAt" />
-        {editing && (
-          <label className="flex h-12 items-center gap-3 text-base font-semibold">
-            <input type="checkbox" {...register('isActive')} className="size-6 accent-brand" />
-            Active
-          </label>
-        )}
-      </EditorCard>
-    </div>
+      </div>
+      <FormField label="Combo price (PHP)" error={errors.comboPrice?.message}>
+        <input type="number" inputMode="decimal" step="0.01" {...register('comboPrice', { valueAsNumber: true })} className={controlClass} />
+      </FormField>
+      <ScheduleFields register={register} errors={errors} startName="startsAt" endName="endsAt" />
+      {rule && (
+        <label className="flex h-12 items-center gap-3 text-base font-semibold">
+          <input type="checkbox" {...register('isActive')} className="size-6 accent-brand" />
+          Active
+        </label>
+      )}
+    </FormDialog>
   );
 }

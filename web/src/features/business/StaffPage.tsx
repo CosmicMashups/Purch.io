@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { toast } from '../../components/feedback/toastStore';
-import { EditorCard } from '../../components/forms/EditorCard';
-import { FormField, controlClass } from '../../components/forms/FormField';
-import { FormLoader } from '../../components/forms/FormLoader';
+import { FormDialog, FormDialogLoader } from '../../components/forms/FormDialog';
+import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
 import { ListCard, Pill, QueryList } from '../../components/lists/QueryList';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/dates';
@@ -36,18 +35,34 @@ export function StaffPage() {
   const branches = useBranches();
   const cancel = useCancelInvite();
   const resetLink = useResetLink();
+  const [inviting, setInviting] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
   const [reEnrol, setReEnrol] = useState<LegacyStaff | null>(null);
   const [shown, setShown] = useState<InviteLink | null>(null);
   const [cancelFor, setCancelFor] = useState<Invite | null>(null);
+
+  const closeDialog = () => {
+    setInviting(false);
+    setEditing(null);
+    setReEnrol(null);
+  };
 
   // A Manager looks after staff only; the server refuses the rest, so the buttons are simply not offered.
   const mayManage = (member: Member) => isAdmin || member.role === MembershipRole.Staff;
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Staff" subtitle="Invite people with a link. They set their own password and PIN." backTo={{ to: '/business', label: 'Business' }} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+      <PageHeader
+        title="Staff"
+        subtitle="Invite people with a link. They set their own password and PIN."
+        backTo={{ to: '/business', label: 'Business' }}
+        action={
+          <PrimaryButton type="button" onClick={() => { setEditing(null); setReEnrol(null); setInviting(true); }}>
+            Invite someone
+          </PrimaryButton>
+        }
+      />
+      <div>
         <div className="flex flex-col gap-6">
           <QueryList
             query={members}
@@ -85,7 +100,7 @@ export function StaffPage() {
                 <ListCard key={person.id}>
                   <div className="min-w-0">
                     <p className="text-base font-semibold">{person.name}</p>
-                    <button type="button" onClick={() => { setEditing(null); setReEnrol(person); }} className={linkButton}>
+                    <button type="button" onClick={() => { setInviting(false); setEditing(null); setReEnrol(person); }} className={linkButton}>
                       Invite
                     </button>
                   </div>
@@ -116,10 +131,30 @@ export function StaffPage() {
           )}
         </div>
 
-        <FormLoader failed={branches.isError ? branches : null} ready={!!branches.data}>
-          {branches.data && <PersonEditor key={editing?.id ?? reEnrol?.id ?? 'new'} member={editing} legacy={reEnrol} branches={branches.data} isAdmin={isAdmin} onDone={() => { setEditing(null); setReEnrol(null); }} onInvited={(link) => { setReEnrol(null); setShown(link); }} />}
-        </FormLoader>
       </div>
+
+      {(inviting || editing || reEnrol) && (
+        <FormDialogLoader
+          title={editing ? `Edit ${editing.name}` : reEnrol ? `Invite ${reEnrol.name}` : 'Invite someone'}
+          failed={branches.isError ? branches : null}
+          ready={!!branches.data}
+          onClose={closeDialog}
+        >
+          {branches.data && (
+            <PersonDialog
+              member={editing}
+              legacy={reEnrol}
+              branches={branches.data}
+              isAdmin={isAdmin}
+              onClose={closeDialog}
+              onInvited={(link) => {
+                closeDialog();
+                setShown(link);
+              }}
+            />
+          )}
+        </FormDialogLoader>
+      )}
 
       <ConfirmModal
         open={cancelFor !== null}
@@ -138,7 +173,7 @@ export function StaffPage() {
   );
 }
 
-function PersonEditor({ member, legacy, branches, isAdmin, onDone, onInvited }: { member: Member | null; legacy: LegacyStaff | null; branches: Branch[]; isAdmin: boolean; onDone: () => void; onInvited: (link: InviteLink) => void }) {
+function PersonDialog({ member, legacy, branches, isAdmin, onClose, onInvited }: { member: Member | null; legacy: LegacyStaff | null; branches: Branch[]; isAdmin: boolean; onClose: () => void; onInvited: (link: InviteLink) => void }) {
   const invite = useInvite();
   const update = useUpdateMember();
   const [name, setName] = useState(legacy?.name ?? '');
@@ -166,16 +201,14 @@ function PersonEditor({ member, legacy, branches, isAdmin, onDone, onInvited }: 
 
     const access = { role, duties: isStaff ? duties : 0, branchIds: isStaff ? branchIds : [] };
     if (member) {
-      update.mutate({ id: member.id, body: { ...access, isActive } }, { onSuccess: () => { toast.success('Saved'); onDone(); } });
+      update.mutate({ id: member.id, body: { ...access, isActive } }, { onSuccess: () => { toast.success('Saved'); onClose(); } });
       return;
     }
     invite.mutate({ name: name.trim(), email: email.trim(), ...access, legacyUserId: legacy?.id ?? null }, { onSuccess: onInvited });
-    setName('');
-    setEmail('');
   }
 
   return (
-    <EditorCard title="person" editing={!!member} heading={member ? `Edit ${member.name}` : legacy ? `Invite ${legacy.name}` : 'Invite someone'} submitLabel={member ? 'Save' : 'Invite'} busy={invite.isPending || update.isPending} onSubmit={submit} onCancel={onDone}>
+    <FormDialog title={member ? `Edit ${member.name}` : legacy ? `Invite ${legacy.name}` : 'Invite someone'} submitLabel={member ? 'Save' : 'Invite'} busy={invite.isPending || update.isPending} onSubmit={submit} onClose={onClose}>
       {!member && (
         <>
           <FormField label="Name" error={errors.name}>
@@ -228,6 +261,6 @@ function PersonEditor({ member, legacy, branches, isAdmin, onDone, onInvited }: 
           Active
         </label>
       )}
-    </EditorCard>
+    </FormDialog>
   );
 }
