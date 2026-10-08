@@ -15,7 +15,7 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: gitleaks
@@ -26,7 +26,7 @@ jobs:
     name: No env/data files tracked
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fail if local env or database files are committed
         run: |
           bad=$(git ls-files | grep -E '(^|/)\.env(\.[^/]*)?$|\.pgdata/|\.seed/|\.keystore$|key\.properties$' | grep -v -E '\.(example|template)$' || true)
@@ -36,7 +36,7 @@ jobs:
     name: NuGet vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
@@ -50,7 +50,7 @@ jobs:
     name: npm audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version-file: web/.nvmrc
