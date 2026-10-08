@@ -69,3 +69,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Obsidian vault settings (local, per machine)
+.obsidian/
