@@ -51,6 +51,7 @@ describe('ModifierGroupsPage category link', () => {
     vi.mocked(catalogApi.createModifierGroup).mockResolvedValue(group);
     renderPage();
     await screen.findByText('Add fries & sides');
+    fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
     fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'More sides' } });
     fireEvent.change(await screen.findByLabelText('Offer items from a category (optional)'), { target: { value: 'cat1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Group' }));
