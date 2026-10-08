@@ -255,6 +255,14 @@ class AuthRepositoryImpl implements AuthRepository {
       accessToken: accessToken,
       refreshToken: refreshToken,
     );
+    // Only a manager or admin gets an attestation. Whoever signs in next replaces or removes the last one, so a cashier
+    // unlocking after a manager never inherits the manager's approval.
+    final attestation = body['supervisorAttestation'];
+    if (attestation is String && attestation.isNotEmpty) {
+      await _tokenStorage.saveSupervisorAttestation(attestation);
+    } else {
+      await _tokenStorage.clearSupervisorAttestation();
+    }
   }
 
   Future<void> _saveIdentityFrom(String accessToken) async {

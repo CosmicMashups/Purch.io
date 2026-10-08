@@ -100,6 +100,18 @@ public static class TestSessions
         return Bearer(shop.Factory, (await unlock.Content.ReadFromJsonAsync<Unlocked>(JsonOptions))!.AccessToken);
     }
 
+    /// <summary>What the till is handed when this person unlocks it: the supervisor attestation, or null for staff who are not
+    /// a manager or admin. Offline discount sales carry it.</summary>
+    public static async Task<string?> SupervisorAttestationAsync(HttpClient admin, Guid membershipId, string pin, string? credential = null)
+    {
+        var shop = ShopOf(admin);
+        using var anonymous = shop.Factory.CreateClient();
+        var unlock = await anonymous.PostAsJsonAsync("/devices/unlock", new UnlockRequest(credential ?? shop.RegisterCredential, membershipId, pin));
+        unlock.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await unlock.Content.ReadAsStringAsync());
+        return body.RootElement.TryGetProperty("supervisorAttestation", out var token) && token.ValueKind == JsonValueKind.String ? token.GetString() : null;
+    }
+
     /// <summary>The owner signed in on a second Register, as a second terminal in the same branch.</summary>
     public static async Task<HttpClient> AdminOnNewRegisterAsync(HttpClient admin, string name = "Second Terminal")
     {

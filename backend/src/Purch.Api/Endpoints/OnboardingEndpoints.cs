@@ -223,7 +223,14 @@ public static class OnboardingEndpoints
             var result = await unlockService.UnlockAsync(request, cancellationToken);
             return result switch
             {
-                UnlockResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken, person = success.Person }),
+                UnlockResult.Success success => Results.Ok(new
+                {
+                    accessToken = success.AccessToken,
+                    refreshToken = success.RefreshToken,
+                    person = success.Person,
+                    supervisorAttestation = success.Attestation?.Token,
+                    supervisorAttestationExpiresAt = success.Attestation?.ExpiresAt,
+                }),
                 UnlockResult.Invalid => Results.Problem(
                     statusCode: StatusCodes.Status401Unauthorized,
                     title: "Cannot sign in here.",

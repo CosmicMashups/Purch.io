@@ -24,7 +24,8 @@ public abstract record RosterResult
 
 public abstract record UnlockResult
 {
-    public sealed record Success(string AccessToken, string RefreshToken, RosterEntryDto Person) : UnlockResult;
+    /// <param name="Attestation">Present only when the person is a manager or admin: lets this till vouch for them on offline sales.</param>
+    public sealed record Success(string AccessToken, string RefreshToken, RosterEntryDto Person, SupervisorAttestation? Attestation = null) : UnlockResult;
 
     /// <summary>Bad credential, unknown person, or a person who may not work on this device. One case on purpose.</summary>
     public sealed record Invalid : UnlockResult;
@@ -53,6 +54,7 @@ public sealed class DeviceUnlockService(
     IPinHasher pinHasher,
     IJwtTokenService jwtTokenService,
     IRefreshTokenService refreshTokenService,
+    ISupervisorAttestationService attestationService,
     IUnitOfWork unitOfWork) : IDeviceUnlockService
 {
     /// <summary>Wrong PINs allowed for one person before they are locked out.</summary>
@@ -113,7 +115,10 @@ public sealed class DeviceUnlockService(
 
         var accessToken = jwtTokenService.IssueMembershipAccessToken(member, device);
         var refreshToken = await refreshTokenService.IssueForMembershipAsync(member.TenantId, member.Id, device.Id, cancellationToken);
-        return new UnlockResult.Success(accessToken, refreshToken, ToEntry(member));
+        var attestation = MembershipRoleMapper.ToApiRole(member, device.DeviceType) is Role.Admin or Role.Manager
+            ? attestationService.Issue(member.Id, member.TenantId, device.Id, DateTimeOffset.UtcNow)
+            : null;
+        return new UnlockResult.Success(accessToken, refreshToken, ToEntry(member), attestation);
     }
 
     private async Task<Device?> ActiveDeviceAsync(string credential, CancellationToken cancellationToken)

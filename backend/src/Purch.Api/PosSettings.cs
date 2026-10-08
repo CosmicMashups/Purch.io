@@ -7,4 +7,6 @@ namespace Purch.Api;
 public sealed class PosSettings(IConfiguration configuration) : IPosSettings
 {
     public bool RequireExpectedTotal { get; } = configuration.GetValue("POS_REQUIRE_EXPECTED_TOTAL", true);
+
+    public bool AcceptUnattestedOfflineDiscounts { get; } = configuration.GetValue("POS_ACCEPT_UNATTESTED_OFFLINE_DISCOUNTS", false);
 }

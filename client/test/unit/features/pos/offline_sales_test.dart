@@ -162,9 +162,11 @@ void main() {
     LocalFirstPosRepository build({
       SaleQueueStore? saleQueue,
       Future<String?> Function()? currentStaffId,
+      Future<String?> Function()? currentSupervisorAttestation,
     }) =>
         LocalFirstPosRepository(
           currentStaffId: currentStaffId,
+          currentSupervisorAttestation: currentSupervisorAttestation,
           drainQueue:
               () => SaleSyncCoordinator(
                 store: queue,
@@ -249,6 +251,35 @@ void main() {
 
       expect(queue.entries.values.single.request.rungByStaffId, 'staff-manager');
       expect(queue.entries.values.single.request.toJson()['rungByStaffId'], 'staff-manager');
+    });
+
+    test('a manager\'s sign-in approval is stored with the queued sale and survives the round trip to the queue', () async {
+      server.failure = const NetworkFailure('no route');
+      var attestation = 'v1.signed-by-the-server';
+      final repo = build(
+        currentStaffId: () async => 'staff-manager',
+        currentSupervisorAttestation: () async => attestation,
+      );
+      await repo.addLine(const AddTransactionLineRequest(itemId: 'coffee', quantity: 1));
+
+      await repo.recordPayment(cash);
+
+      // The terminal is locked and someone else signs in before the sale syncs; the sale keeps what it was made with.
+      attestation = 'v1.a-later-sign-in';
+      final queued = queue.entries.values.single.request;
+      expect(queued.supervisorAttestation, 'v1.signed-by-the-server');
+      expect(queued.toJson()['supervisorAttestation'], 'v1.signed-by-the-server');
+      expect(CheckoutRequest.fromJson(queued.toJson()).supervisorAttestation, 'v1.signed-by-the-server');
+    });
+
+    test('a sale made by someone who is not a supervisor carries no approval', () async {
+      server.failure = const NetworkFailure('no route');
+      final repo = build(currentStaffId: () async => 'staff-cashier', currentSupervisorAttestation: () async => null);
+      await repo.addLine(const AddTransactionLineRequest(itemId: 'coffee', quantity: 1));
+
+      await repo.recordPayment(cash);
+
+      expect(queue.entries.values.single.request.supervisorAttestation, isNull);
     });
 
     test('the queued sale reuses the sale id, so the server cannot record it twice', () async {

@@ -401,6 +401,7 @@ class CheckoutRequest {
     this.offlineSale = false,
     this.soldAt,
     this.rungByStaffId,
+    this.supervisorAttestation,
   });
 
   factory CheckoutRequest.fromJson(Map<String, dynamic> json) {
@@ -425,6 +426,7 @@ class CheckoutRequest {
               ? null
               : DateTime.parse(json['soldAt'] as String),
       rungByStaffId: json['rungByStaffId'] as String?,
+      supervisorAttestation: json['supervisorAttestation'] as String?,
     );
   }
 
@@ -456,6 +458,11 @@ class CheckoutRequest {
   /// Senior/PWD discount. Only an id: the server never takes a role from the device.
   final String? rungByStaffId;
 
+  /// The signed note this terminal received when a manager or admin signed in on it. An offline Senior/PWD sale needs it:
+  /// the server trusts it, not [rungByStaffId], to know a manager rang the sale. Captured when the sale is made, so it
+  /// still travels with the sale after the terminal is locked or another person signs in.
+  final String? supervisorAttestation;
+
   Map<String, dynamic> toJson() => {
     'saleId': saleId,
     'lines': lines.map((l) => l.toJson()).toList(),
@@ -468,6 +475,7 @@ class CheckoutRequest {
     'offlineSale': offlineSale,
     'soldAt': soldAt?.toUtc().toIso8601String(),
     'rungByStaffId': rungByStaffId,
+    'supervisorAttestation': supervisorAttestation,
   };
 }
 

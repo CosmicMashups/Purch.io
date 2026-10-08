@@ -57,7 +57,13 @@ public static class AuthEndpoints
             var result = await registerSessionService.StartAsync(membershipId, request, cancellationToken);
             return result switch
             {
-                RegisterSessionResult.Success success => Results.Ok(new { accessToken = success.AccessToken, refreshToken = success.RefreshToken }),
+                RegisterSessionResult.Success success => Results.Ok(new
+                {
+                    accessToken = success.AccessToken,
+                    refreshToken = success.RefreshToken,
+                    supervisorAttestation = success.Attestation?.Token,
+                    supervisorAttestationExpiresAt = success.Attestation?.ExpiresAt,
+                }),
                 RegisterSessionResult.ChooseRegister choose => Results.Ok(new { chooseRegister = true, registers = choose.Registers }),
                 RegisterSessionResult.NoRegister => Results.Problem(
                     statusCode: StatusCodes.Status409Conflict,

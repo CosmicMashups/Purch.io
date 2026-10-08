@@ -91,6 +91,8 @@ PosRepository posRepository(Ref ref) {
           await ref.read(secureTokenStorageProvider).readAccessToken();
       return token == null ? null : staffIdFromJwt(token);
     },
+    currentSupervisorAttestation:
+        () => ref.read(secureTokenStorageProvider).readSupervisorAttestation(),
     refreshCatalog: () async {
       ref.invalidate(itemListProvider);
       await ref.read(itemListProvider.future);

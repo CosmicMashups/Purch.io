@@ -491,7 +491,7 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         return (new StaffLogin(cashier, managerId, cashierId), admin);
     }
 
-    private static CheckoutRequest OfflineSeniorSale(ItemDto item, Guid? rungBy)
+    private static CheckoutRequest OfflineSeniorSale(ItemDto item, Guid? rungBy, string? attestation = null)
     {
         return new(
             Guid.NewGuid(),
@@ -504,7 +504,8 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
             ReceiptNumber: null,
             OfflineSale: true,
             SoldAt: DateTimeOffset.UtcNow,
-            RungByStaffId: rungBy);
+            RungByStaffId: rungBy,
+            SupervisorAttestation: attestation);
     }
 
     [Fact]
@@ -516,7 +517,9 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         using var _cashier = staff.Client;
         var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Medicine", null, null, null, 100m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
 
-        var response = await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, staff.ManagerId));
+        // The till got this when the manager signed in on it; it travels with the queued sale.
+        var attestation = await TestSessions.SupervisorAttestationAsync(admin, staff.ManagerId, "567812");
+        var response = await staff.Client.PostAsJsonAsync("/transactions/checkout", OfflineSeniorSale(item, staff.ManagerId, attestation));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var from = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));

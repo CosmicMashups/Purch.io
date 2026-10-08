@@ -46,6 +46,7 @@ public sealed class TransactionService(
     IPosSettings posSettings,
     IApproverAuthorizationService approverAuthorizationService,
     IAdjustmentRepository adjustmentRepository,
+    ISupervisorAttestationService attestationService,
     IUnitOfWork unitOfWork) : ITransactionService
 {
     private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
@@ -612,30 +613,59 @@ public sealed class TransactionService(
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        Guid? unverifiedApproverId = null;
-        if (request.OfflineSale && request.RungByStaffId is { } rungByStaffId)
+        // An offline sale is already paid before the server hears of it, and may sync under a cashier's login even
+        // though a manager rang it up. Who rang it is proved by the supervisor attestation the till got when that
+        // manager signed in on it, never by an id the till merely states.
+        Guid? approverId = null;
+        var approverVerified = false;
+        if (request.OfflineSale)
         {
-            // Tenant-scoped lookup, so an id from another tenant simply isn't found. The role comes from
-            // the database, never from the request.
-            var rungBy = await userRepository.FindActorAsync(rungByStaffId, cancellationToken);
-            if (request.SeniorPwdDiscountApplied && rungBy?.Role is not (Role.Admin or Role.Manager))
+            var saleAt = request.SoldAt is { } claimedAt && claimedAt < DateTimeOffset.UtcNow ? claimedAt : DateTimeOffset.UtcNow;
+            if (!string.IsNullOrWhiteSpace(request.SupervisorAttestation))
             {
-                throw new ForbiddenException("Only a manager or admin can apply the Senior Citizen/PWD discount.");
+                var supervisorId = attestationService.Validate(request.SupervisorAttestation, CurrentTenantId, CurrentDeviceId, saleAt);
+                var supervisor = supervisorId is { } id ? await userRepository.FindActorAsync(id, cancellationToken) : null;
+                if (supervisor?.Role is not (Role.Admin or Role.Manager))
+                {
+                    throw new ForbiddenException("The manager approval sent with this offline sale isn't valid for this register.");
+                }
+
+                approverId = supervisor.Id;
+                approverVerified = true;
+            }
+            else if (request.RungByStaffId is { } rungByStaffId)
+            {
+                // Tenant-scoped lookup, so an id from another tenant simply isn't found. The role comes from the
+                // database, never from the request. Used for crediting the sale; it only counts as an approval
+                // for a discount during the upgrade grace period (see IPosSettings).
+                var rungBy = await userRepository.FindActorAsync(rungByStaffId, cancellationToken);
+                approverId = rungBy?.Id;
             }
 
-            staffOverride = rungBy?.Id;
-            unverifiedApproverId = request.SeniorPwdDiscountApplied && rungBy is not null
-                && rungBy.Id != currentActorProvider.UserId ? rungBy.Id : null;
+            if (request.SeniorPwdDiscountApplied && !approverVerified)
+            {
+                var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
+                var callerIsSupervisor = caller?.Role is Role.Admin or Role.Manager;
+                if (!callerIsSupervisor)
+                {
+                    var approver = approverId is { } claimed ? await userRepository.FindActorAsync(claimed, cancellationToken) : null;
+                    if (!posSettings.AcceptUnattestedOfflineDiscounts || approver?.Role is not (Role.Admin or Role.Manager))
+                    {
+                        throw new ForbiddenException("Only a manager or admin can apply the Senior Citizen/PWD discount.");
+                    }
+                }
+            }
+
+            staffOverride = approverId;
         }
 
         var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
         cart.ClientSaleId = request.SaleId;
 
-        if (unverifiedApproverId is { } claimedApprover)
+        if (request.OfflineSale && request.SeniorPwdDiscountApplied && approverId is { } approvedBy && approvedBy != currentActorProvider.UserId)
         {
-            // The server cannot verify a PIN entered offline, and a paid sale must still sync. But the
-            // claimed manager id is knowable by anyone with a till's roster, so record who actually
-            // submitted the sale and who they named, for review under the audit log.
+            // Record who actually submitted the sale and who approved it, and whether the approval was proved by an
+            // attestation or only claimed by the till (the grace-period path), for review under the audit log.
             var submitter = currentActorProvider.UserId
                 ?? throw new InvalidOperationException("The POS requires an authenticated staff user.");
             auditLogRepository.Add(new AuditLog
@@ -650,12 +680,13 @@ public sealed class TransactionService(
                 {
                     seniorPwdDiscount = true,
                     offlineSale = true,
-                    claimedApproverUserId = claimedApprover,
+                    approverUserId = approvedBy,
                     submittedByUserId = submitter,
-                    approvalVerified = false,
+                    approvalVerified = approverVerified,
                 }),
             });
         }
+
         if (request.OfflineSale && request.SoldAt is { } soldAt)
         {
             var now = DateTimeOffset.UtcNow;

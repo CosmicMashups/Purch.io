@@ -78,6 +78,7 @@ class LocalFirstPosRepository implements PosRepository {
     Future<void> Function()? refreshCatalog,
     Future<List<ModifierGroup>> Function(String itemId)? modifierGroupsFor,
     Future<String?> Function()? currentStaffId,
+    Future<String?> Function()? currentSupervisorAttestation,
     DateTime Function()? clock,
   }) : _remote = remote,
        _catalog = catalog,
@@ -94,6 +95,7 @@ class LocalFirstPosRepository implements PosRepository {
        _refreshCatalog = refreshCatalog,
        _modifierGroupsLoader = modifierGroupsFor,
        _currentStaffId = currentStaffId,
+       _currentSupervisorAttestation = currentSupervisorAttestation,
        _clock = clock ?? DateTime.now;
 
   final PosRepository _remote;
@@ -111,6 +113,9 @@ class LocalFirstPosRepository implements PosRepository {
   /// Who is signed in right now, stamped on offline sales so the server can credit and authorise
   /// them correctly when they sync later under a different login.
   final Future<String?> Function()? _currentStaffId;
+
+  /// The manager's signed approval received at sign-in, if the signed-in person is a manager or admin.
+  final Future<String?> Function()? _currentSupervisorAttestation;
   final Future<PricingRules> Function() _loadRules;
   final CartDraftStore _store;
   final Future<CartIdentity?> Function() _identity;
@@ -587,6 +592,7 @@ class LocalFirstPosRepository implements PosRepository {
       offlineSale: true,
       soldAt: now,
       rungByStaffId: await _currentStaffId?.call(),
+      supervisorAttestation: await _currentSupervisorAttestation?.call(),
     );
 
     // Durable first: once this returns the sale survives a crash or restart.

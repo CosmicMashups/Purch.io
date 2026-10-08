@@ -11,7 +11,7 @@ public sealed record RegisterSessionRequest(Guid? DeviceId = null);
 
 public abstract record RegisterSessionResult
 {
-    public sealed record Success(string AccessToken, string RefreshToken) : RegisterSessionResult;
+    public sealed record Success(string AccessToken, string RefreshToken, SupervisorAttestation? Attestation = null) : RegisterSessionResult;
 
     /// <summary>More than one Register and none chosen yet.</summary>
     public sealed record ChooseRegister(IReadOnlyList<RegisterChoice> Registers) : RegisterSessionResult;
@@ -33,7 +33,8 @@ public sealed class RegisterSessionService(
     IBranchRepository branchRepository,
     IUnitOfWork unitOfWork,
     IJwtTokenService jwtTokenService,
-    IRefreshTokenService refreshTokenService) : IRegisterSessionService
+    IRefreshTokenService refreshTokenService,
+    ISupervisorAttestationService attestationService) : IRegisterSessionService
 {
     public async Task<RegisterSessionResult> StartAsync(Guid membershipId, RegisterSessionRequest request, CancellationToken cancellationToken = default)
     {
@@ -93,6 +94,7 @@ public sealed class RegisterSessionService(
 
         var accessToken = jwtTokenService.IssueMembershipAccessToken(member, device);
         var refreshToken = await refreshTokenService.IssueForMembershipAsync(member.TenantId, member.Id, device.Id, cancellationToken);
-        return new RegisterSessionResult.Success(accessToken, refreshToken);
+        // Only Admins and Managers get a register session, so the attestation always applies.
+        return new RegisterSessionResult.Success(accessToken, refreshToken, attestationService.Issue(member.Id, member.TenantId, device.Id, DateTimeOffset.UtcNow));
     }
 }

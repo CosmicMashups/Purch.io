@@ -7,6 +7,7 @@ class FakeTokenStorage extends SecureTokenStorage {
 
   String? accessToken;
   String? refreshToken;
+  String? supervisorAttestation;
 
   @override
   Future<String?> readAccessToken() async => accessToken;
@@ -19,4 +20,14 @@ class FakeTokenStorage extends SecureTokenStorage {
 
   @override
   Future<void> saveRefreshToken(String token) async => refreshToken = token;
+
+  @override
+  Future<String?> readSupervisorAttestation() async => supervisorAttestation;
+
+  @override
+  Future<void> saveSupervisorAttestation(String attestation) async =>
+      supervisorAttestation = attestation;
+
+  @override
+  Future<void> clearSupervisorAttestation() async => supervisorAttestation = null;
 }

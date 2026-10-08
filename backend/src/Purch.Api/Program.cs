@@ -112,6 +112,7 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddSingleton<ISupervisorAttestationService, SupervisorAttestationService>();
 
 // Email and password sign-in. Cloud mode checks the password with Supabase Auth; Local mode keeps a credential table in
 // our own database. Permissions always come from our own Membership rows, never from the provider. Setting

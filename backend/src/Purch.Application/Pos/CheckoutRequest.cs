@@ -42,4 +42,5 @@ public sealed record CheckoutRequest(
     long? ReceiptNumber = null,
     bool OfflineSale = false,
     DateTimeOffset? SoldAt = null,
-    Guid? RungByStaffId = null);
+    Guid? RungByStaffId = null,
+    string? SupervisorAttestation = null);

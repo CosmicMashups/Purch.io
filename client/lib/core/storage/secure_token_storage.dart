@@ -12,6 +12,7 @@ class SecureTokenStorage {
   static const _accessTokenKey = 'purch_access_token';
   static const _refreshTokenKey = 'purch_refresh_token';
   static const _deviceCredentialKey = 'purch_device_credential';
+  static const _supervisorAttestationKey = 'purch_supervisor_attestation';
 
   final FlutterSecureStorage _storage;
 
@@ -56,8 +57,24 @@ class SecureTokenStorage {
     return _storage.delete(key: _deviceCredentialKey);
   }
 
+  /// The signed note the server gives a till when a manager or admin signs in on it, proving to the server later that a
+  /// supervisor was working this till. Attached to offline discount sales. It belongs to that one sign-in, so it is replaced
+  /// (or removed) by whoever signs in next and removed on sign-out.
+  Future<void> saveSupervisorAttestation(String attestation) {
+    return _storage.write(key: _supervisorAttestationKey, value: attestation);
+  }
+
+  Future<String?> readSupervisorAttestation() {
+    return _storage.read(key: _supervisorAttestationKey);
+  }
+
+  Future<void> clearSupervisorAttestation() {
+    return _storage.delete(key: _supervisorAttestationKey);
+  }
+
   Future<void> clear() async {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _supervisorAttestationKey);
   }
 }
