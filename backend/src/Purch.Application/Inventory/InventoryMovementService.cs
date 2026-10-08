@@ -2,6 +2,7 @@ using System.Text.Json;
 using Purch.Application.Auth;
 using Purch.Application.Catalog;
 using Purch.Application.Common;
+using Purch.Application.Reporting;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
@@ -19,6 +20,7 @@ public sealed class InventoryMovementService(
     IInventoryItemRepository inventoryItemRepository,
     IBranchRepository branchRepository,
     IBranchScopeGuard branchScopeGuard,
+    IReportScopeResolver scopeResolver,
     IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -46,7 +48,9 @@ public sealed class InventoryMovementService(
         Guid? inventoryItemId = null,
         CancellationToken cancellationToken = default)
     {
-        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, branchId, type, before, limit, beforeId, inventoryItemId, cancellationToken);
+        // A branch- or department-scoped account only ever sees its own branch, whatever branch the query names.
+        var scopedBranchId = await scopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
+        var movements = await movementRepository.ListAsync(CurrentTenantId, itemId, scopedBranchId, type, before, limit, beforeId, inventoryItemId, cancellationToken);
 
         var dtos = new List<InventoryMovementDto>();
         foreach (var movement in movements)

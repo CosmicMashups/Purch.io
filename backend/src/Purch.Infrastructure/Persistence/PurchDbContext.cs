@@ -176,6 +176,11 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<InventoryItem>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<CustomerCreditLedger>().Property<uint>("Version").IsRowVersion();
 
+        // PIN-guess counters: without a version, N parallel wrong guesses all read the same attempt count,
+        // all write back count+1, and the lockout never trips. With one, all but the first save get a 409.
+        _ = modelBuilder.Entity<Membership>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<Device>().Property<uint>("Version").IsRowVersion();
+
         // Same idea for the rows whose status or counters are checked and then changed: a transfer being
         // shipped or cancelled, the receipt sequence (which also carries the Z-reading counters), a shift
         // being closed, and a purchase order line being received.

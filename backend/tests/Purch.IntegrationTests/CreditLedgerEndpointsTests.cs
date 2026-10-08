@@ -139,6 +139,29 @@ public sealed class CreditLedgerEndpointsTests(PostgresContainerFixture postgres
     }
 
     [Fact]
+    public async Task A_repayment_leaves_an_audit_trail_naming_who_collected_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        await EnableCreditLedgerAsync(client);
+        var ledger = await (await client.PostAsJsonAsync(
+            "/credit-ledger",
+            new CreateCustomerCreditLedgerRequest("Lita Gomez", "09231234567", null, 1000m, null))).Content.ReadFromJsonAsync<CustomerCreditLedgerDto>(JsonOptions);
+        var item = await (await client.PostAsJsonAsync(
+            "/items",
+            new CreateItemRequest("Soap", null, null, null, 400m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions);
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item!.Id, null, 1m));
+        _ = await client.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger!.Id));
+
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/credit-ledger/{ledger.Id}/payments", new RecordCreditPaymentRequest(150m, "Partial"))).StatusCode);
+
+        var audit = await client.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);
+        var entry = Assert.Single(audit!, a => a.ActionType == AuditActionType.CreditPaymentRecorded);
+        Assert.Equal(ledger.Id, entry.TargetEntityId);
+        Assert.NotEqual(Guid.Empty, entry.ActorUserId);
+    }
+
+    [Fact]
     public async Task Reminders_list_only_ledgers_with_a_balance_due_within_the_lookahead_window()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

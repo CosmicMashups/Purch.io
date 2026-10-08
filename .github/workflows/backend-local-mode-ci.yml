@@ -18,6 +18,9 @@ on:
       - "backend/**"
       - "installer/**"
 
+permissions:
+  contents: read
+
 jobs:
   local-mode-smoke-test:
     runs-on: ubuntu-latest
@@ -68,7 +71,7 @@ jobs:
             status=$(curl -s -o /tmp/bootstrap-response.json -w "%{http_code}" \
               -X POST http://localhost:8080/onboarding/bootstrap \
               -H "Content-Type: application/json" \
-              -d '{"tenantName":"CI Smoke Test","businessType":0,"branchName":"Main Branch","adminName":"CI Admin","pin":"1234"}') || status=000
+              -d '{"tenantName":"CI Smoke Test","businessType":0,"branchName":"Main Branch","adminName":"CI Admin","adminPin":"1234","adminEmail":"ci-smoke@example.com","adminPassword":"ci-smoke-password-123"}') || status=000
             if [ "$status" = "200" ]; then
               echo "Bootstrap succeeded on attempt $i:"
               cat /tmp/bootstrap-response.json

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -653,11 +654,11 @@ class _HardwareSettingsScreenState extends ConsumerState<HardwareSettingsScreen>
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Image.network(
-                              'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${Uri.encodeComponent(lanUrl)}',
-                              width: 160,
-                              height: 160,
-                              errorBuilder: (_, __, ___) => const SizedBox(
+                            child: QrImageView(
+                              data: lanUrl,
+                              size: 160,
+                              backgroundColor: Colors.white,
+                              errorStateBuilder: (_, __) => const SizedBox(
                                 width: 160,
                                 height: 160,
                                 child: Center(child: Text('QR unavailable', style: TextStyle(color: Colors.black))),

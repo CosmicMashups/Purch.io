@@ -54,7 +54,9 @@ public static class UploadEndpoints
             }
 
             var tenantFolder = tenantProvider.TenantId?.ToString("N") ?? "public";
-            var uniqueFileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+            // The stored extension follows the detected bytes, never the client's file name, so a PNG sent as ".jpg"
+            // (or the reverse) is served with the extension, and so the content type, that matches what it is.
+            var uniqueFileName = $"{Guid.NewGuid():N}{ExtensionFor(detectedContentType)}";
             // The Host header is chosen by the caller, so a configured public URL wins when set.
             var baseUrl = configuration["PUBLIC_BASE_URL"]?.TrimEnd('/') ?? $"{request.Scheme}://{request.Host}";
 
@@ -75,6 +77,14 @@ public static class UploadEndpoints
 
         return app;
     }
+
+    private static string ExtensionFor(string contentType) => contentType switch
+    {
+        "image/png" => ".png",
+        "image/gif" => ".gif",
+        "image/webp" => ".webp",
+        _ => ".jpg",
+    };
 
     /// <summary>The content type implied by the file's leading bytes, or null if they aren't a
     /// JPEG, PNG, GIF or WebP.</summary>

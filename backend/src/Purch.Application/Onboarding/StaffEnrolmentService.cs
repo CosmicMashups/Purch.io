@@ -166,6 +166,7 @@ public sealed class StaffEnrolmentService(
         var member = await membershipRepository.GetByIdAsync(memberId, cancellationToken)
             ?? throw new NotFoundException("Person", memberId);
         RequireMayManage(member.Role, actorIsAdmin);
+        await RequireSingleBusinessAccountAsync(member.AccountId, CurrentTenantId, cancellationToken);
 
         var invite = new EnrolmentInvite
         {
@@ -289,6 +290,10 @@ public sealed class StaffEnrolmentService(
             throw new NotFoundException("Person", invite.MembershipId ?? Guid.Empty);
         }
 
+        // The password belongs to the person's login, not to this business: if they work for another business
+        // too, one business's manager must not be able to set the password that opens the other.
+        await RequireSingleBusinessAccountAsync(account.Id, invite.TenantId, cancellationToken);
+
         if (!string.IsNullOrWhiteSpace(request.Pin))
         {
             if (PinPolicy.Validate(request.Pin) is { } pinError)
@@ -310,6 +315,16 @@ public sealed class StaffEnrolmentService(
         foreach (var (other, _) in await accountRepository.ListActiveMembershipsAsync(account.Id, cancellationToken))
         {
             await refreshTokenService.RevokeAllForMembershipAsync(other.Id, cancellationToken);
+        }
+    }
+
+    private async Task RequireSingleBusinessAccountAsync(Guid accountId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        var memberships = await accountRepository.ListActiveMembershipsAsync(accountId, cancellationToken);
+        if (memberships.Any(m => m.Membership.TenantId != tenantId))
+        {
+            throw new ForbiddenException(
+                "This person's login is also used at another business, so it can't be reset from here. They can change it themselves.");
         }
     }
 

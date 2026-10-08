@@ -31,4 +31,9 @@ public enum AuditActionType
     /// TransactionService.RequireKitchenEditAllowedAsync. Not recorded for the free-edit case (an
     /// Admin/Manager editing it themselves needs no approval, so there's nothing unusual to log).</summary>
     KitchenOrderLineEdited,
+
+    /// <summary>A repayment against a customer's utang balance, recorded by whoever collected it — see
+    /// CustomerCreditLedgerService.RecordPaymentAsync. Any POS role can collect, so who did it and how much
+    /// is the only control against a balance being quietly written off.</summary>
+    CreditPaymentRecorded,
 }

@@ -221,6 +221,24 @@ public sealed class DeviceUnlockTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task Parallel_wrong_pins_cannot_outrun_the_lockout()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var shop = await NewShopAsync(factory);
+        var ben = await AddPersonAsync(shop, "Ben Santos", MembershipRole.Staff, StaffDuty.Cashier, "4821");
+        var (_, credential) = await PairAsync(shop, DeviceType.Register);
+
+        // 40 simultaneous guesses. Each answer that says "wrong PIN" is a persisted attempt, so no more than
+        // four can ever be given; before the Membership row version, every request read the same count of 0
+        // and all of them were answered as the first miss.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 40)
+            .Select(i => UnlockAsync(shop, credential, ben, (1000 + i).ToString(System.Globalization.CultureInfo.InvariantCulture))));
+
+        Assert.DoesNotContain(responses, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.InRange(responses.Count(r => r.StatusCode == HttpStatusCode.Unauthorized), 0, 4);
+    }
+
+    [Fact]
     public async Task Revoking_the_device_ends_an_unlocked_session()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

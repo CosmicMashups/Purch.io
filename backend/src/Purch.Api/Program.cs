@@ -118,6 +118,17 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 // PURCH_IDENTITY_PROVIDER=Local keeps passwords in our own database in Cloud mode too; that is for the end-to-end test
 // stack, which has no Supabase project, and is never set in a real deployment.
 var useLocalIdentity = string.Equals(builder.Configuration["PURCH_IDENTITY_PROVIDER"], "Local", StringComparison.OrdinalIgnoreCase);
+// Fail closed: this switch bypasses Supabase and checks passwords against our own table. A Production cloud
+// deployment that has it set (a copied e2e environment, a stray variable) must refuse to start, not quietly
+// run with a weaker identity store.
+if (useLocalIdentity
+    && builder.Environment.IsProduction()
+    && !string.Equals(builder.Configuration["PURCH_DEPLOYMENT_MODE"], "Local", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "PURCH_IDENTITY_PROVIDER=Local is only for the end-to-end test stack and cannot be used by a Production cloud deployment.");
+}
+
 builder.Services.AddHttpClient(SupabaseIdentityProvider.HttpClientName);
 builder.Services.AddScoped<IIdentityProvider>(serviceProvider =>
     useLocalIdentity || serviceProvider.GetRequiredService<IDeploymentContext>().Mode == DeploymentMode.Local
@@ -240,6 +251,13 @@ builder.Services
         // well-known default here would let anyone forge tokens the API would accept.
         var jwtSigningKey = builder.Configuration["JWT_SIGNING_KEY"]
             ?? throw new InvalidOperationException("JWT_SIGNING_KEY is not configured.");
+        // HS256 is only as strong as its key: a short or guessable one lets an attacker brute-force it offline
+        // from any issued token and then mint admin tokens for any tenant.
+        if (Encoding.UTF8.GetByteCount(jwtSigningKey) < 32)
+        {
+            throw new InvalidOperationException("JWT_SIGNING_KEY must be at least 32 bytes long.");
+        }
+
         var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "purch.io";
 
         // JwtSecurityTokenHandler otherwise remaps short claim names it recognizes
@@ -257,6 +275,10 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
             ValidateLifetime = true,
+            // Only the algorithm the tokens are actually signed with; the default 5-minute skew would let a
+            // 30-minute access token (or a just-revoked session) live for 35.
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ClockSkew = TimeSpan.FromSeconds(30),
             // JwtTokenService issues the role under our own claim name (JwtClaimTypes.Role),
             // not the .NET-default ClaimTypes.Role — map it here so [Authorize(Roles = "Admin")]
             // reads the right claim instead of silently never matching.
@@ -431,6 +453,30 @@ using (var startupScope = app.Services.CreateScope())
             "would silently return zero rows on every read and fail every write. Reconnect using a role with " +
             "BYPASSRLS (Supabase's postgres role, or the Postgres superuser in Local mode) before starting the app.");
     }
+
+    // A table created by a later migration that forgot "ENABLE ROW LEVEL SECURITY" is readable through
+    // Supabase's public REST API with the anon key — and since this connection bypasses RLS, nothing in
+    // the app would ever notice. Report it loudly; deliberately non-fatal so it can't take the API down.
+    var rlsLogger = startupScope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+#pragma warning disable CA1031 // Intentionally broad: a failed advisory check must never crash startup.
+    try
+    {
+        var unprotected = await dbContext.Database
+            .SqlQueryRaw<string>(
+                "SELECT c.relname AS \"Value\" FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace " +
+                "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity " +
+                "AND c.relname <> '__EFMigrationsHistory' ORDER BY c.relname")
+            .ToListAsync();
+        if (unprotected.Count > 0)
+        {
+            LogTablesWithoutRls(rlsLogger, string.Join(", ", unprotected));
+        }
+    }
+    catch (Exception exception)
+    {
+        LogRlsAuditFailed(rlsLogger, exception);
+    }
+#pragma warning restore CA1031
 }
 
 // Correlation id and request logging come first so every later log line and the final status (including a 500
@@ -438,6 +484,7 @@ using (var startupScope = app.Services.CreateScope())
 // middleware/endpoint so any thrown exception (including ones from TenantResolutionMiddleware or endpoint
 // handlers) is caught and turned into a consistent ProblemDetails response, never a raw 500 with no body.
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 // CORS sits outside the exception handler on purpose: the handler clears the response it rebuilds, so with CORS inside it
 // a 500 reached the browser without Access-Control-Allow-Origin and showed up as a CORS error that hid the real failure.
@@ -523,4 +570,10 @@ public partial class Program
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Automatic migration failed; run scripts/migrate-production against the database.")]
     internal static partial void LogMigrationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "SECURITY: public tables without Row Level Security (exposed via Supabase REST with the anon key): {Tables}")]
+    internal static partial void LogTablesWithoutRls(ILogger logger, string tables);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not audit Row Level Security coverage.")]
+    internal static partial void LogRlsAuditFailed(ILogger logger, Exception exception);
 }

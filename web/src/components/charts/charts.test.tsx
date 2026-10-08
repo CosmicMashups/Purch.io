@@ -23,6 +23,7 @@ describe('AreaLineChart', () => {
 
   it('carries every value in a table one tap away', () => {
     chart();
+    fireEvent.click(screen.getByRole('button', { name: 'Show as table' }));
     const table = screen.getByRole('table', { hidden: true });
     expect(within(table).getAllByRole('row', { hidden: true })).toHaveLength(points.length + 1);
     expect(within(table).getByText('₱250')).toBeInTheDocument();

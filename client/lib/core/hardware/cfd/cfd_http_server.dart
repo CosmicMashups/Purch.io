@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:qr/qr.dart';
+
 import 'cfd_models.dart';
 
 /// Embedded HTTP and WebSocket server for tethered tablets, secondary browser
@@ -39,7 +41,7 @@ class CfdHttpServer {
 
   void broadcastState(CfdState state) {
     _currentState = state;
-    final jsonString = jsonEncode(state.toJson());
+    final jsonString = jsonEncode(_stateJson(state));
 
     final deadClients = <WebSocket>[];
     for (final client in _clients) {
@@ -52,14 +54,47 @@ class CfdHttpServer {
     _clients.removeAll(deadClients);
   }
 
+  /// The state plus, while a QR Ph payment is showing, the QR as rows of '1'/'0' modules. The page draws it on a
+  /// canvas, so the payload never leaves the till for an online QR service and it works offline.
+  static Map<String, dynamic> _stateJson(CfdState state) {
+    final json = state.toJson();
+    final payload = state.qrPhPayload;
+    if (payload != null && payload.isNotEmpty) {
+      final image = QrImage(QrCode.fromData(data: payload, errorCorrectLevel: QrErrorCorrectLevel.M));
+      json['qrMatrix'] = [
+        for (var y = 0; y < image.moduleCount; y++)
+          [for (var x = 0; x < image.moduleCount; x++) image.isDark(y, x) ? '1' : '0'].join(),
+      ];
+    }
+    return json;
+  }
+
+  /// True when there is no Origin header (a non-browser client) or its host:port equals the Host the
+  /// request was sent to.
+  static bool isSameOriginOrAbsent(String? origin, String? host) {
+    if (origin == null || origin.isEmpty) return true;
+    final uri = Uri.tryParse(origin);
+    if (uri == null || host == null) return false;
+    final originAuthority = uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+    return originAuthority == host;
+  }
+
   void _handleRequest(HttpRequest request) async {
     final path = request.uri.path;
 
     if (path == '/cfd/ws') {
+      // Browsers do not apply CORS to WebSockets, so without this any web page open on the LAN could
+      // connect and read the live cart. The display page itself connects same-origin; non-browser
+      // clients send no Origin and are unaffected.
+      if (!isSameOriginOrAbsent(request.headers.value('origin'), request.headers.host)) {
+        request.response.statusCode = HttpStatus.forbidden;
+        await request.response.close();
+        return;
+      }
       if (WebSocketTransformer.isUpgradeRequest(request)) {
         final socket = await WebSocketTransformer.upgrade(request);
         _clients.add(socket);
-        socket.add(jsonEncode(_currentState.toJson()));
+        socket.add(jsonEncode(_stateJson(_currentState)));
         socket.listen(
           (_) {},
           onDone: () => _clients.remove(socket),
@@ -74,8 +109,7 @@ class CfdHttpServer {
 
     if (path == '/cfd/state') {
       request.response.headers.contentType = ContentType.json;
-      request.response.headers.add('Access-Control-Allow-Origin', '*');
-      request.response.write(jsonEncode(_currentState.toJson()));
+      request.response.write(jsonEncode(_stateJson(_currentState)));
       await request.response.close();
       return;
     }
@@ -83,7 +117,10 @@ class CfdHttpServer {
     // Serve HTML5 / CSS / JS Customer Facing Display
     if (path == '/cfd' || path == '/' || path == '/cfd/') {
       request.response.headers.contentType = ContentType.html;
-      request.response.headers.add('Access-Control-Allow-Origin', '*');
+      request.response.headers.set('Content-Security-Policy', _contentSecurityPolicy);
+      request.response.headers.set('X-Content-Type-Options', 'nosniff');
+      request.response.headers.set('X-Frame-Options', 'DENY');
+      request.response.headers.set('Referrer-Policy', 'no-referrer');
       request.response.write(_generateHtmlUi());
       await request.response.close();
       return;
@@ -92,6 +129,17 @@ class CfdHttpServer {
     request.response.statusCode = HttpStatus.notFound;
     await request.response.close();
   }
+
+  /// The page is self-contained apart from Google Fonts and the QR image service, so it may talk to
+  /// nothing else: injected markup can neither load foreign scripts nor send what it reads elsewhere,
+  /// and the page cannot be framed by another site.
+  static const _contentSecurityPolicy = "default-src 'none'; "
+      "script-src 'unsafe-inline'; "
+      "style-src 'unsafe-inline' https://fonts.googleapis.com; "
+      'font-src https://fonts.gstatic.com; '
+      "img-src 'self' data:; "
+      "connect-src 'self'; "
+      "frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
   String _generateHtmlUi() {
     return '''
@@ -291,7 +339,7 @@ class CfdHttpServer {
       </div>
 
       <div class="qr-container" id="qr-section">
-        <img id="qr-image" src="" alt="Dynamic QR Ph">
+        <canvas id="qr-canvas" width="220" height="220" role="img" aria-label="Dynamic QR Ph"></canvas>
         <div class="qr-prompt">Scan with GCash, Maya, or any QR Ph App</div>
       </div>
 
@@ -320,6 +368,22 @@ class CfdHttpServer {
       socket.onclose = () => setTimeout(connect, 2000);
     }
 
+    function drawQr(canvas, rows) {
+      const quiet = 2;
+      const modules = rows.length + quiet * 2;
+      const cell = Math.floor(canvas.width / modules);
+      const offset = Math.floor((canvas.width - cell * modules) / 2);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#000000';
+      rows.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) {
+          if (row[x] === '1') ctx.fillRect(offset + (x + quiet) * cell, offset + (y + quiet) * cell, cell, cell);
+        }
+      });
+    }
+
     function updateUi(state) {
       document.getElementById('store-title').innerText = state.storeName || 'Purch.io Store';
       document.getElementById('subtotal').innerText = `PHP \${state.subtotal.toFixed(2)}`;
@@ -328,29 +392,40 @@ class CfdHttpServer {
       document.getElementById('vatable-sales').innerText = `PHP \${(state.vatableSales || 0).toFixed(2)}`;
       document.getElementById('vat-amount').innerText = `PHP \${(state.vatAmount || 0).toFixed(2)}`;
 
+      // Built with textContent, never an HTML string: item names and the welcome message are staff-editable
+      // catalog/tenant text and must not be able to run script in this page.
       const itemsBox = document.getElementById('items-box');
+      const el = (cls, text) => {
+        const node = document.createElement('div');
+        node.className = cls;
+        node.textContent = text;
+        return node;
+      };
+      itemsBox.replaceChildren();
       if (!state.lines || state.lines.length === 0) {
-        itemsBox.innerHTML = `
-          <div class="idle-view">
-            <div class="idle-title">\${state.welcomeMessage || 'Maligayang Pagdating!'}</div>
-            <div class="idle-desc">Your items will appear here as the cashier scans them.</div>
-          </div>
-        `;
+        const idle = el('idle-view', '');
+        idle.append(
+          el('idle-title', state.welcomeMessage || 'Maligayang Pagdating!'),
+          el('idle-desc', 'Your items will appear here as the cashier scans them.'),
+        );
+        itemsBox.append(idle);
       } else {
-        itemsBox.innerHTML = state.lines.map(line => `
-          <div class="item-row">
-            <div class="item-name">\${line.name}</div>
-            <div class="item-qty">\${line.quantity}</div>
-            <div class="item-total">₱\${line.lineTotal.toFixed(2)}</div>
-          </div>
-        `).join('');
+        for (const line of state.lines) {
+          const row = el('item-row', '');
+          row.append(
+            el('item-name', String(line.name)),
+            el('item-qty', String(line.quantity)),
+            el('item-total', '₱' + Number(line.lineTotal).toFixed(2)),
+          );
+          itemsBox.append(row);
+        }
         itemsBox.scrollTop = itemsBox.scrollHeight;
       }
 
       const qrSection = document.getElementById('qr-section');
-      if (state.qrPhPayload && state.qrPhPayload.length > 0) {
+      if (state.qrMatrix && state.qrMatrix.length > 0) {
         qrSection.style.display = 'block';
-        document.getElementById('qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=\${encodeURIComponent(state.qrPhPayload)}`;
+        drawQr(document.getElementById('qr-canvas'), state.qrMatrix);
       } else {
         qrSection.style.display = 'none';
       }

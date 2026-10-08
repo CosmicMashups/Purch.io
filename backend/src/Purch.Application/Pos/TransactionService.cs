@@ -45,6 +45,7 @@ public sealed class TransactionService(
     ICurrentActorProvider currentActorProvider,
     IPosSettings posSettings,
     IApproverAuthorizationService approverAuthorizationService,
+    IAdjustmentRepository adjustmentRepository,
     IUnitOfWork unitOfWork) : ITransactionService
 {
     private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
@@ -854,6 +855,13 @@ public sealed class TransactionService(
         if (transaction.Status != TransactionStatus.Completed)
         {
             throw new ValidationException(nameof(transaction.Status), "Only completed transactions can be refunded.");
+        }
+
+        // A full refund pays back the whole total, so it must not follow an exchange that already returned some of it,
+        // or those items are paid for twice.
+        if ((await adjustmentRepository.ListReturnLinesByTransactionAsync(transaction.Id, cancellationToken)).Count > 0)
+        {
+            throw new ValidationException(nameof(transaction.Status), "Items from this sale were already returned in an exchange, so it can't be refunded in full.");
         }
 
         var approver = await approverAuthorizationService.AuthorizeAsync(request.ApproverPin, cancellationToken);

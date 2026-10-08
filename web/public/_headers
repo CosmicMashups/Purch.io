@@ -1,9 +1,14 @@
 # Global security and privacy headers
+# CSP note: connect-src allows any https: origin because the API host is chosen at build time
+# (VITE_API_BASE_URL). Once the production API host is fixed, replace `https:` with that origin.
 /*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Cross-Origin-Opener-Policy: same-origin
   X-Content-Type-Options: nosniff
-  X-Frame-Options: SAMEORIGIN
+  X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(self), serial=(self), usb=(self)
+  Permissions-Policy: camera=(self), serial=(self), usb=(self), geolocation=(), microphone=()
 
 # Never cache index.html so updates and asset hashes update immediately on deploy
 /index.html

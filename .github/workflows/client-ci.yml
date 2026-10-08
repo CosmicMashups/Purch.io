@@ -10,6 +10,9 @@ on:
     paths:
       - "client/**"
 
+permissions:
+  contents: read
+
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest

@@ -1,0 +1,39 @@
+# Purch.io security assessment (2026-10-08)
+
+Method: static review of the .NET API, React web app and Flutter client, followed by fixes with regression tests
+run against a local stack (Testcontainers Postgres). **No attack traffic was sent to production or Supabase.**
+Status key: **Fixed** (code + test), **Mitigated** (reduced, not removed), **Open** (needs a decision or more work),
+**Manual** (needs you to act outside the code).
+
+## Findings
+
+| # | Severity | Finding | Status | Where / test |
+|---|----------|---------|--------|--------------|
+| 1 | High | Debug-admin passwords/PINs for the hosted backend in `web/e2e/.env.debug`; expired Vercel OIDC token in `backend/.env.local`. Neither is tracked in git. | **Manual** | Rotate/delete the debug admins; delete `.env.local`. CI now fails if env/data files are tracked (`security.yml`). |
+| 2 | High | RLS missing on `InventoryItems`, `ItemRecipeLines`, `IncomingReceivingReports(+Lines)`: readable with the public Supabase anon key. | **Fixed** | Migration `20261008000000_EnableRowLevelSecurityOnInventoryAndReceiving`; startup audit logs any unprotected table; `RowLevelSecurityCoverageTests`. **Deploy the migration, then confirm in Supabase.** |
+| 3 | High | Offline Senior/PWD sale trusted a client-supplied `RungByStaffId`, so a cashier could name a manager and get the discount, and the sale was attributed to the manager. | **Mitigated** | The server cannot verify a PIN entered offline and must still accept a paid sale, so every such sale now writes a `DiscountOverride` audit row naming the real submitter and the claimed approver (`TransactionService.CheckoutAsync`). Preventing it needs a signed offline approval (design change, **Open**). |
+| 4 | High | PIN lockout (device unlock and approver PIN) could be bypassed with parallel guesses: the attempt counter had no concurrency token. | **Fixed** | `xmin` row version on `Membership` and `Device`; `Parallel_wrong_pins_cannot_outrun_the_lockout`. Refund, exchange and void now share the 10 per 15 min per-user `ShiftApproval` limiter. PINs are still 4 to 8 digits (**Open**: raising the minimum affects existing PINs). |
+| 5 | High | A tenant admin or manager could reset the password of a login that is also used at another business, then sign in there. | **Fixed** | `StaffEnrolmentService` refuses at link creation and redemption; `A_business_cannot_reset_the_password_of_a_login_that_is_also_used_at_another_business`. |
+| 6 | High | Any cashier could record utang repayments with no trail. | **Mitigated** | Repayments now write a `CreditPaymentRecorded` audit row (`A_repayment_leaves_an_audit_trail_naming_who_collected_it`). Collecting is a normal cashier task, so approval is **Open** (business decision). |
+| 7 | Med | Branch-scoped users could read other branches' stock movements by naming `branchId`. | **Fixed (movements)** | `InventoryMovementService.ListAsync`; `A_branch_manager_reading_movements_only_ever_sees_their_own_branch`. Other inventory/kiosk/display lists still **Open**. |
+| 8 | Med | No security headers on the API; no CSP/HSTS on the web app (Cloudflare or Vercel). | **Fixed** | `SecurityHeadersMiddleware` + `SecurityHeadersTests`; `web/public/_headers`, `web/vercel.json` + `securityHeaders.test.ts`. The CSP allows any `https:` for `connect-src` because the API host is build-time; tighten it once fixed. **Smoke-test the hosted site after deploy.** |
+| 9 | Med | Customer-facing display server: stored XSS via item names / welcome message, wildcard CORS, cross-site WebSocket reads of the live cart. | **Fixed** | `cfd_http_server.dart` (DOM building, CSP, Origin check) + `cfd_http_server_security_test.dart`. Still unauthenticated on the LAN and still loads Google Fonts (**Open**). |
+| 10 | Med | JWT: 5-minute clock skew, any algorithm accepted, no key-length check. | **Fixed** | `Program.cs`: HS256 only, 30 s skew, key at least 32 bytes. **Check `JWT_SIGNING_KEY` on Vercel is at least 32 bytes or the API will not start.** `TokenForgeryTests`. |
+| 11 | Med | `PURCH_IDENTITY_PROVIDER=Local` can silently swap Supabase for local passwords in a cloud deployment. | **Fixed** | Startup refuses it when Production and not Local mode. |
+| 12 | Med | Android release signed with the debug key; app data allowed in backups. | **Fixed (partly)** | `allowBackup=false`, data-extraction rules, real signing when `android/key.properties` exists. **Create the upload keystore.** R8 minify/obfuscation **Open** (needs a release-build test). |
+| 13 | Med | CI had default-wide token permissions, no secret/dependency scanning, and the local-mode smoke test posted an outdated body. | **Fixed** | `permissions: contents: read` everywhere, `security.yml` (gitleaks, tracked-file check, NuGet and npm audit), `dependabot.yml`, corrected smoke body. |
+| 14 | Low | Vulnerable transitive SSH.NET (via Testcontainers) in the test project. | **Fixed** | Pinned 2026.0.0; `dotnet list package --vulnerable` is clean. |
+| 15 | Med | Refund/exchange value leaks (exchange ignores discounts, refund-after-exchange, no ledger/stock/drawer reversal, no branch/time scope). | **Fixed (refund after exchange); rest Open** | A full refund is now refused once any item was returned in an exchange (`A_sale_with_items_already_returned_in_an_exchange_cannot_be_refunded_in_full`). Pro-rating discounts, reversing ledger/stock/drawer and branch/time limits are business rules that need your decisions (`AdjustmentService.cs`). |
+| 16 | Med | Forwarded-header trust and IP-only rate limits; bootstrap reveals whether an email exists; no per-account sign-in throttle. | **Open** | `Program.cs`. Safe on Vercel/Render, which overwrite `X-Forwarded-For`; unsafe if the origin is reachable directly. |
+| 17 | Med | Web tokens in `localStorage`; unencrypted SQLite on devices; QR Ph payloads sent to `api.qrserver.com`. | **QR fixed; rest Open** | QR codes are now drawn locally (`qr_flutter` in the app, a canvas fed by `qr` on the display page; test `the QR Ph payload is drawn locally...`), so the payment payload no longer leaves the till and works offline. The HttpOnly-cookie design and SQLCipher still need your approval; the new CSP reduces the XSS risk to the stored tokens. |
+| 18 | Low | Upload stored the client's extension even when the bytes were another image type; Docker image runs as root; actions not pinned to SHAs. | **Upload fixed; rest Open** | Extension now follows the detected bytes (`The_stored_extension_follows_the_bytes_not_the_clients_file_name`). `backend/Dockerfile` stays root on purpose: existing on-prem named volumes are root-owned, so a non-root user would break uploads after an upgrade (`Dockerfile.vercel` is already non-root). Plan a volume migration first. Actions are pinned by tag, not SHA. |
+
+## Verification run
+- Backend: 71 unit tests and 402 integration tests, all passing on a single full run (including every new security test).
+- Web: vitest, `tsc -b`, `npm audit --omit=dev` (0 vulnerabilities). Flutter: `flutter analyze` clean, 480 tests passing.
+- Not run: Playwright e2e, ZAP, any test against hosted environments, a real Android release build.
+- The race test could not be shown failing without the fix (EF refuses a model with no matching snapshot), so it is verified by reasoning only.
+
+## Repository note
+`.git/config` and `refs/remotes/origin/main` were NUL-filled on Oct 7 and were rebuilt. Backups: `.git/config.corrupt.bak`,
+`.git/origin-main.corrupt.bak`. Remote URL was reconstructed from `FETCH_HEAD`.

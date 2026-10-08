@@ -269,6 +269,25 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_business_cannot_reset_the_password_of_a_login_that_is_also_used_at_another_business()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var first = await NewBusinessAsync(factory);
+        var second = await NewBusinessAsync(factory);
+        using var anonymous = factory.CreateClient();
+        var email = NewEmail();
+        Assert.Equal(HttpStatusCode.OK, (await RedeemAsync(anonymous, (await InviteAsync(first.Admin, StaffInvite(first, email))).Token)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await RedeemAsync(anonymous, (await InviteAsync(second.Admin, StaffInvite(second, email, StaffDuty.Warehouse))).Token)).StatusCode);
+        var inFirst = (await first.Admin.GetFromJsonAsync<List<MemberDto>>("/staff/members", JsonOptions))!.Single(m => m.Email == email);
+
+        // The first business's admin must not be able to set a password that also opens the second business.
+        var reset = await first.Admin.PostAsync($"/staff/members/{inFirst.Id}/reset-link", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, reset.StatusCode);
+        Assert.Contains("chooseBusiness", await (await anonymous.PostAsJsonAsync("/auth/sign-in", new SignInRequest(email, Password))).Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Staff_cannot_invite_anyone()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

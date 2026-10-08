@@ -1,0 +1,58 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --redact --no-banner --exit-code 1
+
+  tracked-secret-files:
+    name: No env/data files tracked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if local env or database files are committed
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.env(\.[^/]*)?$|\.pgdata/|\.seed/|\.keystore$|key\.properties$' | grep -v -E '\.(example|template)$' || true)
+          if [ -n "$bad" ]; then echo "Tracked secret/data files:"; echo "$bad"; exit 1; fi
+
+  dotnet-vulnerabilities:
+    name: NuGet vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Fail on vulnerable packages
+        working-directory: backend
+        run: |
+          dotnet list Purch.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then exit 1; fi
+
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+      - working-directory: web
+        run: npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high

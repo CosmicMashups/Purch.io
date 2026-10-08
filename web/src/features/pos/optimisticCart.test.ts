@@ -40,6 +40,7 @@ const cart = (over: Partial<Transaction> = {}): Transaction => ({
   subtotal: 200,
   discountAmount: 0,
   seniorPwdDiscountApplied: false,
+  vatExemptAmount: 0,
   promoCode: null,
   promoDiscountAmount: 0,
   itemPromoDiscountAmount: 0,

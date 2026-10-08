@@ -523,6 +523,10 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
         var to = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
         var report = await admin.GetFromJsonAsync<StaffPerformanceReportDto>($"/reports/staff-performance?from={from}&to={to}", JsonOptions);
         Assert.Equal(staff.ManagerId, Assert.Single(report!.Sales).StaffUserId);
+
+        // The manager id was only claimed (their PIN was entered offline), so the audit trail records who really sent it.
+        var audit = await admin.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs", JsonOptions);
+        Assert.Contains(audit!, a => a.ActionType == AuditActionType.DiscountOverride && a.ActorUserId == staff.CashierId);
     }
 
     [Fact]

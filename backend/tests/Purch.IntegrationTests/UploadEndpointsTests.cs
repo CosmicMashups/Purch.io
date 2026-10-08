@@ -124,6 +124,22 @@ public sealed class UploadEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task The_stored_extension_follows_the_bytes_not_the_clients_file_name()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var (client, _) = await AdminClientAsync(factory, "Extension Shop");
+        using var _client = client;
+
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D };
+        using var form = ImageForm(png, "pic.jpg", "image/jpeg");
+        var response = await client.PostAsync("/uploads/image", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        Assert.EndsWith(".png", result.GetProperty("fileName").GetString());
+    }
+
+    [Fact]
     public async Task The_returned_url_uses_the_configured_public_base_url_not_the_callers_host_header()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString) { ExtraSettings = { ["PUBLIC_BASE_URL"] = "https://media.example.test/" } };

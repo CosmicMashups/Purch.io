@@ -137,6 +137,24 @@ public sealed class AdjustmentEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_sale_with_items_already_returned_in_an_exchange_cannot_be_refunded_in_full()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var (ramen, katsudon, sale) = await RamenAndKatsudonSaleAsync(client);
+        var ramenLine = sale.Lines.Single(l => l.ItemId == ramen.Id);
+        var exchange = await client.PostAsJsonAsync(
+            $"/transactions/{sale.Id}/exchange",
+            new CreateExchangeRequest([new ReturnLineRequest(ramenLine.Id, 1m)], [new ReplacementLineRequest(katsudon.Id, null, 1m)], "Swap", "1234"));
+        Assert.Equal(HttpStatusCode.OK, exchange.StatusCode);
+
+        // Refunding the whole sale now would pay for the returned ramen a second time.
+        var refund = await client.PostAsJsonAsync($"/transactions/{sale.Id}/refund", new RefundTransactionRequest("Changed my mind", "1234"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, refund.StatusCode);
+    }
+
+    [Fact]
     public async Task A_second_exchange_cannot_return_more_of_a_line_than_is_left()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

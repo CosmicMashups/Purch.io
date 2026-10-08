@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'cfd_models.dart';
@@ -424,17 +425,14 @@ class CustomerFacingDisplayScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  Image.network(
-                    'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${Uri.encodeComponent(state.qrPhPayload!)}',
-                    width: 170,
-                    height: 170,
-                    errorBuilder: (_, __, ___) => const SizedBox(
+                  QrImageView(
+                    data: state.qrPhPayload!,
+                    size: 170,
+                    backgroundColor: Colors.white,
+                    errorStateBuilder: (_, __) => const SizedBox(
                       height: 170,
                       child: Center(
-                        child: Text(
-                          'QR Code Ready',
-                          style: TextStyle(color: Colors.black),
-                        ),
+                        child: Text('QR Code Ready', style: TextStyle(color: Colors.black)),
                       ),
                     ),
                   ),

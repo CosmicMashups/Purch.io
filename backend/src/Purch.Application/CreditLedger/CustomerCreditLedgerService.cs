@@ -62,7 +62,19 @@ public sealed class CustomerCreditLedgerService(
             throw new ValidationException(nameof(request.Amount), "Payment amount can't exceed the customer's outstanding balance.");
         }
 
+        var balanceBefore = ledger.Balance;
         ledger.Balance -= request.Amount;
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = currentActorProvider.UserId
+                ?? throw new InvalidOperationException("Recording a credit payment requires an authenticated staff user."),
+            ActionType = AuditActionType.CreditPaymentRecorded,
+            TargetEntityType = nameof(CustomerCreditLedger),
+            TargetEntityId = ledger.Id,
+            BeforeStateJson = JsonSerializer.Serialize(new { balance = balanceBefore }),
+            AfterStateJson = JsonSerializer.Serialize(new { balance = ledger.Balance, paid = request.Amount, note = request.Note }),
+        });
         creditLedgerRepository.AddTransaction(new CreditTransaction
         {
             TenantId = CurrentTenantId,

@@ -66,6 +66,30 @@ public sealed class BranchScopeEnforcementTests(PostgresContainerFixture postgre
     }
 
     [Fact]
+    public async Task A_branch_manager_reading_movements_only_ever_sees_their_own_branch()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var setup = await SetUpAsync(factory);
+        using var _admin = setup.Admin;
+        using var _manager = setup.BranchManager;
+        _ = await setup.BranchManager.PostAsJsonAsync(
+            "/inventory/movements",
+            new RecordMovementRequest(setup.Item.Id, setup.OwnBranchId, MovementType.StockIn, 5m, null, null, null, null));
+
+        // Naming the other branch in the query must not widen what they can read.
+        var asked = await setup.BranchManager.GetFromJsonAsync<List<InventoryMovementDto>>($"/inventory/movements?branchId={setup.MainBranchId}", JsonOptions);
+        var unasked = await setup.BranchManager.GetFromJsonAsync<List<InventoryMovementDto>>("/inventory/movements", JsonOptions);
+
+        Assert.NotEmpty(asked!);
+        Assert.All(asked!, m => Assert.Equal(setup.OwnBranchId, m.BranchId));
+        Assert.All(unasked!, m => Assert.Equal(setup.OwnBranchId, m.BranchId));
+
+        // The tenant-wide admin still sees the branch the manager is barred from (the seed stock-in).
+        var all = await setup.Admin.GetFromJsonAsync<List<InventoryMovementDto>>("/inventory/movements", JsonOptions);
+        Assert.Contains(all!, m => m.BranchId == setup.MainBranchId);
+    }
+
+    [Fact]
     public async Task A_tenant_wide_admin_is_not_confined_to_a_branch()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

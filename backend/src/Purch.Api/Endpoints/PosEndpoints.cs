@@ -1,3 +1,4 @@
+using Purch.Api.RateLimiting;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
 
@@ -56,7 +57,8 @@ public static class PosEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.VoidCartAsync(request ?? new VoidCartRequest(null), cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posOperator))
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
         // Looking up an older sale by its receipt number, so it can be refunded or exchanged without
         // the cashier already having it open (e.g. from an earlier day or a different terminal).
@@ -73,7 +75,8 @@ public static class PosEndpoints
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
             Results.Ok(await transactionService.RefundTransactionAsync(transactionId, request, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posOperator))
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
         // Exchange: reachable by any POS role (a cashier must be able to ask), always needs a manager/
         // admin's PIN inside the service itself — see ApproverAuthorizationService.
@@ -83,7 +86,8 @@ public static class PosEndpoints
             IAdjustmentService adjustmentService,
             CancellationToken cancellationToken) =>
             Results.Ok(await adjustmentService.CreateExchangeAsync(transactionId, request, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+            .RequireAuthorization(policy => policy.RequireRole(posOperator))
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
         _ = app.MapGet("/transactions/{transactionId:guid}/returnable-lines", async (
             Guid transactionId,
