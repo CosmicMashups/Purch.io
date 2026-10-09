@@ -1,4 +1,5 @@
 import type { HubGroup, HubStat } from '../../components/HubGroups';
+import { EquipmentStatus, type Equipment } from '../equipment/types';
 import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type IncomingReceiving, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
 
 
@@ -9,6 +10,7 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
       { id: 'movements', label: 'Stock movements', hint: 'Every stock-in, spoilage and sale', to: '/inventory/movements' },
       { id: 'transfers', label: 'Stock transfers', hint: 'Move stock between branches', to: '/inventory/transfers' },
       { id: 'ingredients', label: 'Ingredients', hint: 'Counts and deliveries', to: '/inventory/ingredients' },
+      { id: 'equipment', label: 'Equipment', hint: 'Machines, furniture and utensils', to: '/inventory/equipment' },
     ],
   },
   {
@@ -30,6 +32,7 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
 
 export interface InventoryHubData {
   ingredients?: InventoryItem[];
+  equipment?: Equipment[];
   suppliers?: Supplier[];
   purchaseOrders?: PurchaseOrder[];
   transfers?: BranchTransfer[];
@@ -47,6 +50,11 @@ export function inventoryHubStats(data: InventoryHubData): Record<string, HubSta
     const low = data.ingredients.filter((i) => i.lowStockThreshold !== null && i.quantityOnHand <= i.lowStockThreshold).length;
     const total = n(data.ingredients.length, 'ingredient', 'ingredients');
     stats.ingredients = low > 0 ? { text: `${total}, ${low} low`, warn: true } : { text: total };
+  }
+  if (data.equipment) {
+    const down = data.equipment.filter((e) => e.isActive && e.status === EquipmentStatus.OutOfService).length;
+    const total = n(data.equipment.length, 'piece', 'pieces');
+    stats.equipment = down > 0 ? { text: `${total}, ${down} out of service`, warn: true } : { text: total };
   }
   if (data.suppliers) {
     const active = data.suppliers.filter((s) => s.isActive).length;

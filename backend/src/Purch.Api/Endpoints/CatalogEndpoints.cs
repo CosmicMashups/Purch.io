@@ -1,5 +1,6 @@
 using Purch.Api.Http;
 using Purch.Application.Catalog;
+using Purch.Application.EquipmentInventory;
 using Purch.Application.Inventory;
 using Purch.Domain.Enums;
 
@@ -177,6 +178,22 @@ public static class CatalogEndpoints
             IItemRecipeService itemRecipeService,
             CancellationToken cancellationToken) =>
             Results.Ok(await itemRecipeService.ReplaceRecipeAsync(itemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        // --- Equipment an item needs; the item is out of stock while any of it is out of service ---
+        _ = app.MapGet("/items/{itemId:guid}/equipment", async (
+            Guid itemId,
+            IItemEquipmentService itemEquipmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemEquipmentService.GetAsync(itemId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(catalogManager));
+
+        _ = app.MapPut("/items/{itemId:guid}/equipment", async (
+            Guid itemId,
+            ReplaceItemEquipmentRequest request,
+            IItemEquipmentService itemEquipmentService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await itemEquipmentService.ReplaceAsync(itemId, request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(catalogManager));
 
         // --- Tingi (sub-unit) selling config for weight/volume items ---

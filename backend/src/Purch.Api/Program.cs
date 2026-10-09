@@ -18,6 +18,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Lifecycle;
 using Purch.Application.Common;
 using Purch.Application.CreditLedger;
+using Purch.Application.EquipmentInventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Inventory;
 using Purch.Application.Devices;
@@ -240,6 +241,10 @@ builder.Services.AddScoped<IItemStockService, ItemStockService>();
 builder.Services.AddScoped<IInventoryItemService, InventoryItemService>();
 builder.Services.AddScoped<IItemRecipeRepository, EfItemRecipeRepository>();
 builder.Services.AddScoped<IItemRecipeService, ItemRecipeService>();
+builder.Services.AddScoped<IEquipmentRepository, EfEquipmentRepository>();
+builder.Services.AddScoped<IItemEquipmentRepository, EfItemEquipmentRepository>();
+builder.Services.AddScoped<IEquipmentService, EquipmentService>();
+builder.Services.AddScoped<IItemEquipmentService, ItemEquipmentService>();
 builder.Services.AddScoped<ISyncedRecordRepository, EfSyncedRecordRepository>();
 builder.Services.AddScoped<ISyncService, SyncService>();
 
@@ -564,6 +569,7 @@ app.MapPromoCodeEndpoints();
 app.MapReportingEndpoints();
 app.MapCreditLedgerEndpoints();
 app.MapInventoryEndpoints();
+app.MapEquipmentEndpoints();
 app.MapSyncEndpoints();
 app.MapUploadEndpoints();
 

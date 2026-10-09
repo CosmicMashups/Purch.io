@@ -15,7 +15,8 @@ export type LifecycleKind =
   | 'Staff'
   | 'Branch'
   | 'Device'
-  | 'Customer';
+  | 'Customer'
+  | 'Equipment';
 
 export type LifecycleStatus = 'Active' | 'Inactive' | 'Deleted';
 

@@ -7,6 +7,7 @@ import { RestockList } from '../components/RestockList';
 import { StockOverview } from '../components/StockOverview';
 import { INVENTORY_GROUPS, inventoryHubStats } from '../hub';
 import type { StockScope } from '../stockScope';
+import { useEquipment } from '../../equipment/queries';
 import { useInventoryItems, useIncomingReceiving, usePurchaseOrders, useSuppliers, useTransfers } from '../queries';
 
 export function InventoryHomePage() {
@@ -14,6 +15,7 @@ export function InventoryHomePage() {
   const [scope, setScope] = useState<StockScope>('items');
   const isManager = role === 'Admin' || role === 'Manager';
   const ingredients = useInventoryItems();
+  const equipment = useEquipment();
   const suppliers = useSuppliers();
   const orders = usePurchaseOrders();
   const transfers = useTransfers();
@@ -23,6 +25,7 @@ export function InventoryHomePage() {
 
   const stats = inventoryHubStats({
     ingredients: ingredients.data,
+    equipment: equipment.data,
     suppliers: suppliers.data,
     purchaseOrders: orders.data,
     transfers: transfers.data,

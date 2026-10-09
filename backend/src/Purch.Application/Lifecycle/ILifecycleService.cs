@@ -17,6 +17,7 @@ public enum LifecycleKind
     Branch,
     Device,
     Customer,
+    Equipment,
 }
 
 public enum LifecycleStatus

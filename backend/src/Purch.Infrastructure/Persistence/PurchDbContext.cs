@@ -44,6 +44,10 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<ItemRecipeLine> ItemRecipeLines => Set<ItemRecipeLine>();
 
+    public DbSet<Equipment> EquipmentItems => Set<Equipment>();
+
+    public DbSet<ItemEquipment> ItemEquipmentLinks => Set<ItemEquipment>();
+
     public DbSet<ItemModifierIngredient> ItemModifierIngredients => Set<ItemModifierIngredient>();
 
     public DbSet<ItemVariant> ItemVariants => Set<ItemVariant>();
@@ -175,6 +179,7 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<EnrolmentInvite>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<Item>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<InventoryItem>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<Equipment>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<CustomerCreditLedger>().Property<uint>("Version").IsRowVersion();
 
         // PIN-guess counters: without a version, N parallel wrong guesses all read the same attempt count,

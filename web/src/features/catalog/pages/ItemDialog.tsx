@@ -12,6 +12,9 @@ import { catalogKeys, useCategories, useCreateItem, useRecipe, useReplaceRecipe,
 import { useTenantSettings } from '../../tenant/queries';
 import { useInventoryItems } from '../../inventory/queries';
 import { IngredientSelector } from '../components/IngredientSelector';
+import { EquipmentSelector } from '../components/EquipmentSelector';
+import { equipmentApi } from '../../equipment/api';
+import { useEquipment, useItemEquipment, useReplaceItemEquipment } from '../../equipment/queries';
 import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
 import { Field, inputClass } from '../../../components/Field';
 import { ImageUploadField } from '../../../components/forms/ImageUploadField';
@@ -79,6 +82,9 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
   const pickable = (inventoryItems.data ?? []).filter((i) => i.isActive);
   const [recipe, setRecipe] = useState<RecipeSelection>({});
   const [recipeError, setRecipeError] = useState<{ id: string; message: string } | null>(null);
+  const equipment = useEquipment();
+  const pickableEquipment = (equipment.data ?? []).filter((e) => e.isActive);
+  const [equipmentIds, setEquipmentIds] = useState<string[]>([]);
   const [threshold, setThreshold] = useState('');
   const [thresholdError, setThresholdError] = useState<string | null>(null);
 
@@ -209,6 +215,18 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
         }
         await qc.invalidateQueries({ queryKey: ['inventory-items'] });
       }
+      if (equipmentIds.length > 0) {
+        try {
+          await equipmentApi.replaceItemEquipment(item.id, equipmentIds);
+        } catch (equipmentFailure) {
+          // The item exists now, so resubmitting would make a duplicate. Close, and let them fix just the equipment.
+          toast.error(`${values.name} was saved, but its equipment was not: ${userMessage(equipmentFailure)} Open Edit on it to add it again.`);
+          await qc.invalidateQueries({ queryKey: catalogKeys.items });
+          onClose();
+          return;
+        }
+        await qc.invalidateQueries({ queryKey: ['equipment'] });
+      }
       await qc.invalidateQueries({ queryKey: catalogKeys.items });
 
       onClose();
@@ -325,6 +343,8 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
 
       {tracksIngredients && <IngredientSelector ingredients={pickable} selection={recipe} onChange={setRecipe} lineError={recipeError} />}
 
+      <EquipmentSelector equipment={pickableEquipment} selected={equipmentIds} onChange={setEquipmentIds} />
+
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
     </form>
   );
@@ -348,8 +368,24 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
   // What the form started from, so saving only touches the recipe when it was really changed.
   const [initialRecipe, setInitialRecipe] = useState<RecipeSelection | null>(null);
 
-  const busy = updateItem.isPending || replaceRecipe.isPending;
+  const equipment = useEquipment();
+  const savedEquipment = useItemEquipment(itemId);
+  const replaceEquipment = useReplaceItemEquipment();
+  const [equipmentIds, setEquipmentIds] = useState<string[]>([]);
+  // What the form started from, so saving only touches the equipment when it was really changed.
+  const [initialEquipment, setInitialEquipment] = useState<string[] | null>(null);
+  // Retired equipment stays pickable only while this item already uses it.
+  const pickableEquipment = (equipment.data ?? []).filter((e) => e.isActive || (initialEquipment?.includes(e.id) ?? false));
+
+  const busy = updateItem.isPending || replaceRecipe.isPending || replaceEquipment.isPending;
   useEffect(() => onBusy(busy), [busy, onBusy]);
+
+  useEffect(() => {
+    if (!savedEquipment.data || initialEquipment) return;
+    const ids = savedEquipment.data.map((e) => e.equipmentId);
+    setInitialEquipment(ids);
+    setEquipmentIds(ids);
+  }, [savedEquipment.data, initialEquipment]);
 
   useEffect(() => {
     if (!savedRecipe.data || initialRecipe) return;
@@ -399,6 +435,7 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
       setRecipeError({ id: recipeLines.inventoryItemId, message: recipeLines.message });
       return;
     }
+    const equipmentChanged = initialEquipment !== null && JSON.stringify([...equipmentIds].sort()) !== JSON.stringify([...initialEquipment].sort());
     try {
       await updateItem.mutateAsync({
         itemId,
@@ -420,6 +457,7 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
       }
       // An empty list is a real change here: it turns the item back into its own inventory item.
       if (recipeChanged) await replaceRecipe.mutateAsync({ lines: recipeLines.lines });
+      if (equipmentChanged) await replaceEquipment.mutateAsync({ itemId, equipmentIds });
       onClose();
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : 'Failed to update item');
@@ -480,6 +518,12 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
         ) : (
           <IngredientSelector ingredients={pickable} selection={recipe} onChange={setRecipe} lineError={recipeError} />
         ))}
+
+      {initialEquipment === null ? (
+        <p className="text-sm text-gray-500">Loading equipment…</p>
+      ) : (
+        <EquipmentSelector equipment={pickableEquipment} selected={equipmentIds} onChange={setEquipmentIds} />
+      )}
 
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
     </form>

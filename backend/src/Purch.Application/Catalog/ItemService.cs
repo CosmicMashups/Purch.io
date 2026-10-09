@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.EquipmentInventory;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Domain.Entities;
@@ -16,6 +17,8 @@ public sealed class ItemService(
     IItemRecipeRepository itemRecipeRepository,
     IInventoryItemRepository inventoryItemRepository,
     IItemComboComponentRepository itemComboComponentRepository,
+    IItemEquipmentRepository itemEquipmentRepository,
+    IEquipmentRepository equipmentRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -49,6 +52,20 @@ public sealed class ItemService(
             recipeLinesByItemId.GetValueOrDefault(item.Id, []),
             inventoryItemsById,
             inventoryItemsByLinkedItemId)).ToList();
+
+        // An item that needs equipment which is out of service cannot be made, so it shows as out of stock.
+        // This runs before the combo pass below so a combo with such an item as a fixed part is blocked too.
+        var equipmentLinks = await itemEquipmentRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+        if (equipmentLinks.Count > 0)
+        {
+            var equipmentById = (await equipmentRepository.ListByTenantAsync(CurrentTenantId, cancellationToken))
+                .ToDictionary(row => row.Id);
+            var blockedByEquipment = EquipmentAvailability.BlockedItemIds(equipmentLinks, equipmentById);
+            if (blockedByEquipment.Count > 0)
+            {
+                dtos = [.. dtos.Select(dto => blockedByEquipment.Contains(dto.Id) ? dto with { IsOutOfStock = true } : dto)];
+            }
+        }
 
         // A combo has no stock of its own, but it cannot be sold while an item it always includes is sold
         // out. Choice slots are not checked here: the customer can pick something that is in stock.

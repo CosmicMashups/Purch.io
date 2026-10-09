@@ -32,7 +32,10 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
             cancellationToken,
             Rows("items", dbContext.Items),
             Rows("inventory", dbContext.InventoryItems),
-            Rows("recipes", dbContext.ItemRecipeLines)));
+            Rows("recipes", dbContext.ItemRecipeLines),
+            // An item is out of stock while equipment it needs is out of service.
+            Rows("equipment", dbContext.EquipmentItems),
+            Rows("itemEquipment", dbContext.ItemEquipmentLinks)));
         return Hash(parts);
     }
 
@@ -66,7 +69,9 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
             // Category-linked groups list the category's items live, with their prices and stock.
             Rows("categoryItems", dbContext.ModifierGroupCategoryItems),
             Rows("items", dbContext.Items),
-            Rows("recipes", dbContext.ItemRecipeLines)));
+            Rows("recipes", dbContext.ItemRecipeLines),
+            Rows("equipment", dbContext.EquipmentItems),
+            Rows("itemEquipment", dbContext.ItemEquipmentLinks)));
         return Hash(parts);
     }
 

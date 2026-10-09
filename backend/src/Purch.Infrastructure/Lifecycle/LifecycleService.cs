@@ -50,6 +50,7 @@ public sealed class LifecycleService(
         {
             LifecycleKind.Item => await db.Items.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
             LifecycleKind.Ingredient => await db.InventoryItems.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
+            LifecycleKind.Equipment => await db.EquipmentItems.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
             LifecycleKind.Category => await db.Categories.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
             LifecycleKind.Supplier => await db.Suppliers.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
             LifecycleKind.ModifierGroup => await db.ModifierGroups.Where(x => x.IsDeleted).Select(x => new DeletedRecordDto(x.Id, x.Name, x.DeletedAt)).ToListAsync(cancellationToken),
@@ -150,7 +151,7 @@ public sealed class LifecycleService(
         var isManager = roles.Contains(Manager);
         var allowed = kind switch
         {
-            LifecycleKind.Item or LifecycleKind.Ingredient or LifecycleKind.Category or LifecycleKind.Supplier
+            LifecycleKind.Item or LifecycleKind.Ingredient or LifecycleKind.Equipment or LifecycleKind.Category or LifecycleKind.Supplier
                 => isAdmin || isManager || roles.Contains(Warehouse),
             LifecycleKind.Branch => isAdmin,
             LifecycleKind.Device => delete ? isAdmin : isAdmin || isManager,
@@ -173,6 +174,9 @@ public sealed class LifecycleService(
             case LifecycleKind.Ingredient:
                 var ing = await db.InventoryItems.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Ingredient", id);
                 return new Target(ing, ing.Name, () => ing.IsActive, v => ing.IsActive = v);
+            case LifecycleKind.Equipment:
+                var eq = await db.EquipmentItems.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Equipment", id);
+                return new Target(eq, eq.Name, () => eq.IsActive, v => eq.IsActive = v);
             case LifecycleKind.Category:
                 var cat = await db.Categories.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Category", id);
                 return new Target(cat, cat.Name, () => cat.IsActive, v => cat.IsActive = v);
@@ -244,6 +248,9 @@ public sealed class LifecycleService(
             case LifecycleKind.Ingredient:
                 Add(notes, await db.ItemRecipeLines.Where(r => r.InventoryItemId == id).Select(r => r.ItemId).Distinct().CountAsync(ct), "recipe", "recipes");
                 Add(notes, await db.ItemModifierIngredients.CountAsync(m => m.InventoryItemId == id, ct), "modifier", "modifiers");
+                break;
+            case LifecycleKind.Equipment:
+                Add(notes, await db.ItemEquipmentLinks.Where(l => db.Items.Any(i => i.Id == l.ItemId && !i.IsDeleted) && l.EquipmentId == id).CountAsync(ct), "item", "items");
                 break;
             case LifecycleKind.Category:
                 Add(notes, await db.Items.CountAsync(i => !i.IsDeleted && i.CategoryId == id, ct), "item", "items");

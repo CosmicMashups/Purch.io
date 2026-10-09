@@ -36,6 +36,7 @@ const NOUN: Record<LifecycleKind, string> = {
   Branch: 'branch',
   Device: 'device',
   Customer: 'customer',
+  Equipment: 'equipment',
 };
 
 /**

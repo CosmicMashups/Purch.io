@@ -48,4 +48,7 @@ public enum AuditActionType
 
     /// <summary>A soft-deleted record was restored.</summary>
     RecordRestored,
+
+    /// <summary>A piece of equipment's status changed (for example to out of service) — see EquipmentService.SetStatusAsync.</summary>
+    EquipmentStatusChanged,
 }

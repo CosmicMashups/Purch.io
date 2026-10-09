@@ -4,6 +4,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
 using Purch.Application.CreditLedger;
+using Purch.Application.EquipmentInventory;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
 using Purch.Application.Promotions;
@@ -26,6 +27,8 @@ public sealed class TransactionService(
     IItemBatchRepository itemBatchRepository,
     IItemVariantRepository itemVariantRepository,
     IItemComboComponentRepository comboComponentRepository,
+    IItemEquipmentRepository itemEquipmentRepository,
+    IEquipmentRepository equipmentRepository,
     IItemModifierGroupRepository itemModifierGroupRepository,
     IModifierGroupRepository modifierGroupRepository,
     IItemModifierIngredientRepository modifierIngredientRepository,
@@ -180,7 +183,7 @@ public sealed class TransactionService(
 
     /// <summary>Validates one add and applies it to the staged cart (a new line or a merge into an existing one)
     /// WITHOUT saving or recalculating; the caller does both once for everything it staged.</summary>
-    private async Task StageLineAsync(CartStage stage, AddTransactionLineRequest request, CancellationToken cancellationToken)
+    private async Task StageLineAsync(CartStage stage, AddTransactionLineRequest request, CancellationToken cancellationToken, bool offlineSale = false)
     {
         if (request.Quantity <= 0)
         {
@@ -193,6 +196,12 @@ public sealed class TransactionService(
         if (!item.IsActive)
         {
             throw new ValidationException(nameof(request.ItemId), $"{item.Name} is no longer available.");
+        }
+
+        // An offline sale is already paid and rung up, so it is recorded rather than refused (see CheckoutRequest).
+        if (!offlineSale)
+        {
+            await EnsureEquipmentAvailableAsync(item, request.ComboSelections, cancellationToken);
         }
 
         if (item.PricingType == PricingType.VariantMatrix && request.ItemVariantId is null)
@@ -328,6 +337,42 @@ public sealed class TransactionService(
             });
             _ = stage.LinesWithModifiers.Add(lineId);
         }
+    }
+
+    /// <summary>Refuses an item that needs equipment which is out of service, or a combo whose fixed or chosen
+    /// part does. Mirrors the catalog's out-of-stock flag, so what the till shows and what the server accepts agree.</summary>
+    private async Task EnsureEquipmentAvailableAsync(
+        Item item,
+        IReadOnlyList<ComboSelectionRequest>? comboSelections,
+        CancellationToken cancellationToken)
+    {
+        var itemIds = new HashSet<Guid> { item.Id };
+        if (item.PricingType == PricingType.Combo)
+        {
+            var slots = await comboComponentRepository.ListByItemAsync(item.Id, cancellationToken);
+            itemIds.UnionWith(slots.Where(slot => slot.ComponentItemId is not null).Select(slot => slot.ComponentItemId!.Value));
+            itemIds.UnionWith((comboSelections ?? []).Select(selection => selection.SelectedItemId));
+        }
+
+        var links = await itemEquipmentRepository.ListByItemsAsync(itemIds, cancellationToken);
+        if (links.Count == 0)
+        {
+            return;
+        }
+
+        var equipment = (await equipmentRepository.ListByIdsAsync([.. links.Select(link => link.EquipmentId).Distinct()], cancellationToken))
+            .ToDictionary(row => row.Id);
+        var blocked = EquipmentAvailability.BlockedItemIds(links, equipment);
+        if (blocked.Count == 0)
+        {
+            return;
+        }
+
+        var blockedId = blocked.Contains(item.Id) ? item.Id : blocked.First();
+        var blockedName = blockedId == item.Id
+            ? item.Name
+            : (await itemRepository.GetByIdAsync(blockedId, cancellationToken))?.Name ?? item.Name;
+        throw new ValidationException(nameof(AddTransactionLineRequest.ItemId), $"{blockedName} is out of stock.");
     }
 
     /// <summary>Validates that every combo slot got exactly its required number of
@@ -705,7 +750,7 @@ public sealed class TransactionService(
         var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
         foreach (var line in request.Lines)
         {
-            await StageLineAsync(stage, line, cancellationToken);
+            await StageLineAsync(stage, line, cancellationToken, request.OfflineSale);
         }
 
         await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
