@@ -1681,7 +1681,15 @@ public sealed class TransactionService(
         var existingCart = await transactionRepository.GetOpenByDeviceAsync(deviceId, cancellationToken);
         if (existingCart is not null)
         {
-            throw new ValidationException(nameof(transactionId), "Finish or void your current cart before claiming a kiosk order.");
+            // The POS screen shows "no cart" while the server still holds an empty open one (it is created on
+            // first touch), so only a cart with items blocks the claim; an empty one has nothing to lose.
+            if (existingCart.OriginatedFromKiosk || existingCart.TotalAmount > 0)
+            {
+                throw new ValidationException(nameof(transactionId), "Finish or void your current cart before claiming a kiosk order.");
+            }
+
+            existingCart.Status = TransactionStatus.Voided;
+            _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
         order.DeviceId = deviceId;
