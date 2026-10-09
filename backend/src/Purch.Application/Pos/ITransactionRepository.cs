@@ -22,6 +22,9 @@ public interface ITransactionRepository
 
     Task<IReadOnlyList<TransactionLine>> ListLinesAsync(Guid transactionId, CancellationToken cancellationToken = default);
 
+    /// <summary>Read-only lines for many transactions in one query (the polled order lists).</summary>
+    Task<IReadOnlyList<TransactionLine>> ListLinesByTransactionsAsync(IReadOnlyCollection<Guid> transactionIds, CancellationToken cancellationToken = default);
+
     Task<TransactionLine?> GetLineAsync(Guid lineId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TransactionLineComboSelection>> ListComboSelectionsAsync(Guid lineId, CancellationToken cancellationToken = default);
@@ -47,6 +50,10 @@ public interface ITransactionRepository
     Task<RefundedTotals> GetRefundedTotalsByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default);
 
     /// <summary>Kiosk orders submitted at this branch, awaiting pickup by a cashier — see TransactionService.SubmitKioskOrderAsync/ClaimKioskOrderAsync.</summary>
+    /// <summary>Cheap change stamp for the branch's pending kiosk orders (one aggregate query), used as the
+    /// ETag so unchanged polls answer 304 without loading the orders.</summary>
+    Task<string> GetPendingKioskOrdersStampAsync(Guid branchId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
 
     /// <summary>Whether a batch of cart adds with this id was already applied.</summary>

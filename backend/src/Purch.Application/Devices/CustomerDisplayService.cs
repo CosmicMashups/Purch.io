@@ -11,9 +11,15 @@ namespace Purch.Application.Devices;
 /// welcome screen). NotModified means the display already has this version.</summary>
 public sealed record CustomerDisplayFeed(long Version, DateTimeOffset? UpdatedAt, JsonElement? State, bool NotModified);
 
+public sealed record CustomerDisplayFeedRead(CustomerDisplayState? State);
+
 public interface ICustomerDisplayRepository
 {
     Task<CustomerDisplayState?> GetByRegisterAsync(Guid registerDeviceId, CancellationToken cancellationToken = default);
+
+    /// <summary>One read-only query for the display's poll: null when the caller is not an active customer display
+    /// linked to a Register; otherwise the Register's stored state (itself null until the Register has published).</summary>
+    Task<CustomerDisplayFeedRead?> GetFeedForDisplayAsync(Guid displayDeviceId, CancellationToken cancellationToken = default);
 
     /// <summary>Whether an active customer display is paired to this Register: nothing is stored for a Register nobody watches.</summary>
     Task<bool> HasActiveDisplayAsync(Guid registerDeviceId, CancellationToken cancellationToken = default);
@@ -86,13 +92,11 @@ public sealed class CustomerDisplayService(
     {
         var displayId = currentActorProvider.DeviceId
             ?? throw new ForbiddenException("Only a paired customer display can read this.");
-        var display = await deviceRepository.GetByIdAsync(displayId, cancellationToken);
-        if (display is not { DeviceType: DeviceType.CustomerDisplay, Status: DeviceStatus.Active, LinkedRegisterDeviceId: { } registerId })
-        {
-            throw new ForbiddenException("Only a paired customer display can read this.");
-        }
+        // One read-only query for the display check and the state: this runs on every poll.
+        var read = await repository.GetFeedForDisplayAsync(displayId, cancellationToken)
+            ?? throw new ForbiddenException("Only a paired customer display can read this.");
 
-        var stored = await repository.GetByRegisterAsync(registerId, cancellationToken);
+        var stored = read.State;
         if (stored is null)
         {
             return new CustomerDisplayFeed(0, null, null, knownVersion == 0);

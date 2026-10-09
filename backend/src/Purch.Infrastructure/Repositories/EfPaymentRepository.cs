@@ -16,6 +16,16 @@ public sealed class EfPaymentRepository(PurchDbContext dbContext) : IPaymentRepo
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Payment>> ListByTransactionsAsync(IReadOnlyCollection<Guid> transactionIds, CancellationToken cancellationToken = default)
+    {
+        return transactionIds.Count == 0
+            ? []
+            : await dbContext.Payments
+                .AsNoTracking()
+                .Where(payment => transactionIds.Contains(payment.TransactionId))
+                .ToListAsync(cancellationToken);
+    }
+
     public async Task<decimal> SumCashCollectedByDeviceSinceAsync(Guid deviceId, DateTimeOffset since, CancellationToken cancellationToken = default)
     {
         var query =

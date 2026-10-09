@@ -50,6 +50,16 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TransactionLine>> ListLinesByTransactionsAsync(IReadOnlyCollection<Guid> transactionIds, CancellationToken cancellationToken = default)
+    {
+        return transactionIds.Count == 0
+            ? []
+            : await dbContext.TransactionLines
+                .AsNoTracking()
+                .Where(line => transactionIds.Contains(line.TransactionId))
+                .ToListAsync(cancellationToken);
+    }
+
     public Task<TransactionLine?> GetLineAsync(Guid lineId, CancellationToken cancellationToken = default)
     {
         return dbContext.TransactionLines.FirstOrDefaultAsync(line => line.Id == lineId, cancellationToken);
@@ -157,9 +167,31 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
         return row is null ? new RefundedTotals(0, 0m) : new RefundedTotals(row.Count, row.Amount);
     }
 
+    public async Task<string> GetPendingKioskOrdersStampAsync(Guid branchId, CancellationToken cancellationToken = default)
+    {
+        var stamp = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction =>
+                transaction.BranchId == branchId
+                && transaction.OriginatedFromKiosk
+                && transaction.Status == TransactionStatus.AwaitingPayment)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                Count = group.Count(),
+                Newest = group.Max(row => row.UpdatedAt ?? row.CreatedAt),
+                KitchenSum = group.Sum(row => (int)row.KitchenStatus),
+                PrepSum = group.Sum(row => row.KioskPrepNumber),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return stamp is null ? "0" : $"{stamp.Count}.{stamp.Newest.UtcTicks}.{stamp.KitchenSum}.{stamp.PrepSum}";
+    }
+
     public async Task<IReadOnlyList<Transaction>> ListPendingKioskOrdersByBranchAsync(Guid branchId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
+            .AsNoTracking()
             .Where(transaction =>
                 transaction.BranchId == branchId
                 && transaction.OriginatedFromKiosk

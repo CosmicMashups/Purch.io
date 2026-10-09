@@ -45,5 +45,7 @@ ENV DOTNET_EnableDiagnostics=0
 # Skip the profile-guided tier-0 instrumentation: it only pays off in long-running processes, and here
 # instances are short-lived, so it just adds start-up and early-request overhead.
 ENV DOTNET_TieredPGO=0
+# No background GC thread: it adds start-up work and steady CPU for little gain on a small, short-lived instance.
+ENV DOTNET_gcConcurrent=0
 
 ENTRYPOINT ["dotnet", "Purch.Api.dll"]

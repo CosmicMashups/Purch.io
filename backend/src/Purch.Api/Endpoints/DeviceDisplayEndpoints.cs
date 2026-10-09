@@ -1,3 +1,4 @@
+using Purch.Api.Http;
 using Purch.Application.Devices;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
@@ -16,23 +17,27 @@ public static class DeviceDisplayEndpoints
         var orderBoardOnly = new[] { nameof(Role.OrderBoard) };
         var kitchenDisplayOnly = new[] { nameof(Role.KitchenDisplay) };
 
-        _ = app.MapGet("/order-board/pending", async (
+        _ = app.MapGet("/order-board/pending", (
             Guid branchId,
+            HttpContext httpContext,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-        {
-            var orders = await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken);
-            return Results.Ok(ExcludePickedUp(orders));
-        }).RequireAuthorization(policy => policy.RequireRole(orderBoardOnly));
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => transactionService.GetPendingKioskOrdersVersionAsync(branchId, cancellationToken),
+                async () => ExcludePickedUp(await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken))))
+            .RequireAuthorization(policy => policy.RequireRole(orderBoardOnly));
 
-        _ = app.MapGet("/kitchen-display/pending", async (
+        _ = app.MapGet("/kitchen-display/pending", (
             Guid branchId,
+            HttpContext httpContext,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-        {
-            var orders = await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken);
-            return Results.Ok(ExcludePickedUp(orders));
-        }).RequireAuthorization(policy => policy.RequireRole(kitchenDisplayOnly));
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => transactionService.GetPendingKioskOrdersVersionAsync(branchId, cancellationToken),
+                async () => ExcludePickedUp(await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken))))
+            .RequireAuthorization(policy => policy.RequireRole(kitchenDisplayOnly));
 
         _ = app.MapPut("/kitchen-display/orders/{transactionId:guid}/status", async (
             Guid transactionId,

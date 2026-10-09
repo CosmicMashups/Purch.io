@@ -463,10 +463,13 @@ using (var startupScope = app.Services.CreateScope())
     // Supabase's public REST API with the anon key — and since this connection bypasses RLS, nothing in
     // the app would ever notice. Report it loudly; deliberately non-fatal so it can't take the API down.
     var rlsLogger = startupScope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+    // Advisory only, and a full catalog scan: on Vercel every cold start would pay for it, so Cloud runs
+    // it only when Startup:AuditRls is set (e.g. in a deploy check). Local installs always run it.
+    var auditRls = deploymentMode == DeploymentMode.Local || app.Configuration.GetValue<bool>("Startup:AuditRls");
 #pragma warning disable CA1031 // Intentionally broad: a failed advisory check must never crash startup.
     try
     {
-        var unprotected = await dbContext.Database
+        var unprotected = !auditRls ? [] : await dbContext.Database
             .SqlQueryRaw<string>(
                 "SELECT c.relname AS \"Value\" FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace " +
                 "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity " +

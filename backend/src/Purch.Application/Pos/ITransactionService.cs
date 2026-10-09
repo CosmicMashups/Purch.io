@@ -63,6 +63,9 @@ public interface ITransactionService
     /// <summary>Lists this branch's kiosk orders still awaiting pickup, oldest first.</summary>
     Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default);
 
+    /// <summary>Change stamp for <see cref="ListPendingKioskOrdersAsync"/>; unchanged stamp means unchanged list.</summary>
+    Task<string> GetPendingKioskOrdersVersionAsync(Guid branchId, CancellationToken cancellationToken = default);
+
     /// <summary>Cashier-POS-only: claims a pending kiosk order onto the calling device, reusing
     /// the exact same payment/discount/promo pipeline as any other cart — reassigns the order
     /// to this device and staff user and reopens it (AwaitingPayment to Open). Rejects if this

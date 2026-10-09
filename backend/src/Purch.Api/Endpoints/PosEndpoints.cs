@@ -1,3 +1,4 @@
+using Purch.Api.Http;
 using Purch.Api.RateLimiting;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
@@ -153,11 +154,15 @@ public static class PosEndpoints
 
         // --- Kiosk order pickup — a cashier POS claims a pending kiosk order,
         // then finishes it through the exact same payment/discount pipeline above ---
-        _ = app.MapGet("/transactions/kiosk-pending", async (
+        _ = app.MapGet("/transactions/kiosk-pending", (
             Guid branchId,
+            HttpContext httpContext,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken)))
+            ConditionalGet.RespondAsync(
+                httpContext,
+                () => transactionService.GetPendingKioskOrdersVersionAsync(branchId, cancellationToken),
+                () => transactionService.ListPendingKioskOrdersAsync(branchId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         _ = app.MapPost("/transactions/kiosk-pending/{transactionId:guid}/claim", async (

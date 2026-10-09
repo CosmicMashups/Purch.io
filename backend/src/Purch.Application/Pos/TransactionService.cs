@@ -1654,16 +1654,15 @@ public sealed class TransactionService(
         return (preference, hint);
     }
 
+    public Task<string> GetPendingKioskOrdersVersionAsync(Guid branchId, CancellationToken cancellationToken = default)
+    {
+        return transactionRepository.GetPendingKioskOrdersStampAsync(branchId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TransactionDto>> ListPendingKioskOrdersAsync(Guid branchId, CancellationToken cancellationToken = default)
     {
         var pending = await transactionRepository.ListPendingKioskOrdersByBranchAsync(branchId, cancellationToken);
-        var dtos = new List<TransactionDto>();
-        foreach (var order in pending)
-        {
-            dtos.Add(await ToDtoAsync(order, cancellationToken));
-        }
-
-        return dtos;
+        return pending.Count == 0 ? [] : await ToDtosAsync(pending, readOnly: true, cancellationToken);
     }
 
     public async Task<TransactionDto> ClaimKioskOrderAsync(Guid transactionId, CancellationToken cancellationToken = default)
@@ -1934,7 +1933,18 @@ public sealed class TransactionService(
 
     private async Task<TransactionDto> ToDtoAsync(Transaction transaction, CancellationToken cancellationToken)
     {
-        var lines = await transactionRepository.ListLinesAsync(transaction.Id, cancellationToken);
+        return (await ToDtosAsync([transaction], readOnly: false, cancellationToken))[0];
+    }
+
+    // Builds DTOs for many transactions with one query per kind of data, not per transaction: the
+    // polled kitchen/board/cashier lists used to run ~8 queries for every pending order on every poll.
+    // readOnly lists use untracked lines; the single-transaction path keeps the tracked read so it still
+    // sees any not-yet-saved line changes made earlier in the same request.
+    private async Task<List<TransactionDto>> ToDtosAsync(IReadOnlyList<Transaction> transactions, bool readOnly, CancellationToken cancellationToken)
+    {
+        var lines = readOnly
+            ? await transactionRepository.ListLinesByTransactionsAsync([.. transactions.Select(t => t.Id)], cancellationToken)
+            : await transactionRepository.ListLinesAsync(transactions[0].Id, cancellationToken);
         var lineIds = lines.Select(line => line.Id).ToList();
 
         // Each lookup below is one batched query for the whole cart, not one per line: on a remote
@@ -1973,10 +1983,17 @@ public sealed class TransactionService(
 
         var comboSelectionsByLine = comboSelections.ToLookup(selection => selection.TransactionLineId);
         var modifierSelectionsByLine = modifierSelections.ToLookup(selection => selection.TransactionLineId);
-        var lineDtos = new List<TransactionLineDto>();
+        var variantAttributesById = new Dictionary<Guid, Dictionary<string, string>>();
+        var lineDtosByTransaction = new Dictionary<Guid, List<TransactionLineDto>>();
 
         foreach (var line in lines)
         {
+            if (!lineDtosByTransaction.TryGetValue(line.TransactionId, out var lineDtos))
+            {
+                lineDtos = [];
+                lineDtosByTransaction[line.TransactionId] = lineDtos;
+            }
+
             _ = itemsById.TryGetValue(line.ItemId, out var item);
 
             var comboSelectionDtos = new List<ComboSelectionDto>();
@@ -1999,8 +2016,13 @@ public sealed class TransactionService(
             var itemVariantAttributes = new Dictionary<string, string>();
             if (line.ItemVariantId is { } variantIdForDto && variantsById.TryGetValue(variantIdForDto, out var variant))
             {
-                itemVariantAttributes = JsonSerializer.Deserialize<Dictionary<string, string>>(variant.VariantAttributesJson)
-                    ?? [];
+                if (!variantAttributesById.TryGetValue(variantIdForDto, out var parsed))
+                {
+                    parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(variant.VariantAttributesJson) ?? [];
+                    variantAttributesById[variantIdForDto] = parsed;
+                }
+
+                itemVariantAttributes = new Dictionary<string, string>(parsed);
             }
 
             var modifierSelectionDtos = new List<ModifierSelectionDto>();
@@ -2040,37 +2062,45 @@ public sealed class TransactionService(
                 modifierSelectionDtos));
         }
 
-        var subtotal = lineDtos.Sum(line => line.LineTotal);
+        var paymentsByTransaction = (await paymentRepository.ListByTransactionsAsync([.. transactions.Select(t => t.Id)], cancellationToken))
+            .ToLookup(payment => payment.TransactionId);
 
-        var payments = await paymentRepository.ListByTransactionAsync(transaction.Id, cancellationToken);
-        var paymentDtos = payments
-            .Select(payment => new PaymentDto(payment.Id, payment.Method, payment.Status, payment.Amount, payment.AmountTendered, payment.ChangeGiven))
-            .ToList();
+        var results = new List<TransactionDto>(transactions.Count);
+        foreach (var transaction in transactions)
+        {
+            var lineDtos = lineDtosByTransaction.TryGetValue(transaction.Id, out var found) ? found : [];
+            var subtotal = lineDtos.Sum(line => line.LineTotal);
+            var paymentDtos = paymentsByTransaction[transaction.Id]
+                .Select(payment => new PaymentDto(payment.Id, payment.Method, payment.Status, payment.Amount, payment.AmountTendered, payment.ChangeGiven))
+                .ToList();
 
-        return new TransactionDto(
-            transaction.Id,
-            transaction.BranchId,
-            transaction.DeviceId,
-            transaction.Status,
-            lineDtos,
-            subtotal,
-            transaction.DiscountAmount,
-            transaction.SeniorPwdDiscountApplied,
-            transaction.PromoCode,
-            transaction.PromoDiscountAmount,
-            transaction.ItemPromoDiscountAmount,
-            transaction.TotalAmount,
-            transaction.ReceiptNumber,
-            transaction.OrderType,
-            transaction.OriginatedFromKiosk,
-            transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,
-            transaction.KitchenStatus,
-            paymentDtos,
-            transaction.CreatedAt,
-            transaction.CompletedAt,
-            transaction.KioskPaymentPreference,
-            transaction.KioskDiscountHint,
-            transaction.VatExemptAmount);
+            results.Add(new TransactionDto(
+                transaction.Id,
+                transaction.BranchId,
+                transaction.DeviceId,
+                transaction.Status,
+                lineDtos,
+                subtotal,
+                transaction.DiscountAmount,
+                transaction.SeniorPwdDiscountApplied,
+                transaction.PromoCode,
+                transaction.PromoDiscountAmount,
+                transaction.ItemPromoDiscountAmount,
+                transaction.TotalAmount,
+                transaction.ReceiptNumber,
+                transaction.OrderType,
+                transaction.OriginatedFromKiosk,
+                transaction.KioskPrepNumber == 0 ? null : transaction.KioskPrepNumber,
+                transaction.KitchenStatus,
+                paymentDtos,
+                transaction.CreatedAt,
+                transaction.CompletedAt,
+                transaction.KioskPaymentPreference,
+                transaction.KioskDiscountHint,
+                transaction.VatExemptAmount));
+        }
+
+        return results;
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

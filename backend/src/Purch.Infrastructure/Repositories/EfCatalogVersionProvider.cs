@@ -27,10 +27,12 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
         var parts = new List<string>
         {
             separateTracking ? "sep" : "single",
-            await StampAsync(dbContext.Items, cancellationToken),
-            await StampAsync(dbContext.InventoryItems, cancellationToken),
-            await StampAsync(dbContext.ItemRecipeLines, cancellationToken),
         };
+        parts.AddRange(await StampsAsync(
+            cancellationToken,
+            Rows("items", dbContext.Items),
+            Rows("inventory", dbContext.InventoryItems),
+            Rows("recipes", dbContext.ItemRecipeLines)));
         return Hash(parts);
     }
 
@@ -54,15 +56,17 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
         var parts = new List<string>
         {
             separateTracking ? "sep" : "single",
-            await StampAsync(dbContext.ModifierGroups, cancellationToken),
-            await StampAsync(dbContext.ItemModifiers, cancellationToken),
-            await StampAsync(dbContext.ItemModifierIngredients, cancellationToken),
-            await StampAsync(dbContext.InventoryItems, cancellationToken),
-            // Category-linked groups list the category's items live, with their prices and stock.
-            await StampAsync(dbContext.ModifierGroupCategoryItems, cancellationToken),
-            await StampAsync(dbContext.Items, cancellationToken),
-            await StampAsync(dbContext.ItemRecipeLines, cancellationToken),
         };
+        parts.AddRange(await StampsAsync(
+            cancellationToken,
+            Rows("groups", dbContext.ModifierGroups),
+            Rows("modifiers", dbContext.ItemModifiers),
+            Rows("ingredients", dbContext.ItemModifierIngredients),
+            Rows("inventory", dbContext.InventoryItems),
+            // Category-linked groups list the category's items live, with their prices and stock.
+            Rows("categoryItems", dbContext.ModifierGroupCategoryItems),
+            Rows("items", dbContext.Items),
+            Rows("recipes", dbContext.ItemRecipeLines)));
         return Hash(parts);
     }
 
@@ -75,6 +79,40 @@ public sealed class EfCatalogVersionProvider(PurchDbContext dbContext, ICurrentT
             .FirstOrDefaultAsync(cancellationToken);
 
         return stamp is null ? "0" : $"{stamp.Count}@{stamp.Newest.UtcTicks}";
+    }
+
+    private sealed class StampRow
+    {
+        public string Tag { get; init; } = "";
+
+        public DateTimeOffset At { get; init; }
+    }
+
+    private static IQueryable<StampRow> Rows<TEntity>(string tag, IQueryable<TEntity> source)
+        where TEntity : Entity
+    {
+        return source.Select(row => new StampRow { Tag = tag, At = row.UpdatedAt ?? row.CreatedAt });
+    }
+
+    /// <summary>The same (count, newest) stamp per source as <see cref="StampAsync"/>, but all sources in one
+    /// UNION ALL query — this runs on every catalog poll, and each extra query is a database round trip.</summary>
+    private static async Task<IEnumerable<string>> StampsAsync(CancellationToken cancellationToken, params IQueryable<StampRow>[] sources)
+    {
+        var all = sources[0];
+        for (var i = 1; i < sources.Length; i++)
+        {
+            all = all.Concat(sources[i]);
+        }
+
+        var stamps = (await all
+            .GroupBy(row => row.Tag)
+            .Select(group => new { Tag = group.Key, Count = group.Count(), Newest = group.Max(row => row.At) })
+            .ToListAsync(cancellationToken))
+            .ToDictionary(stamp => stamp.Tag);
+
+        // An empty source has no group, so it simply has no part; its first row changes the version.
+        return stamps.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key}={pair.Value.Count}@{pair.Value.Newest.UtcTicks}");
     }
 
     private static string Hash(IEnumerable<string> parts)

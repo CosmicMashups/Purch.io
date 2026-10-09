@@ -148,6 +148,54 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task The_pending_list_keeps_each_orders_own_lines_and_answers_304_until_something_changes()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var (kioskClient, branchId, _) = await PairedKioskClientAsync(factory, adminClient);
+
+        var siomai = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Siomai", null, null, null, 45m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var lumpia = (await (await adminClient.PostAsJsonAsync("/items", new CreateItemRequest("Lumpia", null, null, null, 30m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+
+        var first = await (await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(siomai.Id, null, 2m)], "Take Out"))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        var second = await (await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(lumpia.Id, null, 1m)], "Dine In"))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+
+        var path = $"/transactions/kiosk-pending?branchId={branchId}";
+        var response = await adminClient.GetAsync(path);
+        var pending = await response.Content.ReadFromJsonAsync<List<TransactionDto>>(JsonOptions);
+
+        // Lines are loaded for all orders at once, so each order must still get only its own.
+        var firstListed = Assert.Single(pending!, order => order.Id == first!.Id);
+        var secondListed = Assert.Single(pending!, order => order.Id == second!.Id);
+        Assert.Equal("Siomai", Assert.Single(firstListed.Lines).ItemName);
+        Assert.Equal(90m, firstListed.TotalAmount);
+        Assert.Equal("Lumpia", Assert.Single(secondListed.Lines).ItemName);
+        Assert.Equal(30m, secondListed.TotalAmount);
+
+        var etag = response.Headers.ETag!.ToString();
+        Assert.Equal(HttpStatusCode.NotModified, (await GetWithIfNoneMatchAsync(adminClient, path, etag)).StatusCode);
+
+        // A new order, and a claim, each move the version.
+        var third = await (await kioskClient.PostAsJsonAsync("/kiosk/cart/place-order",
+            new PlaceKioskOrderRequest(Guid.NewGuid(), [new AddTransactionLineRequest(lumpia.Id, null, 1m)], "Take Out"))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions);
+        var afterPlace = await GetWithIfNoneMatchAsync(adminClient, path, etag);
+        Assert.Equal(HttpStatusCode.OK, afterPlace.StatusCode);
+
+        var placedEtag = afterPlace.Headers.ETag!.ToString();
+        _ = await adminClient.PostAsync($"/transactions/kiosk-pending/{third!.Id}/claim", null);
+        Assert.Equal(HttpStatusCode.OK, (await GetWithIfNoneMatchAsync(adminClient, path, placedEtag)).StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> GetWithIfNoneMatchAsync(HttpClient client, string path, string etag)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        return client.SendAsync(request);
+    }
+
+    [Fact]
     public async Task A_kiosk_order_carries_the_payment_choice_to_the_cashier_without_changing_the_price()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
