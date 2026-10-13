@@ -139,7 +139,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
         return branchId is { } id ? query.Where(transaction => transaction.BranchId == id) : query;
     }
 
-    public async Task<IReadOnlyList<InventoryMovement>> ListMovementsInRangeAsync(
+    public async Task<IReadOnlyList<MovementTypeSummaryDto>> SummarizeMovementsInRangeAsync(
         Guid? branchId,
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,
@@ -154,7 +154,10 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             query = query.Where(movement => movement.BranchId == id);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        return await query
+            .GroupBy(movement => movement.Type)
+            .Select(group => new MovementTypeSummaryDto(group.Key, group.Sum(movement => movement.Quantity), group.Count()))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Shift>> ListClosedShiftsInRangeAsync(

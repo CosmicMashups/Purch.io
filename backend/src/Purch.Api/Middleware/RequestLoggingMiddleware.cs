@@ -25,7 +25,7 @@ public sealed partial class RequestLoggingMiddleware(RequestDelegate next, ILogg
             var path = context.Request.Path.Value ?? "/";
             var status = context.Response.StatusCode;
 
-            if (path.StartsWith("/health", StringComparison.Ordinal))
+            if (path.StartsWith("/health", StringComparison.Ordinal) || (elapsed < SlowRequestThreshold && IsQuietPoll(context.Request.Method, path, status)))
             {
                 LogHealthProbe(logger, context.Request.Method, path, status, elapsed.TotalMilliseconds);
             }
@@ -38,6 +38,23 @@ public sealed partial class RequestLoggingMiddleware(RequestDelegate next, ILogg
                 LogRequest(logger, context.Request.Method, path, status, elapsed.TotalMilliseconds);
             }
         }
+    }
+
+    // Always-on displays poll these every few seconds; a line per poll buried real traffic and cost a
+    // console write each time. They log at Debug like health probes (errors and slow polls still surface).
+    private static readonly string[] PolledPaths =
+    [
+        "/kitchen-display/pending",
+        "/order-board/pending",
+        "/transactions/kiosk-pending",
+        "/customer-display/state",
+    ];
+
+    private static bool IsQuietPoll(string method, string path, int status)
+    {
+        return HttpMethods.IsGet(method)
+            && status is >= 200 and < 400
+            && PolledPaths.Any(polled => path.Equals(polled, StringComparison.OrdinalIgnoreCase));
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Method} {Path} responded {StatusCode} in {ElapsedMs:0.0} ms")]

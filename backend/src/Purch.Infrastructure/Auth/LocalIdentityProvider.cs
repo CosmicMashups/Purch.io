@@ -11,7 +11,9 @@ namespace Purch.Infrastructure.Auth;
 public sealed class LocalIdentityProvider(PurchDbContext dbContext, IPasswordHasher passwordHasher) : IIdentityProvider
 {
     // Checked for an unknown email too, so the time taken does not reveal whether the account exists.
-    private static readonly string DummyHash = BCrypt.Net.BCrypt.HashPassword("not-a-real-password");
+    // Lazy: a BCrypt hash at type-load made every cold start that touched this class pay for it, even when
+    // no sign-in with an unknown email ever happens on that instance.
+    private static readonly Lazy<string> DummyHash = new(() => BCrypt.Net.BCrypt.HashPassword("not-a-real-password"));
 
     public async Task<Guid> CreateUserAsync(string email, string password, CancellationToken cancellationToken = default)
     {
@@ -44,7 +46,7 @@ public sealed class LocalIdentityProvider(PurchDbContext dbContext, IPasswordHas
         var credential = await dbContext.LocalCredentials.AsNoTracking().FirstOrDefaultAsync(c => c.Email == email, cancellationToken);
         if (credential is null)
         {
-            _ = passwordHasher.Verify(password, DummyHash);
+            _ = passwordHasher.Verify(password, DummyHash.Value);
             return null;
         }
 

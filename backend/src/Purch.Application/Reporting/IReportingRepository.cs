@@ -51,7 +51,9 @@ public interface IReportingRepository
         int take,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<InventoryMovement>> ListMovementsInRangeAsync(
+    /// <summary>Total quantity and movement count per movement type, summed in SQL. Types with no movements
+    /// in the range are omitted.</summary>
+    Task<IReadOnlyList<MovementTypeSummaryDto>> SummarizeMovementsInRangeAsync(
         Guid? branchId,
         DateTimeOffset fromUtc,
         DateTimeOffset toUtc,

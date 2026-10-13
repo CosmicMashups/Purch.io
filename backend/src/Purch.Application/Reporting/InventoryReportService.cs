@@ -21,17 +21,12 @@ public sealed class InventoryReportService(
         CancellationToken cancellationToken = default)
     {
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
-        var movements = await reportingRepository.ListMovementsInRangeAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
+        var summarized = (await reportingRepository.SummarizeMovementsInRangeAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken))
+            .ToDictionary(summary => summary.Type);
 
+        // Every movement type is listed, including those with nothing in the range.
         var byType = Enum.GetValues<MovementType>()
-            .Select(type =>
-            {
-                var matching = movements.Where(movement => movement.Type == type).ToList();
-                return new MovementTypeSummaryDto(
-                    type,
-                    matching.Sum(movement => movement.Quantity),
-                    matching.Count);
-            })
+            .Select(type => summarized.TryGetValue(type, out var summary) ? summary : new MovementTypeSummaryDto(type, 0m, 0))
             .ToList();
 
         return new MovementSummaryDto(fromUtc, toUtc, byType);

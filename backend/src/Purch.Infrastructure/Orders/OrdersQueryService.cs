@@ -140,8 +140,11 @@ public sealed class OrdersQueryService(PurchDbContext db, IReportScopeResolver s
     private async Task<IReadOnlyList<OrderListItemDto>> ToItemsAsync(List<Transaction> rows, CancellationToken ct)
     {
         var ids = rows.Select(r => r.Id).ToList();
-        var branches = await db.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.Name, ct);
-        var devices = await db.Devices.AsNoTracking().ToDictionaryAsync(d => d.Id, d => d.Name ?? d.DeviceType.ToString(), ct);
+        // Only the branches and devices this page actually shows, not every one the tenant has.
+        var branchIds = rows.Select(r => r.BranchId).Distinct().ToList();
+        var deviceIds = rows.Select(r => r.DeviceId).Distinct().ToList();
+        var branches = await db.Branches.AsNoTracking().Where(b => branchIds.Contains(b.Id)).ToDictionaryAsync(b => b.Id, b => b.Name, ct);
+        var devices = await db.Devices.AsNoTracking().Where(d => deviceIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.Name ?? d.DeviceType.ToString(), ct);
         var staffIds = rows.Where(r => r.StaffUserId != null).Select(r => r.StaffUserId!.Value).Distinct().ToList();
         var staff = new Dictionary<Guid, string>();
         foreach (var m in await db.Memberships.AsNoTracking().Include(x => x.Account).Where(m => staffIds.Contains(m.Id)).ToListAsync(ct))
