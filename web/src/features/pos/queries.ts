@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../lib/authStore';
+import { adaptiveListInterval } from '../../lib/pollInterval';
 import { createAddQueue } from './addQueue';
 import { posApi } from './api';
 import { useCartAdds, type CartAdds } from './useCartAdds';
@@ -47,13 +48,16 @@ export function usePay() {
 
 export const kioskKeys = { pending: (branchId: string) => ['pos', 'kiosk-pending', branchId] as const };
 
+// 10 s while orders are waiting, 20 s once none have been for 5 minutes.
+const kioskPendingInterval = adaptiveListInterval({ activeMs: 10_000, idleMs: 20_000, quietAfterMs: 5 * 60_000 });
+
 /** Orders customers placed at a kiosk that are waiting for a cashier. Refreshes on its own while the page is open. */
 export const usePendingKioskOrders = (branchId: string | null) =>
   useQuery({
     queryKey: kioskKeys.pending(branchId ?? ''),
     queryFn: () => posApi.listKioskPending(branchId as string),
     enabled: branchId !== null,
-    refetchInterval: 10_000,
+    refetchInterval: kioskPendingInterval,
   });
 
 /** Claiming turns the kiosk order into this device's open cart, so the cart cache is set from the response. */

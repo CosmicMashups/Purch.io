@@ -598,7 +598,14 @@ public sealed class TransactionService(
         }
     }
 
-    public async Task<TransactionDto> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default)
+    /// <summary>The whole sale is one database transaction: the stages below each save so later steps can read
+    /// what earlier ones wrote, but nothing is visible to anyone else (or survives a failure) until the final commit.</summary>
+    public Task<TransactionDto> CheckoutAsync(CheckoutRequest request, CancellationToken cancellationToken = default)
+    {
+        return unitOfWork.ExecuteInTransactionAsync(ct => CheckoutCoreAsync(request, ct), cancellationToken);
+    }
+
+    private async Task<TransactionDto> CheckoutCoreAsync(CheckoutRequest request, CancellationToken cancellationToken)
     {
         if (request.SaleId == Guid.Empty)
         {
@@ -1097,9 +1104,12 @@ public sealed class TransactionService(
         cart.Status = TransactionStatus.Completed;
         cart.CompletedAt ??= DateTimeOffset.UtcNow;
 
-        await DecrementStockForCompletedSaleAsync(cart, cancellationToken);
-        await ConsumeInventoryForCompletedSaleAsync(cart, cancellationToken);
-        await ConsumeBatchesForCompletedSaleAsync(cart, cancellationToken);
+        // One pass over the cart's lines, items and selections feeds all three stock effects; each used to
+        // repeat that whole set of queries on its own.
+        var soldUnits = await SoldUnitsAsync(cart, cancellationToken);
+        await DecrementStockForCompletedSaleAsync(cart, soldUnits, cancellationToken);
+        await ConsumeInventoryForCompletedSaleAsync(cart, soldUnits, cancellationToken);
+        await ConsumeBatchesForCompletedSaleAsync(cart, soldUnits, cancellationToken);
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -1181,7 +1191,7 @@ public sealed class TransactionService(
         return reversed;
     }
 
-    private async Task DecrementStockForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    private async Task DecrementStockForCompletedSaleAsync(Transaction cart, IReadOnlyList<(Guid ItemId, decimal Quantity)> soldUnits, CancellationToken cancellationToken)
     {
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
         if (tenant is not null && tenant.UseSeparateInventoryTracking)
@@ -1189,7 +1199,7 @@ public sealed class TransactionService(
             return;
         }
 
-        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
+        foreach (var (itemId, quantitySold) in soldUnits)
         {
             var item = await itemRepository.GetByIdAsync(itemId, cancellationToken);
             if (item is null)
@@ -1218,9 +1228,9 @@ public sealed class TransactionService(
     /// keep showing everything it was received with. Item-level stock is handled separately; this only
     /// keeps the per-batch remainder honest. A quantity beyond what the batches hold (overselling) is
     /// simply not attributed to any batch.</summary>
-    private async Task ConsumeBatchesForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    private async Task ConsumeBatchesForCompletedSaleAsync(Transaction cart, IReadOnlyList<(Guid ItemId, decimal Quantity)> soldUnits, CancellationToken cancellationToken)
     {
-        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
+        foreach (var (itemId, quantitySold) in soldUnits)
         {
             var item = await itemRepository.GetByIdAsync(itemId, cancellationToken);
             if (item?.PricingType != PricingType.WeightVolume)
@@ -1251,9 +1261,23 @@ public sealed class TransactionService(
     {
         var units = new Dictionary<Guid, decimal>();
 
-        foreach (var line in await transactionRepository.ListLinesAsync(cart.Id, cancellationToken))
+        // Lines are read once, and each distinct item once, however many lines or add-ons point at it.
+        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        var pricingTypes = new Dictionary<Guid, PricingType?>();
+        async Task<PricingType?> PricingTypeOfAsync(Guid itemId)
         {
-            var pricingType = (await itemRepository.GetByIdAsync(line.ItemId, cancellationToken))?.PricingType;
+            if (!pricingTypes.TryGetValue(itemId, out var known))
+            {
+                known = (await itemRepository.GetByIdAsync(itemId, cancellationToken))?.PricingType;
+                pricingTypes[itemId] = known;
+            }
+
+            return known;
+        }
+
+        foreach (var line in lines)
+        {
+            var pricingType = await PricingTypeOfAsync(line.ItemId);
             if (pricingType == PricingType.Service)
             {
                 continue;
@@ -1274,19 +1298,18 @@ public sealed class TransactionService(
 
         // An item chosen as an add-on through a category-linked modifier group is handed over too, so it
         // is sold (and its recipe consumed) once per unit of the line it was added to.
-        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        var quantityByLine = lines.ToDictionary(line => line.Id, line => line.Quantity);
         var addOnSelections = (await transactionRepository.ListModifierSelectionsByLinesAsync([.. lines.Select(line => line.Id)], cancellationToken))
             .Where(selection => selection.ItemId is not null);
         foreach (var selection in addOnSelections)
         {
             var addOnItemId = selection.ItemId!.Value;
-            if ((await itemRepository.GetByIdAsync(addOnItemId, cancellationToken))?.PricingType == PricingType.Service)
+            if (await PricingTypeOfAsync(addOnItemId) == PricingType.Service)
             {
                 continue;
             }
 
-            var lineQuantity = lines.First(line => line.Id == selection.TransactionLineId).Quantity;
-            units[addOnItemId] = units.GetValueOrDefault(addOnItemId) + lineQuantity;
+            units[addOnItemId] = units.GetValueOrDefault(addOnItemId) + quantityByLine[selection.TransactionLineId];
         }
 
         return [.. units.Select(unit => (unit.Key, unit.Value))];
@@ -1296,7 +1319,7 @@ public sealed class TransactionService(
     /// sold item's recipe ingredients (InventoryItem.QuantityOnHand) by QuantityPerOrder times
     /// the quantity sold, logging a Consumption InventoryMovement per ingredient — in the same
     /// SaveChangesAsync as completing the sale, alongside DecrementStockForCompletedSaleAsync.</summary>
-    private async Task ConsumeInventoryForCompletedSaleAsync(Transaction cart, CancellationToken cancellationToken)
+    private async Task ConsumeInventoryForCompletedSaleAsync(Transaction cart, IReadOnlyList<(Guid ItemId, decimal Quantity)> soldUnits, CancellationToken cancellationToken)
     {
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
         if (tenant is null || !tenant.UseSeparateInventoryTracking)
@@ -1304,7 +1327,7 @@ public sealed class TransactionService(
             return;
         }
 
-        foreach (var (itemId, quantitySold) in await SoldUnitsAsync(cart, cancellationToken))
+        foreach (var (itemId, quantitySold) in soldUnits)
         {
             var recipeLines = await itemRecipeRepository.ListByItemAsync(itemId, cancellationToken);
 

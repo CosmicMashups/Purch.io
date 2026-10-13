@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../core/network/adaptive_poller.dart';
 
 import '../../../pos/domain/transaction_models.dart';
 import '../providers/order_board_providers.dart';
@@ -20,19 +20,24 @@ class OrderBoardDisplayScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderBoardDisplayScreenState extends ConsumerState<OrderBoardDisplayScreen> {
-  Timer? _pollTimer;
+  late final AdaptivePoller _poller;
 
   @override
   void initState() {
     super.initState();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      ref.invalidate(orderBoardPendingOrdersProvider);
-    });
+    // 5 s while orders exist, 15 s once the board has been empty for 5 minutes; paused while backgrounded.
+    _poller = AdaptivePoller(
+      onTick: () => ref.invalidate(orderBoardPendingOrdersProvider),
+      isBusy: () => ref.read(orderBoardPendingOrdersProvider).maybeWhen(
+            data: (orders) => orders.isNotEmpty,
+            orElse: () => true,
+          ),
+    )..start();
   }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    _poller.stop();
     super.dispose();
   }
 

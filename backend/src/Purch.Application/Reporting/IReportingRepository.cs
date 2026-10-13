@@ -9,6 +9,10 @@ namespace Purch.Application.Reporting;
 /// filter, same as every other repository in this codebase.</summary>
 public interface IReportingRepository
 {
+    /// <summary>The most rows the transaction export will build in memory. A request over this is refused, never silently
+    /// truncated, so a partial file can not be mistaken for the whole period.</summary>
+    const int MaxExportRows = 20_000;
+
     Task<IReadOnlyList<Transaction>> ListCompletedTransactionsAsync(
         Guid? branchId,
         DateTimeOffset fromUtc,

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Purch.Api.Middleware;
 using Purch.Application.Auth;
 using Purch.Domain.Entities;
@@ -156,8 +157,67 @@ public sealed class TenantResolutionMiddlewareTests
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
     }
 
+    [Fact]
+    public async Task Device_session_state_is_read_once_per_ttl_window_when_a_cache_is_supplied()
+    {
+        var device = new Device { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), SessionVersion = 1 };
+        var repository = new FakeDeviceRepository(device);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var calls = 0;
+        var middleware = new TenantResolutionMiddleware(_ =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        });
+
+        for (var i = 0; i < 3; i++)
+        {
+            var context = DeviceContext(device, sessionVersion: 1);
+            await middleware.InvokeAsync(context, repository, cache);
+            Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        }
+
+        Assert.Equal(3, calls);
+        Assert.Equal(1, repository.SessionStateReads);
+    }
+
+    [Fact]
+    public async Task A_device_that_is_not_found_is_not_cached_so_it_is_rechecked_every_request()
+    {
+        var unknown = new Device { Id = Guid.NewGuid(), TenantId = Guid.NewGuid(), SessionVersion = 1 };
+        var repository = new FakeDeviceRepository();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+
+        for (var i = 0; i < 2; i++)
+        {
+            var context = DeviceContext(unknown, sessionVersion: 1);
+            context.Response.Body = new MemoryStream();
+            await middleware.InvokeAsync(context, repository, cache);
+            Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        }
+
+        Assert.Equal(2, repository.SessionStateReads);
+    }
+
+    private static DefaultHttpContext DeviceContext(Device device, int sessionVersion)
+    {
+        var claims = new[]
+        {
+            new Claim(JwtClaimTypes.TenantId, device.TenantId.ToString()),
+            new Claim(JwtClaimTypes.DeviceId, device.Id.ToString()),
+            new Claim(JwtClaimTypes.DeviceSessionVersion, sessionVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        };
+        return new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "TestAuth")),
+        };
+    }
+
     private sealed class FakeDeviceRepository(Device? device = null) : IDeviceRepository
     {
+        public int SessionStateReads { get; private set; }
+
         public Task<Device?> FindByPairingCodeHashAsync(string pairingCodeHash, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<Device?> FindByPairingCodeAsync(string pairingCode, CancellationToken cancellationToken = default)
@@ -172,6 +232,7 @@ public sealed class TenantResolutionMiddlewareTests
 
         public Task<DeviceSessionState?> GetSessionStateAsync(Guid id, CancellationToken cancellationToken = default)
         {
+            SessionStateReads++;
             return Task.FromResult(device?.Id == id
                 ? new DeviceSessionState(device.Status, device.IsDeleted, device.SessionVersion)
                 : null);

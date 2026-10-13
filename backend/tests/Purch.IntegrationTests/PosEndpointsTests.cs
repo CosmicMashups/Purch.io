@@ -626,6 +626,31 @@ public sealed class PosEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_checkout_that_fails_after_staging_the_sale_is_rolled_back_and_leaves_the_held_cart_alone()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await AuthenticatedAdminClientAsync(factory);
+        var item = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Candy", null, null, null, 10m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var heldCart = (await (await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 3m))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        // The sale is built and saved in several steps before the payment is checked; cash that does not cover
+        // the total is only refused at the last one.
+        var failing = new CheckoutRequest(Guid.NewGuid(), [new AddTransactionLineRequest(item.Id, null, 1m)], false, null, null, new RecordPaymentRequest(PaymentMethod.Cash, 1m));
+        var refused = await client.PostAsJsonAsync("/transactions/checkout", failing);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+
+        // Nothing the attempt did is left behind: the cart the device was holding is still that cart, with its
+        // items, rather than a voided one replaced by a half-built sale.
+        var cartAfter = (await client.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(heldCart.Id, cartAfter.Id);
+        Assert.Equal(30m, cartAfter.TotalAmount);
+
+        // And the sale id was never claimed, so the same sale goes through once it is paid properly.
+        var retry = failing with { Payment = new RecordPaymentRequest(PaymentMethod.Cash, 500m) };
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/transactions/checkout", retry)).StatusCode);
+    }
+
+    [Fact]
     public async Task Selling_a_combo_takes_the_chosen_component_items_off_stock_not_the_combo_itself()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

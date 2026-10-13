@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { displayApi, kioskApi, type PlaceKioskOrderRequest } from './api';
 import type { KitchenStatus } from '../pos/types';
 import { toPricingRules } from './promoRules';
+import { adaptiveListInterval } from '../../lib/pollInterval';
 
 export const kioskKeys = {
   branding: ['kiosk', 'branding'] as const,
@@ -21,15 +22,18 @@ export const useKioskPromoRules = () =>
 export const usePlaceKioskOrder = () =>
   useMutation({ mutationFn: ({ body, signal }: { body: PlaceKioskOrderRequest; signal?: AbortSignal }) => kioskApi.placeOrder(body, signal), meta: { silent: true } });
 
-/** Both displays poll, because the API has no push channel. */
+/** Both displays poll, because the API has no push channel. 5 s while orders are showing, 15 s once the
+ * board has been empty for 5 minutes (an unattended display overnight); any order snaps it back to 5 s. */
 export const DISPLAY_POLL_MS = 5_000;
+export const DISPLAY_IDLE_POLL_MS = 15_000;
+const displayInterval = adaptiveListInterval({ activeMs: DISPLAY_POLL_MS, idleMs: DISPLAY_IDLE_POLL_MS, quietAfterMs: 5 * 60_000 });
 
 export const useDisplayOrders = (role: 'KitchenDisplay' | 'OrderBoard', branchId: string | null) =>
   useQuery({
     queryKey: kioskKeys.display(role, branchId ?? ''),
     queryFn: () => displayApi.pending(role, branchId as string),
     enabled: branchId !== null,
-    refetchInterval: DISPLAY_POLL_MS,
+    refetchInterval: displayInterval,
     staleTime: 0,
   });
 

@@ -35,8 +35,16 @@ export const queryClient = new QueryClient({
         }
         return failureCount < 4;
       },
-      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15_000),
+      // Full jitter on top of the exponential pause: after a backend restart every open screen would otherwise
+      // retry on the same beat and knock the cold instance over again.
+      retryDelay: (attempt) => {
+        const ceiling = Math.min(1000 * 2 ** attempt, 15_000);
+        return Math.round(ceiling / 2 + Math.random() * (ceiling / 2));
+      },
       refetchOnReconnect: 'always',
+      // Screens that need a fresh read on coming back (the cart) opt in; a blanket refetch of every stale
+      // query on each alt-tab is a burst of requests per device that no one is waiting on.
+      refetchOnWindowFocus: false,
       staleTime: 10_000,
       // Kept in memory as long as it may be saved offline, or a restored copy would be discarded early.
       gcTime: CACHE_MAX_AGE_MS,

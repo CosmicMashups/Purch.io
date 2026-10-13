@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../core/network/adaptive_poller.dart';
 
 import '../../../pos/domain/transaction_models.dart';
 import '../providers/kitchen_display_providers.dart';
@@ -19,19 +19,24 @@ class KitchenDisplayScreen extends ConsumerStatefulWidget {
 }
 
 class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
-  Timer? _pollTimer;
+  late final AdaptivePoller _poller;
 
   @override
   void initState() {
     super.initState();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      ref.invalidate(kitchenDisplayPendingOrdersProvider);
-    });
+    // 5 s while tickets exist, 15 s once the rail has been empty for 5 minutes; paused while backgrounded.
+    _poller = AdaptivePoller(
+      onTick: () => ref.invalidate(kitchenDisplayPendingOrdersProvider),
+      isBusy: () => ref.read(kitchenDisplayPendingOrdersProvider).maybeWhen(
+            data: (orders) => orders.isNotEmpty,
+            orElse: () => true,
+          ),
+    )..start();
   }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    _poller.stop();
     super.dispose();
   }
 

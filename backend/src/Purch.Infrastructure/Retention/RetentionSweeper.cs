@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Purch.Domain.Common;
 using Purch.Infrastructure.Persistence;
 
 namespace Purch.Infrastructure.Retention;
@@ -17,31 +18,101 @@ namespace Purch.Infrastructure.Retention;
 /// </summary>
 public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<RetentionOptions> options)
 {
+    // Arbitrary constant naming "the retention sweep" to Postgres advisory locks.
+    public const long SweepLockKey =0x50_55_52_43_48_52_45_54;
+
+    // A purge removes at most BatchSize x MaxBatchesPerTable rows per table per run, so one run stays well inside a
+    // serverless function's time budget and never holds one huge DELETE; whatever is left goes in the next run.
+    private const int BatchSize = 5_000;
+    private const int MaxBatchesPerTable = 20;
+
+    /// <summary>Runs one sweep, unless another instance is already sweeping (an overlapping cron call, a retry, or a
+    /// second warm instance): the lock is held on one connection for the whole run and a loser returns an empty
+    /// result straight away instead of racing the same rows.</summary>
     public async Task<RetentionSweepResult> RunAsync(CancellationToken cancellationToken = default)
+    {
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            var acquired = await dbContext.Database
+                .SqlQuery<bool>($"SELECT pg_try_advisory_lock({SweepLockKey}) AS \"Value\"")
+                .SingleAsync(cancellationToken);
+            if (!acquired)
+            {
+                return new RetentionSweepResult(0, 0, 0, 0, 0);
+            }
+
+            try
+            {
+                return await RunCoreAsync(cancellationToken);
+            }
+            finally
+            {
+                // Not cancellable: the lock must be released even if the request was aborted. (It is also released
+                // when the connection closes, which is the backstop.)
+                _ = await dbContext.Database
+                    .SqlQuery<bool>($"SELECT pg_advisory_unlock({SweepLockKey}) AS \"Value\"")
+                    .SingleAsync(CancellationToken.None);
+            }
+        }
+        finally
+        {
+            await dbContext.Database.CloseConnectionAsync();
+        }
+    }
+
+    private async Task<int> PurgeInBatchesAsync<TEntity>(IQueryable<TEntity> doomed, CancellationToken cancellationToken)
+        where TEntity : TenantScopedEntity
+    {
+        var total = 0;
+        for (var batch = 0; batch < MaxBatchesPerTable; batch++)
+        {
+            var ids = await doomed.Select(entity => entity.Id).Take(BatchSize).ToListAsync(cancellationToken);
+            if (ids.Count == 0)
+            {
+                break;
+            }
+
+            total += await dbContext.Set<TEntity>().IgnoreQueryFilters()
+                .Where(entity => ids.Contains(entity.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            if (ids.Count < BatchSize)
+            {
+                break;
+            }
+        }
+
+        return total;
+    }
+
+    private async Task<RetentionSweepResult> RunCoreAsync(CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
         var settings = options.Value;
 
         var tokenCutoff = now.AddDays(-settings.ExpiredTokenGraceDays);
 
-        var refreshTokensPurged = await dbContext.RefreshTokens
-            .IgnoreQueryFilters()
-            .Where(token => (token.RevokedAt != null && token.RevokedAt < tokenCutoff)
-                || (token.RevokedAt == null && token.ExpiresAt < tokenCutoff))
-            .ExecuteDeleteAsync(cancellationToken);
+        var refreshTokensPurged = await PurgeInBatchesAsync(
+            dbContext.RefreshTokens
+                .IgnoreQueryFilters()
+                .Where(token => (token.RevokedAt != null && token.RevokedAt < tokenCutoff)
+                    || (token.RevokedAt == null && token.ExpiresAt < tokenCutoff)),
+            cancellationToken);
 
-        var passwordResetTokensPurged = await dbContext.PasswordResetTokens
-            .IgnoreQueryFilters()
-            .Where(token => (token.UsedAt != null && token.UsedAt < tokenCutoff)
-                || (token.UsedAt == null && token.ExpiresAt < tokenCutoff))
-            .ExecuteDeleteAsync(cancellationToken);
+        var passwordResetTokensPurged = await PurgeInBatchesAsync(
+            dbContext.PasswordResetTokens
+                .IgnoreQueryFilters()
+                .Where(token => (token.UsedAt != null && token.UsedAt < tokenCutoff)
+                    || (token.UsedAt == null && token.ExpiresAt < tokenCutoff)),
+            cancellationToken);
 
         var syncedRecordCutoff = now.AddDays(-settings.SyncedRecordRetentionDays);
-        var syncedRecordsPurged = await dbContext.SyncedRecords
-            .IgnoreQueryFilters()
-            // A record still flagged for review is kept regardless of age — see SyncedRecord.FlaggedForReview.
-            .Where(record => !record.FlaggedForReview && record.CreatedAt < syncedRecordCutoff)
-            .ExecuteDeleteAsync(cancellationToken);
+        var syncedRecordsPurged = await PurgeInBatchesAsync(
+            dbContext.SyncedRecords
+                .IgnoreQueryFilters()
+                // A record still flagged for review is kept regardless of age — see SyncedRecord.FlaggedForReview.
+                .Where(record => !record.FlaggedForReview && record.CreatedAt < syncedRecordCutoff),
+            cancellationToken);
 
         var auditLogsPurged = 0;
         if (settings.AuditLogRetentionDays is { } auditLogDays)
@@ -52,17 +123,15 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
                 await ArchiveAuditLogsAsync(settings.ArchiveDirectory, cutoff, cancellationToken);
             }
 
-            auditLogsPurged = await dbContext.AuditLogs
-                .IgnoreQueryFilters()
-                .Where(log => log.CreatedAt < cutoff)
-                .ExecuteDeleteAsync(cancellationToken);
+            auditLogsPurged = await PurgeInBatchesAsync(
+                dbContext.AuditLogs.IgnoreQueryFilters().Where(log => log.CreatedAt < cutoff),
+                cancellationToken);
         }
 
         var cartBatchReceiptCutoff = now.AddDays(-settings.CartBatchReceiptRetentionDays);
-        var cartBatchReceiptsPurged = await dbContext.CartBatchReceipts
-            .IgnoreQueryFilters()
-            .Where(receipt => receipt.CreatedAt < cartBatchReceiptCutoff)
-            .ExecuteDeleteAsync(cancellationToken);
+        var cartBatchReceiptsPurged = await PurgeInBatchesAsync(
+            dbContext.CartBatchReceipts.IgnoreQueryFilters().Where(receipt => receipt.CreatedAt < cartBatchReceiptCutoff),
+            cancellationToken);
 
         var inventoryMovementsPurged = 0;
         if (settings.InventoryMovementRetentionDays is { } movementDays)
@@ -73,10 +142,9 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
                 await ArchiveInventoryMovementsAsync(settings.ArchiveDirectory, cutoff, cancellationToken);
             }
 
-            inventoryMovementsPurged = await dbContext.InventoryMovements
-                .IgnoreQueryFilters()
-                .Where(movement => movement.CreatedAt < cutoff)
-                .ExecuteDeleteAsync(cancellationToken);
+            inventoryMovementsPurged = await PurgeInBatchesAsync(
+                dbContext.InventoryMovements.IgnoreQueryFilters().Where(movement => movement.CreatedAt < cutoff),
+                cancellationToken);
         }
 
         var orphanedUploadsPurged = 0;

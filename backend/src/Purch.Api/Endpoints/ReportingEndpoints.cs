@@ -1,5 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Purch.Application.Approvals;
+using Purch.Application.Auth;
 using Purch.Application.Reporting;
 using Purch.Domain.Enums;
 
@@ -7,6 +10,12 @@ namespace Purch.Api.Endpoints;
 
 public static class ReportingEndpoints
 {
+    private static readonly TimeSpan DashboardCacheTtl = TimeSpan.FromSeconds(30);
+
+    // Per instance and bounded; a serverless instance's copy simply dies with it.
+    private static readonly MemoryCache DashboardCache =
+        new(new MemoryCacheOptions { SizeLimit = 500 });
+
     public static IEndpointRouteBuilder MapReportingEndpoints(this IEndpointRouteBuilder app)
     {
         var reportGenerator = new[] { nameof(Role.Admin), nameof(Role.Manager) };
@@ -25,13 +34,38 @@ public static class ReportingEndpoints
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
         // --- F1 — sales dashboard ---
+        // The dashboard is a handful of aggregations over the sales tables and is asked for on every refresh by every
+        // open admin screen. A short per-caller cache absorbs that; ?fresh=true skips it (a manual Refresh button).
         _ = app.MapGet("/reports/sales-dashboard", async (
+            HttpContext http,
             Guid? branchId,
             [FromQuery(Name = "from")] DateTimeOffset? fromUtc,
             [FromQuery(Name = "to")] DateTimeOffset? toUtc,
+            bool? fresh,
             ISalesDashboardService salesDashboardService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await salesDashboardService.GetDashboardAsync(branchId, fromUtc, toUtc, cancellationToken)))
+        {
+            // Keyed by tenant and user: the result is branch-scoped by the caller's role, so it must never be shared.
+            var key = string.Join(
+                '|',
+                http.User.FindFirst(JwtClaimTypes.TenantId)?.Value,
+                http.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
+                http.User.FindFirst(JwtClaimTypes.Role)?.Value,
+                http.User.FindFirst(JwtClaimTypes.ScopeType)?.Value,
+                http.User.FindFirst(JwtClaimTypes.ScopeId)?.Value,
+                http.User.FindFirst(JwtClaimTypes.BranchId)?.Value,
+                branchId,
+                fromUtc?.UtcTicks,
+                toUtc?.UtcTicks);
+            if (fresh != true && DashboardCache.TryGetValue(key, out SalesDashboardDto? cached) && cached is not null)
+            {
+                return Results.Ok(cached);
+            }
+
+            var dashboard = await salesDashboardService.GetDashboardAsync(branchId, fromUtc, toUtc, cancellationToken);
+            _ = DashboardCache.Set(key, dashboard, new MemoryCacheEntryOptions { Size = 1, AbsoluteExpirationRelativeToNow = DashboardCacheTtl });
+            return Results.Ok(dashboard);
+        })
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
         // --- F3 — inventory reports ---

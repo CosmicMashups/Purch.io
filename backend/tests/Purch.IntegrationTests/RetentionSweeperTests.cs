@@ -292,6 +292,41 @@ public sealed class RetentionSweeperTests(PostgresContainerFixture postgres)
         }
     }
 
+    [Fact]
+    public async Task A_sweep_started_while_another_is_running_does_nothing_and_a_later_one_still_purges()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await using var dbContext = OpenDbContext();
+        var expired = new RefreshToken { TenantId = Guid.NewGuid(), TokenHash = "lock-test", ExpiresAt = now.AddDays(-30) };
+        _ = dbContext.RefreshTokens.Add(expired);
+        _ = await dbContext.SaveChangesAsync();
+
+        // Stand-in for "a sweep is already running": another connection holds the sweep's advisory lock.
+        await using (var holder = new Npgsql.NpgsqlConnection(postgres.ConnectionString))
+        {
+            await holder.OpenAsync();
+            await using (var acquire = new Npgsql.NpgsqlCommand($"SELECT pg_advisory_lock({RetentionSweeper.SweepLockKey})", holder))
+            {
+                _ = await acquire.ExecuteScalarAsync();
+            }
+
+            var blocked = await Sweeper(dbContext, new RetentionOptions { ExpiredTokenGraceDays = 7 }).RunAsync();
+
+            Assert.Equal(0, blocked.Total);
+            Assert.True(await dbContext.RefreshTokens.IgnoreQueryFilters().AnyAsync(t => t.Id == expired.Id));
+
+            // Released explicitly: disposing a pooled connection returns it to the pool still holding its lock.
+            await using var release = new Npgsql.NpgsqlCommand($"SELECT pg_advisory_unlock({RetentionSweeper.SweepLockKey})", holder);
+            _ = await release.ExecuteScalarAsync();
+        }
+
+        // With the lock free again, the next sweep runs normally.
+        var released = await Sweeper(dbContext, new RetentionOptions { ExpiredTokenGraceDays = 7 }).RunAsync();
+
+        Assert.True(released.RefreshTokensPurged >= 1);
+        Assert.False(await dbContext.RefreshTokens.IgnoreQueryFilters().AnyAsync(t => t.Id == expired.Id));
+    }
+
     private PurchDbContext OpenDbContext()
     {
         var options = new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(postgres.ConnectionString).Options;

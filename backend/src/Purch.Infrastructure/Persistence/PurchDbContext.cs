@@ -170,6 +170,26 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
         _ = modelBuilder.ApplyConfigurationsFromAssembly(typeof(PurchDbContext).Assembly);
 
+        // Lookups that run on every kiosk poll miss, cart read, order-list page and sale, and had no index on
+        // the column they filter by (EF only indexes foreign keys it can infer; these are plain Guid columns).
+        _ = modelBuilder.Entity<Payment>().HasIndex(p => p.TransactionId).HasDatabaseName("IX_Payments_TransactionId");
+        _ = modelBuilder.Entity<TransactionLineComboSelection>().HasIndex(s => s.TransactionLineId).HasDatabaseName("IX_ComboSelections_TransactionLineId");
+        _ = modelBuilder.Entity<TransactionLineModifierSelection>().HasIndex(s => s.TransactionLineId).HasDatabaseName("IX_ModifierSelections_TransactionLineId");
+        _ = modelBuilder.Entity<CreditTransaction>().HasIndex(c => c.TransactionId).HasDatabaseName("IX_CreditTransactions_TransactionId");
+        _ = modelBuilder.Entity<CreditTransaction>().HasIndex(c => c.CustomerCreditLedgerId).HasDatabaseName("IX_CreditTransactions_LedgerId");
+        _ = modelBuilder.Entity<InventoryItem>().HasIndex(i => new { i.TenantId, i.LinkedItemId }).HasDatabaseName("IX_InventoryItems_Tenant_LinkedItem");
+        _ = modelBuilder.Entity<ItemBatch>().HasIndex(b => b.ItemId).HasDatabaseName("IX_ItemBatches_ItemId");
+
+        // Orders list and reports filter and sort by completion time and by cashier.
+        _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.BranchId, t.CompletedAt }).HasDatabaseName("IX_Transactions_Completed");
+        _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.StaffUserId }).HasDatabaseName("IX_Transactions_Staff");
+
+        // The kiosk / kitchen / order-board polls only ever look at orders waiting for a cashier: a tiny slice of a
+        // table that grows forever, so a partial index keeps that lookup flat. Status 1 = AwaitingPayment.
+        _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.BranchId })
+            .HasFilter("\"Status\" = 1 AND \"OriginatedFromKiosk\"")
+            .HasDatabaseName("IX_Transactions_KioskAwaitingPayment");
+
         // Optimistic concurrency on the rows that are read, changed in memory, then saved: the
         // cart being paid, stock counters, and a customer's credit balance. Postgres' own xmin
         // system column is the version (Npgsql maps IsRowVersion() to it, so there is no extra

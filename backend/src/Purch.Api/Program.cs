@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Purch.Api;
 using Purch.Api.Endpoints;
 using Purch.Api.ErrorHandling;
@@ -49,6 +50,10 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// Per-instance, in-process cache (no external service). Used for short-lived hot reads such as the
+// per-request device session check; every entry carries a short TTL so instances converge quickly.
+builder.Services.AddMemoryCache();
 
 // The catalog and report payloads are large, repetitive JSON; on a store connection this is the cheapest
 // bandwidth win there is. The API authenticates with a bearer header, not cookies, so there is no
@@ -101,14 +106,29 @@ builder.Services.AddSingleton<IFileStorage>(serviceProvider =>
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
 builder.Services.AddScoped<ICurrentActorProvider, HttpContextCurrentActorProvider>();
 
+builder.Services.AddSingleton<DeviceSessionCacheEvictionInterceptor>();
 builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 {
     var deploymentContext = serviceProvider.GetRequiredService<IDeploymentContext>();
+    _ = options.AddInterceptors(serviceProvider.GetRequiredService<DeviceSessionCacheEvictionInterceptor>());
     // Transient-failure retries cover the brief connection drops a pooled Supabase/Vercel
     // connection sees after idle periods; nothing here opens manual transactions, so the
     // retrying execution strategy is safe (SaveChanges is already atomic per call).
+    //
+    // Npgsql's default pool is 100 connections per process. Each serverless instance is a separate process
+    // behind the same Supabase pooler, so the default multiplies by the instance count and exhausts the
+    // pooler's session slots under load. Ten is plenty for one instance's concurrent requests; an explicit
+    // "Maximum Pool Size" in the configured connection string still wins.
+    var connectionString = deploymentContext.DatabaseConnectionString;
+    var connectionStringBuilder = new NpgsqlConnectionStringBuilder(connectionString);
+    if (!connectionStringBuilder.ContainsKey("Maximum Pool Size") && !connectionStringBuilder.ContainsKey("Max Pool Size"))
+    {
+        connectionStringBuilder.MaxPoolSize = 10;
+        connectionString = connectionStringBuilder.ConnectionString;
+    }
+
     _ = options.UseNpgsql(
-        deploymentContext.DatabaseConnectionString,
+        connectionString,
         npgsql => npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(4), errorCodesToAdd: null));
 });
 

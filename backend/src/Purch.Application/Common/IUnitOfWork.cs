@@ -11,4 +11,13 @@ namespace Purch.Application.Common;
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a use-case that has to save more than once (a checkout stages, prices and pays in several steps) as a
+    /// single database transaction: if any step throws, every save made inside it is rolled back, rather than leaving
+    /// a half-finished sale behind. Retried as a whole on a transient connection failure, so the delegate must be
+    /// safe to run again from the start. The default just runs it, for implementations with no transactions.
+    /// </summary>
+    Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        => operation(cancellationToken);
 }

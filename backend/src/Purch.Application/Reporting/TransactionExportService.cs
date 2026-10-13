@@ -21,6 +21,12 @@ public sealed class TransactionExportService(
     {
         var resolvedBranchId = await reportScopeResolver.ResolveBranchIdAsync(branchId, cancellationToken);
         var transactions = await reportingRepository.ListCompletedTransactionsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
+        if (transactions.Count > IReportingRepository.MaxExportRows)
+        {
+            throw new Common.Exceptions.ValidationException(
+                "range",
+                $"That period has more than {IReportingRepository.MaxExportRows:N0} sales. Choose a shorter date range and export it in parts.");
+        }
 
         var tenantId = currentTenantProvider.TenantId
             ?? throw new InvalidOperationException("The transaction export requires an authenticated tenant context.");

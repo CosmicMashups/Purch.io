@@ -631,6 +631,12 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CustomerCreditLedgerId")
+                        .HasDatabaseName("IX_CreditTransactions_LedgerId");
+
+                    b.HasIndex("TransactionId")
+                        .HasDatabaseName("IX_CreditTransactions_TransactionId");
+
                     b.ToTable("CreditTransactions");
                 });
 
@@ -1222,6 +1228,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId", "LinkedItemId")
+                        .HasDatabaseName("IX_InventoryItems_Tenant_LinkedItem");
+
                     b.ToTable("InventoryItems");
                 });
 
@@ -1418,6 +1427,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("IX_ItemBatches_ItemId");
 
                     b.ToTable("ItemBatches");
                 });
@@ -2036,6 +2048,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TransactionId")
+                        .HasDatabaseName("IX_Payments_TransactionId");
 
                     b.ToTable("Payments");
                 });
@@ -2730,9 +2745,19 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_Transactions_OneOpenCartPerDevice")
                         .HasFilter("\"Status\" = 0");
 
+                    b.HasIndex("TenantId", "BranchId")
+                        .HasDatabaseName("IX_Transactions_KioskAwaitingPayment")
+                        .HasFilter("\"Status\" = 1 AND \"OriginatedFromKiosk\"");
+
                     b.HasIndex("TenantId", "ClientSaleId")
                         .IsUnique()
                         .HasFilter("\"ClientSaleId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "StaffUserId")
+                        .HasDatabaseName("IX_Transactions_Staff");
+
+                    b.HasIndex("TenantId", "BranchId", "CompletedAt")
+                        .HasDatabaseName("IX_Transactions_Completed");
 
                     b.HasIndex("TenantId", "BranchId", "DeviceId", "ReceiptNumber")
                         .IsUnique()
@@ -2821,6 +2846,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("TransactionLineId")
+                        .HasDatabaseName("IX_ComboSelections_TransactionLineId");
+
                     b.ToTable("TransactionLineComboSelections");
                 });
 
@@ -2856,6 +2884,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TransactionLineId")
+                        .HasDatabaseName("IX_ModifierSelections_TransactionLineId");
 
                     b.ToTable("TransactionLineModifierSelections");
                 });

@@ -26,7 +26,8 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             query = query.Where(transaction => transaction.BranchId == id);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        // One past the limit, so the caller can tell "exactly at the limit" from "over it" without a COUNT.
+        return await query.Take(IReportingRepository.MaxExportRows + 1).ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TransactionLine>> ListLinesForTransactionsAsync(

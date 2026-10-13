@@ -87,12 +87,14 @@ public sealed class OrdersQueryService(PurchDbContext db, IReportScopeResolver s
 
         if (query.FromUtc is { } from)
         {
-            q = q.Where(t => (t.CompletedAt ?? t.CreatedAt) >= from);
+            // Equivalent to (CompletedAt ?? CreatedAt) >= from, written as two plain column comparisons so
+            // each branch can use its own index instead of evaluating a COALESCE per row.
+            q = q.Where(t => (t.CompletedAt != null && t.CompletedAt >= from) || (t.CompletedAt == null && t.CreatedAt >= from));
         }
 
         if (query.ToExclusiveUtc is { } to)
         {
-            q = q.Where(t => (t.CompletedAt ?? t.CreatedAt) < to);
+            q = q.Where(t => (t.CompletedAt != null && t.CompletedAt < to) || (t.CompletedAt == null && t.CreatedAt < to));
         }
 
         if (query.DeviceId is { } deviceId)
