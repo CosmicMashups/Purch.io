@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
+import { useCreditEnabled } from '../tenant/queries';
 import { useCreditLedgers } from '../credit/queries';
 import { formatPeso } from '../dashboard/format';
 import { stateForPayment, vatOf } from '../../hardware/display/channel';
@@ -42,7 +43,8 @@ export function PaymentPage() {
   const [choice, setChoice] = useState<Choice>('cash');
   const [tendered, setTendered] = useState('');
   const [ledgerId, setLedgerId] = useState('');
-  const ledgers = useCreditLedgers(choice === 'utang');
+  const creditOn = useCreditEnabled();
+  const ledgers = useCreditLedgers(choice === 'utang' && creditOn);
   usePublishCustomerDisplay(stateForPayment(cart.data));
 
   if (!claims?.deviceId) return <Navigate to="/sell" replace />;
@@ -89,7 +91,7 @@ export function PaymentPage() {
       </div>
 
       <div role="radiogroup" aria-label="Payment method" className="grid gap-3 sm:grid-cols-2">
-        {CHOICES.map((c) => (
+        {CHOICES.filter((c) => c.id !== 'utang' || creditOn).map((c) => (
           <button
             key={c.id}
             type="button"

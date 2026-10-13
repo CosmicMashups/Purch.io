@@ -17,12 +17,13 @@ interface AttentionRow {
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** What to look at first, gathered from the places that already know: sync review, credit due dates and stock. */
-export function NeedsAttention() {
+export function NeedsAttention({ creditOn }: { creditOn: boolean }) {
   const flagged = useFlaggedSync(true);
-  const reminders = useCreditReminders(7);
+  const reminders = useCreditReminders(7, creditOn);
   const stock = useInventoryDashboard(true);
 
-  const queries = [flagged, reminders, stock];
+  // A switched-off query stays "pending" forever, so it must not count towards loading or failure.
+  const queries = creditOn ? [flagged, reminders, stock] : [flagged, stock];
   if (queries.every((q) => q.isPending)) {
     return (
       <Panel title="Needs attention">
@@ -36,8 +37,9 @@ export function NeedsAttention() {
   if (open > 0) {
     rows.push({ key: 'sync', tone: 'warn', title: `${count(open, 'offline record needs', 'offline records need')} review`, detail: 'Two devices changed the same record.', to: '/business/sync-conflicts' });
   }
-  const overdue = reminders.data?.filter((r) => r.isOverdue).length ?? 0;
-  const soon = (reminders.data?.length ?? 0) - overdue;
+  const due = creditOn ? reminders.data : undefined;
+  const overdue = due?.filter((r) => r.isOverdue).length ?? 0;
+  const soon = (due?.length ?? 0) - overdue;
   if (overdue > 0) {
     rows.push({ key: 'overdue', tone: 'danger', title: `${count(overdue, 'customer account is', 'customer accounts are')} overdue`, detail: 'Utang past its due date.', to: '/business/customers' });
   }

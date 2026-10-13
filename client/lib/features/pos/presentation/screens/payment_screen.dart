@@ -464,13 +464,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           isSelected: _selectedMethod == PaymentMethod.manualGcashQr,
           onTap: isLoading ? null : () => setState(() => _selectedMethod = PaymentMethod.manualGcashQr),
         ),
-        _MethodTabButton(
-          label: 'Utang / Credit',
-          badge: 'Ledger',
-          icon: Icons.menu_book_rounded,
-          isSelected: _selectedMethod == PaymentMethod.utangCredit,
-          onTap: isLoading ? null : () => setState(() => _selectedMethod = PaymentMethod.utangCredit),
-        ),
+        if (ref.watch(isCreditLedgerEnabledProvider))
+          _MethodTabButton(
+            label: 'Utang / Credit',
+            badge: 'Ledger',
+            icon: Icons.menu_book_rounded,
+            isSelected: _selectedMethod == PaymentMethod.utangCredit,
+            onTap: isLoading ? null : () => setState(() => _selectedMethod = PaymentMethod.utangCredit),
+          ),
       ],
     );
   }

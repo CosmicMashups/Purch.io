@@ -15,6 +15,7 @@ import '../../../credit_ledger/presentation/providers/credit_ledger_providers.da
 import '../../../inventory/domain/inventory_movement_models.dart';
 import '../../../inventory/presentation/providers/inventory_providers.dart';
 import '../../../onboarding/domain/onboarding_enums.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../../../reports/domain/sales_dashboard_models.dart';
 import '../../../reports/domain/sales_trend_models.dart';
 import '../../../reports/presentation/providers/reports_providers.dart';
@@ -39,8 +40,9 @@ class HomeTabScreen extends ConsumerWidget {
     final role = ref.watch(currentStaffRoleProvider).value;
     final syncConflicts =
         ref.watch(flaggedSyncRecordsProvider).value?.length ?? 0;
+    final creditOn = ref.watch(isCreditLedgerEnabledProvider);
     final paymentReminders =
-        role == StaffRole.cashier || role == StaffRole.warehouse
+        !creditOn || role == StaffRole.cashier || role == StaffRole.warehouse
             ? 0
             : ref.watch(creditRemindersProvider()).value?.length ?? 0;
 
@@ -211,6 +213,7 @@ class HomeTabScreen extends ConsumerWidget {
             const NavSectionHeader(title: 'Quick actions'),
             _QuickActions(
               paymentReminders: paymentReminders,
+              showCredit: creditOn,
               showExports: showReporting,
             ),
 
@@ -1000,10 +1003,12 @@ class _RevenueCardSkeleton extends StatelessWidget {
 class _QuickActions extends ConsumerWidget {
   const _QuickActions({
     required this.paymentReminders,
+    required this.showCredit,
     required this.showExports,
   });
 
   final int paymentReminders;
+  final bool showCredit;
   final bool showExports;
 
   @override
@@ -1022,16 +1027,17 @@ class _QuickActions extends ConsumerWidget {
                 subtitle: 'Active • Balanced',
                 onTap: () => context.push('/home/shift'),
               ),
-              _QuickActionButton(
-                icon: Icons.receipt_long_outlined,
-                label: 'Payment Reminders',
-                subtitle:
-                    paymentReminders == 0
-                        ? 'No due reminders'
-                        : '$paymentReminders due today',
-                badgeCount: paymentReminders,
-                onTap: () => context.push('/home/payment-reminders'),
-              ),
+              if (showCredit)
+                _QuickActionButton(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Payment Reminders',
+                  subtitle:
+                      paymentReminders == 0
+                          ? 'No due reminders'
+                          : '$paymentReminders due today',
+                  badgeCount: paymentReminders,
+                  onTap: () => context.push('/home/payment-reminders'),
+                ),
               if (showExports) _LowStockExportButton(),
             ];
 

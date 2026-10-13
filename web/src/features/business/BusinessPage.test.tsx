@@ -1,18 +1,33 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderPage, signInAs } from '../../test/render';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { BusinessPage } from './BusinessPage';
+
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 
 const tileNames = () => screen.queryAllByRole('link').map((l) => l.textContent ?? '');
 
 describe('BusinessPage tiles', () => {
-  it('shows an admin everything, including devices and business settings', () => {
+  it('shows an admin everything, including devices and business settings', async () => {
+    vi.mocked(tenantApi.get).mockResolvedValue({ creditLedgerEnabled: true } as TenantSettings);
     signInAs('Admin');
     renderPage(<BusinessPage />);
+    await screen.findByRole('link', { name: /Customers/ });
     const text = tileNames().join(' | ');
     for (const label of ['Items', 'Reports', 'Customers', 'Staff', 'Branches', 'Devices', 'Business settings', 'Audit log', 'Promotions']) {
       expect(text).toContain(label);
     }
+  });
+
+  it('hides Customers and Money owed while customer credit is off', async () => {
+    vi.mocked(tenantApi.get).mockResolvedValue({ creditLedgerEnabled: false } as TenantSettings);
+    signInAs('Admin');
+    renderPage(<BusinessPage />);
+    await screen.findByRole('link', { name: /Business settings/ });
+    expect(tileNames().join(' | ')).not.toContain('Customers');
+    expect(screen.queryByText('Money owed')).not.toBeInTheDocument();
   });
 
   it('keeps devices and business settings from a manager', () => {

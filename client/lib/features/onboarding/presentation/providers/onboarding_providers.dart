@@ -313,6 +313,17 @@ bool isDineInTakeOutVertical(Ref ref) {
       businessType == BusinessType.cafe;
 }
 
+/// Whether the tenant sells on customer credit (utang), per the "Customer
+/// credit" option in Business settings. Defaults to false while settings are
+/// loading or unavailable, so credit screens never flash in and vanish.
+final isCreditLedgerEnabledProvider = Provider<bool>((ref) {
+  return ref
+          .watch(tenantSettingsNotifierProvider)
+          .valueOrNull
+          ?.creditLedgerEnabled ??
+      false;
+});
+
 /// Loads the audit log viewer (A6). Filtering by staff/date/action type is
 /// deferred until there's real audit data (Phase 4) to make filtering worth
 /// building a UI for — the backend query endpoint already supports it.

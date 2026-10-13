@@ -2,6 +2,8 @@ import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeItem } from '../../test/pos';
 import { renderPage, signInAs } from '../../test/render';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { branchesApi } from '../branches/api';
 import { catalogApi } from '../catalog/api';
 import { creditApi } from '../credit/api';
@@ -16,9 +18,11 @@ vi.mock('../credit/api', () => ({ creditApi: { list: vi.fn(), reminders: vi.fn()
 vi.mock('../dashboard/api', () => ({ dashboardApi: { sales: vi.fn(), inventory: vi.fn(), flaggedSync: vi.fn() } }));
 vi.mock('./deviceApi', () => ({ deviceApi: { list: vi.fn() } }));
 vi.mock('./staffApi', () => ({ staffApi: { list: vi.fn() } }));
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(tenantApi.get).mockResolvedValue({ creditLedgerEnabled: true } as TenantSettings);
   vi.mocked(catalogApi.listItems).mockResolvedValue([makeItem({ id: 'a', name: 'Latte' }), makeItem({ id: 'b', name: 'Mocha' })]);
   vi.mocked(catalogApi.listCategories).mockResolvedValue([{ id: 'c', name: 'Coffee', sortOrder: 1, imageUrl: null }]);
   vi.mocked(catalogApi.listModifierGroups).mockResolvedValue([]);

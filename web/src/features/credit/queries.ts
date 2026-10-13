@@ -4,8 +4,8 @@ import { creditApi, type CreateCreditBody } from './api';
 export const creditKeys = { all: ['credit-ledger'] as const, reminders: ['credit-ledger', 'reminders'] as const };
 
 export const useCreditLedgers = (enabled = true) => useQuery({ queryKey: creditKeys.all, queryFn: () => creditApi.list(), enabled });
-export const useCreditReminders = (withinDays = 7) =>
-  useQuery({ queryKey: [...creditKeys.reminders, withinDays], queryFn: () => creditApi.reminders(withinDays) });
+export const useCreditReminders = (withinDays = 7, enabled = true) =>
+  useQuery({ queryKey: [...creditKeys.reminders, withinDays], queryFn: () => creditApi.reminders(withinDays), enabled });
 
 /** Any change to an account can change what is due, so the list and the reminders refresh together. */
 function useCreditMutation<TVars>(fn: (vars: TVars) => Promise<unknown>) {

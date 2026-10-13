@@ -4,6 +4,8 @@ import { makeCart, makeLine } from '../../test/pos';
 import { renderPage, signInAs } from '../../test/render';
 import { branchesApi } from '../branches/api';
 import { creditApi } from '../credit/api';
+import { tenantApi } from '../tenant/api';
+import type { TenantSettings } from '../tenant/types';
 import { posApi } from './api';
 import { PaymentPage } from './PaymentPage';
 import { usePosStore } from './posStore';
@@ -12,6 +14,7 @@ import { ReceiptPage } from './ReceiptPage';
 vi.mock('./api', () => ({ posApi: { getCart: vi.fn(), pay: vi.fn(), refund: vi.fn() } }));
 vi.mock('../branches/api', () => ({ branchesApi: { list: vi.fn() } }));
 vi.mock('../credit/api', () => ({ creditApi: { list: vi.fn() } }));
+vi.mock('../tenant/api', () => ({ tenantApi: { get: vi.fn() } }));
 
 const cartWithTotal = (totalAmount: number) =>
   makeCart({ lines: [makeLine({ id: 'l1', itemName: 'Iced Latte', lineTotal: totalAmount })], subtotal: totalAmount, totalAmount });
@@ -45,6 +48,7 @@ beforeEach(() => {
     { id: 'kat', name: 'Katipunan', address: null, manualGcashQrImageUrl: 'https://cdn.example/qr.png', manualGcashAccountName: 'Kape Katipunan', manualGcashAccountNumber: '0917 555 0101' },
   ]);
   vi.mocked(creditApi.list).mockResolvedValue([]);
+  vi.mocked(tenantApi.get).mockResolvedValue({ creditLedgerEnabled: true } as TenantSettings);
 });
 
 describe('PaymentPage', () => {

@@ -10,6 +10,7 @@ import '../../../../core/session/session_scope.dart';
 import '../../../../core/theming/app_tokens.dart';
 import '../../../../core/widgets/purch_app_bar.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../widgets/nav_tile_card.dart';
 
 /// Business tab landing page — customers, staff/branches/devices, and
@@ -22,7 +23,20 @@ class BusinessTabScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(currentStaffRoleProvider).value;
-    final sections = businessSectionsForRole(role);
+    final creditOn = ref.watch(isCreditLedgerEnabledProvider);
+    // Customer accounts and reminders only exist while customer credit is on.
+    final sections = [
+      for (final section in businessSectionsForRole(role))
+        NavSection(
+          title: section.title,
+          tiles: [
+            for (final tile in section.tiles)
+              if (creditOn ||
+                  (tile.id != 'customers' && tile.id != 'payment-reminders'))
+                tile,
+          ],
+        ),
+    ].where((section) => section.tiles.isNotEmpty).toList();
 
     return Scaffold(
       appBar: PurchAppBar(

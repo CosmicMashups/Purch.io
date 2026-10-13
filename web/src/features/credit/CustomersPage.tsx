@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Navigate } from 'react-router-dom';
+import { useTenantSettings } from '../tenant/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { Modal } from '../../components/Modal';
@@ -17,7 +19,14 @@ import { RowActionsMenu } from '../../components/RowActionsMenu';
 import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../lifecycle/StatusFilter';
 import { useLifecycle } from '../lifecycle/useLifecycle';
 
+/** With customer credit switched off in Business settings there is nothing to show, so a bookmark falls back to the hub. */
 export function CustomersPage() {
+  const settings = useTenantSettings();
+  if (settings.data && !settings.data.creditLedgerEnabled) return <Navigate to="/business" replace />;
+  return <CustomersContent />;
+}
+
+function CustomersContent() {
   const ledgers = useCreditLedgers();
   const reminders = useCreditReminders(7);
   const anonymize = useAnonymizeCustomer();

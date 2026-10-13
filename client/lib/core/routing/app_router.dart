@@ -29,6 +29,7 @@ import '../../features/inventory/presentation/screens/supplier_list_screen.dart'
 import '../../features/kiosk/presentation/screens/kiosk_landing_screen.dart';
 import '../../features/kitchen_display/presentation/screens/kitchen_display_screen.dart';
 import '../../features/order_board/presentation/screens/order_board_display_screen.dart';
+import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../../features/onboarding/presentation/screens/audit_log_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_list_screen.dart';
 import '../../features/onboarding/presentation/screens/device_list_screen.dart';
@@ -54,8 +55,17 @@ class _AuthRefreshNotifier extends ChangeNotifier {
     ref.listen(authGateProvider, (_, _) => notifyListeners());
     // The landing page and the allowed pages depend on the role, which is read asynchronously.
     ref.listen(currentStaffRoleProvider, (_, _) => notifyListeners());
+    // Customer-credit pages leave as soon as the option is switched off.
+    ref.listen(tenantSettingsNotifierProvider, (_, _) => notifyListeners());
   }
 }
+
+/// Pages that only exist while customer credit (utang) is switched on.
+const _creditPaths = [
+  '/business/customers',
+  '/business/payment-reminders',
+  '/home/payment-reminders',
+];
 
 /// The one GoRouter for the whole app: a splash/login/kiosk top level, and a
 /// [StatefulShellRoute] for the staff app shell's four (role-filtered)
@@ -104,9 +114,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 return inStaffShell ? null : '/home';
               }
               // A page the role has no tab for sends it to the first one it does have.
-              return inStaffShell && roleMayOpen(role, location)
-                  ? null
-                  : landingPathForRole(role);
+              if (!inStaffShell || !roleMayOpen(role, location)) {
+                return landingPathForRole(role);
+              }
+              // Customer credit pages are gone while the option is off. Only
+              // act once settings have loaded, so a cold start is not bounced.
+              final settings =
+                  ref.read(tenantSettingsNotifierProvider).valueOrNull;
+              if (settings != null &&
+                  !settings.creditLedgerEnabled &&
+                  _creditPaths.any(location.startsWith)) {
+                return location.startsWith('/business') ? '/business' : '/home';
+              }
+              return null;
           }
         },
       );

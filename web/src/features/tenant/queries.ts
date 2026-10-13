@@ -36,3 +36,6 @@ export const useUpdateDepartmentTracking = () => useSettingsMutation((value: boo
 
 /** Whether the shop monitors departments. Unknown (still loading) reads as off, so department screens never flash in. */
 export const useDepartmentTracking = () => useTenantSettings().data?.useDepartmentTracking === true;
+
+/** Whether the shop sells on customer credit (utang). Unknown (still loading) reads as off, so credit screens never flash in. */
+export const useCreditEnabled = () => useTenantSettings().data?.creditLedgerEnabled === true;

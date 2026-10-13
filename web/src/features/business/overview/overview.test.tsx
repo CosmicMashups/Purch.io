@@ -42,7 +42,7 @@ beforeEach(() => {
 
 describe('NeedsAttention', () => {
   it('is good news when nothing needs looking at', async () => {
-    renderPage(<NeedsAttention />);
+    renderPage(<NeedsAttention creditOn />);
     expect(await screen.findByText('Nothing needs attention right now.')).toBeInTheDocument();
   });
 
@@ -50,7 +50,7 @@ describe('NeedsAttention', () => {
     vi.mocked(creditApi.reminders).mockResolvedValue([reminder({ id: '1', isOverdue: true }), reminder({ id: '2', isOverdue: true }), reminder({ id: '3', isOverdue: false })]);
     vi.mocked(dashboardApi.inventory).mockResolvedValue({ ...stock, outOfStockCount: 1, lowStockCount: 4 });
     vi.mocked(dashboardApi.flaggedSync).mockResolvedValue([{ id: 'a', deviceId: 'd', entityType: 'Sale', entityId: 'e', clientTimestamp: '', reviewedAt: null }]);
-    renderPage(<NeedsAttention />);
+    renderPage(<NeedsAttention creditOn />);
 
     expect(await screen.findByText('2 customer accounts are overdue')).toBeInTheDocument();
     expect(screen.getByText('1 account falls due within 7 days')).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('NeedsAttention', () => {
 
   it('admits when a check could not be made, and offers to try again', async () => {
     vi.mocked(dashboardApi.inventory).mockRejectedValue(new Error('boom'));
-    renderPage(<NeedsAttention />);
+    renderPage(<NeedsAttention creditOn />);
     expect(await screen.findByText(/Some checks could not be loaded/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
