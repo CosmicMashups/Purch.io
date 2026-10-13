@@ -5,6 +5,12 @@ import 'package:drift/drift.dart';
 /// just because the device (or the LAN link to a Local-mode server) was
 /// briefly unreachable. See docs/ARCHITECTURE.md §5 and the implementation
 /// plan's "Offline sync scope for v1" note.
+///
+/// SECURITY — read before using: nothing in the app writes to this table today (offline sales use QueuedSales), but
+/// SyncCoordinator is running and sends every row it finds to the server. Rows here are NOT sealed. Before any feature
+/// starts writing here, seal them the way QueuedSales does (see SaleQueueIntegrity and QueuedSales.integrity) and have
+/// the coordinator refuse rows that fail the check; otherwise anyone with the database file can inject records that the
+/// app will send. Details: docs/security/SECURITY-ASSESSMENT.md.
 class PendingSyncQueue extends Table {
   TextColumn get id =>
       text()(); // client-generated UUID, doubles as the idempotency key on /sync
