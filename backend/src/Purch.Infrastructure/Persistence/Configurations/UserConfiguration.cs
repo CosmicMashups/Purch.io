@@ -12,6 +12,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // email: the admin email+password login looks a user up by email alone,
         // before it knows which tenant to scope to (mirrors DeviceConfiguration's
         // pairing-code index). Most users have no email at all (PIN-only staff).
+        _ = builder.Ignore(u => u.PinLookup);
         _ = builder.HasIndex(u => u.Email)
             .IsUnique()
             .HasFilter("\"Email\" IS NOT NULL");

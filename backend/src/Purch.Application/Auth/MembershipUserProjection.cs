@@ -20,6 +20,7 @@ public static class MembershipUserProjection
             ScopeType = scope,
             ScopeId = scopeId,
             PinHash = membership.PinHash ?? string.Empty,
+            PinLookup = membership.PinLookup,
             Email = membership.Account?.Email,
             IsActive = membership.IsActive,
             CreatedAt = membership.CreatedAt,

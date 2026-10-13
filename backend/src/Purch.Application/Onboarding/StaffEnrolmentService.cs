@@ -18,6 +18,7 @@ public sealed class StaffEnrolmentService(
     IIdentityProvider identityProvider,
     IBranchRepository branchRepository,
     IPinHasher pinHasher,
+    IPinLookupKey pinLookupKey,
     IRefreshTokenService refreshTokenService,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
@@ -245,6 +246,10 @@ public sealed class StaffEnrolmentService(
             throw new ValidationException(nameof(request.Pin), pinError);
         }
 
+        // Checked before anything is created, so a refused PIN leaves nothing behind and the link can be retried.
+        var pinLookup = pinLookupKey.Compute(invite.TenantId, request.Pin!);
+        await RequireUnusedApproverPinAsync(invite.Role, invite.TenantId, pinLookup, null, nameof(request.Pin), cancellationToken);
+
         // A person who already has an account (another business) proves it with their existing password, so only a new
         // account is held to the password rules.
         var existing = await accountRepository.FindByEmailAsync(invite.Email, cancellationToken);
@@ -267,6 +272,7 @@ public sealed class StaffEnrolmentService(
             Role = invite.Role,
             Duties = invite.Duties,
             PinHash = pinHasher.Hash(request.Pin!),
+            PinLookup = pinLookup,
             LegacyUserId = invite.LegacyUserId,
         };
         membership.Branches.AddRange(invite.BranchIds.Select(branchId => new MembershipBranch { TenantId = invite.TenantId, MembershipId = membership.Id, BranchId = branchId }));
@@ -274,6 +280,17 @@ public sealed class StaffEnrolmentService(
 
         invite.RedeemedAt = DateTimeOffset.UtcNow;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>An Admin or Manager's PIN identifies them when it approves something, so two of them may not share one.</summary>
+    private async Task RequireUnusedApproverPinAsync(
+        MembershipRole role, Guid tenantId, string pinLookup, Guid? exceptMembershipId, string field, CancellationToken cancellationToken)
+    {
+        if (role is MembershipRole.Admin or MembershipRole.Manager
+            && await membershipRepository.ApproverPinInUseAsync(tenantId, pinLookup, exceptMembershipId, cancellationToken))
+        {
+            throw new ValidationException(field, "That PIN is already used by another manager or admin. Choose a different PIN.");
+        }
     }
 
     private async Task ResetPasswordAsync(EnrolmentInvite invite, RedeemInviteRequest request, CancellationToken cancellationToken)
@@ -301,7 +318,11 @@ public sealed class StaffEnrolmentService(
                 throw new ValidationException(nameof(request.Pin), pinError);
             }
 
+            var pinLookup = pinLookupKey.Compute(member.TenantId, request.Pin);
+            await RequireUnusedApproverPinAsync(member.Role, member.TenantId, pinLookup, member.Id, nameof(request.Pin), cancellationToken);
+
             member.PinHash = pinHasher.Hash(request.Pin);
+            member.PinLookup = pinLookup;
             member.PinFailedAttempts = 0;
             member.PinLockedUntil = null;
         }

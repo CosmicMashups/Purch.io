@@ -10,6 +10,7 @@ public sealed class BootstrapTenantService(
     ITenantRepository tenantRepository,
     IBranchRepository branchRepository,
     IPinHasher pinHasher,
+    IPinLookupKey pinLookupKey,
     IDeploymentContext deploymentContext,
     IAccountService accountService,
     IAccountRepository accountRepository,
@@ -44,6 +45,7 @@ public sealed class BootstrapTenantService(
             AccountId = account.Id,
             Role = MembershipRole.Admin,
             PinHash = pinHasher.Hash(request.AdminPin),
+            PinLookup = pinLookupKey.Compute(tenant.Id, request.AdminPin),
         };
         accountRepository.Add(membership);
 

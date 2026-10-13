@@ -1,6 +1,7 @@
 using Purch.Application.Auth;
 using Purch.Application.Common;
 using Purch.Application.Common.Exceptions;
+using Purch.Application.Onboarding;
 using Purch.Application.Pos;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
@@ -19,9 +20,40 @@ public sealed class ApproverAuthorizationServiceTests
     // only needs to say whether a typed PIN matches a stored one.
     private sealed class FakePinHasher : IPinHasher
     {
+        public int Verifications;
+
         public string Hash(string pin) => pin;
 
-        public bool Verify(string pin, string hash) => pin == hash;
+        public bool Verify(string pin, string hash)
+        {
+            Verifications++;
+            return pin == hash;
+        }
+    }
+
+    private sealed class FakePinLookupKey : IPinLookupKey
+    {
+        public string Compute(Guid tenantId, string pin) => $"lookup:{pin}";
+    }
+
+    private sealed class FakeMembershipRepository(params Membership[] memberships) : IMembershipRepository
+    {
+        public Task<Membership?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(memberships.FirstOrDefault(m => m.Id == id));
+
+        public Task<IReadOnlyList<Membership>> ListAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> ExistsForEmailAsync(string email, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> ExistsAsync(Guid tenantId, Guid accountId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<Membership?> GetUnscopedAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Membership>> ListByTenantUnscopedAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> ApproverPinInUseAsync(Guid tenantId, string pinLookup, Guid? exceptMembershipId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeDeviceRepository(Device device) : IDeviceRepository
@@ -32,6 +64,8 @@ public sealed class ApproverAuthorizationServiceTests
 
         public Task<Device?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(id == device.Id ? device : null);
+
+        public Task<DeviceSessionState?> GetSessionStateAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<Device?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
@@ -85,14 +119,18 @@ public sealed class ApproverAuthorizationServiceTests
         new() { Id = id, TenantId = TenantId, Name = role.ToString(), Role = role, PinHash = pin, IsActive = true };
 
     private static (ApproverAuthorizationService Service, Device Device, NoopUnitOfWork UnitOfWork) Build(
-        IReadOnlyList<User> users, Guid requesterId, Device? device = null)
+        IReadOnlyList<User> users, Guid requesterId, Device? device = null) =>
+        BuildWithHasher(users, requesterId, new FakePinHasher(), device);
+
+    private static (ApproverAuthorizationService Service, Device Device, NoopUnitOfWork UnitOfWork) BuildWithHasher(
+        IReadOnlyList<User> users, Guid requesterId, FakePinHasher hasher, Device? device = null, params Membership[] memberships)
     {
         device ??= new Device { Id = DeviceId, TenantId = TenantId, BranchId = Guid.NewGuid() };
         var unitOfWork = new NoopUnitOfWork();
         var service = new ApproverAuthorizationService(
             new FakeDeviceRepository(device),
             new FakeUserRepository(users),
-            new FakePinHasher(),
+            new ApproverPinMatcher(hasher, new FakePinLookupKey(), new FakeMembershipRepository(memberships)),
             new FakeCurrentTenantProvider(),
             new FakeCurrentActorProvider(requesterId),
             unitOfWork);
@@ -219,5 +257,63 @@ public sealed class ApproverAuthorizationServiceTests
 
         var exception = await Assert.ThrowsAsync<ValidationException>(() => service.AuthorizeAsync("1234"));
         Assert.Contains("PIN", exception.Errors["approverPin"][0]);
+    }
+
+    [Fact]
+    public async Task A_manager_with_a_pin_fingerprint_is_found_with_a_single_pin_check()
+    {
+        var first = MakeUser(ManagerId, Role.Manager, "1111");
+        first.PinLookup = "lookup:1111";
+        var second = MakeUser(AdminId, Role.Admin, "2222");
+        second.PinLookup = "lookup:2222";
+        var hasher = new FakePinHasher();
+        var (service, _, _) = BuildWithHasher([first, second], CashierId, hasher);
+
+        var approver = await service.AuthorizeAsync("2222");
+
+        Assert.Equal(AdminId, approver.Id);
+        Assert.Equal(1, hasher.Verifications);
+    }
+
+    [Fact]
+    public async Task A_wrong_pin_against_managers_that_all_have_fingerprints_costs_no_pin_checks()
+    {
+        var first = MakeUser(ManagerId, Role.Manager, "1111");
+        first.PinLookup = "lookup:1111";
+        var second = MakeUser(AdminId, Role.Admin, "2222");
+        second.PinLookup = "lookup:2222";
+        var hasher = new FakePinHasher();
+        var (service, _, _) = BuildWithHasher([first, second], CashierId, hasher);
+
+        _ = await Assert.ThrowsAsync<ValidationException>(() => service.AuthorizeAsync("9999"));
+
+        Assert.Equal(0, hasher.Verifications);
+    }
+
+    [Fact]
+    public async Task A_manager_without_a_fingerprint_still_approves_and_gets_one_saved()
+    {
+        var user = MakeUser(ManagerId, Role.Manager, "1234");
+        var membership = new Membership { Id = ManagerId, TenantId = TenantId, PinHash = "1234" };
+        var (service, _, _) = BuildWithHasher([user], CashierId, new FakePinHasher(), memberships: membership);
+
+        var approver = await service.AuthorizeAsync("1234");
+
+        Assert.Equal(ManagerId, approver.Id);
+        Assert.Equal("lookup:1234", membership.PinLookup);
+    }
+
+    [Fact]
+    public async Task A_fingerprint_for_a_different_pin_is_never_accepted_even_if_the_hash_would_match()
+    {
+        // Defence in depth: the fingerprint only narrows who is checked, so a stale one must not widen it.
+        var user = MakeUser(ManagerId, Role.Manager, "1234");
+        user.PinLookup = "lookup:other";
+        var hasher = new FakePinHasher();
+        var (service, _, _) = BuildWithHasher([user], CashierId, hasher);
+
+        _ = await Assert.ThrowsAsync<ValidationException>(() => service.AuthorizeAsync("1234"));
+
+        Assert.Equal(0, hasher.Verifications);
     }
 }

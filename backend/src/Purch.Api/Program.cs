@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -112,6 +113,8 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 });
 
 builder.Services.AddSingleton<IPinHasher, BCryptPinHasher>();
+builder.Services.AddSingleton<IPinLookupKey, HmacPinLookupKey>();
+builder.Services.AddScoped<IApproverPinMatcher, ApproverPinMatcher>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<ISupervisorAttestationService, SupervisorAttestationService>();
@@ -553,6 +556,28 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+
+// Scheduled retention sweep for Cloud (see RetentionHostedService, which only sweeps in-process in Local mode).
+// Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" when that env var is set; with no secret configured
+// the endpoint does not exist, so it can never be called anonymously.
+app.MapGet("/internal/retention-sweep", async (HttpContext http, RetentionSweeper sweeper, CancellationToken cancellationToken) =>
+{
+    var secret = app.Configuration["CRON_SECRET"];
+    if (string.IsNullOrEmpty(secret))
+    {
+        return Results.NotFound();
+    }
+
+    var supplied = http.Request.Headers.Authorization.ToString();
+    var expected = "Bearer " + secret;
+    if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(expected)))
+    {
+        return Results.Unauthorized();
+    }
+
+    var result = await sweeper.RunAsync(cancellationToken);
+    return Results.Ok(new { purged = result.Total });
+}).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") })
     .AllowAnonymous();
 app.MapAuthEndpoints();

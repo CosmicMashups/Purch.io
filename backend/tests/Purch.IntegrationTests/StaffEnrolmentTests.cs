@@ -140,6 +140,25 @@ public sealed class StaffEnrolmentTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_manager_cannot_take_a_pin_another_manager_or_admin_already_uses_but_a_cashier_can()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        var business = await NewBusinessAsync(factory); // the owner's PIN is 123412
+        using var anonymous = factory.CreateClient();
+
+        var managerInvite = new CreateInviteRequest("Mia Cruz", NewEmail(), MembershipRole.Manager, StaffDuty.Cashier, [business.Result.BranchId]);
+        var managerLink = await InviteAsync(business.Admin, managerInvite);
+
+        // The PIN identifies the approver, so it must be different from the owner's; nothing is used up by the refusal.
+        Assert.Equal(HttpStatusCode.BadRequest, (await RedeemAsync(anonymous, managerLink.Token, pin: "123412")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await RedeemAsync(anonymous, managerLink.Token, pin: "654321")).StatusCode);
+
+        // A cashier cannot approve anything, so sharing a manager's PIN is not ambiguous and is allowed.
+        var cashierLink = await InviteAsync(business.Admin, StaffInvite(business));
+        Assert.Equal(HttpStatusCode.OK, (await RedeemAsync(anonymous, cashierLink.Token, pin: "123412")).StatusCode);
+    }
+
+    [Fact]
     public async Task An_expired_or_cancelled_link_is_refused()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

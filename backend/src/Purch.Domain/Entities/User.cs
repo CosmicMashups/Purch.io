@@ -18,6 +18,9 @@ public class User : TenantScopedEntity
 
     public string PinHash { get; set; } = string.Empty;
 
+    /// <summary>Not stored. Set when a membership is shown as a User, carrying that membership's PIN fingerprint.</summary>
+    public string? PinLookup { get; set; }
+
     /// <summary>Set only for admin/owner accounts that use the separate
     /// email+password login (back-office use) instead of device+PIN.
     /// Null for ordinary staff, who only ever log in via PIN.</summary>

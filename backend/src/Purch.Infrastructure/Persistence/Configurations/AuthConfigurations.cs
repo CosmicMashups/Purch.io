@@ -42,6 +42,8 @@ public class MembershipConfiguration : IEntityTypeConfiguration<Membership>
         _ = builder.HasOne(m => m.Account).WithMany().HasForeignKey(m => m.AccountId).OnDelete(DeleteBehavior.Restrict);
         _ = builder.HasMany(m => m.Branches).WithOne().HasForeignKey(b => b.MembershipId).OnDelete(DeleteBehavior.Cascade);
         _ = builder.HasIndex(m => m.LegacyUserId).HasFilter("\"LegacyUserId\" IS NOT NULL");
+        _ = builder.Property(m => m.PinLookup).HasMaxLength(64);
+        _ = builder.HasIndex(m => new { m.TenantId, m.PinLookup }).HasFilter("\"PinLookup\" IS NOT NULL");
     }
 }
 

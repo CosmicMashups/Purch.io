@@ -34,6 +34,15 @@ public sealed class EfDeviceRepository(PurchDbContext dbContext) : IDeviceReposi
         return dbContext.Devices.FirstOrDefaultAsync(device => device.Id == id, cancellationToken);
     }
 
+    public Task<DeviceSessionState?> GetSessionStateAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Devices
+            .AsNoTracking()
+            .Where(device => device.Id == id)
+            .Select(device => new DeviceSessionState(device.Status, device.IsDeleted, device.SessionVersion))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Device>> ListByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Devices

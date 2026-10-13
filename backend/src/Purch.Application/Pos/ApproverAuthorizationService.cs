@@ -9,7 +9,7 @@ namespace Purch.Application.Pos;
 public sealed class ApproverAuthorizationService(
     IDeviceRepository deviceRepository,
     IUserRepository userRepository,
-    IPinHasher pinHasher,
+    IApproverPinMatcher approverPinMatcher,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IApproverAuthorizationService
@@ -52,7 +52,7 @@ public sealed class ApproverAuthorizationService(
         // its own request rather than being unable to void or refund anything at all.
         var otherApprovers = eligibleApprovers.Where(user => user.Id != requesterId).ToList();
         var candidates = otherApprovers.Count > 0 ? otherApprovers : eligibleApprovers;
-        var approver = candidates.FirstOrDefault(user => pinHasher.Verify(pin, user.PinHash));
+        var approver = await approverPinMatcher.FindAsync(candidates, pin, currentTenantProvider.TenantId!.Value, cancellationToken);
 
         if (approver is null)
         {

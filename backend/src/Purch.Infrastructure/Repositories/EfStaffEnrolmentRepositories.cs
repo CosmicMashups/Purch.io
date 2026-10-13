@@ -53,6 +53,18 @@ public sealed class EfMembershipRepository(PurchDbContext dbContext) : IMembersh
             .ToListAsync(cancellationToken);
     }
 
+    public Task<bool> ApproverPinInUseAsync(Guid tenantId, string pinLookup, Guid? exceptMembershipId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Memberships.IgnoreQueryFilters().AnyAsync(
+            m => m.TenantId == tenantId
+                && m.IsActive
+                && !m.IsDeleted
+                && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Manager)
+                && m.PinLookup == pinLookup
+                && (exceptMembershipId == null || m.Id != exceptMembershipId),
+            cancellationToken);
+    }
+
     public Task<Membership?> GetUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.Memberships.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.Id == id, cancellationToken);

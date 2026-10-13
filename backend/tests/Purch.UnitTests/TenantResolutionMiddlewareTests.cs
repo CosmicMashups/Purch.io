@@ -170,6 +170,13 @@ public sealed class TenantResolutionMiddlewareTests
             return Task.FromResult(device?.Id == id ? device : null);
         }
 
+        public Task<DeviceSessionState?> GetSessionStateAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(device?.Id == id
+                ? new DeviceSessionState(device.Status, device.IsDeleted, device.SessionVersion)
+                : null);
+        }
+
         public Task<Device?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return GetByIdAsync(id, cancellationToken);

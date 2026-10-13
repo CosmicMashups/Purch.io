@@ -33,7 +33,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 // A missing or unreadable version must not default to 0 and match a device that has
                 // never been reset: it is rejected like any other stale session.
                 var hasSessionVersion = int.TryParse(context.User.FindFirst(JwtClaimTypes.DeviceSessionVersion)?.Value, out var tokenSessionVersion);
-                var device = await deviceRepository.GetByIdAsync(deviceId, context.RequestAborted);
+                var device = await deviceRepository.GetSessionStateAsync(deviceId, context.RequestAborted);
 
                 if (device is null || device.Status is Purch.Domain.Enums.DeviceStatus.Revoked or Purch.Domain.Enums.DeviceStatus.Inactive || device.IsDeleted || !hasSessionVersion || device.SessionVersion != tokenSessionVersion)
                 {

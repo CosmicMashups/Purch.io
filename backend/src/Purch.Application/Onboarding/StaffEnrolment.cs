@@ -51,6 +51,10 @@ public interface IMembershipRepository
     /// <summary>Not tenant-filtered: used while redeeming a link, when nobody is signed in.</summary>
     Task<Membership?> GetUnscopedAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Whether another active Admin or Manager of this business already has the PIN with this fingerprint.
+    /// Not tenant-filtered (the tenant is given): redeeming a link happens with nobody signed in.</summary>
+    Task<bool> ApproverPinInUseAsync(Guid tenantId, string pinLookup, Guid? exceptMembershipId, CancellationToken cancellationToken = default);
+
     /// <summary>Every person of a business with their account and branches, without needing a signed-in tenant: a till asks
     /// for its roster using only its own device credential.</summary>
     Task<IReadOnlyList<Membership>> ListByTenantUnscopedAsync(Guid tenantId, CancellationToken cancellationToken = default);

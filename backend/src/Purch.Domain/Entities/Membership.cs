@@ -27,6 +27,10 @@ public class Membership : TenantScopedEntity, ISoftDeletable
     /// (the person is chosen first), so unlike the old PIN login it needs no cross-user uniqueness. Null until set.</summary>
     public string? PinHash { get; set; }
 
+    /// <summary>Keyed fingerprint of the PIN within this business (see IPinLookupKey). It only narrows which person an
+    /// approver PIN can belong to; <see cref="PinHash"/> decides. Null until the PIN is next set or correctly entered.</summary>
+    public string? PinLookup { get; set; }
+
     public int PinFailedAttempts { get; set; }
 
     /// <summary>Set once PinFailedAttempts reaches the limit; PIN sign-in is refused until it passes.</summary>

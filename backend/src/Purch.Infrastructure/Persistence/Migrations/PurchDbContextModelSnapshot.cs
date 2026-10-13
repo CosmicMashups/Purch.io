@@ -1821,6 +1821,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("PinLockedUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PinLookup")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<int>("Role")
                         .HasColumnType("integer");
 
@@ -1845,6 +1849,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "AccountId")
                         .IsUnique();
+
+                    b.HasIndex("TenantId", "PinLookup")
+                        .HasFilter("\"PinLookup\" IS NOT NULL");
 
                     b.ToTable("Memberships");
                 });

@@ -19,7 +19,7 @@ public sealed class ShiftService(
     ICustomerCreditLedgerRepository creditLedgerRepository,
     IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
-    IPinHasher pinHasher,
+    IApproverPinMatcher approverPinMatcher,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
     IUnitOfWork unitOfWork) : IShiftService
@@ -94,7 +94,7 @@ public sealed class ShiftService(
             }
 
             var activeUsers = await userRepository.GetActiveActorsAsync(CurrentTenantId, cancellationToken);
-            var approver = activeUsers.FirstOrDefault(user => ApproverRoles.Contains(user.Role) && pinHasher.Verify(request.ApproverPin, user.PinHash))
+            var approver = await approverPinMatcher.FindAsync([.. activeUsers.Where(user => ApproverRoles.Contains(user.Role))], request.ApproverPin, CurrentTenantId, cancellationToken)
                 ?? throw new ValidationException(nameof(request.ApproverPin), "That PIN doesn't match an active manager or admin.");
 
             approvedByUserId = approver.Id;
@@ -136,7 +136,7 @@ public sealed class ShiftService(
             }
 
             var activeUsers = await userRepository.GetActiveActorsAsync(CurrentTenantId, cancellationToken);
-            var approver = activeUsers.FirstOrDefault(user => ApproverRoles.Contains(user.Role) && pinHasher.Verify(request.SupervisorPin, user.PinHash))
+            var approver = await approverPinMatcher.FindAsync([.. activeUsers.Where(user => ApproverRoles.Contains(user.Role))], request.SupervisorPin, CurrentTenantId, cancellationToken)
                 ?? throw new ValidationException(nameof(request.SupervisorPin), "That PIN doesn't match an active manager or admin.");
 
             approvedByUserId = approver.Id;

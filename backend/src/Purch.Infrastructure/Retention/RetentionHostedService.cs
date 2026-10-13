@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Purch.Application.Common;
+using Purch.Domain.Enums;
 
 namespace Purch.Infrastructure.Retention;
 
@@ -18,6 +20,17 @@ public sealed partial class RetentionHostedService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Cloud instances are short-lived serverless containers: sweeping on every spin-up wastes CPU and the
+        // process rarely lives long enough to matter. Cloud runs the sweep from a scheduled call to
+        // /internal/retention-sweep instead; only a long-lived Local install sweeps in-process.
+        using (var scope = scopeFactory.CreateScope())
+        {
+            if (scope.ServiceProvider.GetRequiredService<IDeploymentContext>().Mode != DeploymentMode.Local)
+            {
+                return;
+            }
+        }
+
         try
         {
             await Task.Delay(Random.Shared.Next(1_000, 30_000), stoppingToken);
