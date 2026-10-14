@@ -37,6 +37,22 @@ public static class PosEndpoints
             Results.Ok(await transactionService.AddLinesBatchAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
+        // --- Open item (something not in the catalog) and a free-text note on any line ---
+        _ = app.MapPost("/transactions/cart/lines/open", async (
+            AddOpenItemRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.AddOpenItemAsync(request, cancellationToken)))
+            .RequirePermission(Permissions.OpenItemAdd);
+
+        _ = app.MapPut("/transactions/cart/lines/{lineId:guid}/note", async (
+            Guid lineId,
+            SetLineNoteRequest request,
+            ITransactionService transactionService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await transactionService.SetLineNoteAsync(lineId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(posOperator));
+
         _ = app.MapPut("/transactions/cart/lines/{lineId:guid}", async (
             Guid lineId,
             UpdateTransactionLineRequest request,

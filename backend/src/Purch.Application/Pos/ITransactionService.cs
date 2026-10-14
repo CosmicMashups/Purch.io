@@ -14,6 +14,13 @@ public interface ITransactionService
     /// <see cref="AddLinesBatchRequest.BatchId"/>: a retry adds nothing a second time.</summary>
     Task<TransactionDto> AddLinesBatchAsync(AddLinesBatchRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>Adds an ad-hoc line that is not a catalog item (see <see cref="AddOpenItemRequest"/>). Always a new line,
+    /// never merged. Refused with a 403 when the tenant has switched open items off.</summary>
+    Task<TransactionDto> AddOpenItemAsync(AddOpenItemRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets or clears the note on a line of this device's open cart.</summary>
+    Task<TransactionDto> SetLineNoteAsync(Guid lineId, SetLineNoteRequest request, CancellationToken cancellationToken = default);
+
     Task<TransactionDto> UpdateLineAsync(Guid lineId, UpdateTransactionLineRequest request, CancellationToken cancellationToken = default);
 
     Task<TransactionDto> RemoveLineAsync(Guid lineId, string? approverPin, CancellationToken cancellationToken = default);

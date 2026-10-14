@@ -21,4 +21,5 @@ public sealed record TenantSettingsDto(
     string? KioskPosterImageUrl,
     bool UseSeparateInventoryTracking,
     bool UseDepartmentTracking = false,
-    bool UpdateCostOnReceiving = false);
+    bool UpdateCostOnReceiving = false,
+    bool OpenItemEnabled = true);

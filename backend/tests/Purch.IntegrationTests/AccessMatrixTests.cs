@@ -183,7 +183,23 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
             Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/discount", body)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/transactions/cart/discount", body)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/price", new { newUnitPrice = 1m, reason = "Match" })).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/transactions/cart/lines/open", new { name = "Thing", unitPrice = 10m, quantity = 1m })).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/note", new { note = "x" })).StatusCode);
         }
+    }
+
+    [Fact]
+    public async Task A_cashier_may_add_an_open_item_and_set_a_line_note()
+    {
+        var (factory, admin, business, anonymous) = await NewShopAsync();
+        await using var _ = factory;
+        var cashier = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Cashier);
+        var register = await PairAsync(admin, anonymous, business, DeviceType.Register);
+        var cashierClient = Bearer(factory, await UnlockAsync(anonymous, register, cashier));
+
+        var added = await cashierClient.PostAsJsonAsync("/transactions/cart/lines/open", new { name = "Thing", unitPrice = 10m, quantity = 1m });
+        Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{Guid.NewGuid()}/note", new { note = "x" })).StatusCode);
     }
 
     [Fact]

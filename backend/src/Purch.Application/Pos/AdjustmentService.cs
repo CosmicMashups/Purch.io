@@ -108,7 +108,7 @@ public sealed class AdjustmentService(
             {
                 TenantId = CurrentTenantId,
                 OriginalLineId = originalLine.Id,
-                ItemId = originalLine.ItemId ?? throw new ValidationException(nameof(request.ReturnLines), "An open-item line has no catalog item to return."),
+                ItemId = originalLine.ItemId ?? throw new ValidationException(nameof(request.ReturnLines), "An open item (a line rung up outside the catalog) can't be returned or exchanged; refund the whole sale instead."),
                 ItemVariantId = originalLine.ItemVariantId,
                 Quantity = requested.Quantity,
                 UnitPrice = originalLine.UnitPrice,

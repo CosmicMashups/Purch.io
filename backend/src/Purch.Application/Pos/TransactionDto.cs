@@ -51,7 +51,10 @@ public sealed record TransactionLineDto(
     decimal ManualDiscountAmount = 0m,
     decimal? PriceOverrideFrom = null,
     string? ManualDiscountKind = null,
-    decimal? ManualDiscountValue = null);
+    decimal? ManualDiscountValue = null,
+    bool IsOpenItem = false,
+    string? OpenItemName = null,
+    string? Note = null);
 
 /// <summary>Mirrors Purch.Domain.Entities.TransactionLineComboSelection, resolved to
 /// readable slot/item names for receipt display.</summary>

@@ -118,6 +118,102 @@ public sealed class TransactionService(
         return await ToDtoAsync(await AddLineCoreAsync(request, cancellationToken), cancellationToken);
     }
 
+    private const int MaxOpenItemNameLength = 80;
+    private const int MaxLineNoteLength = 200;
+
+    public async Task<TransactionDto> AddOpenItemAsync(AddOpenItemRequest request, CancellationToken cancellationToken = default)
+    {
+        var name = request.Name?.Trim() ?? string.Empty;
+        if (name.Length is 0 or > MaxOpenItemNameLength)
+        {
+            throw new ValidationException(nameof(request.Name), $"The name must be between 1 and {MaxOpenItemNameLength} characters.");
+        }
+
+        if (request.UnitPrice <= 0m)
+        {
+            throw new ValidationException(nameof(request.UnitPrice), "The price must be greater than zero.");
+        }
+
+        if (request.Quantity <= 0m)
+        {
+            throw new ValidationException(nameof(request.Quantity), "Quantity must be greater than zero.");
+        }
+
+        var note = NormalizeNote(request.Note, nameof(request.Note));
+
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken)
+            ?? throw new NotFoundException("Tenant", CurrentTenantId);
+        if (!tenant.OpenItemEnabled)
+        {
+            throw new ForbiddenException("Open items are switched off for this business.");
+        }
+
+        var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
+
+        var unitPrice = Math.Round(request.UnitPrice, 2, MidpointRounding.AwayFromZero);
+        if (unitPrice <= 0m)
+        {
+            throw new ValidationException(nameof(request.UnitPrice), "The price must be greater than zero.");
+        }
+
+        // Never merged with another line: each open item is its own line, with no catalog item, cost or stock.
+        var line = new TransactionLine
+        {
+            TenantId = CurrentTenantId,
+            TransactionId = cart.Id,
+            ItemId = null,
+            Quantity = request.Quantity,
+            UnitPrice = unitPrice,
+            LineTotal = unitPrice * request.Quantity,
+            UnitCost = null,
+            IsOpenItem = true,
+            OpenItemName = name,
+            Note = note,
+        };
+        transactionRepository.AddLine(line);
+        stage.Lines.Add(line);
+
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.OpenItemAdded,
+            TargetEntityType = nameof(Transaction),
+            TargetEntityId = cart.Id,
+            BeforeStateJson = "{}",
+            AfterStateJson = JsonSerializer.Serialize(new { lineId = line.Id, name, unitPrice, quantity = request.Quantity, lineTotal = line.LineTotal }),
+        });
+
+        await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    public async Task<TransactionDto> SetLineNoteAsync(Guid lineId, SetLineNoteRequest request, CancellationToken cancellationToken = default)
+    {
+        var note = NormalizeNote(request.Note, nameof(request.Note));
+        var line = await RequireOwnLineAsync(lineId, cancellationToken);
+        var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
+            ?? throw new NotFoundException("Transaction", line.TransactionId);
+
+        line.Note = note;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    private static string? NormalizeNote(string? note, string field)
+    {
+        var trimmed = note?.Trim();
+        return string.IsNullOrEmpty(trimmed)
+            ? null
+            : trimmed.Length > MaxLineNoteLength
+                ? throw new ValidationException(field, $"The note can be at most {MaxLineNoteLength} characters.")
+                : trimmed;
+    }
+
     /// <summary>The most lines one batch may carry: enough for a cashier tapping fast, small enough that one
     /// request cannot hold a database connection for long.</summary>
     private const int MaxBatchLines = 50;
@@ -2290,7 +2386,10 @@ public sealed class TransactionService(
                 line.ManualDiscountAmount,
                 line.PriceOverrideFrom,
                 line.ManualDiscountKind?.ToString(),
-                line.ManualDiscountValue));
+                line.ManualDiscountValue,
+                line.IsOpenItem,
+                line.OpenItemName,
+                line.Note));
         }
 
         var paymentsByTransaction = (await paymentRepository.ListByTransactionsAsync([.. transactions.Select(t => t.Id)], cancellationToken))

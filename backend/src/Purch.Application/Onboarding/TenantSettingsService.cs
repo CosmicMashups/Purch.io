@@ -58,6 +58,10 @@ public sealed partial class TenantSettingsService(
     {
         var tenant = await GetCurrentTenantAsync(cancellationToken);
         tenant.RequiresBarcodePerItem = request.RequiresBarcodePerItem;
+        if (request.OpenItemEnabled is { } openItemEnabled)
+        {
+            tenant.OpenItemEnabled = openItemEnabled;
+        }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToDto(tenant);
@@ -124,7 +128,8 @@ public sealed partial class TenantSettingsService(
         tenant.KioskPosterImageUrl,
         tenant.UseSeparateInventoryTracking,
         tenant.UseDepartmentTracking,
-        tenant.UpdateCostOnReceiving);
+        tenant.UpdateCostOnReceiving,
+        tenant.OpenItemEnabled);
     }
 
     private static void ValidateHex(string? value, string field, string label)
