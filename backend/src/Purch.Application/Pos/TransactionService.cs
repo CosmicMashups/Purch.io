@@ -94,6 +94,16 @@ public sealed class TransactionService(
         return await ToDtoAsync(transaction, cancellationToken);
     }
 
+    /// <summary>Every staff/cashier-driven void goes through here so it clears the parked markers: only the
+    /// retention sweep leaves ParkedAt set on a voided cart, which is what keeps expired carts out of the
+    /// X/Z voided totals.</summary>
+    private static void MarkVoided(Transaction cart)
+    {
+        cart.Status = TransactionStatus.Voided;
+        cart.ParkedAt = null;
+        cart.ParkedLabel = null;
+    }
+
     public async Task<TransactionDto> RecalculateCartAsync(Guid transactionId, CancellationToken cancellationToken = default)
     {
         var cart = await transactionRepository.GetByIdAsync(transactionId, cancellationToken)
@@ -671,7 +681,7 @@ public sealed class TransactionService(
 
             // A previous attempt stopped before payment (validation error, price change, crash).
             // Discard it and release the id so this attempt can claim it.
-            existing.Status = TransactionStatus.Voided;
+            MarkVoided(existing);
             existing.ClientSaleId = null;
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
@@ -698,7 +708,7 @@ public sealed class TransactionService(
                 AuditVoid(open, "Discarded when a new sale was checked out", approver: null);
             }
 
-            open.Status = TransactionStatus.Voided;
+            MarkVoided(open);
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
@@ -926,7 +936,7 @@ public sealed class TransactionService(
         }
 
         AuditVoid(cart, request.Reason ?? "Voided by staff", approver);
-        cart.Status = TransactionStatus.Voided;
+        MarkVoided(cart);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
@@ -1717,7 +1727,7 @@ public sealed class TransactionService(
 
             // A previous attempt stopped before submitting (an unavailable item, a crash). Discard it
             // and release the id so this attempt can claim it.
-            existing.Status = TransactionStatus.Voided;
+            MarkVoided(existing);
             existing.ClientSaleId = null;
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
@@ -1727,7 +1737,7 @@ public sealed class TransactionService(
         var open = await transactionRepository.GetOpenByDeviceAsync(CurrentDeviceId, cancellationToken);
         if (open is not null)
         {
-            open.Status = TransactionStatus.Voided;
+            MarkVoided(open);
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
@@ -1815,7 +1825,7 @@ public sealed class TransactionService(
                 throw new ValidationException(nameof(transactionId), "Finish or void your current cart before claiming a kiosk order.");
             }
 
-            existingCart.Status = TransactionStatus.Voided;
+            MarkVoided(existingCart);
             _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 

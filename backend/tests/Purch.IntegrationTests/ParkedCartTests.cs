@@ -402,6 +402,89 @@ public sealed class ParkedCartTests(PostgresContainerFixture postgres)
         Assert.Contains(again.ChangedLines!, c => c.Reason == "Unavailable");
     }
 
+    [Fact]
+    public async Task Discard_NoPin_IsExactly400_AndWrongPinsLockTheDevice()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var water = await CreateItemAsync(admin, "Water", 100m);
+        var cart = await AddAsync(cashier, water);
+        _ = await ParkAsync(cashier);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await DiscardAsync(cashier, cart.Id, null)).StatusCode);
+
+        // Five wrong PINs: each is a 400 and each failed attempt must persist, so the sixth try (even with the
+        // right PIN) is locked out exactly as it is for VoidCart.
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await DiscardAsync(cashier, cart.Id, "999999")).StatusCode);
+        }
+
+        var locked = await DiscardAsync(cashier, cart.Id, "567812");
+        Assert.Equal(HttpStatusCode.Forbidden, locked.StatusCode);
+        _ = Assert.Single(await ListParkedAsync(cashier));
+    }
+
+    [Fact]
+    public async Task Discard_ZeroTotal_NeedsNoPin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var water = await CreateItemAsync(client, "Water", 100m);
+        var cart = await AddAsync(client, water);
+        _ = await ParkAsync(client);
+        await ExecAsync("UPDATE \"Transactions\" SET \"TotalAmount\" = 0 WHERE \"Id\" = @id", ("id", cart.Id));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await DiscardAsync(client, cart.Id, null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task XReading_CountsApprovedDiscard_ButNotSweptExpiredCart()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var water = await CreateItemAsync(admin, "Water", 100m);
+        var soda = await CreateItemAsync(admin, "Soda", 40m);
+
+        var discarded = await AddAsync(cashier, water);
+        _ = await ParkAsync(cashier);
+        var expired = await AddAsync(cashier, soda);
+        _ = await ParkAsync(cashier);
+        await ExecAsync("UPDATE \"Transactions\" SET \"ParkedAt\" = now() - interval '48 hours' WHERE \"Id\" = @id", ("id", expired.Id));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await DiscardAsync(cashier, discarded.Id, "567812")).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        Assert.True(await scope.ServiceProvider.GetRequiredService<ICartParkingService>().ExpireStaleAsync(DateTimeOffset.UtcNow) >= 1);
+
+        var x = (await (await admin.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<Purch.Application.Reporting.BirReadingDto>(JsonOptions))!;
+        Assert.Equal(1, x.VoidedCount);
+        Assert.Equal(100m, x.VoidedAmount);
+    }
+
+    [Fact]
+    public async Task Resume_OtherBranchAndNoLongerParked_Is403Not409()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var shop = TestSessions.ShopOf(admin);
+        var water = await CreateItemAsync(admin, "Water", 100m);
+        var cart = await AddAsync(admin, water);
+        _ = await ParkAsync(admin);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/transactions/{cart.Id}/resume", null)).StatusCode);
+
+        var branch = (await (await admin.PostAsJsonAsync("/branches", new CreateBranchRequest("Second Branch", null))).Content.ReadFromJsonAsync<BranchDto>(JsonOptions))!;
+        using var anonymous = factory.CreateClient();
+        var (_, credential) = await TestSessions.PairAsync(admin, anonymous, branch.Id, DeviceType.Register, "Other Till");
+        using var other = await TestSessions.UnlockAsync(admin, shop.Tenant.AdminMembershipId, TestSessions.AdminPin, credential);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await other.PostAsync($"/transactions/{cart.Id}/resume", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsync($"/transactions/{cart.Id}/resume", null)).StatusCode);
+    }
+
     private sealed class NoTenant : ICurrentTenantProvider
     {
         public Guid? TenantId => null;

@@ -143,16 +143,29 @@ public sealed class CartParkingService(
         return changed.Count == 0 ? priced : priced with { ChangedLines = changed };
     }
 
-    public Task DiscardAsync(Guid transactionId, string? approverPin, CancellationToken cancellationToken = default)
+    public async Task DiscardAsync(Guid transactionId, string? approverPin, CancellationToken cancellationToken = default)
     {
-        return unitOfWork.ExecuteInTransactionAsync<bool>(async ct =>
+        // The PIN is checked BEFORE the transaction opens: a wrong PIN records a failed attempt (and a lockout
+        // after five), and that write must survive the ValidationException that follows. Inside the transaction
+        // it would be rolled back and the lockout would never accumulate on this path.
+        User? approver = null;
+        var preview = await RequireParkedAsync(transactionId, cancellationToken);
+        if (preview.TotalAmount > 0)
         {
-            var cart = await RequireParkedAsync(transactionId, ct);
+            approver = await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
+        }
 
-            // Discarding a cart with items is a staff void like any other: it needs a different manager PIN.
-            if (cart.TotalAmount > 0)
+        _ = await unitOfWork.ExecuteInTransactionAsync<bool>(async ct =>
+        {
+            // Re-read after the PIN step: the cart may have been resumed, swept or changed meanwhile.
+            var cart = await RequireParkedAsync(transactionId, ct);
+            if (cart.TotalAmount > 0 && approver is null)
             {
-                var approver = await approverAuthorizationService.AuthorizeAsync(approverPin, ct);
+                throw new ValidationException("approverPin", "A manager's PIN is required to discard a cart with items.");
+            }
+
+            if (approver is not null)
+            {
                 auditLogRepository.Add(new AuditLog
                 {
                     TenantId = cart.TenantId,
