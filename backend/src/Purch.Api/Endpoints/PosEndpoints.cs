@@ -89,13 +89,15 @@ public static class PosEndpoints
 
         _ = app.MapDelete("/transactions/{transactionId:guid}/parked", async (
             Guid transactionId,
+            [Microsoft.AspNetCore.Mvc.FromBody] VoidCartRequest? request,
             ICartParkingService parking,
             CancellationToken cancellationToken) =>
         {
-            await parking.DiscardAsync(transactionId, cancellationToken);
+            await parking.DiscardAsync(transactionId, request?.ApproverPin, cancellationToken);
             return Results.NoContent();
         })
-            .RequirePermission(Permissions.CartPark);
+            .RequirePermission(Permissions.CartPark)
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
 
         // Looking up an older sale by its receipt number, so it can be refunded or exchanged without
         // the cashier already having it open (e.g. from an earlier day or a different terminal).

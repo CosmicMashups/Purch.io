@@ -11,8 +11,8 @@ public interface ICartParkingService
     /// <summary>Makes a parked cart this device's open cart, repricing it and reporting changed lines.</summary>
     Task<TransactionDto> ResumeAsync(Guid transactionId, CancellationToken cancellationToken = default);
 
-    /// <summary>Voids a parked cart without payment, audited.</summary>
-    Task DiscardAsync(Guid transactionId, CancellationToken cancellationToken = default);
+    /// <summary>Voids a parked cart without payment. A cart with items needs an approver PIN, like VoidCartAsync.</summary>
+    Task DiscardAsync(Guid transactionId, string? approverPin, CancellationToken cancellationToken = default);
 
     /// <summary>Voids every parked cart older than its tenant's ParkedCartTtlHours. Cross-tenant; needs no
     /// request context (called from the retention sweep). Returns how many carts were expired.</summary>

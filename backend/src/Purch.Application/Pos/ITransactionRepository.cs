@@ -13,7 +13,7 @@ public interface ITransactionRepository
 
     /// <summary>Every parked cart in every tenant with its tenant's TTL hours: for the retention sweep only
     /// (opts out of the tenant filter).</summary>
-    Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>Atomically voids a cart that is STILL Parked (one conditional UPDATE); false if something else
     /// (a resume, a discard, another sweep) got there first. Cross-tenant; sweep only.</summary>

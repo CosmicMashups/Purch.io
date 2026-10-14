@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Purch.Application.Catalog;
+using Purch.Application.Auth;
 using Purch.Application.Common;
 using Purch.Application.Devices;
 using Purch.Application.Onboarding;
@@ -295,6 +296,110 @@ public sealed class ParkedCartTests(PostgresContainerFixture postgres)
         var park = await ParkAsync(admin);
 
         Assert.Equal(HttpStatusCode.BadRequest, park.StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> DiscardAsync(HttpClient client, Guid id, string? pin)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"/transactions/{id}/parked");
+        if (pin is not null)
+        {
+            request.Content = JsonContent.Create(new VoidCartRequest(pin));
+        }
+
+        return client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task Discard_WithItems_NeedsApproverPin_AndAuditsApprover()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var water = await CreateItemAsync(admin, "Water", 100m);
+        var cart = await AddAsync(cashier, water);
+        _ = await ParkAsync(cashier);
+
+        var noPin = await DiscardAsync(cashier, cart.Id, null);
+        Assert.True((int)noPin.StatusCode is >= 400 and < 500);
+        _ = Assert.Single(await ListParkedAsync(cashier));
+
+        var withPin = await DiscardAsync(cashier, cart.Id, "567812");
+        Assert.Equal(HttpStatusCode.NoContent, withPin.StatusCode);
+        Assert.Empty(await ListParkedAsync(cashier));
+        var approved = await ScalarAsync<long>(
+            "SELECT count(*) FROM \"AuditLogs\" WHERE \"TargetEntityId\" = @id AND \"ActionType\" = @type AND \"ApprovedByUserId\" IS NOT NULL",
+            ("id", cart.Id), ("type", (int)AuditActionType.Void));
+        Assert.Equal(1, approved);
+    }
+
+    [Fact]
+    public async Task Sweeper_ExpiredCart_StaysOutOfVoidedTotals()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var water = await CreateItemAsync(client, "Water", 100m);
+        var stale = await AddAsync(client, water);
+        _ = await ParkAsync(client);
+        await ExecAsync("UPDATE \"Transactions\" SET \"ParkedAt\" = now() - interval '48 hours' WHERE \"Id\" = @id", ("id", stale.Id));
+
+        using var scope = factory.Services.CreateScope();
+        var parking = scope.ServiceProvider.GetRequiredService<ICartParkingService>();
+        Assert.True(await parking.ExpireStaleAsync(DateTimeOffset.UtcNow) >= 1);
+
+        var x = (await (await client.PostAsync("/reports/x-reading", null)).Content.ReadFromJsonAsync<Purch.Application.Reporting.BirReadingDto>(JsonOptions))!;
+        Assert.Equal(0, x.VoidedCount);
+        Assert.Equal((int)TransactionStatus.Voided, await ScalarAsync<int>("SELECT \"Status\" FROM \"Transactions\" WHERE \"Id\" = @id", ("id", stale.Id)));
+    }
+
+    [Fact]
+    public async Task Resume_ModifierLine_RepricesAndUnavailableModifierDropsLine()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var latte = await CreateItemAsync(client, "Latte", 100m);
+        var group = (await (await client.PostAsJsonAsync("/modifier-groups", new CreateModifierGroupRequest("Add-ons", true, false))).Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions))!;
+        var modifier = (await (await client.PostAsJsonAsync($"/modifier-groups/{group.Id}/modifiers", new CreateItemModifierRequest("Shot", 20m))).Content.ReadFromJsonAsync<ModifierGroupDto>(JsonOptions))!.Modifiers[0];
+        _ = await client.PostAsJsonAsync($"/items/{latte.Id}/modifier-groups", new AttachModifierGroupRequest(group.Id));
+        var added = (await (await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(latte.Id, null, 1m, SelectedModifierIds: [modifier.Id]))).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        Assert.Equal(120m, added.TotalAmount);
+        _ = await ParkAsync(client);
+        await ExecAsync("UPDATE \"ItemModifiers\" SET \"PriceDelta\" = 30 WHERE \"Id\" = @id", ("id", modifier.Id));
+
+        var parked = Assert.Single(await ListParkedAsync(client));
+        var resumed = (await (await client.PostAsync($"/transactions/{parked.Id}/resume", null)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        Assert.Equal(130m, resumed.TotalAmount);
+        Assert.Contains(resumed.ChangedLines!, c => c.Reason == "PriceChanged");
+
+        _ = await ParkAsync(client);
+        await ExecAsync("UPDATE \"ItemModifiers\" SET \"IsActive\" = false WHERE \"Id\" = @id", ("id", modifier.Id));
+        var again = (await (await client.PostAsync($"/transactions/{parked.Id}/resume", null)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        Assert.Empty(again.Lines);
+        Assert.Contains(again.ChangedLines!, c => c.Reason == "Unavailable");
+    }
+
+    [Fact]
+    public async Task Resume_ComboLine_IsFlaggedNotRepricedAndUnavailableComponentDropsIt()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var drinks = (await (await client.PostAsJsonAsync("/categories", new CreateCategoryRequest("Drinks", 1))).Content.ReadFromJsonAsync<CategoryDto>(JsonOptions))!;
+        var soda = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Soda", null, null, drinks.Id, 25m, null, PricingType.Unit))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var combo = (await (await client.PostAsJsonAsync("/items", new CreateItemRequest("Meal", null, null, null, 150m, null, PricingType.Combo))).Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        var slot = (await (await client.PostAsJsonAsync($"/items/{combo.Id}/combo-components", new CreateItemComboComponentRequest(drinks.Id, "Drink", 1, null))).Content.ReadFromJsonAsync<ItemComboComponentDto>(JsonOptions))!;
+        _ = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(combo.Id, null, 1m, [new ComboSelectionRequest(slot.Id, soda.Id)]));
+        _ = await ParkAsync(client);
+
+        var parked = Assert.Single(await ListParkedAsync(client));
+        var resumed = (await (await client.PostAsync($"/transactions/{parked.Id}/resume", null)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        _ = Assert.Single(resumed.Lines);
+        Assert.Contains(resumed.ChangedLines!, c => c.Reason == "NotRepriced");
+
+        _ = await ParkAsync(client);
+        await ExecAsync("UPDATE \"Items\" SET \"IsActive\" = false WHERE \"Id\" = @id", ("id", soda.Id));
+        var again = (await (await client.PostAsync($"/transactions/{parked.Id}/resume", null)).Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        Assert.Empty(again.Lines);
+        Assert.Contains(again.ChangedLines!, c => c.Reason == "Unavailable");
     }
 
     private sealed class NoTenant : ICurrentTenantProvider

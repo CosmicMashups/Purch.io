@@ -23,12 +23,15 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         return await (
             from transaction in dbContext.Transactions.IgnoreQueryFilters().AsNoTracking()
             join tenant in dbContext.Tenants.IgnoreQueryFilters().AsNoTracking() on transaction.TenantId equals tenant.Id
             where transaction.Status == TransactionStatus.Parked
+                && tenant.ParkedCartTtlHours > 0
+                && transaction.ParkedAt != null
+                && tenant.ParkedCartTtlHours * 3600.0 <= (now - transaction.ParkedAt.Value).TotalSeconds
             select new ParkedCartForExpiry(transaction.Id, transaction.TenantId, transaction.ParkedAt, tenant.ParkedCartTtlHours, transaction.TotalAmount))
             .ToListAsync(cancellationToken);
     }
@@ -149,6 +152,9 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .Where(transaction =>
                 transaction.DeviceId == deviceId
                 && transaction.Status == TransactionStatus.Voided
+                // A parked cart the retention sweep expired is a system action, not a staff void: it keeps ParkedAt
+                // (resume and an approved discard clear it), so it never enters the BIR voided counts.
+                && transaction.ParkedAt == null
                 && transaction.CreatedAt >= since)
             .ToListAsync(cancellationToken);
     }
@@ -160,6 +166,9 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .Where(transaction =>
                 transaction.DeviceId == deviceId
                 && transaction.Status == TransactionStatus.Voided
+                // A parked cart the retention sweep expired is a system action, not a staff void: it keeps ParkedAt
+                // (resume and an approved discard clear it), so it never enters the BIR voided counts.
+                && transaction.ParkedAt == null
                 && transaction.CreatedAt >= since)
             .GroupBy(_ => 1)
             .Select(g => new

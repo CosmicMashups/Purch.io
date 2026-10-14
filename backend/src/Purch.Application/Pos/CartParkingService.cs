@@ -25,10 +25,13 @@ public sealed class CartParkingService(
     IUserRepository userRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
+    IApproverAuthorizationService approverAuthorizationService,
+    IModifierGroupRepository modifierGroupRepository,
     IUnitOfWork unitOfWork) : ICartParkingService
 {
     public const string PriceChanged = "PriceChanged";
     public const string Unavailable = "Unavailable";
+    public const string NotRepriced = "NotRepriced";
 
     public Task ParkAsync(string? label, CancellationToken cancellationToken = default)
     {
@@ -140,12 +143,39 @@ public sealed class CartParkingService(
         return changed.Count == 0 ? priced : priced with { ChangedLines = changed };
     }
 
-    public Task DiscardAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    public Task DiscardAsync(Guid transactionId, string? approverPin, CancellationToken cancellationToken = default)
     {
         return unitOfWork.ExecuteInTransactionAsync<bool>(async ct =>
         {
             var cart = await RequireParkedAsync(transactionId, ct);
+
+            // Discarding a cart with items is a staff void like any other: it needs a different manager PIN.
+            if (cart.TotalAmount > 0)
+            {
+                var approver = await approverAuthorizationService.AuthorizeAsync(approverPin, ct);
+                auditLogRepository.Add(new AuditLog
+                {
+                    TenantId = cart.TenantId,
+                    ActorUserId = CurrentUserId,
+                    ActionType = AuditActionType.Void,
+                    TargetEntityType = nameof(Transaction),
+                    TargetEntityId = cart.Id,
+                    BeforeStateJson = JsonSerializer.Serialize(new { status = nameof(TransactionStatus.Parked), total = cart.TotalAmount }),
+                    AfterStateJson = JsonSerializer.Serialize(new
+                    {
+                        status = nameof(TransactionStatus.Voided),
+                        reason = "Parked cart discarded",
+                        approvedByUserId = approver.Id,
+                        approvedByRole = approver.Role.ToString(),
+                    }),
+                    ApprovedByUserId = approver.Id,
+                });
+            }
+
             auditLogRepository.Add(ExpiredAudit(cart.TenantId, CurrentUserId, cart.Id, cart.TotalAmount, "Discarded"));
+            // Cleared so this void counts in the X/Z voided totals (only sweep-expired carts keep ParkedAt).
+            cart.ParkedAt = null;
+            cart.ParkedLabel = null;
             cart.Status = TransactionStatus.Voided;
             _ = await unitOfWork.SaveChangesAsync(ct);
             return true;
@@ -155,7 +185,7 @@ public sealed class CartParkingService(
     public async Task<int> ExpireStaleAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         var expired = 0;
-        foreach (var parked in await transactionRepository.ListParkedForExpiryAsync(cancellationToken))
+        foreach (var parked in await transactionRepository.ListParkedForExpiryAsync(now, cancellationToken))
         {
             // TtlHours <= 0 means the tenant opted out of expiry.
             if (parked.TtlHours <= 0 || parked.ParkedAt is not { } parkedAt || parkedAt.AddHours(parked.TtlHours) > now)
@@ -194,15 +224,15 @@ public sealed class CartParkingService(
             throw new NotFoundException("Parked cart", transactionId);
         }
 
+        if (cart.BranchId != CurrentBranchId)
+        {
+            throw new ForbiddenException("This cart was parked at another branch.");
+        }
+
         // Another register may have resumed, discarded or the sweep expired it between the list and this call.
         if (cart.Status != TransactionStatus.Parked)
         {
             throw new ConflictException("This cart is no longer parked.");
-        }
-
-        if (cart.BranchId != CurrentBranchId)
-        {
-            throw new ForbiddenException("This cart was parked at another branch.");
         }
 
         return cart;
@@ -256,9 +286,16 @@ public sealed class CartParkingService(
         }
 
         var lineIds = lines.Select(line => line.Id).ToList();
-        var withSelections = (await transactionRepository.ListComboSelectionsByLinesAsync(lineIds, cancellationToken)).Select(s => s.TransactionLineId)
-            .Concat((await transactionRepository.ListModifierSelectionsByLinesAsync(lineIds, cancellationToken)).Select(s => s.TransactionLineId))
-            .ToHashSet();
+        var comboByLine = (await transactionRepository.ListComboSelectionsByLinesAsync(lineIds, cancellationToken)).ToLookup(s => s.TransactionLineId);
+        var modifiersByLine = (await transactionRepository.ListModifierSelectionsByLinesAsync(lineIds, cancellationToken)).ToLookup(s => s.TransactionLineId);
+
+        var modifierIds = modifiersByLine.SelectMany(g => g).Where(s => s.ItemModifierId is not null).Select(s => s.ItemModifierId!.Value).Distinct().ToList();
+        var modifiersById = (await modifierGroupRepository.ListModifiersWithGroupsByIdsAsync(modifierIds, cancellationToken))
+            .ToDictionary(entry => entry.Modifier.Id, entry => entry.Modifier);
+        var pickedItemIds = comboByLine.SelectMany(g => g).Select(s => s.SelectedItemId)
+            .Concat(modifiersByLine.SelectMany(g => g).Where(s => s.ItemId is not null).Select(s => s.ItemId!.Value))
+            .Distinct().ToList();
+        var pickedItems = (await itemRepository.ListByIdsAsync(pickedItemIds, cancellationToken)).ToDictionary(item => item.Id);
 
         foreach (var line in lines)
         {
@@ -274,19 +311,37 @@ public sealed class CartParkingService(
                 variant = await itemVariantRepository.GetByIdAsync(variantId, cancellationToken);
             }
 
-            if (item is null || !item.IsActive || item.IsDeleted || (line.ItemVariantId is not null && variant is null))
+            var combo = comboByLine[line.Id].ToList();
+            var mods = modifiersByLine[line.Id].ToList();
+
+            var gone = item is null || !item.IsActive || item.IsDeleted || (line.ItemVariantId is not null && variant is null)
+                || combo.Any(s => !pickedItems.TryGetValue(s.SelectedItemId, out var picked) || !picked.IsActive || picked.IsDeleted)
+                || mods.Any(s =>
+                    (s.ItemModifierId is { } mid && (!modifiersById.TryGetValue(mid, out var modifier) || !modifier.IsActive || modifier.IsDeleted))
+                    || (s.ItemId is { } pid && (!pickedItems.TryGetValue(pid, out var picked2) || !picked2.IsActive || picked2.IsDeleted)));
+            if (gone)
             {
                 transactionRepository.RemoveLine(line);
                 changed.Add(new ChangedLineDto(line.Id, Unavailable));
                 continue;
             }
 
-            if (withSelections.Contains(line.Id) || item.PricingType == PricingType.Combo || line.PriceOverrideFrom is not null)
+            if (line.PriceOverrideFrom is not null)
             {
                 continue;
             }
 
-            var currentPrice = variant?.PriceOverride ?? item.BasePrice;
+            // Combo lines and lines with category-item picks fold selection prices into UnitPrice in ways that
+            // are only resolved when the line is staged; they are not re-priced here and are flagged so the
+            // cashier checks them. Plain and plain-modifier lines are re-priced from current catalog prices.
+            if (item!.PricingType == PricingType.Combo || combo.Count > 0 || mods.Any(s => s.ItemId is not null))
+            {
+                changed.Add(new ChangedLineDto(line.Id, NotRepriced));
+                continue;
+            }
+
+            var currentPrice = (variant?.PriceOverride ?? item.BasePrice)
+                + mods.Where(s => s.ItemModifierId is not null).Sum(s => modifiersById[s.ItemModifierId!.Value].PriceDelta);
             if (currentPrice != line.UnitPrice)
             {
                 line.UnitPrice = currentPrice;
