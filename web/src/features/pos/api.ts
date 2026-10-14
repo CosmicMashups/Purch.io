@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/apiClient';
-import type { AddLineRequest, Adjustment, CreateExchangeRequest, RecordPaymentRequest, RefundTransactionRequest, Transaction } from './types';
+import type { AddLineRequest, Adjustment, CreateExchangeRequest, ManualDiscountRequest, OpenItemRequest, OverridePriceRequest, ParkedCartSummary, RecordPaymentRequest, RefundTransactionRequest, Transaction } from './types';
 
 /** The server owns the cart and prices it. Every call returns the whole priced cart to render as-is. */
 export const posApi = {
@@ -29,5 +29,22 @@ export const posApi = {
     apiClient.get<{ lineId: string; remainingQuantity: number }[]>(`/transactions/${transactionId}/returnable-lines`).then((r) => r.data),
   /** Finds a completed sale by its receipt number, to refund or exchange one the cashier doesn't already
    * have open. Receipt numbers are only unique per device, so more than one sale can come back. */
+  /** Sets the cart aside and returns it; the register gets a fresh cart on its next getCart. */
+  parkCart: (label?: string) => apiClient.post<Transaction>('/transactions/cart/park', { label }).then((r) => r.data),
+  listParked: () => apiClient.get<ParkedCartSummary[]>('/transactions/parked').then((r) => r.data),
+  /** Returns the repriced cart; changedLines lists what moved. 409 if another register got it first. */
+  resumeCart: (id: string) => apiClient.post<Transaction>(`/transactions/${id}/resume`).then((r) => r.data),
+  /** approverPin goes in the DELETE body, as the backend reads it from there. */
+  discardParked: (id: string, approverPin?: string) =>
+    apiClient.delete<void>(`/transactions/${id}/parked`, { data: { approverPin } }).then(() => undefined),
+  setLineDiscount: (lineId: string, body: ManualDiscountRequest) =>
+    apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}/discount`, body).then((r) => r.data),
+  setCartDiscount: (body: ManualDiscountRequest) => apiClient.put<Transaction>('/transactions/cart/discount', body).then((r) => r.data),
+  overrideLinePrice: (lineId: string, body: OverridePriceRequest) =>
+    apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}/price`, body).then((r) => r.data),
+  addOpenItem: (body: OpenItemRequest) => apiClient.post<Transaction>('/transactions/cart/lines/open', body).then((r) => r.data),
+  /** approverPin only on a claimed kiosk order. */
+  setLineNote: (lineId: string, note: string | null, approverPin?: string) =>
+    apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}/note`, { note, approverPin }).then((r) => r.data),
   findByReceiptNumber: (receiptNumber: number) => apiClient.get<Transaction[]>(`/transactions/by-receipt/${receiptNumber}`).then((r) => r.data),
 };

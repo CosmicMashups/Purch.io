@@ -19,4 +19,8 @@ export interface TenantSettings {
   useSeparateInventoryTracking: boolean;
   /** Off hides every department screen, field and report. Mirrors Tenant.UseDepartmentTracking. */
   useDepartmentTracking: boolean;
+  /** Receiving stock updates the item's cost price. */
+  updateCostOnReceiving?: boolean;
+  /** Lets the cashier ring up something not in the catalog. */
+  openItemEnabled?: boolean;
 }

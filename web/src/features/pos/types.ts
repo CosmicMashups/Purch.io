@@ -52,6 +52,15 @@ export interface TransactionLine {
   appliedPromoLabel: string | null;
   comboSelections: ComboSelection[];
   modifierSelections: ModifierSelection[];
+  /** Manager/Admin manual discount on this line (0 when none). */
+  manualDiscountAmount?: number;
+  manualDiscountKind?: ManualDiscountKind | null;
+  manualDiscountValue?: number | null;
+  /** The catalog price this line was first overridden from; null when never overridden. */
+  priceOverrideFrom?: number | null;
+  isOpenItem?: boolean;
+  openItemName?: string | null;
+  note?: string | null;
 }
 
 export interface Payment {
@@ -61,6 +70,9 @@ export interface Payment {
   amount: number;
   amountTendered: number | null;
   changeGiven: number | null;
+  /** Order of this tender within a split payment. */
+  sequence?: number;
+  reference?: string | null;
 }
 
 export interface Transaction {
@@ -92,6 +104,61 @@ export interface Transaction {
   createdAt: string;
   /** When it was paid, which is the moment the receipt shows. Null while the sale is still open. */
   completedAt: string | null;
+  /** Lines that changed or were dropped on resume of a parked cart; absent otherwise. */
+  changedLines?: ChangedLine[] | null;
+  manualDiscountAmount?: number;
+  manualDiscountReason?: string | null;
+  manualDiscountKind?: ManualDiscountKind | null;
+  manualDiscountValue?: number | null;
+}
+
+/** Mirrors Purch.Application.Pos.ChangedLineDto. */
+export interface ChangedLine {
+  lineId: string;
+  reason: 'PriceChanged' | 'Unavailable';
+}
+
+export type ManualDiscountKind = 'Percent' | 'Fixed';
+
+/** Mirrors Purch.Application.Pos.ParkedCartSummaryDto. */
+export interface ParkedCartSummary {
+  id: string;
+  label: string | null;
+  parkedAt: string;
+  parkedByName: string | null;
+  lineCount: number;
+  totalAmount: number;
+}
+
+/** Mirrors SetManualDiscountRequest. A value of 0 clears the discount. */
+export interface ManualDiscountRequest {
+  kind: ManualDiscountKind;
+  value: number;
+  reason: string;
+}
+
+/** Mirrors OverrideLinePriceRequest. */
+export interface OverridePriceRequest {
+  newUnitPrice: number;
+  reason: string;
+}
+
+/** Mirrors AddOpenItemRequest. approverPin only on a claimed kiosk order. */
+export interface OpenItemRequest {
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  note?: string | null;
+  approverPin?: string;
+}
+
+/** Mirrors PaymentPartRequest. Only a Cash part may be tendered above its amount. */
+export interface PaymentPart {
+  method: PaymentMethod;
+  amount: number;
+  amountTendered?: number | null;
+  customerCreditLedgerId?: string | null;
+  reference?: string | null;
 }
 
 export interface AddLineRequest {
@@ -112,6 +179,9 @@ export interface RecordPaymentRequest {
   creditLimitOverrideReason?: string | null;
   /** The total the customer was shown. The server refuses the sale unless this equals its own total. */
   expectedTotal?: number;
+  /** Split tender: one entry per tender, summing exactly to the total. When present the request-level
+   * method/amountTendered/customerCreditLedgerId are ignored; omit for a single full payment. */
+  parts?: PaymentPart[];
 }
 
 /** Refunding a completed sale always needs an Admin/Manager's approval — see ApproverPinDialog. */
