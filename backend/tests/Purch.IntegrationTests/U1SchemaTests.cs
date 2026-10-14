@@ -97,4 +97,28 @@ public sealed class U1SchemaTests(PostgresContainerFixture postgres)
         Assert.Equal([0, 1], payments.Select(p => p.Sequence));
         Assert.Equal("REF1", payments[1].Reference);
     }
+
+    [Fact]
+    public async Task Tenant_defaults_and_unique_payment_sequence()
+    {
+        var tenantId = Guid.NewGuid();
+        await using (var write = NewContext(tenantId))
+        {
+            _ = write.Tenants.Add(new Tenant { Id = tenantId, Name = "Defaults" });
+            _ = await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext(tenantId);
+        var tenant = await read.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId);
+        Assert.Equal(24, tenant.ParkedCartTtlHours);
+        Assert.True(tenant.OpenItemEnabled);
+        Assert.False(tenant.UpdateCostOnReceiving);
+
+        var transactionId = Guid.NewGuid();
+        await using var dup = NewContext(tenantId);
+        dup.Payments.AddRange(
+            new Payment { TenantId = tenantId, TransactionId = transactionId, Method = PaymentMethod.Cash, Amount = 1m, Sequence = 0 },
+            new Payment { TenantId = tenantId, TransactionId = transactionId, Method = PaymentMethod.Cash, Amount = 1m, Sequence = 0 });
+        _ = await Assert.ThrowsAsync<DbUpdateException>(() => dup.SaveChangesAsync());
+    }
 }

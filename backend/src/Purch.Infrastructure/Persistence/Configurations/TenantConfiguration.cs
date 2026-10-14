@@ -14,5 +14,7 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         _ = builder.Property(t => t.BrandingPrimaryTextColorHex).HasMaxLength(7);
         _ = builder.Property(t => t.BrandingSecondaryTextColorHex).HasMaxLength(7);
         _ = builder.Property(t => t.Tin).HasMaxLength(20);
+        _ = builder.Property(t => t.ParkedCartTtlHours).HasDefaultValue(24);
+        _ = builder.Property(t => t.OpenItemEnabled).HasDefaultValue(true);
     }
 }

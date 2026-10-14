@@ -158,14 +158,14 @@ namespace Purch.Infrastructure.Persistence.Migrations
                 table: "Tenants",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "ParkedCartTtlHours",
                 table: "Tenants",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 24);
 
             migrationBuilder.AddColumn<bool>(
                 name: "UpdateCostOnReceiving",
