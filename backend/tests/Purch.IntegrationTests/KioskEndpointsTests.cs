@@ -376,6 +376,34 @@ public sealed class KioskEndpointsTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_cashier_adding_an_open_item_or_a_note_to_a_queued_kitchen_order_needs_a_managers_pin_and_is_audited()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var adminClient = await AuthenticatedAdminClientAsync(factory);
+        var managerId = await TestSessions.AddPersonAsync(adminClient, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashierClient = await TestSessions.CashierClientAsync(adminClient);
+        var (claimed, _) = await ClaimedKioskOrderAsync(factory, adminClient, cashierClient);
+        var lineId = claimed.Lines.Single().Id;
+
+        var noPinOpen = await cashierClient.PostAsJsonAsync("/transactions/cart/lines/open", new { name = "Extra", unitPrice = 20m, quantity = 1m });
+        Assert.Equal(HttpStatusCode.BadRequest, noPinOpen.StatusCode);
+        var noPinNote = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/note", new { note = "No onions" });
+        Assert.Equal(HttpStatusCode.BadRequest, noPinNote.StatusCode);
+        Assert.Single((await cashierClient.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!.Lines);
+
+        var withPinNote = await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/note", new { note = "No onions", approverPin = "567812" });
+        Assert.Equal(HttpStatusCode.OK, withPinNote.StatusCode);
+        var withPinOpen = await cashierClient.PostAsJsonAsync("/transactions/cart/lines/open", new { name = "Extra", unitPrice = 20m, quantity = 1m, approverPin = "567812" });
+        Assert.Equal(HttpStatusCode.OK, withPinOpen.StatusCode);
+        var cart = (await withPinOpen.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+        var openLine = cart.Lines.Single(l => l.IsOpenItem);
+
+        var auditLogs = await adminClient.GetFromJsonAsync<List<AuditLogDto>>("/audit-logs?actionType=KitchenOrderLineEdited", JsonOptions);
+        Assert.Equal(managerId, Assert.Single(auditLogs!, log => log.TargetEntityId == lineId).ApprovedByUserId);
+        Assert.Equal(managerId, Assert.Single(auditLogs!, log => log.TargetEntityId == openLine.Id).ApprovedByUserId);
+    }
+
+    [Fact]
     public async Task An_admin_editing_a_not_yet_prepared_kitchen_order_needs_no_pin()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

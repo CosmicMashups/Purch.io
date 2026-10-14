@@ -120,27 +120,14 @@ public sealed class TransactionService(
 
     private const int MaxOpenItemNameLength = 80;
     private const int MaxLineNoteLength = 200;
+    private const decimal MaxOpenItemUnitPrice = 999999.99m;
+    private const decimal MaxOpenItemQuantity = 99999m;
+    private const decimal MaxOpenItemLineTotal = 9_999_999.99m;
+    private const decimal MaxCartTotal = 9_999_999_999.99m;
 
     public async Task<TransactionDto> AddOpenItemAsync(AddOpenItemRequest request, CancellationToken cancellationToken = default)
     {
-        var name = request.Name?.Trim() ?? string.Empty;
-        if (name.Length is 0 or > MaxOpenItemNameLength)
-        {
-            throw new ValidationException(nameof(request.Name), $"The name must be between 1 and {MaxOpenItemNameLength} characters.");
-        }
-
-        if (request.UnitPrice <= 0m)
-        {
-            throw new ValidationException(nameof(request.UnitPrice), "The price must be greater than zero.");
-        }
-
-        if (request.Quantity <= 0m)
-        {
-            throw new ValidationException(nameof(request.Quantity), "Quantity must be greater than zero.");
-        }
-
-        var note = NormalizeNote(request.Note, nameof(request.Note));
-
+        // The setting is checked first so a switched-off business is a 403 whatever the payload looks like.
         var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken)
             ?? throw new NotFoundException("Tenant", CurrentTenantId);
         if (!tenant.OpenItemEnabled)
@@ -148,13 +135,33 @@ public sealed class TransactionService(
             throw new ForbiddenException("Open items are switched off for this business.");
         }
 
+        var name = request.Name?.Trim() ?? string.Empty;
+        if (name.Length is 0 or > MaxOpenItemNameLength)
+        {
+            throw new ValidationException(nameof(request.Name), $"The name must be between 1 and {MaxOpenItemNameLength} characters.");
+        }
+
+        if (request.UnitPrice <= 0m || request.UnitPrice > MaxOpenItemUnitPrice || decimal.Round(request.UnitPrice, 2) != request.UnitPrice)
+        {
+            throw new ValidationException(nameof(request.UnitPrice), $"The price must be above zero, at most {MaxOpenItemUnitPrice:0.00}, with at most 2 decimals.");
+        }
+
+        if (request.Quantity <= 0m || request.Quantity > MaxOpenItemQuantity || decimal.Round(request.Quantity, 3) != request.Quantity)
+        {
+            throw new ValidationException(nameof(request.Quantity), $"The quantity must be above zero, at most {MaxOpenItemQuantity}, with at most 3 decimals.");
+        }
+
+        var note = NormalizeNote(request.Note, nameof(request.Note));
+
         var cart = await GetOrCreateOpenTransactionAsync(cancellationToken);
+        var approver = await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
         var stage = await CartStage.LoadAsync(cart, transactionRepository, cancellationToken);
 
-        var unitPrice = Math.Round(request.UnitPrice, 2, MidpointRounding.AwayFromZero);
-        if (unitPrice <= 0m)
+        var unitPrice = request.UnitPrice;
+        var lineTotal = Math.Round(unitPrice * request.Quantity, 2, MidpointRounding.AwayFromZero);
+        if (lineTotal > MaxOpenItemLineTotal)
         {
-            throw new ValidationException(nameof(request.UnitPrice), "The price must be greater than zero.");
+            throw new ValidationException(nameof(request.Quantity), $"The line total can be at most {MaxOpenItemLineTotal:0.00}.");
         }
 
         // Never merged with another line: each open item is its own line, with no catalog item, cost or stock.
@@ -165,7 +172,7 @@ public sealed class TransactionService(
             ItemId = null,
             Quantity = request.Quantity,
             UnitPrice = unitPrice,
-            LineTotal = unitPrice * request.Quantity,
+            LineTotal = lineTotal,
             UnitCost = null,
             IsOpenItem = true,
             OpenItemName = name,
@@ -185,7 +192,22 @@ public sealed class TransactionService(
             AfterStateJson = JsonSerializer.Serialize(new { lineId = line.Id, name, unitPrice, quantity = request.Quantity, lineTotal = line.LineTotal }),
         });
 
+        if (approver is not null)
+        {
+            AuditKitchenOrderLineEdit(
+                cart,
+                line,
+                before: new { itemId = (Guid?)null, quantity = 0m },
+                after: new { itemId = (Guid?)null, quantity = request.Quantity, kind = "open item added", name, unitPrice },
+                approver);
+        }
+
         await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
+        if (cart.TotalAmount > MaxCartTotal)
+        {
+            throw new ValidationException(nameof(request.Quantity), "The cart total would be too large.");
+        }
+
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
@@ -197,6 +219,17 @@ public sealed class TransactionService(
         var line = await RequireOwnLineAsync(lineId, cancellationToken);
         var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
             ?? throw new NotFoundException("Transaction", line.TransactionId);
+
+        var approver = await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
+        if (approver is not null)
+        {
+            AuditKitchenOrderLineEdit(
+                cart,
+                line,
+                before: new { itemId = line.ItemId, note = line.Note },
+                after: new { itemId = line.ItemId, note, kind = "note changed" },
+                approver);
+        }
 
         line.Note = note;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);

@@ -208,4 +208,32 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
         _ = await admin.PutAsJsonAsync("/tenant/settings/barcode", new { requiresBarcodePerItem = true, openItemEnabled = true });
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Thing", 10m))).StatusCode);
     }
+
+    [Fact]
+    public async Task Open_item_price_and_quantity_are_bounded_and_scaled_and_the_line_total_is_rounded()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Thing", 1000000m))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Thing", 10.999m))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Thing", 10m, 100000m))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Thing", 10m, 0.3333m))).StatusCode);
+
+        var cart = await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Fabric", 3m, 0.333m)));
+        Assert.Equal(1m, cart.Lines[0].LineTotal);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Big", 999999.99m, 99999m))).StatusCode);
+        var max = await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Big", 999999.99m, 9m)));
+        Assert.Equal(2, max.Lines.Count);
+    }
+
+    [Fact]
+    public async Task A_switched_off_tenant_is_a_403_even_for_an_invalid_payload()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await admin.PutAsJsonAsync("/tenant/settings/barcode", new { requiresBarcodePerItem = false, openItemEnabled = false });
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("", -5m, 0m))).StatusCode);
+    }
 }
