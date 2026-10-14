@@ -1002,27 +1002,32 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(request.Quantity), "The line total is too large.");
         }
 
-        var oldQuantity = line.Quantity;
-        line.Quantity = request.Quantity;
-        line.LineTotal = line.Quantity * line.UnitPrice;
-
-        if (approver is not null)
+        // The approver PIN was authorized above, before any transaction opens. The flush-then-reprice below is one
+        // unit: if the re-pricing refuses (cart total cap), the flushed quantity rolls back with it.
+        return await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            AuditKitchenOrderLineEdit(
-                cart,
-                line,
-                before: new { itemId = line.ItemId, quantity = oldQuantity },
-                after: new { itemId = line.ItemId, quantity = request.Quantity, kind = "quantity changed" },
-                approver);
-        }
+            var oldQuantity = line.Quantity;
+            line.Quantity = request.Quantity;
+            line.LineTotal = line.Quantity * line.UnitPrice;
 
-        // Flush the quantity/LineTotal change above before recalculating — its
-        // line query would otherwise still see the old quantity.
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        await RecalculateTotalAsync(cart, cancellationToken);
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+            if (approver is not null)
+            {
+                AuditKitchenOrderLineEdit(
+                    cart,
+                    line,
+                    before: new { itemId = line.ItemId, quantity = oldQuantity },
+                    after: new { itemId = line.ItemId, quantity = request.Quantity, kind = "quantity changed" },
+                    approver);
+            }
 
-        return await ToDtoAsync(cart, cancellationToken);
+            // Flush the quantity/LineTotal change above before recalculating — its
+            // line query would otherwise still see the old quantity.
+            _ = await unitOfWork.SaveChangesAsync(ct);
+            await RecalculateTotalAsync(cart, ct);
+            _ = await unitOfWork.SaveChangesAsync(ct);
+
+            return await ToDtoAsync(cart, ct);
+        }, cancellationToken);
     }
 
     public async Task<TransactionDto> RemoveLineAsync(Guid lineId, string? approverPin, CancellationToken cancellationToken = default)

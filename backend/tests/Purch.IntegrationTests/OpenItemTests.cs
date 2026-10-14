@@ -260,4 +260,44 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
         var openMax = await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Big", 999999.99m, 99999m));
         Assert.Equal(HttpStatusCode.BadRequest, openMax.StatusCode);
     }
+
+    [Fact]
+    public async Task A_cap_refusal_after_a_flush_leaves_the_cart_exactly_as_it_was()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var big = await CreateItemAsync(admin, "Gold bar", 999999.99m);
+        var other = await CreateItemAsync(admin, "Silver bar", 999999.99m);
+
+        var first = await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(big.Id, null, 8000m)));
+        var second = await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(other.Id, null, 1m)));
+        var secondLine = second.Lines.Single(l => l.ItemName == "Silver bar");
+        var before = second.TotalAmount;
+
+        // Each line alone is under the cap, together they are not.
+        var update = await admin.PutAsJsonAsync($"/transactions/cart/lines/{secondLine.Id}", new UpdateTransactionLineRequest(5000m));
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+        var cart = (await admin.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(1m, cart.Lines.Single(l => l.Id == secondLine.Id).Quantity);
+        Assert.Equal(before, cart.TotalAmount);
+
+        var ok = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{secondLine.Id}", new UpdateTransactionLineRequest(2m)));
+        Assert.Equal(before + 999999.99m, ok.TotalAmount);
+
+        // Each override alone fits (8000 x 1,249,900 < cap) but with the other line the cart overflows: 400, nothing changed.
+        var priceOver = await admin.PutAsJsonAsync($"/transactions/cart/lines/{first.Lines[0].Id}/price", new { newUnitPrice = 1249900m, reason = "x" });
+        Assert.Equal(HttpStatusCode.BadRequest, priceOver.StatusCode);
+        var after = (await admin.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(ok.TotalAmount, after.TotalAmount);
+        Assert.Equal(999999.99m, after.Lines.Single(l => l.Id == first.Lines[0].Id).UnitPrice);
+        Assert.Null(after.Lines.Single(l => l.Id == first.Lines[0].Id).PriceOverrideFrom);
+
+        // A batch that would overflow adds nothing.
+        var batch = await admin.PostAsJsonAsync("/transactions/cart/lines/batch", new AddLinesBatchRequest(Guid.NewGuid(),
+            [new AddTransactionLineRequest(big.Id, null, 1m), new AddTransactionLineRequest(other.Id, null, 5000m)]));
+        Assert.Equal(HttpStatusCode.BadRequest, batch.StatusCode);
+        var final = (await admin.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(after.Lines.Count, final.Lines.Count);
+        Assert.Equal(after.TotalAmount, final.TotalAmount);
+    }
 }
