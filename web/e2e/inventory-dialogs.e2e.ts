@@ -8,7 +8,7 @@ test.describe('inventory forms', () => {
     await page.goto('/inventory/ingredients');
     await page.getByRole('button', { name: 'Add Ingredient' }).click();
     await page.getByLabel('Name').fill(name);
-    await page.getByLabel('Base unit').fill('g');
+    await page.getByLabel('Base unit', { exact: true }).fill('g');
     await page.getByLabel('Packaging unit').fill('sack');
     await page.getByLabel('Packaging size').fill('1000');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
