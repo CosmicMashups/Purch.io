@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { formatPeso } from '../dashboard/format';
-import type { ManualDiscountKind, Transaction, TransactionLine } from './types';
+import { PaymentMethod, type ManualDiscountKind, type PaymentPart, type Transaction, type TransactionLine } from './types';
 
 /** Client copies of the server's rules for manual discounts, price overrides, open items and notes. The server still decides. */
 
@@ -89,3 +89,44 @@ export const parseAmount = (text: string): number => (text.trim() === '' ? NaN :
 export const REASON_CHIPS = ['Loyal customer', 'Damaged item', 'Price match', 'Staff meal'] as const;
 
 export const SENIOR_EXCLUSIVE = 'Senior/PWD discount is applied - remove it to give a manual discount';
+
+/* Split tender: client copies of SplitTenderService's rules. The server still decides. */
+
+export const MAX_SPLIT_PARTS = 10;
+export const MAX_REFERENCE_LENGTH = 100;
+export const SPLIT_METHODS: readonly PaymentMethod[] = [PaymentMethod.Cash, PaymentMethod.BankTransfer, PaymentMethod.ManualGcashQr, PaymentMethod.UtangCredit];
+
+const cents = (n: number) => Math.round(n * 100);
+const isCentAmount = (n: number) => Number.isFinite(n) && decimals(n, 2);
+
+/** What is still to collect, never negative: the total less every part's amount, worked in whole centavos. */
+export function remaining(total: number, parts: Pick<PaymentPart, 'amount'>[]): number {
+  const left = cents(total) - parts.reduce((sum, p) => sum + cents(p.amount), 0);
+  return Math.max(0, left) / 100;
+}
+
+/** Change handed back across the cash parts. */
+export function splitChange(parts: PaymentPart[]): number {
+  return parts.reduce((sum, p) => (p.method === PaymentMethod.Cash && p.amountTendered != null ? sum + cents(p.amountTendered) - cents(p.amount) : sum), 0) / 100;
+}
+
+/** The first rule the parts break, or null when the server should accept them. Order follows the server's. */
+export function validateParts(total: number, parts: PaymentPart[]): string | null {
+  if (parts.length === 0) return 'Add at least one payment.';
+  if (parts.length > MAX_SPLIT_PARTS) return `A sale can be split into at most ${MAX_SPLIT_PARTS} payments.`;
+  for (const p of parts) {
+    if (!SPLIT_METHODS.includes(p.method)) return "That method isn't available for checkout yet.";
+    if (!(p.amount > 0) || !isCentAmount(p.amount)) return 'Each payment amount must be more than zero, in pesos and centavos.';
+    if (p.method === PaymentMethod.Cash) {
+      const tendered = p.amountTendered ?? p.amount;
+      if (!isCentAmount(tendered) || cents(tendered) < cents(p.amount)) return 'Cash received must cover its part of the payment.';
+    } else if (p.amountTendered != null && cents(p.amountTendered) !== cents(p.amount)) {
+      return 'Only cash can be more than its amount; enter the exact amount for the other payments.';
+    }
+    if (p.method === PaymentMethod.UtangCredit && !p.customerCreditLedgerId) return 'Choose a customer account for the Utang payment.';
+    if ((p.reference?.trim().length ?? 0) > MAX_REFERENCE_LENGTH) return `A payment reference can be at most ${MAX_REFERENCE_LENGTH} characters.`;
+  }
+  if (parts.filter((p) => p.method === PaymentMethod.UtangCredit).length > 1) return 'Only one Utang payment is allowed per sale.';
+  if (parts.reduce((s, p) => s + cents(p.amount), 0) !== cents(total)) return `The payments must add up to ${formatPeso(total)}.`;
+  return null;
+}

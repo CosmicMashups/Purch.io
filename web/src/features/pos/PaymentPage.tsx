@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { ArrowsSplit } from '@phosphor-icons/react';
+import { useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
 import { PageHeader } from '../../components/PageHeader';
-import { userMessage } from '../../lib/apiError';
+import { ApiError, userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
 import { useBranches } from '../branches/queries';
 import { useCreditEnabled } from '../tenant/queries';
@@ -14,9 +15,10 @@ import { stateForPayment, vatOf } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { tenderCoversTotal } from './catalogView';
 import { CashKeypad } from './components/CashKeypad';
+import { SplitTenderPanel } from './components/SplitTenderPanel';
 import { usePosStore } from './posStore';
 import { useCart, usePay } from './queries';
-import { PaymentMethod, type RecordPaymentRequest } from './types';
+import { PaymentMethod, type PaymentPart, type RecordPaymentRequest } from './types';
 
 type Choice = 'cash' | 'bank' | 'gcash' | 'utang';
 
@@ -30,12 +32,20 @@ const CHOICES: { id: Choice; label: string; method: PaymentMethod }[] = [
 const UNAVAILABLE = [
   { label: 'QR Ph', why: 'Needs a live payment connection' },
   { label: 'Bill payment / e-load', why: 'Not connected yet' },
-  { label: 'Split payment', why: 'Not built yet' },
 ];
+
+/** Roles holding the SplitPay permission (backend Permissions.SplitPay). The API still enforces it. */
+const SPLIT_ROLES: readonly string[] = ['Admin', 'Manager', 'Cashier'];
+
+/** A refused split, shown in the panel: a moved total gets one plain instruction, anything else the server's words. */
+function splitErrorText(error: unknown): string {
+  if (error instanceof ApiError && error.kind === 'conflict') return 'The cart changed, review the total before completing the sale.';
+  return userMessage(error);
+}
 
 export function PaymentPage() {
   const navigate = useNavigate();
-  const { claims } = useSession();
+  const { claims, role } = useSession();
   const cart = useCart(true);
   const pay = usePay();
   const showReceipt = usePosStore((s) => s.showReceipt);
@@ -43,6 +53,10 @@ export function PaymentPage() {
   const [choice, setChoice] = useState<Choice>('cash');
   const [tendered, setTendered] = useState('');
   const [ledgerId, setLedgerId] = useState('');
+  const [splitting, setSplitting] = useState(false);
+  // One request per attempt: a double tap lands before React re-renders the button as busy.
+  const inFlight = useRef(false);
+  const canSplit = role !== null && SPLIT_ROLES.includes(role);
   const creditOn = useCreditEnabled();
   const ledgers = useCreditLedgers(choice === 'utang' && creditOn);
   usePublishCustomerDisplay(stateForPayment(cart.data));
@@ -69,11 +83,30 @@ export function PaymentPage() {
       // Exactly the total on this screen, which is the server's last answer: the server refuses the sale if its own total has moved.
       expectedTotal: total,
     };
+    submit(body);
+  }
+
+  function completeSplit(parts: PaymentPart[]) {
+    // With parts the server ignores the request-level method, but it is still required: send the first part's.
+    submit({ method: parts[0].method, amountTendered: null, customerCreditLedgerId: null, expectedTotal: total, parts });
+  }
+
+  function openSplit(open: boolean) {
+    pay.reset();
+    setSplitting(open);
+  }
+
+  function submit(body: RecordPaymentRequest) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
     pay.mutate(body, {
       onSuccess: (completed) => {
         showReceipt(completed);
         navigate('/sell/receipt', { replace: true, state: { justSold: true } });
+      },
+      onSettled: () => {
+        inFlight.current = false;
       },
     });
   }
@@ -90,80 +123,103 @@ export function PaymentPage() {
         <p className="mt-1 text-base text-ink-soft">VAT (12%): {formatPeso(vatOf(cart.data))}</p>
       </div>
 
-      <div role="radiogroup" aria-label="Payment method" className="grid gap-3 sm:grid-cols-2">
-        {CHOICES.filter((c) => c.id !== 'utang' || creditOn).map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            role="radio"
-            aria-checked={choice === c.id}
-            onClick={() => setChoice(c.id)}
-            className={`min-h-16 rounded-control px-5 text-left text-lg font-semibold ${choice === c.id ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-      <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-soft">
-        {UNAVAILABLE.map((u) => (
-          <li key={u.label}>
-            {u.label}: {u.why}
-          </li>
-        ))}
-      </ul>
-
-      <section className="rounded-panel border border-line bg-surface p-6">
-        {choice === 'cash' && <CashKeypad total={total} value={tendered} onChange={setTendered} />}
-
-        {choice === 'bank' && <p className="text-base">Confirm only after you have checked that the transfer of {formatPeso(total)} has arrived.</p>}
-
-        {choice === 'gcash' && (
-          <div className="flex flex-col gap-3">
-            <p className="text-base">Show this QR to the customer. Confirm only after you see the payment of {formatPeso(total)} land.</p>
-            {branch?.manualGcashQrImageUrl ? (
-              <img src={branch.manualGcashQrImageUrl} alt="GCash QR code for this branch" className="size-56 rounded-control border border-line object-contain" />
-            ) : (
-              <p className="rounded-control border border-dashed border-ink-soft/40 p-4 text-base text-ink-soft">No QR is set for this branch. An admin can add one in the branch settings.</p>
-            )}
-            {(branch?.manualGcashAccountName || branch?.manualGcashAccountNumber) && (
-              <p className="text-base font-semibold">
-                {[branch.manualGcashAccountName, branch.manualGcashAccountNumber].filter(Boolean).join(', ')}
-              </p>
-            )}
+      {splitting ? (
+        <SplitTenderPanel
+          total={total}
+          creditOn={creditOn}
+          busy={pay.isPending}
+          error={pay.isError ? splitErrorText(pay.error) : null}
+          onComplete={completeSplit}
+          onCancel={() => openSplit(false)}
+        />
+      ) : (
+        <>
+          <div role="radiogroup" aria-label="Payment method" className="grid gap-3 sm:grid-cols-2">
+            {CHOICES.filter((c) => c.id !== 'utang' || creditOn).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={choice === c.id}
+                onClick={() => setChoice(c.id)}
+                className={`min-h-16 rounded-control px-5 text-left text-lg font-semibold ${choice === c.id ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
-        )}
+          {canSplit && (
+            <button
+              type="button"
+              onClick={() => openSplit(true)}
+              className="flex h-12 items-center gap-2 self-start rounded-control border border-line bg-surface px-5 text-base font-semibold text-ink hover:border-brand"
+            >
+              <ArrowsSplit size={22} aria-hidden />
+              Split payment
+            </button>
+          )}
+          <ul className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-soft">
+            {UNAVAILABLE.map((u) => (
+              <li key={u.label}>
+                {u.label}: {u.why}
+              </li>
+            ))}
+          </ul>
 
-        {choice === 'utang' && (
-          <div className="flex flex-col gap-3">
-            {ledgers.isError ? (
-              <ErrorState title="Customer accounts could not be loaded" message={userMessage(ledgers.error)} onRetry={() => void ledgers.refetch()} />
-            ) : ledgers.isPending ? (
-              <Skeleton className="h-14 w-full" />
-            ) : ledgers.data.filter((l) => l.isActive).length === 0 ? (
-              <p className="text-base text-ink-soft">No customer accounts yet. A manager can add one.</p>
-            ) : (
-              <FormField label="Customer account" hint="The server checks the credit limit when you confirm">
-                <select value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} className={controlClass}>
-                  <option value="">Choose a customer</option>
-                  {ledgers.data
-                    .filter((l) => l.isActive)
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.customerFullName} ({formatPeso(Math.max(0, l.creditLimit - l.balance))} available)
-                      </option>
-                    ))}
-                </select>
-              </FormField>
+          <section className="rounded-panel border border-line bg-surface p-6">
+            {choice === 'cash' && <CashKeypad total={total} value={tendered} onChange={setTendered} />}
+
+            {choice === 'bank' && <p className="text-base">Confirm only after you have checked that the transfer of {formatPeso(total)} has arrived.</p>}
+
+            {choice === 'gcash' && (
+              <div className="flex flex-col gap-3">
+                <p className="text-base">Show this QR to the customer. Confirm only after you see the payment of {formatPeso(total)} land.</p>
+                {branch?.manualGcashQrImageUrl ? (
+                  <img src={branch.manualGcashQrImageUrl} alt="GCash QR code for this branch" className="size-56 rounded-control border border-line object-contain" />
+                ) : (
+                  <p className="rounded-control border border-dashed border-ink-soft/40 p-4 text-base text-ink-soft">No QR is set for this branch. An admin can add one in the branch settings.</p>
+                )}
+                {(branch?.manualGcashAccountName || branch?.manualGcashAccountNumber) && (
+                  <p className="text-base font-semibold">
+                    {[branch.manualGcashAccountName, branch.manualGcashAccountNumber].filter(Boolean).join(', ')}
+                  </p>
+                )}
+              </div>
             )}
-          </div>
-        )}
-      </section>
 
-      <div>
-        <PrimaryButton type="button" busy={pay.isPending} disabled={!ready} onClick={confirm}>
-          {pay.isPending ? 'Recording payment...' : `Confirm ${formatPeso(total)}`}
-        </PrimaryButton>
-      </div>
+            {choice === 'utang' && (
+              <div className="flex flex-col gap-3">
+                {ledgers.isError ? (
+                  <ErrorState title="Customer accounts could not be loaded" message={userMessage(ledgers.error)} onRetry={() => void ledgers.refetch()} />
+                ) : ledgers.isPending ? (
+                  <Skeleton className="h-14 w-full" />
+                ) : ledgers.data.filter((l) => l.isActive).length === 0 ? (
+                  <p className="text-base text-ink-soft">No customer accounts yet. A manager can add one.</p>
+                ) : (
+                  <FormField label="Customer account" hint="The server checks the credit limit when you confirm">
+                    <select value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} className={controlClass}>
+                      <option value="">Choose a customer</option>
+                      {ledgers.data
+                        .filter((l) => l.isActive)
+                        .map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.customerFullName} ({formatPeso(Math.max(0, l.creditLimit - l.balance))} available)
+                          </option>
+                        ))}
+                    </select>
+                  </FormField>
+                )}
+              </div>
+            )}
+          </section>
+
+          <div>
+            <PrimaryButton type="button" busy={pay.isPending} disabled={!ready} onClick={confirm}>
+              {pay.isPending ? 'Recording payment...' : `Confirm ${formatPeso(total)}`}
+            </PrimaryButton>
+          </div>
+        </>
+      )}
     </div>
   );
 }

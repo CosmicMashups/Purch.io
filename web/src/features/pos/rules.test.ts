@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeLine } from '../../test/pos';
-import { discountBase, discountMarker, discountPreview, discountSchema, hasManualDiscount, lineNoteSchema, openItemSchema, priceOverrideSchema } from './rules';
+import { discountBase, discountMarker, discountPreview, discountSchema, hasManualDiscount, lineNoteSchema, openItemSchema, priceOverrideSchema, remaining, splitChange, validateParts } from './rules';
 import { makeCart } from '../../test/pos';
 
 const ok = (r: { success: boolean }) => r.success;
@@ -87,5 +87,50 @@ describe('markers', () => {
     expect(hasManualDiscount(makeCart())).toBe(false);
     expect(hasManualDiscount(makeCart({ manualDiscountAmount: 5 }))).toBe(true);
     expect(hasManualDiscount(makeCart({ lines: [makeLine({ id: 'l', itemName: 'A', manualDiscountAmount: 3 })] }))).toBe(true);
+  });
+});
+
+describe('split tender: remaining and validateParts', () => {
+  const cash = (amount: number, amountTendered?: number) => ({ method: 0 as const, amount, amountTendered: amountTendered ?? null });
+  const gcash = (amount: number, reference?: string) => ({ method: 3 as const, amount, reference: reference ?? null });
+  const utang = (amount: number, customerCreditLedgerId: string | null = 'c1') => ({ method: 5 as const, amount, customerCreditLedgerId });
+
+  it('remaining is the total less the parts, in exact centavos', () => {
+    expect(remaining(100.3, [])).toBe(100.3);
+    expect(remaining(100.3, [cash(0.1), gcash(0.2)])).toBe(100);
+    expect(remaining(0.3, [cash(0.1), gcash(0.2)])).toBe(0);
+  });
+  it('accepts parts that add up exactly, with cash tendered over its amount', () => {
+    expect(validateParts(300, [cash(100, 150), gcash(200, 'REF1')])).toBeNull();
+  });
+  it('blocks a sum that is not the total', () => {
+    expect(validateParts(300, [cash(100), gcash(199.99)])).toMatch(/add up to ₱300\.00/);
+    expect(validateParts(300, [cash(100), gcash(200.01)])).toMatch(/add up to ₱300\.00/);
+  });
+  it('blocks an empty split and more than 10 parts', () => {
+    expect(validateParts(10, [])).toMatch(/at least one/);
+    expect(validateParts(11, Array.from({ length: 11 }, () => gcash(1)))).toMatch(/at most 10/);
+  });
+  it('blocks zero, negative and sub-centavo amounts', () => {
+    expect(validateParts(10, [cash(0), gcash(10)])).toMatch(/more than zero/);
+    expect(validateParts(10, [cash(-5), gcash(15)])).toMatch(/more than zero/);
+    expect(validateParts(10, [cash(5.005), gcash(4.995)])).toMatch(/more than zero/);
+  });
+  it('only lets cash be tendered over its amount, and never under', () => {
+    expect(validateParts(100, [cash(50, 40), gcash(50)])).toMatch(/Cash received must cover/);
+    expect(validateParts(100, [cash(50), { ...gcash(50), amountTendered: 60 }])).toMatch(/Only cash/);
+    expect(validateParts(100, [cash(50), { ...gcash(50), amountTendered: 50 }])).toBeNull();
+  });
+  it('allows one Utang part, and it needs a customer account', () => {
+    expect(validateParts(100, [utang(50), utang(50)])).toMatch(/one Utang/);
+    expect(validateParts(100, [cash(50), utang(50, null)])).toMatch(/customer account/);
+  });
+  it('rejects methods the API does not accept and references over 100 characters', () => {
+    expect(validateParts(100, [{ method: 1, amount: 100 }])).toMatch(/isn't available/);
+    expect(validateParts(100, [gcash(100, 'x'.repeat(101))])).toMatch(/100 characters/);
+  });
+  it('totals the change from the cash part', () => {
+    expect(splitChange([cash(100, 150), gcash(200)])).toBe(50);
+    expect(splitChange([gcash(200)])).toBe(0);
   });
 });

@@ -223,3 +223,107 @@ describe('ReceiptPage', () => {
     expect(within(dialog).getByRole('button', { name: 'Refund' })).toBeDisabled();
   });
 });
+
+describe('PaymentPage split payment', () => {
+  const splitSale = makeCart({
+    status: 2,
+    receiptNumber: 42,
+    lines: [makeLine({ id: 'l1', itemName: 'Iced Latte', lineTotal: 137.5 })],
+    subtotal: 137.5,
+    totalAmount: 137.5,
+    payments: [
+      { id: 'p1', method: 0, status: 1, amount: 37.5, amountTendered: 50, changeGiven: 12.5, sequence: 0, reference: null },
+      { id: 'p2', method: 3, status: 1, amount: 100, amountTendered: null, changeGiven: null, sequence: 1, reference: 'GC-778812' },
+    ],
+  });
+
+  async function splitCashThenGcash() {
+    fireEvent.click(await screen.findByRole('button', { name: 'Split payment' }));
+    fireEvent.change(screen.getByLabelText('Amount for this part'), { target: { value: '37.5' } });
+    fireEvent.change(screen.getByLabelText('Cash received'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add payment' }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Method for this part' })).getByRole('radio', { name: 'GCash' }));
+    fireEvent.change(screen.getByLabelText('Reference (optional)'), { target: { value: 'GC-778812' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add payment' }));
+  }
+
+  it('is hidden for roles without the split permission', async () => {
+    signInAs('Warehouse', { device_id: 'dev1', branch_id: 'kat' });
+    renderPayment();
+    await screen.findByTestId('amount-due');
+    expect(screen.queryByRole('button', { name: 'Split payment' })).not.toBeInTheDocument();
+  });
+
+  it('is offered to cashiers, managers and admins', async () => {
+    for (const role of ['Cashier', 'Manager', 'Admin']) {
+      signInAs(role, { device_id: 'dev1', branch_id: 'kat' });
+      const { unmount } = renderPayment();
+      expect(await screen.findByRole('button', { name: 'Split payment' })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('pays in parts, sending the first part as the method, then shows each tender on the receipt', async () => {
+    vi.mocked(posApi.pay).mockResolvedValue(splitSale);
+    renderPayment();
+    await splitCashThenGcash();
+    fireEvent.click(screen.getByRole('button', { name: /Complete sale/ }));
+    await waitFor(() =>
+      expect(posApi.pay).toHaveBeenCalledWith({
+        method: 0,
+        amountTendered: null,
+        customerCreditLedgerId: null,
+        expectedTotal: 137.5,
+        parts: [
+          { method: 0, amount: 37.5, amountTendered: 50, customerCreditLedgerId: null, reference: null },
+          { method: 3, amount: 100, amountTendered: null, customerCreditLedgerId: null, reference: 'GC-778812' },
+        ],
+      }),
+    );
+    expect(await screen.findByText('Sale complete')).toBeInTheDocument();
+    expect(screen.getByText('Cash (tendered ₱50.00)')).toBeInTheDocument();
+    expect(screen.getByText('GCash ref GC-778812')).toBeInTheDocument();
+    expect(screen.getByText('Change')).toBeInTheDocument();
+  });
+
+  it('sends one request however many times Complete is tapped', async () => {
+    let resolve: (t: typeof splitSale) => void = () => {};
+    vi.mocked(posApi.pay).mockImplementation(() => new Promise((r) => (resolve = r)));
+    renderPayment();
+    await splitCashThenGcash();
+    const complete = screen.getByRole('button', { name: /Complete sale/ });
+    fireEvent.click(complete);
+    fireEvent.click(complete);
+    fireEvent.click(complete);
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledTimes(1));
+    resolve(splitSale);
+    expect(await screen.findByText('Sale complete')).toBeInTheDocument();
+    expect(posApi.pay).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the cart changed on a 409 and reloads the total', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00.'));
+    renderPayment();
+    await splitCashThenGcash();
+    vi.mocked(posApi.getCart).mockResolvedValue(cartWithTotal(150));
+    fireEvent.click(screen.getByRole('button', { name: /Complete sale/ }));
+    expect(await screen.findByText(/The cart changed, review the total/)).toBeInTheDocument();
+    expect(await screen.findByTestId('amount-due')).toHaveTextContent('₱150.00');
+    expect(screen.getByTestId('split-remaining')).toHaveTextContent('₱12.50');
+  });
+
+  it('keeps the single cash payment as the default, unchanged', async () => {
+    renderPayment();
+    expect(await screen.findByRole('radio', { name: 'Cash' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Cash received')).toBeInTheDocument();
+    expect(screen.queryByTestId('split-remaining')).not.toBeInTheDocument();
+  });
+
+  it('keeps the single-payment receipt as it was', () => {
+    usePosStore.setState({ receipt: completed });
+    renderPage(<ReceiptPage />);
+    expect(screen.getByText('Tendered (Cash)')).toBeInTheDocument();
+    expect(screen.queryByText(/Cash \(tendered/)).not.toBeInTheDocument();
+  });
+});

@@ -10,7 +10,7 @@ import { IDLE_STATE, stateForReceipt, vatOf } from '../../hardware/display/chann
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { posApi } from './api';
 import { usePosStore } from './posStore';
-import { PaymentMethod, TransactionStatus, type TransactionLine } from './types';
+import { PaymentMethod, TransactionStatus, type Payment, type TransactionLine } from './types';
 
 const METHOD_LABEL: Record<number, string> = {
   [PaymentMethod.Cash]: 'Cash',
@@ -149,7 +149,16 @@ export function ReceiptPage() {
             <dt>TOTAL AMOUNT DUE</dt>
             <dd className="tabular-nums">{formatPeso(receipt.totalAmount)}</dd>
           </div>
-          {payment && (
+          {receipt.payments.length > 1 ? (
+            <>
+              {[...receipt.payments]
+                .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                .map((p) => (
+                  <Row key={p.id} label={tenderLabel(p)} value={p.amount} />
+                ))}
+              {splitChangeGiven(receipt.payments) > 0 && <Row label="Change" value={splitChangeGiven(receipt.payments)} />}
+            </>
+          ) : payment && (
             <>
               <Row label={`Tendered (${METHOD_LABEL[payment.method] ?? 'Payment'})`} value={payment.amountTendered ?? payment.amount} />
               {payment.changeGiven !== null && payment.changeGiven > 0 && <Row label="Change" value={payment.changeGiven} />}
@@ -206,6 +215,17 @@ export function ReceiptPage() {
       {refunding && <RefundDialog total={formatPeso(receipt.totalAmount)} busy={refundBusy} onSubmit={submitRefund} onCancel={() => setRefunding(false)} />}
     </div>
   );
+}
+
+/** One tender of a split sale: "Cash (tendered ₱50.00)", "GCash ref GC-1", "Bank transfer". */
+function tenderLabel(p: Payment): string {
+  const name = METHOD_LABEL[p.method] ?? 'Payment';
+  if (p.method === PaymentMethod.Cash && p.amountTendered !== null && p.amountTendered !== p.amount) return `${name} (tendered ${formatPeso(p.amountTendered)})`;
+  return p.reference ? `${name} ref ${p.reference}` : name;
+}
+
+function splitChangeGiven(payments: Payment[]): number {
+  return Math.round(payments.reduce((sum, p) => sum + (p.changeGiven ?? 0), 0) * 100) / 100;
 }
 
 function plain(value: number): string {
