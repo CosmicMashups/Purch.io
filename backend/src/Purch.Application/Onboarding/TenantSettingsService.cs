@@ -56,11 +56,23 @@ public sealed partial class TenantSettingsService(
 
     public async Task<TenantSettingsDto> UpdateBarcodeSettingAsync(UpdateBarcodeSettingRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.ParkedCartTtlHours is < 1 or > 168)
+        {
+            throw new ValidationException(
+                nameof(request.ParkedCartTtlHours),
+                "Parked carts must be kept for between 1 and 168 hours.");
+        }
+
         var tenant = await GetCurrentTenantAsync(cancellationToken);
         tenant.RequiresBarcodePerItem = request.RequiresBarcodePerItem;
         if (request.OpenItemEnabled is { } openItemEnabled)
         {
             tenant.OpenItemEnabled = openItemEnabled;
+        }
+
+        if (request.ParkedCartTtlHours is { } ttlHours)
+        {
+            tenant.ParkedCartTtlHours = ttlHours;
         }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -129,7 +141,8 @@ public sealed partial class TenantSettingsService(
         tenant.UseSeparateInventoryTracking,
         tenant.UseDepartmentTracking,
         tenant.UpdateCostOnReceiving,
-        tenant.OpenItemEnabled);
+        tenant.OpenItemEnabled,
+        tenant.ParkedCartTtlHours);
     }
 
     private static void ValidateHex(string? value, string field, string label)

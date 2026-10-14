@@ -22,4 +22,5 @@ public sealed record TenantSettingsDto(
     bool UseSeparateInventoryTracking,
     bool UseDepartmentTracking = false,
     bool UpdateCostOnReceiving = false,
-    bool OpenItemEnabled = true);
+    bool OpenItemEnabled = true,
+    int ParkedCartTtlHours = 24);
