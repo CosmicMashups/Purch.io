@@ -984,14 +984,14 @@ public sealed class TransactionService(
             throw new ValidationException(nameof(request.Quantity), "Quantity must be greater than zero.");
         }
 
-        var line = await RequireOwnLineAsync(lineId, cancellationToken);
-        var cart = await transactionRepository.GetByIdAsync(line.TransactionId, cancellationToken)
-            ?? throw new NotFoundException("Transaction", line.TransactionId);
+        var preview = await RequireOwnLineAsync(lineId, cancellationToken);
+        var previewCart = await transactionRepository.GetByIdAsync(preview.TransactionId, cancellationToken)
+            ?? throw new NotFoundException("Transaction", preview.TransactionId);
 
-        var approver = await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
+        var approver = await RequireKitchenEditAllowedAsync(previewCart, request.ApproverPin, cancellationToken);
 
         // A line is flushed before the cart is re-priced, so an oversized one must be refused up front.
-        if (request.Quantity * line.UnitPrice > MaxCartAmount)
+        if (request.Quantity * preview.UnitPrice > MaxCartAmount)
         {
             throw new ValidationException(nameof(request.Quantity), "The line total is too large.");
         }
@@ -1000,6 +1000,11 @@ public sealed class TransactionService(
         // unit: if the re-pricing refuses (cart total cap), the flushed quantity rolls back with it.
         return await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            // A retry of this block clears the change tracker, which detaches anything loaded before it; so the
+            // line and cart are read again inside, from what the database holds, and only those are mutated.
+            var line = await RequireOwnLineAsync(lineId, ct);
+            var cart = await transactionRepository.GetByIdAsync(line.TransactionId, ct)
+                ?? throw new NotFoundException("Transaction", line.TransactionId);
             var oldQuantity = line.Quantity;
             line.Quantity = request.Quantity;
             line.LineTotal = line.Quantity * line.UnitPrice;
@@ -1259,7 +1264,12 @@ public sealed class TransactionService(
                     throw new ValidationException(nameof(request.AmountTendered), "Cash tendered must cover the total amount.");
                 }
 
-                changeGiven = tendered - cart.TotalAmount;
+                if (tendered > MaxCartAmount)
+            {
+                throw new ValidationException(nameof(request.AmountTendered), $"Cash tendered can be at most {MaxCartAmount:0.00}.");
+            }
+
+            changeGiven = tendered - cart.TotalAmount;
             }
 
             if (request.Method == PaymentMethod.UtangCredit)

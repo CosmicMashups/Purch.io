@@ -317,6 +317,8 @@ namespace Purch.Infrastructure.Persistence.Migrations
                 name: "UnitCost",
                 table: "InventoryItems");
 
+            // NOTE: this fails while open-item rows (TransactionLines.ItemId IS NULL) exist, because the column goes
+            // back to NOT NULL. Delete or backfill those rows first before reverting this migration.
             migrationBuilder.AlterColumn<Guid>(
                 name: "ItemId",
                 table: "TransactionLines",

@@ -111,6 +111,8 @@ builder.Services.AddDbContext<PurchDbContext>((serviceProvider, options) =>
 {
     var deploymentContext = serviceProvider.GetRequiredService<IDeploymentContext>();
     _ = options.AddInterceptors(serviceProvider.GetRequiredService<DeviceSessionCacheEvictionInterceptor>());
+    // Test seam: nothing registers extra interceptors in production; tests inject fault interceptors here.
+    _ = options.AddInterceptors(serviceProvider.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>());
     // Transient-failure retries cover the brief connection drops a pooled Supabase/Vercel
     // connection sees after idle periods; nothing here opens manual transactions, so the
     // retrying execution strategy is safe (SaveChanges is already atomic per call).

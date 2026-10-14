@@ -67,6 +67,11 @@ public static class SplitTenderService
                     throw new ValidationException(Field, "Cash tendered must cover its part of the payment.");
                 }
 
+                if (tendered > TransactionService.MaxCartAmount)
+                {
+                    throw new ValidationException(Field, $"Cash tendered can be at most {TransactionService.MaxCartAmount:0.00}.");
+                }
+
                 partChange = tendered - part.Amount;
                 change += partChange.Value;
             }

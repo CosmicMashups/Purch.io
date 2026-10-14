@@ -1,7 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Purch.Domain.Entities;
 using Purch.Application.Catalog;
 using Purch.Application.Onboarding;
 using Purch.Application.Pos;
@@ -299,5 +304,49 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
         var final = (await admin.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
         Assert.Equal(after.Lines.Count, final.Lines.Count);
         Assert.Equal(after.TotalAmount, final.TotalAmount);
+    }
+
+    /// <summary>Throws a transient database error once, on the first save that touches a modified line, so the
+    /// execution strategy re-runs the transactional block (clearing the change tracker first).</summary>
+    private sealed class FailOnceInterceptor : SaveChangesInterceptor
+    {
+        public int Armed;
+        public int Fired;
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context is { } context
+                && context.ChangeTracker.Entries<TransactionLine>().Any(e => e.State == EntityState.Modified)
+                && Interlocked.Exchange(ref Armed, 0) == 1)
+            {
+                _ = Interlocked.Increment(ref Fired);
+                throw new NpgsqlException("simulated transient failure", new TimeoutException());
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task A_quantity_update_whose_transaction_is_retried_still_persists_and_answers_what_the_database_holds()
+    {
+        var interceptor = new FailOnceInterceptor();
+        await using var baseFactory = new PurchApiFactory(postgres.ConnectionString);
+        await using var factory = baseFactory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IInterceptor>(interceptor)));
+        using var admin = await TestSessions.AdminClientAsync(baseFactory);
+        using var adminWithRetry = factory.CreateClient();
+        adminWithRetry.DefaultRequestHeaders.Authorization = admin.DefaultRequestHeaders.Authorization;
+        var item = await CreateItemAsync(admin, "Rice", 100m);
+        var lineId = (await ReadAsync(await adminWithRetry.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m)))).Lines[0].Id;
+
+        interceptor.Armed = 1;
+        var updated = await ReadAsync(await adminWithRetry.PutAsJsonAsync($"/transactions/cart/lines/{lineId}", new UpdateTransactionLineRequest(4m)));
+
+        Assert.Equal(1, interceptor.Fired);
+        Assert.Equal(4m, updated.Lines[0].Quantity);
+        Assert.Equal(400m, updated.TotalAmount);
+        Assert.Equal(4m, await ScalarAsync<decimal>("SELECT \"Quantity\" FROM \"TransactionLines\" WHERE \"Id\" = @id", ("id", lineId)));
+        Assert.Equal(400m, await ScalarAsync<decimal>("SELECT \"TotalAmount\" FROM \"Transactions\" WHERE \"Id\" = @id", ("id", updated.Id)));
     }
 }
