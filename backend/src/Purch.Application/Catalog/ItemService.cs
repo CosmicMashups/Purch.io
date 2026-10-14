@@ -99,6 +99,8 @@ public sealed class ItemService(
             throw new ValidationException(nameof(request.BasePrice), "Price cannot be negative.");
         }
 
+        ValidateCostPrice(request.CostPrice);
+
         await ValidateBarcodeAsync(request.Barcode, cancellationToken);
         await ValidateCategoryAsync(request.CategoryId, cancellationToken);
         await ValidateDepartmentAsync(request.DepartmentId, cancellationToken);
@@ -118,6 +120,7 @@ public sealed class ItemService(
             PricingType = request.PricingType,
             DepartmentId = request.DepartmentId,
             SortOrder = request.SortOrder,
+            CostPrice = request.CostPrice,
             IsActive = true,
         };
 
@@ -155,6 +158,8 @@ public sealed class ItemService(
         {
             throw new ValidationException(nameof(request.BasePrice), "Price cannot be negative.");
         }
+
+        ValidateCostPrice(request.CostPrice);
 
         var item = await itemRepository.GetByIdAsync(itemId, cancellationToken)
             ?? throw new NotFoundException("Item", itemId);
@@ -204,6 +209,7 @@ public sealed class ItemService(
         item.IsActive = request.IsActive;
         item.DepartmentId = request.DepartmentId;
         item.SortOrder = request.SortOrder ?? item.SortOrder;
+        item.CostPrice = request.CostPrice;
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -320,6 +326,14 @@ public sealed class ItemService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(item, await GetTenantAsync(cancellationToken), cancellationToken);
+    }
+
+    private static void ValidateCostPrice(decimal? costPrice)
+    {
+        if (costPrice is < 0)
+        {
+            throw new ValidationException(nameof(costPrice), "Cost cannot be negative.");
+        }
     }
 
     private async Task ValidateBarcodeAsync(string? barcode, CancellationToken cancellationToken)
@@ -572,6 +586,7 @@ public sealed class ItemService(
         isOutOfStock,
         item.SortOrder,
         hasOwnStock,
-        linked?.QuantityOnHand ?? item.StockOnHand);
+        linked?.QuantityOnHand ?? item.StockOnHand,
+        item.CostPrice);
     }
 }

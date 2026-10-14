@@ -9,7 +9,8 @@ public sealed record UpdateItemRequest(
     string? ImageUrl,
     bool IsActive,
     Guid? DepartmentId = null,
-    int? SortOrder = null);
+    int? SortOrder = null,
+    decimal? CostPrice = null);
 
 /// <summary>The items in their new order; each one's position in the list becomes its sort order.</summary>
 public sealed record ReorderItemsRequest(IReadOnlyList<Guid> ItemIds);

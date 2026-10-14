@@ -76,6 +76,10 @@ public sealed partial class TenantSettingsService(
     {
         var tenant = await GetCurrentTenantAsync(cancellationToken);
         tenant.UseSeparateInventoryTracking = request.UseSeparateInventoryTracking;
+        if (request.UpdateCostOnReceiving is { } updateCost)
+        {
+            tenant.UpdateCostOnReceiving = updateCost;
+        }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
         return ToDto(tenant);
@@ -119,7 +123,8 @@ public sealed partial class TenantSettingsService(
         tenant.CreditLedgerEnabled,
         tenant.KioskPosterImageUrl,
         tenant.UseSeparateInventoryTracking,
-        tenant.UseDepartmentTracking);
+        tenant.UseDepartmentTracking,
+        tenant.UpdateCostOnReceiving);
     }
 
     private static void ValidateHex(string? value, string field, string label)

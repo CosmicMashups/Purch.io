@@ -69,6 +69,7 @@ public sealed class InventoryItemService(
             PackagingUnit = string.IsNullOrWhiteSpace(request.PackagingUnit) ? "pc" : request.PackagingUnit.Trim(),
             PackagingSize = request.PackagingSize,
             LowStockThreshold = request.LowStockThreshold,
+            UnitCost = ValidUnitCost(request.UnitCost),
             CategoryId = await ValidCategoryAsync(request.CategoryId, cancellationToken),
             IsActive = true,
         };
@@ -99,6 +100,7 @@ public sealed class InventoryItemService(
         inventoryItem.PackagingUnit = string.IsNullOrWhiteSpace(request.PackagingUnit) ? "pc" : request.PackagingUnit.Trim();
         inventoryItem.PackagingSize = request.PackagingSize;
         inventoryItem.LowStockThreshold = request.LowStockThreshold;
+        inventoryItem.UnitCost = ValidUnitCost(request.UnitCost);
         inventoryItem.CategoryId = await ValidCategoryAsync(request.CategoryId, cancellationToken);
         inventoryItem.IsActive = request.IsActive;
 
@@ -192,6 +194,16 @@ public sealed class InventoryItemService(
     private Guid CurrentUserId => currentActorProvider.UserId
         ?? throw new InvalidOperationException("Inventory item management requires an authenticated staff user.");
 
+    private static decimal? ValidUnitCost(decimal? unitCost)
+    {
+        if (unitCost is < 0)
+        {
+            throw new ValidationException(nameof(unitCost), "Unit cost cannot be negative.");
+        }
+
+        return unitCost;
+    }
+
     private static InventoryItemDto ToDto(InventoryItem inventoryItem)
     {
         return new(
@@ -207,6 +219,7 @@ public sealed class InventoryItemService(
             inventoryItem.LinkedItemId,
             inventoryItem.IsActive,
             inventoryItem.CategoryId,
-            SortOrder: inventoryItem.SortOrder);
+            SortOrder: inventoryItem.SortOrder,
+            UnitCost: inventoryItem.UnitCost);
     }
 }

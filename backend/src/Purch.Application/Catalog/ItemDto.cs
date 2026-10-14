@@ -23,4 +23,5 @@ public sealed record ItemDto(
     bool IsOutOfStock,
     int SortOrder = 0,
     bool HasOwnStock = true,
-    decimal CountOnHand = 0);
+    decimal CountOnHand = 0,
+    decimal? CostPrice = null);

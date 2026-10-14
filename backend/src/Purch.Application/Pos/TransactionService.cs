@@ -226,6 +226,7 @@ public sealed class TransactionService(
                 Quantity = request.Quantity,
                 UnitPrice = unitPrice,
                 LineTotal = unitPrice * request.Quantity,
+                UnitCost = item.CostPrice,
             };
             transactionRepository.AddLine(comboLine);
             stage.Lines.Add(comboLine);
@@ -295,11 +296,38 @@ public sealed class TransactionService(
             Quantity = request.Quantity,
             UnitPrice = resolvedUnitPrice,
             LineTotal = resolvedUnitPrice * request.Quantity,
+            UnitCost = await ResolveUnitCostAsync(item, cancellationToken),
         };
         transactionRepository.AddLine(line);
         stage.Lines.Add(line);
 
         AddModifierSelections(stage, line.Id, modifiers);
+    }
+
+    /// <summary>The cost snapshotted onto a line when it is staged. A recipe item costs the sum of each ingredient's
+    /// unit cost times its per-order quantity; if any ingredient's cost or quantity is unknown the whole line cost is
+    /// unknown (null) rather than understated. An item with no recipe uses its own CostPrice.</summary>
+    private async Task<decimal?> ResolveUnitCostAsync(Item item, CancellationToken cancellationToken)
+    {
+        var recipeLines = await itemRecipeRepository.ListByItemAsync(item.Id, cancellationToken);
+        if (recipeLines.Count == 0)
+        {
+            return item.CostPrice;
+        }
+
+        decimal total = 0m;
+        foreach (var recipeLine in recipeLines)
+        {
+            var ingredient = await inventoryItemRepository.GetByIdAsync(recipeLine.InventoryItemId, cancellationToken);
+            if (ingredient?.UnitCost is not { } unitCost || recipeLine.QuantityPerOrder is not { } perOrder)
+            {
+                return null;
+            }
+
+            total += unitCost * perOrder;
+        }
+
+        return total;
     }
 
     /// <summary>One chosen option of a line, resolved and priced: modifiers and category items together.</summary>

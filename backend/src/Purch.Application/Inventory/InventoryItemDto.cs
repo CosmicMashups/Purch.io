@@ -16,7 +16,8 @@ public sealed record InventoryItemDto(
     bool IsActive,
     Guid? CategoryId = null,
     bool IsCountedByHand = false,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    decimal? UnitCost = null);
 
 public sealed record CreateInventoryItemRequest(
     string Name,
@@ -25,7 +26,8 @@ public sealed record CreateInventoryItemRequest(
     string PackagingUnit,
     decimal PackagingSize,
     decimal? LowStockThreshold,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    decimal? UnitCost = null);
 
 public sealed record UpdateInventoryItemRequest(
     string Name,
@@ -35,7 +37,8 @@ public sealed record UpdateInventoryItemRequest(
     decimal PackagingSize,
     decimal? LowStockThreshold,
     bool IsActive,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    decimal? UnitCost = null);
 
 /// <summary>BranchId is required so the resulting Adjustment InventoryMovement can be attributed to a branch, matching InventoryMovement's shape.</summary>
 public sealed record UpdatePhysicalCountRequest(decimal QuantityOnHand, Guid BranchId);

@@ -17,6 +17,7 @@ public sealed class IncomingReceivingService(
     ISupplierRepository supplierRepository,
     IItemRepository itemRepository,
     IItemStockService itemStockService,
+    ITenantRepository tenantRepository,
     IBranchRepository branchRepository,
     IUserRepository userRepository,
     IBranchScopeGuard branchScopeGuard,
@@ -75,6 +76,8 @@ public sealed class IncomingReceivingService(
             }
         }
 
+        var updateCostOnReceiving = (await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken))?.UpdateCostOnReceiving ?? false;
+
         PurchaseOrder? purchaseOrder = null;
         if (request.PurchaseOrderId is { } purchaseOrderId)
         {
@@ -112,6 +115,12 @@ public sealed class IncomingReceivingService(
             if (line.Remark != ReceivingRemark.Accepted)
             {
                 continue;
+            }
+
+            if (updateCostOnReceiving)
+            {
+                // Last-cost: the most recent accepted receipt price becomes the item's cost.
+                items[line.ItemId].CostPrice = line.UnitPrice;
             }
 
             var inventoryItemId = await itemStockService.AdjustAsync(items[line.ItemId], line.QuantityReceived, cancellationToken);
