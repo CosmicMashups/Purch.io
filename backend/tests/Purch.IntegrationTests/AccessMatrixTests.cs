@@ -145,6 +145,27 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_cashier_is_refused_the_manual_discount_and_price_override_routes_and_a_manager_is_not()
+    {
+        var (factory, admin, business, anonymous) = await NewShopAsync();
+        await using var _ = factory;
+        var cashier = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Cashier);
+        var manager = await AddPersonAsync(admin, anonymous, business, MembershipRole.Manager, StaffDuty.None);
+        var register = await PairAsync(admin, anonymous, business, DeviceType.Register);
+        var cashierClient = Bearer(factory, await UnlockAsync(anonymous, register, cashier));
+        var managerClient = Bearer(factory, await UnlockAsync(anonymous, register, manager));
+        var someLine = Guid.NewGuid();
+        var body = new { kind = "Percent", value = 10m, reason = "Damaged" };
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/discount", body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashierClient.PutAsJsonAsync("/transactions/cart/discount", body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashierClient.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/price", new { newUnitPrice = 1m, reason = "Match" })).StatusCode);
+
+        // A manager is let through the policy: no open cart is a 404, never a 403.
+        Assert.Equal(HttpStatusCode.NotFound, (await managerClient.PutAsJsonAsync("/transactions/cart/discount", body)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_manager_reaches_everything_except_devices_wherever_they_unlock()
     {
         var (factory, admin, business, anonymous) = await NewShopAsync();

@@ -76,8 +76,11 @@ public sealed class BirReadingService(
         // gross minus the reported discounts has to equal net.
         var salesTotal = transactions.Sum(t => t.TotalAmount);
         var promoCodeDiscountTotal = transactions.Sum(t => t.PromoDiscountAmount);
-        var seniorPwdDiscountTotal = transactions.Sum(t => t.DiscountAmount) - promoCodeDiscountTotal;
-        var promoDiscountTotal = promoCodeDiscountTotal + transactions.Sum(t => t.ItemPromoDiscountAmount);
+        // A manager's manual discount is exclusive with Senior/PWD, so the Senior/PWD amount is read from Senior/PWD
+        // sales only; the rest of DiscountAmount beyond the promo code is manual and is reported with the other discounts.
+        var seniorPwdDiscountTotal = transactions.Where(t => t.SeniorPwdDiscountApplied).Sum(t => t.DiscountAmount - t.PromoDiscountAmount);
+        var manualDiscountTotal = transactions.Sum(t => t.DiscountAmount) - promoCodeDiscountTotal - seniorPwdDiscountTotal;
+        var promoDiscountTotal = promoCodeDiscountTotal + manualDiscountTotal + transactions.Sum(t => t.ItemPromoDiscountAmount);
         var totalDiscounts = seniorPwdDiscountTotal + promoDiscountTotal;
 
         // Exchanges add (or give back) revenue, refunds take it away — both fold into net sales right

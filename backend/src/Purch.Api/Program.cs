@@ -224,6 +224,7 @@ builder.Services.AddSingleton<IPosSettings, PosSettings>();
 builder.Services.AddScoped<IApproverAuthorizationService, ApproverAuthorizationService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ICartParkingService, CartParkingService>();
+builder.Services.AddScoped<IManualDiscountService, ManualDiscountService>();
 builder.Services.AddScoped<IAdjustmentService, AdjustmentService>();
 builder.Services.AddScoped<IKioskSessionService, KioskSessionService>();
 builder.Services.AddScoped<IShiftRepository, EfShiftRepository>();

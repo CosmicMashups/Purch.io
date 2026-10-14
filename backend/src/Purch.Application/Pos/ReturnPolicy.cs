@@ -41,13 +41,13 @@ public static class ReturnPolicy
     /// values of all lines add up to the sale's total.</summary>
     public static decimal PaidValue(Transaction sale, IReadOnlyCollection<TransactionLine> lines, TransactionLine line, decimal quantity)
     {
-        var netOfLinePromos = lines.Sum(l => l.LineTotal - l.PromoDiscountAmount);
+        var netOfLinePromos = lines.Sum(l => l.LineTotal - l.PromoDiscountAmount - l.ManualDiscountAmount);
         if (netOfLinePromos <= 0 || line.Quantity <= 0)
         {
             return 0m;
         }
 
-        var paidForLine = (line.LineTotal - line.PromoDiscountAmount) * sale.TotalAmount / netOfLinePromos;
+        var paidForLine = (line.LineTotal - line.PromoDiscountAmount - line.ManualDiscountAmount) * sale.TotalAmount / netOfLinePromos;
         return Math.Round(paidForLine * quantity / line.Quantity, 2, MidpointRounding.AwayFromZero);
     }
 }

@@ -1606,11 +1606,48 @@ public sealed class TransactionService(
             });
         }
 
+        if (request.Apply)
+        {
+            await ClearManualDiscountsAsync(cart, cancellationToken);
+        }
+
         cart.SeniorPwdDiscountApplied = request.Apply;
         await RecalculateTotalAsync(cart, cancellationToken);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return cart;
+    }
+
+    /// <summary>Senior/PWD is the statutory discount and cannot sit beside a manual one: applying it removes every
+    /// manual discount on the cart, and the removal is audited (the same save commits both).</summary>
+    private async Task ClearManualDiscountsAsync(Transaction cart, CancellationToken cancellationToken)
+    {
+        var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
+        var lineAmounts = lines.Where(line => line.ManualDiscountAmount > 0m)
+            .Select(line => new { lineId = line.Id, amount = line.ManualDiscountAmount }).ToList();
+        if (lineAmounts.Count == 0 && cart.ManualDiscountAmount <= 0m)
+        {
+            return;
+        }
+
+        auditLogRepository.Add(new AuditLog
+        {
+            TenantId = CurrentTenantId,
+            ActorUserId = CurrentUserId,
+            ActionType = AuditActionType.DiscountOverride,
+            TargetEntityType = nameof(Transaction),
+            TargetEntityId = cart.Id,
+            BeforeStateJson = JsonSerializer.Serialize(new { cartManualDiscount = cart.ManualDiscountAmount, reason = cart.ManualDiscountReason, lines = lineAmounts }),
+            AfterStateJson = JsonSerializer.Serialize(new { manualDiscountsCleared = true, because = "Senior/PWD discount applied" }),
+        });
+
+        foreach (var line in lines)
+        {
+            line.ManualDiscountAmount = 0m;
+        }
+
+        cart.ManualDiscountAmount = 0m;
+        cart.ManualDiscountReason = null;
     }
 
     public async Task<TransactionDto> ApplyPromoCodeAsync(ApplyPromoCodeRequest request, CancellationToken cancellationToken = default)
@@ -1981,16 +2018,30 @@ public sealed class TransactionService(
             line.AppliedPromoLabel = null;
         }
 
-        var itemPromoResults = await CalculateItemPromosAsync(pricedLines, cancellationToken);
+        // Manual (Manager/Admin) discounts: held to what they cover, cleared under Senior/PWD (BIR wins), and a
+        // line carrying one is left out of the promotions. See ManualDiscountPricing.
+        var seniorPwd = transaction.SeniorPwdDiscountApplied;
+        var manualLines = ManualDiscountPricing.ClampLines(
+            pricedLines.Select(line => new ManualDiscountPricing.LineInput(line.Id, line.LineTotal, seniorPwd ? 0m : line.ManualDiscountAmount)));
+        foreach (var line in pricedLines)
+        {
+            line.ManualDiscountAmount = manualLines[line.Id];
+        }
+
+        var lineManualTotal = manualLines.Values.Sum();
+        var promoLines = lineManualTotal == 0m ? pricedLines : pricedLines.Where(line => line.ManualDiscountAmount == 0m).ToList();
+
+        var itemPromoResults = await CalculateItemPromosAsync(promoLines, cancellationToken);
         var itemPromoAmount = itemPromoResults.Sum(result => result.DiscountAmount);
-        var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, grossSubtotal, cancellationToken);
+        var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, promoLines.Sum(line => line.LineTotal), cancellationToken);
 
         var seniorPwdAmount = 0m;
         var vatExemptAmount = 0m;
         var appliedItemPromoAmount = 0m;
         var appliedPromoCodeAmount = 0m;
+        var cartManualAmount = 0m;
 
-        if (transaction.SeniorPwdDiscountApplied)
+        if (seniorPwd)
         {
             // Prices include 12% VAT. A Senior/PWD sale is VAT-exempt, so the VAT comes off first, and the 20% is
             // then taken off the VAT-exclusive regular price (not off a price already reduced by a promotion).
@@ -1998,27 +2049,38 @@ public sealed class TransactionService(
             vatExemptAmount = grossSubtotal - vatExclusive;
             seniorPwdAmount = Math.Round(vatExclusive * SeniorPwdDiscountRate, 2);
         }
-        else if (itemPromoAmount >= promoCodeAmount)
+        else
         {
-            appliedItemPromoAmount = itemPromoAmount;
-            var linesById = pricedLines.ToDictionary(line => line.Id);
-            foreach (var result in itemPromoResults)
+            var resolved = ManualDiscountPricing.ResolveCart(
+                transaction.ManualDiscountAmount, grossSubtotal - lineManualTotal, itemPromoAmount, promoCodeAmount);
+            cartManualAmount = resolved.CartAmount;
+            appliedItemPromoAmount = resolved.AppliedItemPromo;
+            appliedPromoCodeAmount = resolved.AppliedPromoCode;
+
+            // A tie (including no promos at all) goes to the item promos; nothing is assigned under a manual cart discount.
+            if (transaction.ManualDiscountAmount <= 0m && itemPromoAmount >= promoCodeAmount)
             {
-                if (linesById.TryGetValue(result.LineId, out var line))
+                var linesById = pricedLines.ToDictionary(line => line.Id);
+                foreach (var result in itemPromoResults)
                 {
-                    line.PromoDiscountAmount = result.DiscountAmount;
-                    line.AppliedPromoLabel = result.Label;
+                    if (linesById.TryGetValue(result.LineId, out var line))
+                    {
+                        line.PromoDiscountAmount = result.DiscountAmount;
+                        line.AppliedPromoLabel = result.Label;
+                    }
                 }
             }
         }
-        else
+
+        transaction.ManualDiscountAmount = cartManualAmount;
+        if (cartManualAmount == 0m)
         {
-            appliedPromoCodeAmount = promoCodeAmount;
+            transaction.ManualDiscountReason = null;
         }
 
         transaction.ItemPromoDiscountAmount = appliedItemPromoAmount;
         transaction.PromoDiscountAmount = appliedPromoCodeAmount;
-        transaction.DiscountAmount = seniorPwdAmount + appliedPromoCodeAmount;
+        transaction.DiscountAmount = seniorPwdAmount + appliedPromoCodeAmount + lineManualTotal + cartManualAmount;
         transaction.VatExemptAmount = vatExemptAmount;
         transaction.TotalAmount = grossSubtotal - appliedItemPromoAmount - vatExemptAmount - transaction.DiscountAmount;
     }
@@ -2206,7 +2268,9 @@ public sealed class TransactionService(
                 line.PromoDiscountAmount,
                 line.AppliedPromoLabel,
                 comboSelectionDtos,
-                modifierSelectionDtos));
+                modifierSelectionDtos,
+                line.ManualDiscountAmount,
+                line.PriceOverrideFrom));
         }
 
         var paymentsByTransaction = (await paymentRepository.ListByTransactionsAsync([.. transactions.Select(t => t.Id)], cancellationToken))
@@ -2244,7 +2308,9 @@ public sealed class TransactionService(
                 transaction.CompletedAt,
                 transaction.KioskPaymentPreference,
                 transaction.KioskDiscountHint,
-                transaction.VatExemptAmount));
+                transaction.VatExemptAmount,
+                ManualDiscountAmount: transaction.ManualDiscountAmount,
+                ManualDiscountReason: transaction.ManualDiscountReason));
         }
 
         return results;

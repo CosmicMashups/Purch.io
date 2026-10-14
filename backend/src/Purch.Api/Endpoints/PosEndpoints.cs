@@ -176,6 +176,33 @@ public static class PosEndpoints
             Results.Ok(await transactionService.ApplySeniorPwdDiscountAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
 
+        // --- Manager/Admin manual discount and price override (exclusive with Senior/PWD; audited) ---
+        _ = app.MapPut("/transactions/cart/lines/{lineId:guid}/discount", async (
+            Guid lineId,
+            SetManualDiscountRequest request,
+            IManualDiscountService manualDiscounts,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await manualDiscounts.SetLineDiscountAsync(lineId, request, cancellationToken)))
+            .RequirePermission(Permissions.DiscountApply)
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
+
+        _ = app.MapPut("/transactions/cart/discount", async (
+            SetManualDiscountRequest request,
+            IManualDiscountService manualDiscounts,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await manualDiscounts.SetCartDiscountAsync(request, cancellationToken)))
+            .RequirePermission(Permissions.DiscountApply)
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
+
+        _ = app.MapPut("/transactions/cart/lines/{lineId:guid}/price", async (
+            Guid lineId,
+            OverrideLinePriceRequest request,
+            IManualDiscountService manualDiscounts,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await manualDiscounts.OverridePriceAsync(lineId, request, cancellationToken)))
+            .RequirePermission(Permissions.PriceOverride)
+            .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
+
         _ = app.MapPut("/transactions/cart/promo-code", async (
             ApplyPromoCodeRequest request,
             ITransactionService transactionService,
