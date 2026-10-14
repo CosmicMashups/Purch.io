@@ -189,6 +189,39 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_warehouse_staff_member_and_a_kiosk_are_refused_a_split_payment_and_a_cashier_is_not()
+    {
+        var (factory, admin, business, anonymous) = await NewShopAsync();
+        await using var _ = factory;
+        var warehouse = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Warehouse);
+        var cashier = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Cashier);
+        var warehouseClient = Bearer(factory, await UnlockAsync(anonymous, await PairAsync(admin, anonymous, business, DeviceType.WarehouseOfficer), warehouse));
+        var cashierClient = Bearer(factory, await UnlockAsync(anonymous, await PairAsync(admin, anonymous, business, DeviceType.Register), cashier));
+        var kioskCredential = await PairAsync(admin, anonymous, business, DeviceType.Kiosk);
+        var session = (await (await anonymous.PostAsJsonAsync("/devices/session", new DeviceSessionRequest(kioskCredential))).Content.ReadFromJsonAsync<DeviceSessionDto>(JsonOptions))!;
+        var kioskClient = Bearer(factory, session.AccessToken!);
+        var payment = new
+        {
+            method = (int)PaymentMethod.Cash,
+            parts = new object[]
+            {
+                new { method = (int)PaymentMethod.Cash, amount = 100m, amountTendered = 100m },
+                new { method = (int)PaymentMethod.ManualGcashQr, amount = 50m },
+            },
+        };
+        var checkout = new { saleId = Guid.NewGuid(), lines = new[] { new { itemId = Guid.NewGuid(), quantity = 1m } }, seniorPwdDiscountApplied = false, payment };
+
+        foreach (var client in new[] { warehouseClient, kioskClient })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/transactions/cart/payments", payment)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/transactions/checkout", checkout)).StatusCode);
+        }
+
+        // A cashier holds payment.split: no open cart is a 404, never a 403.
+        Assert.Equal(HttpStatusCode.NotFound, (await cashierClient.PostAsJsonAsync("/transactions/cart/payments", payment)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_cashier_may_add_an_open_item_and_set_a_line_note()
     {
         var (factory, admin, business, anonymous) = await NewShopAsync();

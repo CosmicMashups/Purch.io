@@ -54,13 +54,7 @@ public sealed class TransactionService(
 {
     private static readonly HashSet<Role> ApproverRoles = [Role.Admin, Role.Manager];
 
-    private static readonly HashSet<PaymentMethod> SupportedPaymentMethods =
-    [
-        PaymentMethod.Cash,
-        PaymentMethod.BankTransfer,
-        PaymentMethod.ManualGcashQr,
-        PaymentMethod.UtangCredit,
-    ];
+    private static readonly IReadOnlySet<PaymentMethod> SupportedPaymentMethods = SplitTenderService.SupportedMethods;
 
     /// <summary>RA 9994/RA 10754 Senior Citizen/PWD discount — see ApplySeniorPwdDiscountRequest for the VAT-treatment caveat.</summary>
     private const decimal SeniorPwdDiscountRate = 0.20m;
@@ -1147,6 +1141,11 @@ public sealed class TransactionService(
         // balance, and (via RefundedOnDeviceId) any cash paid out is deducted from this register's shift.
         await RestockRefundedSaleAsync(transaction, cancellationToken);
         var creditReversed = await ReverseCreditChargeAsync(transaction, cancellationToken);
+        // Which tenders to hand back: one entry per Payment row (one for a single-tender sale, N for a split one).
+        var tenders = (await paymentRepository.ListByTransactionAsync(transaction.Id, cancellationToken))
+            .OrderBy(payment => payment.Sequence)
+            .Select(payment => new { method = payment.Method.ToString(), amount = payment.Amount, reference = payment.Reference })
+            .ToList();
 
         auditLogRepository.Add(new AuditLog
         {
@@ -1162,6 +1161,7 @@ public sealed class TransactionService(
                 reason = request.Reason,
                 total = transaction.TotalAmount,
                 creditReversed,
+                tenders,
                 approvedByUserId = approver.Id,
                 approvedByRole = approver.Role.ToString(),
             }),
@@ -1209,7 +1209,7 @@ public sealed class TransactionService(
         bool enforceExpectedTotal,
         CancellationToken cancellationToken)
     {
-        if (!SupportedPaymentMethods.Contains(request.Method))
+        if (request.Parts is null && !SupportedPaymentMethods.Contains(request.Method))
         {
             throw new ValidationException(
                 nameof(request.Method),
@@ -1230,33 +1230,55 @@ public sealed class TransactionService(
             EnforceExpectedTotal(cart.TotalAmount, expectedTotal);
         }
 
-        decimal? changeGiven = null;
-        if (request.Method == PaymentMethod.Cash)
+        if (request.Parts is not null)
         {
-            if (request.AmountTendered is not { } tendered || tendered < cart.TotalAmount)
+            // Split tender: every part is validated before anything is charged or added, and all of it is saved in the
+            // same SaveChangesAsync as the receipt number below, so a rejected split leaves no Payment rows.
+            var split = SplitTenderService.Build(cart.TotalAmount, request.Parts);
+            foreach (var payment in split.Payments)
             {
-                throw new ValidationException(nameof(request.AmountTendered), "Cash tendered must cover the total amount.");
+                if (payment.Method == PaymentMethod.UtangCredit)
+                {
+                    var utang = request.Parts[payment.Sequence];
+                    await ChargeToCreditLedgerAsync(cart, utang.CustomerCreditLedgerId, payment.Amount, request, cancellationToken);
+                }
+
+                payment.TenantId = CurrentTenantId;
+                payment.CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow;
+                payment.TransactionId = cart.Id;
+                paymentRepository.Add(payment);
+            }
+        }
+        else
+        {
+            decimal? changeGiven = null;
+            if (request.Method == PaymentMethod.Cash)
+            {
+                if (request.AmountTendered is not { } tendered || tendered < cart.TotalAmount)
+                {
+                    throw new ValidationException(nameof(request.AmountTendered), "Cash tendered must cover the total amount.");
+                }
+
+                changeGiven = tendered - cart.TotalAmount;
             }
 
-            changeGiven = tendered - cart.TotalAmount;
-        }
+            if (request.Method == PaymentMethod.UtangCredit)
+            {
+                await ChargeToCreditLedgerAsync(cart, request.CustomerCreditLedgerId, cart.TotalAmount, request, cancellationToken);
+            }
 
-        if (request.Method == PaymentMethod.UtangCredit)
-        {
-            await ChargeToCreditLedgerAsync(cart, request, cancellationToken);
+            paymentRepository.Add(new Payment
+            {
+                TenantId = CurrentTenantId,
+                CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
+                TransactionId = cart.Id,
+                Method = request.Method,
+                Status = PaymentStatus.Confirmed,
+                Amount = cart.TotalAmount,
+                AmountTendered = request.AmountTendered,
+                ChangeGiven = changeGiven,
+            });
         }
-
-        paymentRepository.Add(new Payment
-        {
-            TenantId = CurrentTenantId,
-            CreatedAt = saleTimeOverride ?? DateTimeOffset.UtcNow,
-            TransactionId = cart.Id,
-            Method = request.Method,
-            Status = PaymentStatus.Confirmed,
-            Amount = cart.TotalAmount,
-            AmountTendered = request.AmountTendered,
-            ChangeGiven = changeGiven,
-        });
 
         var sequence = await receiptSequenceRepository.GetOrCreateTrackedAsync(CurrentTenantId, cart.BranchId, cart.DeviceId, cancellationToken);
         if (deviceIssuedReceiptNumber is { } issuedNumber)
@@ -1661,9 +1683,9 @@ public sealed class TransactionService(
     /// CreditTransaction recorded in the same SaveChangesAsync as the payment
     /// and transaction-completion below, so a rollback can't charge a customer
     /// without actually completing the sale (or vice versa).</summary>
-    private async Task ChargeToCreditLedgerAsync(Transaction cart, RecordPaymentRequest request, CancellationToken cancellationToken)
+    private async Task ChargeToCreditLedgerAsync(Transaction cart, Guid? customerCreditLedgerId, decimal amount, RecordPaymentRequest request, CancellationToken cancellationToken)
     {
-        if (request.CustomerCreditLedgerId is not { } ledgerId)
+        if (customerCreditLedgerId is not { } ledgerId)
         {
             throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "A customer credit account is required for Utang/Credit payments.");
         }
@@ -1680,7 +1702,7 @@ public sealed class TransactionService(
             throw new NotFoundException("Customer credit account", ledgerId);
         }
 
-        if (ledger.Balance + cart.TotalAmount > ledger.CreditLimit)
+        if (ledger.Balance + amount > ledger.CreditLimit)
         {
             if (!request.AllowCreditLimitOverride)
             {
@@ -1701,17 +1723,17 @@ public sealed class TransactionService(
                 TargetEntityType = nameof(CustomerCreditLedger),
                 TargetEntityId = ledger.Id,
                 BeforeStateJson = JsonSerializer.Serialize(new { creditLimit = ledger.CreditLimit, balance = ledger.Balance }),
-                AfterStateJson = JsonSerializer.Serialize(new { newBalance = ledger.Balance + cart.TotalAmount, saleId = cart.Id, reason = request.CreditLimitOverrideReason ?? "Manager approved credit limit override at checkout" }),
+                AfterStateJson = JsonSerializer.Serialize(new { newBalance = ledger.Balance + amount, saleId = cart.Id, reason = request.CreditLimitOverrideReason ?? "Manager approved credit limit override at checkout" }),
             });
         }
 
-        ledger.Balance += cart.TotalAmount;
+        ledger.Balance += amount;
         creditLedgerRepository.AddTransaction(new CreditTransaction
         {
             TenantId = CurrentTenantId,
             CustomerCreditLedgerId = ledger.Id,
             TransactionId = cart.Id,
-            Amount = cart.TotalAmount,
+            Amount = amount,
             Note = "POS sale on credit",
         });
     }
@@ -2442,7 +2464,8 @@ public sealed class TransactionService(
             var lineDtos = lineDtosByTransaction.TryGetValue(transaction.Id, out var found) ? found : [];
             var subtotal = lineDtos.Sum(line => line.LineTotal);
             var paymentDtos = paymentsByTransaction[transaction.Id]
-                .Select(payment => new PaymentDto(payment.Id, payment.Method, payment.Status, payment.Amount, payment.AmountTendered, payment.ChangeGiven))
+                .OrderBy(payment => payment.Sequence)
+                .Select(payment => new PaymentDto(payment.Id, payment.Method, payment.Status, payment.Amount, payment.AmountTendered, payment.ChangeGiven, payment.Sequence, payment.Reference))
                 .ToList();
 
             results.Add(new TransactionDto(

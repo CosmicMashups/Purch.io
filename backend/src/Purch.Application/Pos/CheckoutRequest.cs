@@ -11,7 +11,7 @@ namespace Purch.Application.Pos;
 /// <param name="SeniorPwdDiscountApplied">Cashier-verified Senior Citizen/PWD ID; Admin/Manager only, like the cart endpoint.</param>
 /// <param name="PromoCode">A cart-level promo code, or null.</param>
 /// <param name="OrderType">Fulfillment choice such as "Dine In"/"Take Out", or null.</param>
-/// <param name="Payment">A single full payment, exactly as the cart endpoint accepts.</param>
+/// <param name="Payment">The payment, exactly as the cart endpoint accepts: one full payment, or split tender via Parts.</param>
 /// <param name="ExpectedTotal">The total the device showed the customer. If the server prices the
 /// cart differently, checkout stops with a 409 before charging anything, so the customer never
 /// pays a price they were not shown. Null skips the check.</param>

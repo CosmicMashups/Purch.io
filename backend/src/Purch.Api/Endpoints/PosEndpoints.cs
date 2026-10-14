@@ -9,6 +9,15 @@ namespace Purch.Api.Endpoints;
 
 public static class PosEndpoints
 {
+    /// <summary>A payment in more than one part needs <see cref="Permissions.SplitPay"/> on top of the route's role gate.</summary>
+    private static void EnsureMaySplit(RecordPaymentRequest? payment, System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (payment?.Parts is { Count: > 1 } && !Permissions.RolesFor(Permissions.SplitPay).Any(user.IsInRole))
+        {
+            throw new Application.Common.Exceptions.ForbiddenException("You don't have permission to split a payment.");
+        }
+    }
+
     public static IEndpointRouteBuilder MapPosEndpoints(this IEndpointRouteBuilder app)
     {
         var posOperator = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Cashier) };
@@ -153,9 +162,13 @@ public static class PosEndpoints
 
         _ = app.MapPost("/transactions/cart/payments", async (
             RecordPaymentRequest request,
+            System.Security.Claims.ClaimsPrincipal user,
             ITransactionService transactionService,
             CancellationToken cancellationToken) =>
-            Results.Ok(await transactionService.RecordPaymentAsync(request, cancellationToken)))
+        {
+            EnsureMaySplit(request, user);
+            return Results.Ok(await transactionService.RecordPaymentAsync(request, cancellationToken));
+        })
             .RequireAuthorization(policy => policy.RequireRole(posOperator));
 
         _ = app.MapGet("/transactions/receipt-sequence", async (
@@ -177,6 +190,7 @@ public static class PosEndpoints
             // An offline sale is checked against the manager's attestation instead (see
             // TransactionService.CheckoutAsync): it syncs under whoever is signed in later, who may be a
             // cashier even though a manager applied the discount at the counter.
+            EnsureMaySplit(request.Payment, user);
             return request.SeniorPwdDiscountApplied && !posSupervisor.Any(user.IsInRole)
                 && !request.OfflineSale
                 ? throw new Application.Common.Exceptions.ForbiddenException(
