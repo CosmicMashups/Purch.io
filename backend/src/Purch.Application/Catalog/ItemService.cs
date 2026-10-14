@@ -51,7 +51,8 @@ public sealed class ItemService(
             tenant,
             recipeLinesByItemId.GetValueOrDefault(item.Id, []),
             inventoryItemsById,
-            inventoryItemsByLinkedItemId)).ToList();
+            inventoryItemsByLinkedItemId,
+            currentActorProvider.CanSeeCosts)).ToList();
 
         // An item that needs equipment which is out of service cannot be made, so it shows as out of stock.
         // This runs before the combo pass below so a combo with such an item as a fixed part is blocked too.
@@ -209,7 +210,14 @@ public sealed class ItemService(
         item.IsActive = request.IsActive;
         item.DepartmentId = request.DepartmentId;
         item.SortOrder = request.SortOrder ?? item.SortOrder;
-        item.CostPrice = request.CostPrice;
+        if (request.ClearCostPrice)
+        {
+            item.CostPrice = null;
+        }
+        else if (request.CostPrice is { } newCost)
+        {
+            item.CostPrice = newCost;
+        }
 
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -491,7 +499,7 @@ public sealed class ItemService(
             }
         }
 
-        return ToDto(item, tenant, recipeLines, inventoryItemsById, inventoryItemsByLinkedItemId);
+        return ToDto(item, tenant, recipeLines, inventoryItemsById, inventoryItemsByLinkedItemId, currentActorProvider.CanSeeCosts);
     }
 
     /// <summary>When UseSeparateInventoryTracking is off, availability is just StockOnHand.
@@ -549,7 +557,8 @@ public sealed class ItemService(
         Tenant tenant,
         IReadOnlyList<ItemRecipeLine> recipeLines,
         IReadOnlyDictionary<Guid, InventoryItem> inventoryItemsById,
-        Dictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId)
+        Dictionary<Guid, InventoryItem> inventoryItemsByLinkedItemId,
+        bool includeCost)
     {
         var allowedSizes = new List<decimal>();
         if (item.TingiAllowedSizesJson is not null)
@@ -587,6 +596,6 @@ public sealed class ItemService(
         item.SortOrder,
         hasOwnStock,
         linked?.QuantityOnHand ?? item.StockOnHand,
-        item.CostPrice);
+        includeCost ? item.CostPrice : null);
     }
 }

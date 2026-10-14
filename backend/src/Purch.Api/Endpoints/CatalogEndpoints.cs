@@ -46,7 +46,8 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             ConditionalGet.RespondAsync(
                 httpContext,
-                () => catalogVersion.GetItemsVersionAsync(cancellationToken),
+                async () => await catalogVersion.GetItemsVersionAsync(cancellationToken)
+                    + (httpContext.User.IsInRole(nameof(Role.Admin)) || httpContext.User.IsInRole(nameof(Role.Manager)) || httpContext.User.IsInRole(nameof(Role.Warehouse)) ? string.Empty : "-nocost"),
                 () => itemService.ListAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPost("/items", async (

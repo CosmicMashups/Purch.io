@@ -38,7 +38,8 @@ public sealed record UpdateInventoryItemRequest(
     decimal? LowStockThreshold,
     bool IsActive,
     Guid? CategoryId = null,
-    decimal? UnitCost = null);
+    decimal? UnitCost = null,
+    bool ClearUnitCost = false);
 
 /// <summary>BranchId is required so the resulting Adjustment InventoryMovement can be attributed to a branch, matching InventoryMovement's shape.</summary>
 public sealed record UpdatePhysicalCountRequest(decimal QuantityOnHand, Guid BranchId);

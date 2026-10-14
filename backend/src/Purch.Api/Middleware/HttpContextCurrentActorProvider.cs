@@ -23,6 +23,15 @@ public sealed class HttpContextCurrentActorProvider(IHttpContextAccessor httpCon
         }
     }
 
+    public Role? Role
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.User.FindFirst(JwtClaimTypes.Role)?.Value;
+            return Enum.TryParse<Role>(value, out var parsed) ? parsed : null;
+        }
+    }
+
     public Guid? ScopeId => ParseGuidClaim(JwtClaimTypes.ScopeId);
 
     private Guid? ParseGuidClaim(string claimType)

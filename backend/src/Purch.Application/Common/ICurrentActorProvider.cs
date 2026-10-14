@@ -23,4 +23,10 @@ public interface ICurrentActorProvider
     ScopeType? ScopeType { get; }
 
     Guid? ScopeId { get; }
+
+    /// <summary>The caller's role claim, when there is one (a staff or Kiosk token). Null when unknown.</summary>
+    Role? Role => null;
+
+    /// <summary>Whether this caller may see item and ingredient costs: Admin, Manager and Warehouse only.</summary>
+    bool CanSeeCosts => Role is Domain.Enums.Role.Admin or Domain.Enums.Role.Manager or Domain.Enums.Role.Warehouse;
 }

@@ -117,7 +117,7 @@ public sealed class IncomingReceivingService(
                 continue;
             }
 
-            if (updateCostOnReceiving)
+            if (updateCostOnReceiving && line.UnitPrice > 0)
             {
                 // Last-cost: the most recent accepted receipt price becomes the item's cost.
                 items[line.ItemId].CostPrice = line.UnitPrice;

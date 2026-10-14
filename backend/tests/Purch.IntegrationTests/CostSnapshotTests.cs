@@ -180,4 +180,69 @@ public sealed class CostSnapshotTests(PostgresContainerFixture postgres)
     {
         Assert.Equal(40m, await ReceiveAsync(false));
     }
+
+    [Fact]
+    public async Task Update_omitting_cost_keeps_it_and_clear_flag_unsets_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Keep", 40m);
+
+        var keep = await client.PutAsJsonAsync($"/items/{item.Id}", new UpdateItemRequest("Keep", null, null, null, 120m, null, true));
+        Assert.Equal(40m, (await keep.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!.CostPrice);
+
+        var clear = await client.PutAsJsonAsync($"/items/{item.Id}", new UpdateItemRequest("Keep", null, null, null, 120m, null, true, ClearCostPrice: true));
+        Assert.Null((await clear.Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!.CostPrice);
+    }
+
+    [Fact]
+    public async Task Cashier_sees_no_cost_but_manager_does()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await CreateItemAsync(admin, "Secret Cost", 40m);
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        using var manager = await TestSessions.ManagerClientAsync(admin);
+
+        var cashierItems = (await cashier.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!;
+        var managerItems = (await manager.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!;
+
+        Assert.Null(cashierItems.Single(i => i.Name == "Secret Cost").CostPrice);
+        Assert.Equal(40m, managerItems.Single(i => i.Name == "Secret Cost").CostPrice);
+    }
+
+    [Fact]
+    public async Task Zero_priced_receipt_line_does_not_overwrite_cost()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        _ = await client.PutAsJsonAsync("/tenant/settings/inventory-tracking", new UpdateInventoryTrackingSettingRequest(false, true));
+        var branchId = (await client.GetFromJsonAsync<List<BranchDto>>("/branches", JsonOptions))!.Single().Id;
+        var item = await CreateItemAsync(client, "Bonus", 40m);
+        var supplier = (await (await client.PostAsJsonAsync("/suppliers", new CreateSupplierRequest("Acme", null))).Content.ReadFromJsonAsync<SupplierDto>(JsonOptions))!;
+        var receive = await client.PostAsJsonAsync(
+            "/incoming-receiving",
+            new CreateIncomingReceivingRequest(null, supplier.Id, branchId, DateOnly.FromDateTime(DateTime.UtcNow), null,
+                [new CreateIncomingReceivingLineRequest(item.Id, 5m, "pc", 0m, ReceivingCondition.Good, ReceivingRemark.Accepted)]));
+        Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
+
+        Assert.Equal(40m, (await client.GetFromJsonAsync<List<ItemDto>>("/items", JsonOptions))!.Single(i => i.Id == item.Id).CostPrice);
+    }
+
+    [Fact]
+    public async Task Cost_change_between_adds_keeps_first_snapshot_on_merged_line()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var item = await CreateItemAsync(client, "Merge2", 40m);
+
+        var first = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        _ = await client.PutAsJsonAsync($"/items/{item.Id}", new UpdateItemRequest("Merge2", null, null, null, 100m, null, true, CostPrice: 70m));
+        var second = await client.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 2m));
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var cart = (await second.Content.ReadFromJsonAsync<TransactionDto>(JsonOptions))!;
+
+        Assert.Equal([40m], await LineCostsAsync(cart.Id));
+    }
 }

@@ -100,7 +100,14 @@ public sealed class InventoryItemService(
         inventoryItem.PackagingUnit = string.IsNullOrWhiteSpace(request.PackagingUnit) ? "pc" : request.PackagingUnit.Trim();
         inventoryItem.PackagingSize = request.PackagingSize;
         inventoryItem.LowStockThreshold = request.LowStockThreshold;
-        inventoryItem.UnitCost = ValidUnitCost(request.UnitCost);
+        if (request.ClearUnitCost)
+        {
+            inventoryItem.UnitCost = null;
+        }
+        else if (request.UnitCost is not null)
+        {
+            inventoryItem.UnitCost = ValidUnitCost(request.UnitCost);
+        }
         inventoryItem.CategoryId = await ValidCategoryAsync(request.CategoryId, cancellationToken);
         inventoryItem.IsActive = request.IsActive;
 
@@ -204,7 +211,7 @@ public sealed class InventoryItemService(
         return unitCost;
     }
 
-    private static InventoryItemDto ToDto(InventoryItem inventoryItem)
+    private InventoryItemDto ToDto(InventoryItem inventoryItem)
     {
         return new(
             inventoryItem.Id,
@@ -220,6 +227,6 @@ public sealed class InventoryItemService(
             inventoryItem.IsActive,
             inventoryItem.CategoryId,
             SortOrder: inventoryItem.SortOrder,
-            UnitCost: inventoryItem.UnitCost);
+            UnitCost: currentActorProvider.CanSeeCosts ? inventoryItem.UnitCost : null);
     }
 }
