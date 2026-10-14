@@ -11,9 +11,9 @@ interface PendingApproval {
   message: string;
   isError: boolean;
   /** Retries the same action, this time with the PIN the cashier just typed. */
-  retry: (pin: string) => Promise<Transaction>;
+  retry: (pin: string) => Promise<Transaction | void>;
   /** Runs once the action actually lands, whether on the first try or after a PIN — e.g. a success toast. */
-  onLanded?: (cart: Transaction) => void;
+  onLanded?: (cart: Transaction | void) => void;
 }
 
 /**
@@ -27,20 +27,21 @@ export function useApproverGatedAction() {
   const [pending, setPending] = useState<PendingApproval | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function land(cart: Transaction, onLanded?: (cart: Transaction) => void) {
-    qc.setQueryData(posKeys.cart, cart);
+  /** An action that returns the cart (void, remove) lands it in the cache; one that returns nothing (discarding a parked cart) does not. */
+  function land(cart: Transaction | void, onLanded?: (cart: Transaction | void) => void) {
+    if (cart) qc.setQueryData(posKeys.cart, cart);
     onLanded?.(cart);
     setPending(null);
   }
 
   /** `title` names the action for the dialog, e.g. "Clear the cart" or "Remove Ramen". `onLanded` runs once
    * the action actually succeeds, on the first try or after a PIN — a success toast, typically. */
-  async function run(title: string, send: (approverPin?: string) => Promise<Transaction>, onLanded?: (cart: Transaction) => void): Promise<void> {
+  async function run<T extends Transaction | void>(title: string, send: (approverPin?: string) => Promise<T>, onLanded?: (cart: T) => void): Promise<void> {
     try {
-      land(await send(), onLanded);
+      land(await send(), onLanded as PendingApproval['onLanded']);
     } catch (error) {
       if (needsApproverPin(error)) {
-        setPending({ title, message: approverPinPrompt(error), isError: false, retry: send, onLanded });
+        setPending({ title, message: approverPinPrompt(error), isError: false, retry: send, onLanded: onLanded as PendingApproval['onLanded'] });
       } else {
         toast.error(userMessage(error));
       }

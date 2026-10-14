@@ -1,11 +1,14 @@
+import { Pause } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { formatPeso } from '../../dashboard/format';
 import { vatOf } from '../../../hardware/display/channel';
+import { userMessage } from '../../../lib/apiError';
 import { posApi } from '../api';
-import { useApplyPromoCode, useApplySeniorPwd, useSetOrderType } from '../queries';
+import { useApplyPromoCode, useApplySeniorPwd, useParkCart, useSetOrderType } from '../queries';
+import { ParkCartDialog } from './ParkCartDialog';
 import { useApproverGatedAction } from '../useApproverGatedAction';
 import type { PendingRow } from '../addQueue';
 import type { Transaction, TransactionLine } from '../types';
@@ -39,9 +42,11 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
   const [code, setCode] = useState('');
   const [confirmVoid, setConfirmVoid] = useState(false);
   const [gatedActionBusy, setGatedActionBusy] = useState(false);
+  const [parkOpen, setParkOpen] = useState(false);
+  const park = useParkCart();
 
   const updating = pending.length > 0;
-  const busy = updating || gatedActionBusy || promo.isPending || senior.isPending || orderType.isPending;
+  const busy = updating || gatedActionBusy || park.isPending || promo.isPending || senior.isPending || orderType.isPending;
   const empty = cart.lines.length === 0;
 
   function applyCode(event: React.FormEvent) {
@@ -59,6 +64,16 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
     } finally {
       setGatedActionBusy(false);
     }
+  }
+
+  function onPark(label: string | undefined) {
+    park.mutate(label, {
+      onSuccess: () => {
+        setParkOpen(false);
+        toast.success(label ? `Cart parked as "${label}"` : 'Cart parked');
+      },
+      onError: (error) => toast.error(userMessage(error)),
+    });
   }
 
   function onVoid() {
@@ -217,14 +232,26 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
           </div>
         </dl>
 
-        <button
-          type="button"
-          disabled={empty || busy}
-          onClick={onCheckout}
-          className="h-12 rounded-control bg-brand text-base font-bold text-on-brand hover:bg-brand-strong active:translate-y-px disabled:opacity-50"
-        >
-          {updating ? 'Updating...' : `Charge ${formatPeso(cart.totalAmount)}`}
-        </button>
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+          <button
+            type="button"
+            disabled={empty || busy}
+            onClick={() => setParkOpen(true)}
+            title="Set this cart aside and serve the next customer"
+            className="inline-flex h-12 items-center gap-2 rounded-control border border-line px-4 text-base font-semibold hover:border-brand active:translate-y-px disabled:opacity-40"
+          >
+            <Pause size={18} aria-hidden="true" />
+            Park cart
+          </button>
+          <button
+            type="button"
+            disabled={empty || busy}
+            onClick={onCheckout}
+            className="h-12 truncate rounded-control bg-brand px-3 text-base font-bold text-on-brand hover:bg-brand-strong active:translate-y-px disabled:opacity-50"
+          >
+            {updating ? 'Updating...' : `Charge ${formatPeso(cart.totalAmount)}`}
+          </button>
+        </div>
       </div>
 
       <ConfirmModal
@@ -238,6 +265,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
       />
 
       {gated.dialogProps && <ApproverPinDialog open {...gated.dialogProps} />}
+      {parkOpen && <ParkCartDialog open busy={park.isPending} onPark={onPark} onClose={() => setParkOpen(false)} />}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { ArrowsClockwise, CaretDown } from '@phosphor-icons/react';
+import { ArrowsClockwise, CaretDown, Pause } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -11,11 +11,43 @@ export interface MenuAction {
 const barButton = 'inline-flex h-10 items-center gap-2 rounded-control border border-line bg-surface px-4 text-sm font-semibold hover:border-brand';
 
 /** The Cashier page's own bar: who is signed in, the Kiosk queue, a price refresh, and the less-used till pages in a menu. */
-export function CashierTopBar({ role, kioskTo, onRefresh, actions }: { role: string | null; kioskTo: string; onRefresh: () => void; actions: MenuAction[] }) {
+export function CashierTopBar({
+  role,
+  kioskTo,
+  onRefresh,
+  actions,
+  parkedCount,
+  onOpenParked,
+}: {
+  role: string | null;
+  kioskTo: string;
+  onRefresh: () => void;
+  actions: MenuAction[];
+  /** Carts parked in this branch; the badge hides at zero. */
+  parkedCount?: number;
+  onOpenParked?: () => void;
+}) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-panel border border-line bg-surface px-4 py-2">
       <p className="min-w-0 truncate text-sm text-ink-soft">{role ? `Signed in as ${role}` : 'Cashier'}</p>
       <div className="flex shrink-0 items-center gap-2">
+        {onOpenParked && (
+          <button
+            type="button"
+            onClick={onOpenParked}
+            aria-haspopup="dialog"
+            aria-label={`Parked carts, ${parkedCount ? `${parkedCount} waiting` : 'none waiting'}`}
+            className={barButton}
+          >
+            <Pause size={18} aria-hidden="true" />
+            Parked
+            {!!parkedCount && (
+              <span aria-hidden="true" className="grid min-w-6 place-items-center rounded-full bg-warn px-1.5 text-xs font-bold tabular-nums text-white">
+                {parkedCount}
+              </span>
+            )}
+          </button>
+        )}
         <Link to={kioskTo} className={barButton}>
           Kiosk
         </Link>

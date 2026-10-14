@@ -36,14 +36,13 @@ export const useSetLineNote = () =>
 /** Carts set aside on this branch. */
 export const useParkedCarts = (enabled = true) => useQuery({ queryKey: posKeys.parked, queryFn: posApi.listParked, enabled, staleTime: 0 });
 
-/** Parking empties the register: drop the cart cache so the next visit fetches a fresh one. */
+/** Parking empties the register: reset the cart cache so an open till refetches (and gets) a fresh one at once. */
 export function useParkCart() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (label?: string) => posApi.parkCart(label),
     onSuccess: async () => {
-      qc.removeQueries({ queryKey: posKeys.cart });
-      await qc.invalidateQueries({ queryKey: posKeys.parked });
+      await Promise.all([qc.resetQueries({ queryKey: posKeys.cart }), qc.invalidateQueries({ queryKey: posKeys.parked })]);
     },
   });
 }

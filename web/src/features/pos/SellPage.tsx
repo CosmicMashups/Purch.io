@@ -21,7 +21,8 @@ import { DeviceRequired } from './components/DeviceRequired';
 import { ItemSections } from './components/ItemGrid';
 import { OptionsDialog } from './components/OptionsDialog';
 import { WeightDialog } from './components/WeightDialog';
-import { useCart, usePosAdds } from './queries';
+import { ParkedCartsDrawer } from './components/ParkedCartsDrawer';
+import { useCart, useParkedCarts, usePosAdds } from './queries';
 import { useCatalogSync } from './useCatalogSync';
 import { CUSTOMER_DISPLAY_PATH, customerDisplaySupported, stateForCart } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
@@ -53,6 +54,8 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
   const [dialog, setDialog] = useState<Dialog>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [parkedOpen, setParkedOpen] = useState(false);
+  const parked = useParkedCarts(online);
 
   // The menu is one continuous list, grouped by category. Search narrows every group at once, and the rail
   // follows whichever category is at the top as you scroll.
@@ -117,7 +120,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
   }
 
   usePublishCustomerDisplay(stateForCart(cart.data));
-  useBarcodeWedge(scanCode, online && dialog === null && !cameraOpen);
+  useBarcodeWedge(scanCode, online && dialog === null && !cameraOpen && !parkedOpen);
 
   function onSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter') return;
@@ -147,7 +150,10 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
 
   return (
     <div className="flex flex-col gap-4">
-      <CashierTopBar role={role} kioskTo="/sell/kiosk-orders" onRefresh={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))} actions={menuActions} />
+      <CashierTopBar role={role} kioskTo="/sell/kiosk-orders" onRefresh={() => void catalogSync.refresh().then(() => toast.info('Prices and items refreshed'))} actions={menuActions}
+        parkedCount={parked.data?.length ?? 0}
+        onOpenParked={() => setParkedOpen(true)}
+      />
       <CategoryStrip tiles={railTiles} activeId={spy.activeId} onSelect={spy.scrollTo} />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div className="flex min-w-0 flex-col gap-4">
@@ -198,6 +204,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
         </div>
       )}
 
+      <ParkedCartsDrawer open={parkedOpen} onClose={() => setParkedOpen(false)} cartHasItems={(cart.data?.lines.length ?? 0) > 0} />
       {cameraOpen && (
         <CameraScanDialog
           onDetect={(code) => {

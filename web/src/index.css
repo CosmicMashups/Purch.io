@@ -186,6 +186,12 @@ input:-webkit-autofill:active {
   }
 }
 
+/* The parked-carts drawer arriving from the right edge (used behind motion-safe:). */
+@keyframes drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
