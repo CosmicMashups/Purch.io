@@ -48,17 +48,29 @@ export interface SplitTenderPanelProps {
   branch?: Branch;
   /** Parts or the draft changed: a refusal shown for the last attempt no longer applies. */
   onEdit?: () => void;
+  /** A customer account the server refused as missing: any part using it is dropped so another can be chosen. */
+  rejectedLedgerId?: string | null;
   onComplete: (parts: PaymentPart[]) => void;
   onCancel: () => void;
 }
 
-export function SplitTenderPanel({ total, creditOn, busy, error, branch, onEdit, onComplete, onCancel }: SplitTenderPanelProps) {
+export function SplitTenderPanel({ total, creditOn, busy, error, branch, onEdit, rejectedLedgerId, onComplete, onCancel }: SplitTenderPanelProps) {
   const [parts, setParts] = useState<PaymentPart[]>([]);
   const [method, setMethod] = useState<Method>(PaymentMethod.Cash);
   const [amount, setAmount] = useState(() => amountText(total));
   const [tendered, setTendered] = useState('');
   const [reference, setReference] = useState('');
   const [ledgerId, setLedgerId] = useState('');
+  const [seenRejected, setSeenRejected] = useState(rejectedLedgerId);
+  if (seenRejected !== rejectedLedgerId) {
+    setSeenRejected(rejectedLedgerId);
+    if (rejectedLedgerId && parts.some((p) => p.customerCreditLedgerId === rejectedLedgerId)) {
+      const kept = parts.filter((p) => p.customerCreditLedgerId !== rejectedLedgerId);
+      setParts(kept);
+      setLedgerId('');
+      setAmount(amountText(remaining(total, kept)));
+    }
+  }
   const completeRef = useRef<HTMLButtonElement>(null);
   const focusComplete = useRef(false);
   // Add unmounts once nothing remains; focus moves to the next thing to press instead of the page body.

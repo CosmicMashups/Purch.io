@@ -38,18 +38,28 @@ const UNAVAILABLE = [
 /** Roles holding the SplitPay permission (backend Permissions.SplitPay). The API still enforces it. */
 const SPLIT_ROLES: readonly string[] = ['Admin', 'Manager', 'Cashier'];
 
-/** A refused split, shown in the panel. The expected-total mismatch gets one plain instruction with the new total;
- * every other refusal (other 409s included) is shown in the server's own words. */
-function splitErrorText(error: unknown): string {
+/*
+ * The API's 404 problem details carry no resource type, only detail text built by NotFoundException as
+ * "<resource> '<key>' was not found.", so the resource name at the start of the message is what tells them apart.
+ */
+const notFoundOf = (error: unknown, resource: string) => error instanceof ApiError && error.kind === 'notFound' && error.message.startsWith(`${resource} '`);
+
+/** 404 for the open cart on pay: an earlier attempt most likely completed the sale and its answer was lost. */
+const isLostSale = (error: unknown) => notFoundOf(error, 'Open cart');
+
+/** 404 for the Utang customer account: the cart is still open, the cashier picks another customer. */
+const isMissingLedger = (error: unknown) => notFoundOf(error, 'Customer credit account');
+
+/** A refused payment, shown inline. The expected-total mismatch gets one plain instruction with the new total, a
+ * missing customer account says what to do; every other refusal (other 409s and 404s included) is the server's words. */
+function payErrorText(error: unknown): string {
+  if (isMissingLedger(error)) return 'That customer account could not be found. Choose another customer.';
   if (error instanceof ApiError && error.kind === 'conflict') {
     const moved = /the total is now (\d+(?:\.\d+)?)/i.exec(error.message);
     if (moved) return `The cart changed, review the total. It is now ${formatPeso(Number(moved[1]))}.`;
   }
   return userMessage(error);
 }
-
-/** 404 on pay: the open cart is gone, most likely because an earlier attempt completed the sale and its answer was lost. */
-const isLostSale = (error: unknown) => error instanceof ApiError && error.kind === 'notFound';
 
 export function PaymentPage() {
   const navigate = useNavigate();
@@ -64,6 +74,9 @@ export function PaymentPage() {
   const [splitting, setSplitting] = useState(false);
   // The last split refusal, cleared as soon as the cashier changes the parts.
   const [splitError, setSplitError] = useState<string | null>(null);
+  const [singleError, setSingleError] = useState<string | null>(null);
+  // An Utang account the server no longer has: the split panel drops the part that used it.
+  const [rejectedLedgerId, setRejectedLedgerId] = useState<string | null>(null);
   // One request per attempt: a double tap lands before React re-renders the button as busy.
   const inFlight = useRef(false);
   const canSplit = role !== null && SPLIT_ROLES.includes(role);
@@ -113,6 +126,7 @@ export function PaymentPage() {
     if (inFlight.current) return;
     inFlight.current = true;
     setSplitError(null);
+    setSingleError(null);
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
     pay.mutate(body, {
       onSuccess: (completed) => {
@@ -120,7 +134,13 @@ export function PaymentPage() {
         navigate('/sell/receipt', { replace: true, state: { justSold: true } });
       },
       onError: (error) => {
-        if (body.parts) setSplitError(splitErrorText(error));
+        const text = payErrorText(error);
+        if (body.parts) setSplitError(text);
+        else setSingleError(text);
+        if (isMissingLedger(error)) {
+          setLedgerId('');
+          setRejectedLedgerId(body.parts?.find((p) => p.method === PaymentMethod.UtangCredit)?.customerCreditLedgerId ?? null);
+        }
       },
       onSettled: () => {
         inFlight.current = false;
@@ -147,6 +167,7 @@ export function PaymentPage() {
           busy={pay.isPending}
           branch={branch}
           error={splitError}
+          rejectedLedgerId={rejectedLedgerId}
           onEdit={() => {
             setSplitError(null);
           }}
@@ -225,6 +246,11 @@ export function PaymentPage() {
             )}
           </section>
 
+          {singleError && (
+            <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-4 py-3 text-base font-medium text-danger">
+              {singleError}
+            </p>
+          )}
           <div>
             <PrimaryButton type="button" busy={pay.isPending} disabled={!ready} onClick={confirm}>
               {pay.isPending ? 'Recording payment...' : `Confirm ${formatPeso(total)}`}

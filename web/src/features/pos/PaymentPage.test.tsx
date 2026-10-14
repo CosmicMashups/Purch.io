@@ -349,9 +349,45 @@ describe('PaymentPage split payment', () => {
     expect(screen.getByText('Kape Katipunan, 0917 555 0101')).toBeInTheDocument();
   });
 
+  const ledgers = [
+    { id: 'c1', customerFullName: 'Aling Nena', customerPhoneNumber: '0917', customerAddress: null, balance: 0, creditLimit: 1000, dueDate: null, isActive: true },
+  ];
+
+  it('keeps the single Utang payment screen on a missing customer account, says so inline and clears the choice', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(creditApi.list).mockResolvedValue(ledgers);
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Customer credit account 'c1' was not found."));
+    renderPayment();
+    fireEvent.click(await screen.findByRole('radio', { name: 'Utang / Credit' }));
+    fireEvent.change(await screen.findByLabelText('Customer account'), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
+    expect(await screen.findByText('That customer account could not be found. Choose another customer.')).toBeInTheDocument();
+    expect(screen.queryByText(/may already be recorded/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Customer account')).toHaveValue('');
+    expect(screen.getByTestId('amount-due')).toBeInTheDocument();
+  });
+
+  it('keeps the split screen on a missing customer account, says so inline and drops that Utang part', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(creditApi.list).mockResolvedValue(ledgers);
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Customer credit account 'c1' was not found."));
+    renderPayment();
+    fireEvent.click(await screen.findByRole('button', { name: 'Split payment' }));
+    fireEvent.change(screen.getByLabelText('Amount for this part'), { target: { value: '37.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add payment' }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Method for this part' })).getByRole('radio', { name: 'Utang / Credit' }));
+    fireEvent.change(await screen.findByLabelText('Customer account'), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add payment' }));
+    fireEvent.click(screen.getByRole('button', { name: /Complete sale/ }));
+    expect(await screen.findByText('That customer account could not be found. Choose another customer.')).toBeInTheDocument();
+    expect(screen.queryByText(/may already be recorded/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Utang / Credit ₱100.00' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('split-remaining')).toHaveTextContent('₱100.00');
+  });
+
   it.each([false, true])('when the cart is gone after a lost response (split %s), points to Recent sales instead of charging again', async (split) => {
     const { ApiError } = await import('../../lib/apiError');
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', 'Open cart not found.'));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Open cart 'dev1' was not found."));
     renderPayment();
     if (split) await splitCashThenGcash();
     else fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '200' } });
