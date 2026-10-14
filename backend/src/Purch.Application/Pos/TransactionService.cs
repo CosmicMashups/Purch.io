@@ -1103,6 +1103,7 @@ public sealed class TransactionService(
 
         cart.Status = TransactionStatus.Completed;
         cart.CompletedAt ??= DateTimeOffset.UtcNow;
+        StampVat(cart);
 
         // One pass over the cart's lines, items and selections feeds all three stock effects; each used to
         // repeat that whole set of queries on its own.
@@ -1114,6 +1115,22 @@ public sealed class TransactionService(
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
+    }
+
+    /// <summary>Freezes the sale's VAT split on the row at completion, so reports and receipts read it back instead of
+    /// recomputing from a rate that may change. Mirrors the legacy X/Z rule: a Senior/PWD sale is wholly VAT-exempt
+    /// (its VAT-exclusive price, TotalAmount + DiscountAmount), everything else is VAT-inclusive.</summary>
+    private static void StampVat(Transaction sale)
+    {
+        var breakdown = sale.SeniorPwdDiscountApplied
+            ? VatBreakdownCalculator.Compute(0m, sale.TotalAmount + sale.DiscountAmount, VatRate)
+            : VatBreakdownCalculator.Compute(sale.TotalAmount, 0m, VatRate);
+        sale.VatableSales = breakdown.VatableSales;
+        sale.VatAmount = breakdown.VatAmount;
+        sale.VatExemptSales = breakdown.VatExemptSales;
+        sale.ZeroRatedSales = breakdown.ZeroRatedSales;
+        sale.VatRateApplied = breakdown.Rate;
+        sale.VatDerived = false;
     }
 
     /// <summary>Deducts each line's quantity from its item's StockOnHand and logs a Sale
