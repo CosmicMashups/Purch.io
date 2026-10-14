@@ -1,0 +1,596 @@
+[
+  {
+    "name": "manual_percent_line_discount_follows_quantity",
+    "description": "10% manual line discount on a 100.00 item; quantity 1 -> 3 -> 1 -> 3; amount is derived from kind and value, never ratcheted.",
+    "inputs": {
+      "unitPrice": 100,
+      "discount": {
+        "kind": "Percent",
+        "value": 10
+      },
+      "quantitySequence": [
+        1,
+        3,
+        1,
+        3
+      ]
+    },
+    "expected": {
+      "manualDiscountAmountAtQty3": 30,
+      "manualDiscountAmountAtQty1": 10,
+      "cartTotalAtQty3": 270
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_percent_discount_follows_the_quantity_and_never_ratchets",
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::The_amount_is_derived_from_kind_and_value_so_it_re_expands_when_the_base_grows"
+    ]
+  },
+  {
+    "name": "fixed_discount_clamped_then_re_expanded",
+    "description": "Fixed 150 on a 100 line clamps to 100 (stored value stays 150); quantity 3 makes it whole again.",
+    "inputs": {
+      "unitPrice": 100,
+      "discount": {
+        "kind": "Fixed",
+        "value": 150
+      },
+      "quantitySequence": [
+        1,
+        3
+      ]
+    },
+    "expected": {
+      "manualDiscountAmountAtQty1": 100,
+      "manualDiscountValue": 150,
+      "manualDiscountAmountAtQty3": 150,
+      "cartTotalAtQty3": 150
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_fixed_discount_clamps_on_a_small_line_and_re_expands_when_quantity_rises",
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::The_amount_is_derived_from_kind_and_value_so_it_re_expands_when_the_base_grows"
+    ]
+  },
+  {
+    "name": "fixed_discount_larger_than_line_is_clamped_and_zero_clears",
+    "description": "Fixed 500 on a 200 line clamps to 200 (total 0); setting value 0 clears it (total 200).",
+    "inputs": {
+      "unitPrice": 200,
+      "quantity": 1,
+      "discount": {
+        "kind": "Fixed",
+        "value": 500
+      },
+      "then": {
+        "kind": "Fixed",
+        "value": 0
+      }
+    },
+    "expected": {
+      "manualDiscountAmount": 200,
+      "totalAmount": 0,
+      "afterClearAmount": 0,
+      "afterClearTotal": 200
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_fixed_discount_larger_than_the_line_is_clamped_and_zero_clears_it",
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::A_fixed_500_on_a_200_line_is_clamped_to_200_and_never_negative"
+    ]
+  },
+  {
+    "name": "manual_percent_vat_on_net",
+    "description": "10% on a 200 line is 20 off; VAT is taken on the 180 net (also asserted at checkout: cash 180).",
+    "inputs": {
+      "unitPrice": 200,
+      "discountPercent": 10
+    },
+    "expected": {
+      "manualDiscountAmount": 20,
+      "net": 180,
+      "vatableSales": 160.71,
+      "vatAmount": 19.29
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::Ten_percent_on_a_200_line_is_20_off_and_vat_is_taken_on_the_net",
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::Vat_is_stamped_on_the_net_total_of_a_manually_discounted_sale"
+    ]
+  },
+  {
+    "name": "cart_percent_after_line_discounts",
+    "description": "Fixed 50 line discount on a 200 line in a 500 cart, then 10% cart discount is taken on the 450 net; a cart discount larger than what is left is clamped; cart percent recomputes when a 300 line is added to a 100 cart.",
+    "inputs": {
+      "lineFixed": 50,
+      "lineBase": 200,
+      "cartBefore": 500,
+      "cartPercent": 10,
+      "clampCase": {
+        "discount": 900,
+        "remaining": 450
+      },
+      "recompute": {
+        "cartLines": [
+          100
+        ],
+        "added": 300,
+        "percent": 10
+      }
+    },
+    "expected": {
+      "lineDiscountAmount": 50,
+      "cartDiscountAmount": 45,
+      "clampedCartAmount": 450,
+      "recompute": {
+        "discountBefore": 10,
+        "discountAfter": 40,
+        "totalAmount": 360
+      }
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::A_cart_percent_is_taken_after_the_line_discounts_and_each_applies_once",
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::A_cart_discount_larger_than_what_is_left_is_clamped",
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_cart_percent_recomputes_after_another_line_is_added"
+    ]
+  },
+  {
+    "name": "manual_cart_discount_suppresses_promos",
+    "description": "A manual cart discount suppresses the promo code and item promos; without it the larger promo wins and a tie goes to item promos.",
+    "inputs": {
+      "manual": true,
+      "manualAmount": 30,
+      "netBase": 500,
+      "itemPromo": 40,
+      "promoCode": 100
+    },
+    "expected": {
+      "cartAmount": 30,
+      "appliedPromoCode": 0,
+      "appliedItemPromo": 0,
+      "withoutManual": {
+        "promoCodeWins": {
+          "appliedPromoCode": 100,
+          "appliedItemPromo": 0
+        },
+        "tie_40_vs_40": {
+          "appliedItemPromo": 40,
+          "appliedPromoCode": 0
+        }
+      }
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::A_manual_cart_discount_suppresses_the_promo_code_and_item_promos",
+      "backend/tests/Purch.UnitTests/Pos/ManualDiscountPricingTests.cs::Without_a_manual_cart_discount_the_larger_promotion_still_wins_and_a_tie_goes_to_item_promos"
+    ]
+  },
+  {
+    "name": "senior_pwd_clears_manual_discount",
+    "description": "112 item with a fixed 12 manual line discount; applying Senior/PWD clears manual discounts (kind and value null) and an audit records the removal.",
+    "inputs": {
+      "unitPrice": 112,
+      "lineFixed": 12,
+      "seniorPwd": true
+    },
+    "expected": {
+      "lineManualDiscountAmount": 0,
+      "cartManualDiscountAmount": 0,
+      "manualDiscountKind": null,
+      "manualDiscountValue": null,
+      "seniorPwdDiscountApplied": true,
+      "totalAmount": 80,
+      "vatExemptAmount": 12,
+      "auditContains": "manualDiscountsCleared"
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::Senior_discount_after_a_manual_discount_clears_it_and_audits_the_removal",
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_manual_discount_removes_that_line_from_a_promo_group_and_senior_clears_kind_and_value"
+    ]
+  },
+  {
+    "name": "manual_discount_while_senior_applied_is_conflict",
+    "description": "Setting a manual discount while Senior/PWD is applied is refused (HTTP 409).",
+    "inputs": {
+      "seniorPwd": true,
+      "manualDiscount": true
+    },
+    "expected": {
+      "httpStatus": 409
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_manual_discount_while_senior_is_applied_is_a_409"
+    ]
+  },
+  {
+    "name": "price_override_recomputes_line",
+    "description": "Override a 200 item (qty 2) to 150: line 300, old price remembered, audited with reason.",
+    "inputs": {
+      "catalogPrice": 200,
+      "quantity": 2,
+      "override": 150,
+      "reason": "Price match"
+    },
+    "expected": {
+      "unitPrice": 150,
+      "priceOverrideFrom": 200,
+      "lineTotal": 300,
+      "totalAmount": 300
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_price_override_remembers_the_old_price_recomputes_the_line_and_is_audited"
+    ]
+  },
+  {
+    "name": "price_override_then_add_same_item_makes_separate_line",
+    "description": "Override a 200 item (qty 1) to 150, then add the same item again: a second line at catalog price. Same for a discounted line.",
+    "inputs": {
+      "catalogPrice": 200,
+      "quantity": 1,
+      "override": 150,
+      "thenAddSameItemQty": 1
+    },
+    "expected": {
+      "lineCount": 2,
+      "lines": [
+        {
+          "unitPrice": 150,
+          "quantity": 1
+        },
+        {
+          "unitPrice": 200,
+          "quantity": 1,
+          "priceOverrideFrom": null
+        }
+      ],
+      "totalAmount": 350
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::Adding_the_same_item_after_an_override_or_discount_creates_a_second_line_at_catalog_price"
+    ]
+  },
+  {
+    "name": "price_overridden_line_gets_no_item_promo",
+    "description": "A 50% item promo on a 100 item; overriding the price to 90 removes the item promo.",
+    "inputs": {
+      "catalogPrice": 100,
+      "itemPromoPercent": 50,
+      "override": 90
+    },
+    "expected": {
+      "itemPromoBefore": 50,
+      "itemPromoAfter": 0,
+      "totalAmount": 90
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ManualDiscountTests.cs::A_price_overridden_line_gets_no_item_promo"
+    ]
+  },
+  {
+    "name": "open_item_totals",
+    "description": "Open item 'Birthday cake' 450 x 2 with a note: no catalog item, no unit cost; line and cart total 900. A second open item 3 x 0.333 rounds to 1.",
+    "inputs": {
+      "name": "Birthday cake",
+      "price": 450,
+      "quantity": 2,
+      "note": "No candles",
+      "second": {
+        "name": "Fabric",
+        "price": 3,
+        "quantity": 0.333
+      }
+    },
+    "expected": {
+      "lineTotal": 900,
+      "totalAmount": 900,
+      "itemId": "00000000-0000-0000-0000-000000000000",
+      "isOpenItem": true,
+      "unitCost": null,
+      "fabricLineTotal": 1
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/OpenItemTests.cs::An_open_item_becomes_a_line_with_no_catalog_item_no_cost_and_its_name_on_the_dto",
+      "backend/tests/Purch.IntegrationTests/OpenItemTests.cs::Open_item_price_and_quantity_are_bounded_and_scaled_and_the_line_total_is_rounded"
+    ]
+  },
+  {
+    "name": "open_item_bounds",
+    "description": "Rejected: price 1000000, price with 3 decimals, quantity 100000, quantity with 4 decimals, 999999.99 x 99999 (over cart cap). Accepted: 999999.99 x 9. Tenant open-item switch off is 403.",
+    "inputs": {
+      "rejected": [
+        {
+          "price": 1000000,
+          "quantity": 1
+        },
+        {
+          "price": 10.999,
+          "quantity": 1
+        },
+        {
+          "price": 10,
+          "quantity": 100000
+        },
+        {
+          "price": 10,
+          "quantity": 0.3333
+        },
+        {
+          "price": 999999.99,
+          "quantity": 99999
+        }
+      ],
+      "accepted": [
+        {
+          "price": 999999.99,
+          "quantity": 9
+        }
+      ]
+    },
+    "expected": {
+      "rejectedStatus": 400,
+      "acceptedStatus": 200,
+      "openItemEnabledFalseStatus": 403
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/OpenItemTests.cs::Open_item_price_and_quantity_are_bounded_and_scaled_and_the_line_total_is_rounded",
+      "backend/tests/Purch.IntegrationTests/OpenItemTests.cs::A_tenant_with_open_items_switched_off_is_refused_with_403_and_back_on_works"
+    ]
+  },
+  {
+    "name": "cart_cap_constant",
+    "description": "Maximum cart total; any add, quantity update, merge or open item that would exceed it is a 400.",
+    "inputs": {
+      "constant": "TransactionService.MaxCartAmount"
+    },
+    "expected": {
+      "maxCartAmount": 9999999999.99,
+      "overflowStatus": 400
+    },
+    "source": [
+      "backend/src/Purch.Application/Pos/TransactionService.cs::MaxCartAmount",
+      "backend/tests/Purch.IntegrationTests/OpenItemTests.cs::Every_path_that_would_overflow_the_cart_total_is_a_400"
+    ]
+  },
+  {
+    "name": "vat_stamp_plain_sale",
+    "description": "112 VAT-inclusive sale at 12%: vatable 100, VAT 12, exempt 0, zero-rated 0, rate 0.12, not derived.",
+    "inputs": {
+      "netTotal": 112,
+      "seniorPwdExempt": 0
+    },
+    "expected": {
+      "vatableSales": 100,
+      "vatAmount": 12,
+      "vatExemptSales": 0,
+      "zeroRatedSales": 0,
+      "rate": 0.12,
+      "vatDerived": false
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/VatBreakdownCalculatorTests.cs::A_vat_inclusive_amount_splits_into_vatable_sales_and_vat",
+      "backend/tests/Purch.IntegrationTests/VatStampingTests.cs::Checkout_StampsVat"
+    ]
+  },
+  {
+    "name": "vat_stamp_senior_pwd_sale",
+    "description": "Senior/PWD sale with net 160 and exempt 24: exempt amount is kept and vatable + VAT sums exactly to 160.",
+    "inputs": {
+      "netTotal": 160,
+      "vatExemptAmount": 24
+    },
+    "expected": {
+      "vatExemptSales": 24,
+      "vatablePlusVat": 160
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/VatBreakdownCalculatorTests.cs::A_senior_pwd_sale_keeps_the_exempt_amount_and_splits_exactly"
+    ]
+  },
+  {
+    "name": "vat_stamp_zero_sale",
+    "description": "A zero sale stamps all zero.",
+    "inputs": {
+      "netTotal": 0,
+      "vatExemptAmount": 0
+    },
+    "expected": {
+      "vatableSales": 0,
+      "vatAmount": 0,
+      "vatExemptSales": 0,
+      "zeroRatedSales": 0
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/VatBreakdownCalculatorTests.cs::A_zero_sale_is_all_zero"
+    ]
+  },
+  {
+    "name": "split_tender_cash_gcash_exact",
+    "description": "150 total: cash 100 (tendered 100) + GCash 50 (ref GC-123): two confirmed payments in sequence, no change.",
+    "inputs": {
+      "total": 150,
+      "parts": [
+        {
+          "method": "Cash",
+          "amount": 100,
+          "tendered": 100
+        },
+        {
+          "method": "ManualGcashQr",
+          "amount": 50,
+          "reference": "GC-123"
+        }
+      ]
+    },
+    "expected": {
+      "paymentCount": 2,
+      "sequences": [
+        0,
+        1
+      ],
+      "status": "Confirmed",
+      "cashChangeGiven": 0,
+      "gcashChangeGiven": null,
+      "totalChangeGiven": 0
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::Cash_100_and_gcash_50_on_a_150_total_builds_two_confirmed_payments_in_order"
+    ]
+  },
+  {
+    "name": "split_tender_cash_overpay_change",
+    "description": "150 total: GCash 50 + cash part 100 tendered 200 gives 100 change.",
+    "inputs": {
+      "total": 150,
+      "parts": [
+        {
+          "method": "ManualGcashQr",
+          "amount": 50
+        },
+        {
+          "method": "Cash",
+          "amount": 100,
+          "tendered": 200
+        }
+      ]
+    },
+    "expected": {
+      "totalChangeGiven": 100,
+      "cashAmountTendered": 200,
+      "cashChangeGiven": 100,
+      "cashAmount": 100
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::Cash_tendered_200_for_a_100_part_gives_100_change",
+      "backend/tests/Purch.IntegrationTests/SplitTenderTests.cs::A_split_payment_writes_one_row_per_part_in_sequence_under_one_receipt_number"
+    ]
+  },
+  {
+    "name": "split_tender_utang_part",
+    "description": "300 sale, credit limit 100: cash 150 + utang 150 is refused (400, balance stays 0); cash 200 + utang 100 completes and charges only 100.",
+    "inputs": {
+      "total": 300,
+      "creditLimit": 100,
+      "attempts": [
+        {
+          "parts": [
+            {
+              "method": "Cash",
+              "amount": 150,
+              "tendered": 150
+            },
+            {
+              "method": "UtangCredit",
+              "amount": 150
+            }
+          ]
+        },
+        {
+          "parts": [
+            {
+              "method": "Cash",
+              "amount": 200,
+              "tendered": 200
+            },
+            {
+              "method": "UtangCredit",
+              "amount": 100
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "attempt1": {
+        "httpStatus": 400,
+        "ledgerBalance": 0
+      },
+      "attempt2": {
+        "status": "Completed",
+        "ledgerBalance": 100,
+        "creditTransactionSum": 100
+      }
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/SplitTenderTests.cs::An_utang_part_respects_the_credit_limit_for_its_own_amount_and_charges_only_that"
+    ]
+  },
+  {
+    "name": "split_tender_rejections",
+    "description": "Rejected: parts not summing to the total (200 total, cash 149.99 or 150.01 + 50), cash tendered below its part, overpaid non-cash part, two utang parts, utang without a credit account, zero or negative part, more than 2 decimals, empty list, reference over 100 characters. Accepted: non-cash tendered equal to its amount, a single part for the full total.",
+    "inputs": {
+      "total": 200,
+      "cashParts": [
+        149.99,
+        150.01
+      ],
+      "otherPart": {
+        "method": "BankTransfer",
+        "amount": 50
+      }
+    },
+    "expected": {
+      "invalid": "ValidationException (HTTP 400, no payment rows persisted)",
+      "valid": "accepted"
+    },
+    "source": [
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::Parts_that_do_not_sum_to_the_total_are_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::Cash_tendered_below_its_part_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::An_overpaid_gcash_part_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::Two_utang_parts_are_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::An_utang_part_without_a_credit_account_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::A_zero_or_negative_part_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::A_part_with_more_than_two_decimals_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::An_empty_part_list_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::A_reference_over_100_characters_is_rejected",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::A_non_cash_tendered_equal_to_its_amount_is_accepted",
+      "backend/tests/Purch.UnitTests/Pos/SplitTenderServiceTests.cs::A_single_part_for_the_full_total_is_accepted"
+    ]
+  },
+  {
+    "name": "parked_cart_ttl_setting",
+    "description": "Keep-for hours default 24, settable 1..168, omitted keeps the value; 0, 169 and -1 are 400.",
+    "inputs": {
+      "default": 24,
+      "set": [
+        72,
+        1,
+        168
+      ],
+      "invalid": [
+        0,
+        169,
+        -1
+      ]
+    },
+    "expected": {
+      "default": 24,
+      "validRange": [
+        1,
+        168
+      ],
+      "invalidStatus": 400
+    },
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ParkedCartTtlSettingTests.cs::Ttl_defaults_to_24_can_be_set_and_an_omitted_value_keeps_it",
+      "backend/tests/Purch.IntegrationTests/ParkedCartTtlSettingTests.cs::Out_of_range_ttl_is_400_and_changes_nothing"
+    ]
+  },
+  {
+    "name": "parked_cart_expiry_boundary",
+    "description": "Sweeper voids a parked cart once parkedAt + ttlHours <= now (ttlHours <= 0 means never). Test: a cart parked 48h ago at the default 24h TTL is voided with one CartExpired audit; a freshly parked cart stays Parked; a second sweep does not double void; expired carts stay out of voided totals.",
+    "inputs": {
+      "ttlHours": 24,
+      "parkedAgoHours": {
+        "stale": 48,
+        "fresh": 0
+      }
+    },
+    "expected": {
+      "stale": "Voided",
+      "fresh": "Parked",
+      "cartExpiredAuditCount": 1,
+      "expiredCartsCountedInVoidedTotals": false
+    },
+    "note": "The exact-instant rule is taken from CartParkingService.cs (kept while parkedAt + ttl > now); no test asserts the exact boundary instant.",
+    "source": [
+      "backend/tests/Purch.IntegrationTests/ParkedCartTests.cs::Sweeper_VoidsParkedPastTtlWithAudit",
+      "backend/tests/Purch.IntegrationTests/ParkedCartTests.cs::Sweeper_ExpiredCart_StaysOutOfVoidedTotals",
+      "backend/src/Purch.Application/Pos/CartParkingService.cs::expiry check (line ~204)"
+    ]
+  }
+]
