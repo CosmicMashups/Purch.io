@@ -296,7 +296,10 @@ public sealed class TransactionService(
             existingLine = stage.Lines.FirstOrDefault(line =>
                 line.ItemId == request.ItemId
                 && line.ItemVariantId == request.ItemVariantId
-                && !stage.LinesWithModifiers.Contains(line.Id));
+                && !stage.LinesWithModifiers.Contains(line.Id)
+                // A manager's override or discount belongs to the units already rung: new units are a new line at catalog price.
+                && line.PriceOverrideFrom is null
+                && line.ManualDiscountKind is null);
         }
 
         if (existingLine is not null)
@@ -1623,9 +1626,9 @@ public sealed class TransactionService(
     private async Task ClearManualDiscountsAsync(Transaction cart, CancellationToken cancellationToken)
     {
         var lines = await transactionRepository.ListLinesAsync(cart.Id, cancellationToken);
-        var lineAmounts = lines.Where(line => line.ManualDiscountAmount > 0m)
-            .Select(line => new { lineId = line.Id, amount = line.ManualDiscountAmount }).ToList();
-        if (lineAmounts.Count == 0 && cart.ManualDiscountAmount <= 0m)
+        var lineAmounts = lines.Where(line => line.ManualDiscountKind is not null)
+            .Select(line => new { lineId = line.Id, kind = line.ManualDiscountKind.ToString(), value = line.ManualDiscountValue, amount = line.ManualDiscountAmount }).ToList();
+        if (lineAmounts.Count == 0 && cart.ManualDiscountKind is null)
         {
             return;
         }
@@ -1637,15 +1640,19 @@ public sealed class TransactionService(
             ActionType = AuditActionType.DiscountOverride,
             TargetEntityType = nameof(Transaction),
             TargetEntityId = cart.Id,
-            BeforeStateJson = JsonSerializer.Serialize(new { cartManualDiscount = cart.ManualDiscountAmount, reason = cart.ManualDiscountReason, lines = lineAmounts }),
+            BeforeStateJson = JsonSerializer.Serialize(new { cartManualDiscount = cart.ManualDiscountAmount, kind = cart.ManualDiscountKind?.ToString(), value = cart.ManualDiscountValue, reason = cart.ManualDiscountReason, lines = lineAmounts }),
             AfterStateJson = JsonSerializer.Serialize(new { manualDiscountsCleared = true, because = "Senior/PWD discount applied" }),
         });
 
         foreach (var line in lines)
         {
             line.ManualDiscountAmount = 0m;
+            line.ManualDiscountKind = null;
+            line.ManualDiscountValue = null;
         }
 
+        cart.ManualDiscountKind = null;
+        cart.ManualDiscountValue = null;
         cart.ManualDiscountAmount = 0m;
         cart.ManualDiscountReason = null;
     }
@@ -2021,19 +2028,24 @@ public sealed class TransactionService(
         // Manual (Manager/Admin) discounts: held to what they cover, cleared under Senior/PWD (BIR wins), and a
         // line carrying one is left out of the promotions. See ManualDiscountPricing.
         var seniorPwd = transaction.SeniorPwdDiscountApplied;
-        var manualLines = ManualDiscountPricing.ClampLines(
-            pricedLines.Select(line => new ManualDiscountPricing.LineInput(line.Id, line.LineTotal, seniorPwd ? 0m : line.ManualDiscountAmount)));
+        // The stored kind/value are the truth; the amount is derived here every time and clamped to the line.
         foreach (var line in pricedLines)
         {
-            line.ManualDiscountAmount = manualLines[line.Id];
+            line.ManualDiscountAmount = !seniorPwd && line.ManualDiscountKind is { } lineKind
+                ? ManualDiscountPricing.Amount(lineKind, line.ManualDiscountValue ?? 0m, line.LineTotal)
+                : 0m;
         }
 
-        var lineManualTotal = manualLines.Values.Sum();
-        var promoLines = lineManualTotal == 0m ? pricedLines : pricedLines.Where(line => line.ManualDiscountAmount == 0m).ToList();
+        var lineManualTotal = pricedLines.Sum(line => line.ManualDiscountAmount);
 
-        var itemPromoResults = await CalculateItemPromosAsync(promoLines, cancellationToken);
+        // A line a manager discounted or re-priced is final: it takes no item promo (a BOGO/combo group spanning it
+        // loses that pairing), and a manually discounted line is also outside the promo-code base.
+        var itemPromoLines = pricedLines.Where(line => line.ManualDiscountKind is null && line.PriceOverrideFrom is null).ToList();
+        var promoCodeLines = pricedLines.Where(line => line.ManualDiscountKind is null).ToList();
+
+        var itemPromoResults = await CalculateItemPromosAsync(itemPromoLines, cancellationToken);
         var itemPromoAmount = itemPromoResults.Sum(result => result.DiscountAmount);
-        var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, promoLines.Sum(line => line.LineTotal), cancellationToken);
+        var promoCodeAmount = await CalculatePromoCodeAmountAsync(transaction, promoCodeLines.Sum(line => line.LineTotal), cancellationToken);
 
         var seniorPwdAmount = 0m;
         var vatExemptAmount = 0m;
@@ -2051,14 +2063,20 @@ public sealed class TransactionService(
         }
         else
         {
+            var netAfterLines = grossSubtotal - lineManualTotal;
+            var requestedCartAmount = transaction.ManualDiscountKind is { } cartKind && (transaction.ManualDiscountValue ?? 0m) > 0m
+                ? ManualDiscountPricing.Amount(cartKind, transaction.ManualDiscountValue!.Value, netAfterLines)
+                : 0m;
+            var cartManualActive = transaction.ManualDiscountKind is not null && (transaction.ManualDiscountValue ?? 0m) > 0m;
             var resolved = ManualDiscountPricing.ResolveCart(
-                transaction.ManualDiscountAmount, grossSubtotal - lineManualTotal, itemPromoAmount, promoCodeAmount);
+                cartManualActive, requestedCartAmount, netAfterLines, itemPromoAmount, promoCodeAmount);
+
             cartManualAmount = resolved.CartAmount;
             appliedItemPromoAmount = resolved.AppliedItemPromo;
             appliedPromoCodeAmount = resolved.AppliedPromoCode;
 
             // A tie (including no promos at all) goes to the item promos; nothing is assigned under a manual cart discount.
-            if (transaction.ManualDiscountAmount <= 0m && itemPromoAmount >= promoCodeAmount)
+            if (!cartManualActive && itemPromoAmount >= promoCodeAmount)
             {
                 var linesById = pricedLines.ToDictionary(line => line.Id);
                 foreach (var result in itemPromoResults)
@@ -2073,7 +2091,7 @@ public sealed class TransactionService(
         }
 
         transaction.ManualDiscountAmount = cartManualAmount;
-        if (cartManualAmount == 0m)
+        if (transaction.ManualDiscountKind is null)
         {
             transaction.ManualDiscountReason = null;
         }
@@ -2270,7 +2288,9 @@ public sealed class TransactionService(
                 comboSelectionDtos,
                 modifierSelectionDtos,
                 line.ManualDiscountAmount,
-                line.PriceOverrideFrom));
+                line.PriceOverrideFrom,
+                line.ManualDiscountKind?.ToString(),
+                line.ManualDiscountValue));
         }
 
         var paymentsByTransaction = (await paymentRepository.ListByTransactionsAsync([.. transactions.Select(t => t.Id)], cancellationToken))
@@ -2310,7 +2330,9 @@ public sealed class TransactionService(
                 transaction.KioskDiscountHint,
                 transaction.VatExemptAmount,
                 ManualDiscountAmount: transaction.ManualDiscountAmount,
-                ManualDiscountReason: transaction.ManualDiscountReason));
+                ManualDiscountReason: transaction.ManualDiscountReason,
+                ManualDiscountKind: transaction.ManualDiscountKind?.ToString(),
+                ManualDiscountValue: transaction.ManualDiscountValue));
         }
 
         return results;

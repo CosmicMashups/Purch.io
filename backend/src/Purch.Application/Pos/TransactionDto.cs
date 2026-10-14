@@ -28,7 +28,9 @@ public sealed record TransactionDto(
     decimal VatExemptAmount = 0m,
     IReadOnlyList<ChangedLineDto>? ChangedLines = null,
     decimal ManualDiscountAmount = 0m,
-    string? ManualDiscountReason = null);
+    string? ManualDiscountReason = null,
+    string? ManualDiscountKind = null,
+    decimal? ManualDiscountValue = null);
 
 /// <summary>Kitchen Display's request to advance a kiosk order's kitchen-prep state.</summary>
 public sealed record UpdateKitchenStatusRequest(KitchenStatus KitchenStatus);
@@ -47,7 +49,9 @@ public sealed record TransactionLineDto(
     IReadOnlyList<ComboSelectionDto> ComboSelections,
     IReadOnlyList<ModifierSelectionDto> ModifierSelections,
     decimal ManualDiscountAmount = 0m,
-    decimal? PriceOverrideFrom = null);
+    decimal? PriceOverrideFrom = null,
+    string? ManualDiscountKind = null,
+    decimal? ManualDiscountValue = null);
 
 /// <summary>Mirrors Purch.Domain.Entities.TransactionLineComboSelection, resolved to
 /// readable slot/item names for receipt display.</summary>

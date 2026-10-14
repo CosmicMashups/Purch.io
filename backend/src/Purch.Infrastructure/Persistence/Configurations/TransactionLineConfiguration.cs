@@ -10,6 +10,7 @@ public class TransactionLineConfiguration : IEntityTypeConfiguration<Transaction
     {
         _ = builder.Property(l => l.UnitCost).HasPrecision(18, 2);
         _ = builder.Property(l => l.ManualDiscountAmount).HasPrecision(18, 2);
+        _ = builder.Property(l => l.ManualDiscountValue).HasPrecision(18, 2);
         _ = builder.Property(l => l.PriceOverrideFrom).HasPrecision(18, 2);
 
         _ = builder.HasIndex(l => l.TransactionId)

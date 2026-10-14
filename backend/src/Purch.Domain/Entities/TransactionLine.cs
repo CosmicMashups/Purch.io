@@ -1,3 +1,4 @@
+using Purch.Domain.Enums;
 using Purch.Domain.Common;
 
 namespace Purch.Domain.Entities;
@@ -31,6 +32,11 @@ public class TransactionLine : TenantScopedEntity
 
     /// <summary>A cashier-entered discount on this line.</summary>
     public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>How the discount was entered (null = none). The amount above is derived from this on every recalculation.</summary>
+    public ManualDiscountKind? ManualDiscountKind { get; set; }
+
+    public decimal? ManualDiscountValue { get; set; }
 
     /// <summary>The catalog price this line's UnitPrice was overridden from, or null.</summary>
     public decimal? PriceOverrideFrom { get; set; }

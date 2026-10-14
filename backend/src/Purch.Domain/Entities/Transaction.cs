@@ -104,6 +104,11 @@ public class Transaction : TenantScopedEntity
     // --- Manual discount ---
     public decimal ManualDiscountAmount { get; set; }
 
+    /// <summary>How the cart discount was entered (null = none); the amount is derived from it on every recalculation.</summary>
+    public ManualDiscountKind? ManualDiscountKind { get; set; }
+
+    public decimal? ManualDiscountValue { get; set; }
+
     public string? ManualDiscountReason { get; set; }
 
     // --- VAT stamping ---

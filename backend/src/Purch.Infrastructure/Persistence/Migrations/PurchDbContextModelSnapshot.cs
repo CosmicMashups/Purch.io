@@ -2722,8 +2722,15 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<int?>("ManualDiscountKind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ManualDiscountReason")
                         .HasColumnType("text");
+
+                    b.Property<decimal?>("ManualDiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("OrderType")
                         .HasColumnType("text");
@@ -2868,6 +2875,13 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(14,4)");
 
                     b.Property<decimal>("ManualDiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("ManualDiscountKind")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("ManualDiscountValue")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 

@@ -31,7 +31,10 @@ public sealed class ManualDiscountService(
             var line = await RequireLineAsync(cart, lineId, ct);
 
             var before = line.ManualDiscountAmount;
-            line.ManualDiscountAmount = ManualDiscountPricing.Amount(request.Kind, request.Value, line.LineTotal);
+            var kind = ParseKind(request.Kind);
+            line.ManualDiscountKind = request.Value > 0m ? kind : null;
+            line.ManualDiscountValue = request.Value > 0m ? request.Value : null;
+            line.ManualDiscountAmount = request.Value > 0m ? ManualDiscountPricing.Amount(kind, request.Value, line.LineTotal) : 0m;
             Audit(AuditActionType.DiscountOverride, cart,
                 new { scope = "line", lineId, manualDiscountAmount = before, total = cart.TotalAmount },
                 new { scope = "line", lineId, kind = request.Kind, value = request.Value, manualDiscountAmount = line.ManualDiscountAmount, reason = request.Reason.Trim() });
@@ -48,10 +51,14 @@ public sealed class ManualDiscountService(
             var lines = await transactionRepository.ListLinesAsync(cart.Id, ct);
 
             // The cart discount comes off what is left after the line discounts (and no promotion applies beside it).
-            var netAfterLines = lines.Sum(line => line.LineTotal - line.ManualDiscountAmount);
+            var kind = ParseKind(request.Kind);
+            cart.ManualDiscountKind = request.Value > 0m ? kind : null;
+            cart.ManualDiscountValue = request.Value > 0m ? request.Value : null;
             var before = cart.ManualDiscountAmount;
-            cart.ManualDiscountAmount = ManualDiscountPricing.Amount(request.Kind, request.Value, netAfterLines);
-            cart.ManualDiscountReason = cart.ManualDiscountAmount > 0m ? request.Reason.Trim() : null;
+            cart.ManualDiscountAmount = request.Value > 0m
+                ? ManualDiscountPricing.Amount(kind, request.Value, lines.Sum(line => line.LineTotal - line.ManualDiscountAmount))
+                : 0m;
+            cart.ManualDiscountReason = request.Value > 0m ? request.Reason.Trim() : null;
             Audit(AuditActionType.DiscountOverride, cart,
                 new { scope = "cart", manualDiscountAmount = before, total = cart.TotalAmount },
                 new { scope = "cart", kind = request.Kind, value = request.Value, manualDiscountAmount = cart.ManualDiscountAmount, reason = request.Reason.Trim() });
@@ -128,11 +135,16 @@ public sealed class ManualDiscountService(
         });
     }
 
+    private static ManualDiscountKind ParseKind(string kind)
+        => string.Equals(kind, nameof(ManualDiscountKind.Percent), StringComparison.OrdinalIgnoreCase)
+            ? ManualDiscountKind.Percent
+            : ManualDiscountKind.Fixed;
+
     private static void Validate(SetManualDiscountRequest request)
     {
         ValidateReason(request.Reason);
-        var isPercent = string.Equals(request.Kind, ManualDiscountPricing.Percent, StringComparison.OrdinalIgnoreCase);
-        if (!isPercent && !string.Equals(request.Kind, ManualDiscountPricing.Fixed, StringComparison.OrdinalIgnoreCase))
+        var isPercent = string.Equals(request.Kind, nameof(ManualDiscountKind.Percent), StringComparison.OrdinalIgnoreCase);
+        if (!isPercent && !string.Equals(request.Kind, nameof(ManualDiscountKind.Fixed), StringComparison.OrdinalIgnoreCase))
         {
             throw new ValidationException(nameof(request.Kind), "Kind must be Percent or Fixed.");
         }

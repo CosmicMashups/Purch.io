@@ -166,6 +166,27 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_warehouse_staff_member_and_a_kiosk_are_refused_the_manual_discount_and_price_routes()
+    {
+        var (factory, admin, business, anonymous) = await NewShopAsync();
+        await using var _ = factory;
+        var warehouse = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Warehouse);
+        var warehouseClient = Bearer(factory, await UnlockAsync(anonymous, await PairAsync(admin, anonymous, business, DeviceType.WarehouseOfficer), warehouse));
+        var kioskCredential = await PairAsync(admin, anonymous, business, DeviceType.Kiosk);
+        var session = (await (await anonymous.PostAsJsonAsync("/devices/session", new DeviceSessionRequest(kioskCredential))).Content.ReadFromJsonAsync<DeviceSessionDto>(JsonOptions))!;
+        var kioskClient = Bearer(factory, session.AccessToken!);
+        var someLine = Guid.NewGuid();
+        var body = new { kind = "Percent", value = 10m, reason = "Damaged" };
+
+        foreach (var client in new[] { warehouseClient, kioskClient })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/discount", body)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/transactions/cart/discount", body)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/transactions/cart/lines/{someLine}/price", new { newUnitPrice = 1m, reason = "Match" })).StatusCode);
+        }
+    }
+
+    [Fact]
     public async Task A_manager_reaches_everything_except_devices_wherever_they_unlock()
     {
         var (factory, admin, business, anonymous) = await NewShopAsync();

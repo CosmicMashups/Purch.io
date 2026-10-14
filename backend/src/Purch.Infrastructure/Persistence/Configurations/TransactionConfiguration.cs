@@ -13,6 +13,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         _ = builder.Property(t => t.VatExemptAmount).HasPrecision(12, 2);
 
         _ = builder.Property(t => t.ManualDiscountAmount).HasPrecision(18, 2);
+        _ = builder.Property(t => t.ManualDiscountValue).HasPrecision(18, 2);
         _ = builder.Property(t => t.VatableSales).HasPrecision(18, 2);
         _ = builder.Property(t => t.VatAmount).HasPrecision(18, 2);
         _ = builder.Property(t => t.VatExemptSales).HasPrecision(18, 2);
