@@ -14,6 +14,33 @@ public sealed class EfTransactionRepository(PurchDbContext dbContext) : ITransac
             .FirstOrDefaultAsync(transaction => transaction.DeviceId == deviceId && transaction.Status == TransactionStatus.Open, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Transaction>> ListParkedByBranchAsync(Guid branchId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction => transaction.BranchId == branchId && transaction.Status == TransactionStatus.Parked)
+            .OrderByDescending(transaction => transaction.ParkedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(CancellationToken cancellationToken = default)
+    {
+        return await (
+            from transaction in dbContext.Transactions.IgnoreQueryFilters().AsNoTracking()
+            join tenant in dbContext.Tenants.IgnoreQueryFilters().AsNoTracking() on transaction.TenantId equals tenant.Id
+            where transaction.Status == TransactionStatus.Parked
+            select new ParkedCartForExpiry(transaction.Id, transaction.TenantId, transaction.ParkedAt, tenant.ParkedCartTtlHours, transaction.TotalAmount))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryVoidParkedAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Transactions.IgnoreQueryFilters()
+            .Where(transaction => transaction.Id == transactionId && transaction.Status == TransactionStatus.Parked)
+            .ExecuteUpdateAsync(set => set.SetProperty(transaction => transaction.Status, TransactionStatus.Voided), cancellationToken);
+        return rows == 1;
+    }
+
     public Task<Transaction?> GetByClientSaleIdAsync(Guid clientSaleId, CancellationToken cancellationToken = default)
     {
         return dbContext.Transactions

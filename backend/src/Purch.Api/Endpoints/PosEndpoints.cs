@@ -1,5 +1,7 @@
+using Purch.Api.Auth;
 using Purch.Api.Http;
 using Purch.Api.RateLimiting;
+using Purch.Application.Auth;
 using Purch.Application.Pos;
 using Purch.Domain.Enums;
 
@@ -60,6 +62,40 @@ public static class PosEndpoints
             Results.Ok(await transactionService.VoidCartAsync(request ?? new VoidCartRequest(null), cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posOperator))
             .RequireRateLimiting(RateLimiterPolicies.ShiftApproval);
+
+        // --- Parked carts: set a cart aside, serve someone else, resume it later ---
+        _ = app.MapPost("/transactions/cart/park", async (
+            ParkCartRequest? request,
+            ICartParkingService parking,
+            CancellationToken cancellationToken) =>
+        {
+            await parking.ParkAsync(request?.Label, cancellationToken);
+            return Results.NoContent();
+        })
+            .RequirePermission(Permissions.CartPark);
+
+        _ = app.MapGet("/transactions/parked", async (
+            ICartParkingService parking,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await parking.ListParkedAsync(cancellationToken)))
+            .RequirePermission(Permissions.CartPark);
+
+        _ = app.MapPost("/transactions/{transactionId:guid}/resume", async (
+            Guid transactionId,
+            ICartParkingService parking,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await parking.ResumeAsync(transactionId, cancellationToken)))
+            .RequirePermission(Permissions.CartPark);
+
+        _ = app.MapDelete("/transactions/{transactionId:guid}/parked", async (
+            Guid transactionId,
+            ICartParkingService parking,
+            CancellationToken cancellationToken) =>
+        {
+            await parking.DiscardAsync(transactionId, cancellationToken);
+            return Results.NoContent();
+        })
+            .RequirePermission(Permissions.CartPark);
 
         // Looking up an older sale by its receipt number, so it can be refunded or exchanged without
         // the cashier already having it open (e.g. from an earlier day or a different terminal).

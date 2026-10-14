@@ -16,7 +16,10 @@ namespace Purch.Infrastructure.Retention;
 /// to compressed JSON files before deletion. Unreferenced uploaded files older than the grace window
 /// are also cleaned up.
 /// </summary>
-public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<RetentionOptions> options)
+public sealed class RetentionSweeper(
+    PurchDbContext dbContext,
+    IOptions<RetentionOptions> options,
+    Purch.Application.Pos.ICartParkingService? cartParking = null)
 {
     // Arbitrary constant naming "the retention sweep" to Postgres advisory locks.
     public const long SweepLockKey =0x50_55_52_43_48_52_45_54;
@@ -154,6 +157,11 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
             orphanedUploadsPurged = await PurgeOrphanedUploadsAsync(uploadsDir, settings.OrphanedUploadGraceHours, cancellationToken);
         }
 
+        // Parked carts past their tenant's TTL are voided (and audited) rather than deleted: they were real
+        // pending sales, so the trail stays. Each is claimed with one conditional UPDATE, so a resume that
+        // is racing the sweep wins or loses cleanly and nothing is voided twice.
+        var parkedCartsExpired = cartParking is null ? 0 : await cartParking.ExpireStaleAsync(now, cancellationToken);
+
         return new RetentionSweepResult(
             refreshTokensPurged,
             passwordResetTokensPurged,
@@ -161,7 +169,8 @@ public sealed class RetentionSweeper(PurchDbContext dbContext, IOptions<Retentio
             auditLogsPurged,
             inventoryMovementsPurged,
             orphanedUploadsPurged,
-            cartBatchReceiptsPurged);
+            cartBatchReceiptsPurged,
+            parkedCartsExpired);
     }
 
     private async Task ArchiveAuditLogsAsync(string archiveDirectory, DateTimeOffset cutoff, CancellationToken cancellationToken)

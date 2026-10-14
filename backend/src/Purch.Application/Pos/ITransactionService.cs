@@ -5,6 +5,9 @@ public interface ITransactionService
     /// <summary>Returns the current device's open cart, creating one if none exists yet.</summary>
     Task<TransactionDto> GetOrCreateOpenCartAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Re-prices a cart whose lines were changed outside the cart engine (a resumed parked cart) and saves it.</summary>
+    Task<TransactionDto> RecalculateCartAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
     Task<TransactionDto> AddLineAsync(AddTransactionLineRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Applies several adds together, all or nothing, and answers with the priced cart. Idempotent on

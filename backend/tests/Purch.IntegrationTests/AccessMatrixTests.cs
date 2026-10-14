@@ -123,6 +123,28 @@ public sealed class AccessMatrixTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_warehouse_device_is_refused_the_parked_cart_routes_and_a_cashier_is_not()
+    {
+        var (factory, admin, business, anonymous) = await NewShopAsync();
+        await using var _ = factory;
+        var warehouse = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Warehouse);
+        var cashier = await AddPersonAsync(admin, anonymous, business, MembershipRole.Staff, StaffDuty.Cashier);
+        var warehouseClient = Bearer(factory, await UnlockAsync(anonymous, await PairAsync(admin, anonymous, business, DeviceType.WarehouseOfficer), warehouse));
+        var cashierClient = Bearer(factory, await UnlockAsync(anonymous, await PairAsync(admin, anonymous, business, DeviceType.Register), cashier));
+        var someCart = Guid.NewGuid();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouseClient.PostAsJsonAsync("/transactions/cart/park", new { label = "x" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouseClient.GetAsync("/transactions/parked")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouseClient.PostAsync($"/transactions/{someCart}/resume", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouseClient.DeleteAsync($"/transactions/{someCart}/parked")).StatusCode);
+
+        // A cashier is let through the policy: an empty cart is a 400 and an unknown cart a 404, never a 403.
+        Assert.Equal(HttpStatusCode.BadRequest, (await cashierClient.PostAsJsonAsync("/transactions/cart/park", new { label = "x" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await cashierClient.GetAsync("/transactions/parked")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await cashierClient.PostAsync($"/transactions/{someCart}/resume", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_manager_reaches_everything_except_devices_wherever_they_unlock()
     {
         var (factory, admin, business, anonymous) = await NewShopAsync();

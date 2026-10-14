@@ -8,6 +8,17 @@ public interface ITransactionRepository
     Task<Transaction?> GetOpenByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>The transaction created for a checkout's client-generated SaleId, if any — the idempotency lookup.</summary>
+    /// <summary>Parked carts of one branch, newest parked first (read-only list).</summary>
+    Task<IReadOnlyList<Transaction>> ListParkedByBranchAsync(Guid branchId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every parked cart in every tenant with its tenant's TTL hours: for the retention sweep only
+    /// (opts out of the tenant filter).</summary>
+    Task<IReadOnlyList<ParkedCartForExpiry>> ListParkedForExpiryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Atomically voids a cart that is STILL Parked (one conditional UPDATE); false if something else
+    /// (a resume, a discard, another sweep) got there first. Cross-tenant; sweep only.</summary>
+    Task<bool> TryVoidParkedAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
     Task<Transaction?> GetByClientSaleIdAsync(Guid clientSaleId, CancellationToken cancellationToken = default);
 
     /// <summary>Whether a completed sale on this terminal already carries this receipt number.</summary>

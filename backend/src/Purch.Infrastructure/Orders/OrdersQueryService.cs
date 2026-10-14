@@ -63,7 +63,7 @@ public sealed class OrdersQueryService(PurchDbContext db, IReportScopeResolver s
     {
         var confinedTo = await scopeResolver.ResolveBranchIdAsync(null, cancellationToken);
         var visible = await db.Transactions.AnyAsync(
-            t => t.Id == transactionId && t.Status != TransactionStatus.Open && t.Status != TransactionStatus.AwaitingPayment && (confinedTo == null || t.BranchId == confinedTo),
+            t => t.Id == transactionId && t.Status != TransactionStatus.Open && t.Status != TransactionStatus.AwaitingPayment && t.Status != TransactionStatus.Parked && (confinedTo == null || t.BranchId == confinedTo),
             cancellationToken);
         if (!visible)
         {

@@ -94,6 +94,15 @@ public sealed class TransactionService(
         return await ToDtoAsync(transaction, cancellationToken);
     }
 
+    public async Task<TransactionDto> RecalculateCartAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        var cart = await transactionRepository.GetByIdAsync(transactionId, cancellationToken)
+            ?? throw new NotFoundException("Transaction", transactionId);
+        await RecalculateTotalAsync(cart, cancellationToken);
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(cart, cancellationToken);
+    }
+
     public async Task<TransactionDto> AddLineAsync(AddTransactionLineRequest request, CancellationToken cancellationToken = default)
     {
         return await ToDtoAsync(await AddLineCoreAsync(request, cancellationToken), cancellationToken);
