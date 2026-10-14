@@ -12,6 +12,7 @@ interface PendingApproval {
   isError: boolean;
   /** Retries the same action, this time with the PIN the cashier just typed. */
   retry: (pin: string) => Promise<Transaction | void>;
+  describeError: (error: unknown) => string;
   /** Runs once the action actually lands, whether on the first try or after a PIN — e.g. a success toast. */
   onLanded?: (cart: Transaction | void) => void;
 }
@@ -36,14 +37,20 @@ export function useApproverGatedAction() {
 
   /** `title` names the action for the dialog, e.g. "Clear the cart" or "Remove Ramen". `onLanded` runs once
    * the action actually succeeds, on the first try or after a PIN — a success toast, typically. */
-  async function run<T extends Transaction | void>(title: string, send: (approverPin?: string) => Promise<T>, onLanded?: (cart: T) => void): Promise<void> {
+  /** `describeError` turns a non-PIN failure into the toast text (defaults to userMessage); the error itself is never re-labelled. */
+  async function run<T extends Transaction | void>(
+    title: string,
+    send: (approverPin?: string) => Promise<T>,
+    onLanded?: (cart: T) => void,
+    describeError: (error: unknown) => string = userMessage,
+  ): Promise<void> {
     try {
       land(await send(), onLanded as PendingApproval['onLanded']);
     } catch (error) {
       if (needsApproverPin(error)) {
-        setPending({ title, message: approverPinPrompt(error), isError: false, retry: send, onLanded: onLanded as PendingApproval['onLanded'] });
+        setPending({ title, message: approverPinPrompt(error), isError: false, retry: send, onLanded: onLanded as PendingApproval['onLanded'], describeError });
       } else {
-        toast.error(userMessage(error));
+        toast.error(describeError(error));
       }
     }
   }
@@ -57,7 +64,7 @@ export function useApproverGatedAction() {
       if (needsApproverPin(error)) {
         setPending({ ...pending, message: approverPinPrompt(error), isError: true });
       } else {
-        toast.error(userMessage(error));
+        toast.error(pending.describeError(error));
         setPending(null);
       }
     } finally {

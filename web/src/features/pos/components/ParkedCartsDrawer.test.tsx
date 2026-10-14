@@ -1,6 +1,7 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useToastStore } from '../../../components/feedback/toastStore';
+import { Toaster } from '../../../components/feedback/Toaster';
+import { toast, useToastStore } from '../../../components/feedback/toastStore';
 import { ApiError } from '../../../lib/apiError';
 import { makeCart, makeLine } from '../../../test/pos';
 import { renderPage, signInAs } from '../../../test/render';
@@ -197,7 +198,7 @@ describe('Parked carts drawer', () => {
   it.each([
     ['conflict', 'Another register already resumed this cart'],
     ['notFound', 'This parked cart is no longer available'],
-    ['forbidden', 'This cart belongs to another branch'],
+    ['forbidden', "You can't change this parked cart."],
   ] as const)('a %s on resume says why in plain words and refetches the list', async (kind, message) => {
     vi.mocked(posApi.resumeCart).mockRejectedValue(new ApiError(kind, 'raw server text'));
     const drawer = await openDrawer();
@@ -260,6 +261,42 @@ describe('Parked carts drawer', () => {
     fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
     expect(last).toHaveFocus();
     expect(screen.getByTestId('cart-total').closest('[inert]')).not.toBeNull();
+  });
+
+  it('a 403 on discard shows the copy, not the PIN dialog, and keeps network errors their own wording', async () => {
+    vi.mocked(posApi.discardParked).mockRejectedValueOnce(new ApiError('forbidden', 'raw')).mockRejectedValueOnce(new ApiError('network', 'raw'));
+    const drawer = await openDrawer();
+    for (const expected of ["You can't change this parked cart.", 'Cannot reach the server. Check the connection and try again.']) {
+      fireEvent.click(await within(drawer).findByRole('button', { name: 'Discard Table 4' }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Discard Table 4?' })).getByRole('button', { name: 'Discard' }));
+      await waitFor(() => expect(toastMessages()).toContain(expected));
+      expect(screen.queryByLabelText('Manager or admin PIN')).not.toBeInTheDocument();
+      await waitFor(() => expect(within(drawer).getByRole('button', { name: 'Discard Table 4' })).toBeEnabled());
+    }
+  });
+
+  it('keeps toasts live while open, and lifts inert from the till after close and after unmount', async () => {
+    const view = renderPage(
+      <>
+        <SellPage />
+        <Toaster />
+      </>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Parked carts, 2 waiting/ }));
+    const drawer = await screen.findByRole('dialog', { name: 'Parked carts' });
+    act(() => toast.success('Discarded Table 4'));
+    const shown = await screen.findByText('Discarded Table 4');
+    expect(shown.closest('[inert]')).toBeNull();
+    expect(screen.getByTestId('cart-total').closest('[inert]')).not.toBeNull();
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close parked carts' }));
+    await waitFor(() => expect(screen.getByTestId('cart-total').closest('[inert]')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: /Parked carts, 2 waiting/ }));
+    await screen.findByRole('dialog', { name: 'Parked carts' });
+    view.unmount();
+    expect(document.querySelectorAll('[inert]')).toHaveLength(0);
+    expect(document.body.style.overflow).toBe('');
   });
 });
 

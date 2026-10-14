@@ -49,7 +49,7 @@ function parkedErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.kind === 'conflict') return 'Another register already resumed this cart';
     if (error.kind === 'notFound') return 'This parked cart is no longer available';
-    if (error.kind === 'forbidden') return 'This cart belongs to another branch';
+    if (error.kind === 'forbidden') return "You can't change this parked cart.";
   }
   return userMessage(error);
 }
@@ -90,7 +90,12 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
     closeRef.current?.focus();
     // Everything behind the drawer is inert while it is open, so neither Tab nor a screen reader wanders into the till.
     const host = hostRef.current;
-    const background = Array.from(document.body.children).filter((el) => el !== host && !el.contains(host) && !el.hasAttribute('inert'));
+    // The toast root stays live so outcomes are still announced and dismissable.
+    const background = Array.from(document.body.children).filter(
+      (el) => el !== host && !el.contains(host) && !el.hasAttribute('inert') && !el.matches('[data-toast-root]'),
+    );
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     background.forEach((el) => el.setAttribute('inert', ''));
     const onKey = (event: KeyboardEvent) => {
       if (nested.current) return; // the confirm or PIN dialog on top owns the keyboard
@@ -114,6 +119,7 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
     return () => {
       window.removeEventListener('keydown', onKey);
       background.forEach((el) => el.removeAttribute('inert'));
+      document.body.style.overflow = overflow;
       previous?.focus?.();
     };
   }, [open]);
@@ -147,15 +153,14 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
         try {
           return await posApi.discardParked(cart.id, approverPin);
         } catch (error) {
-          if (needsApproverPin(error)) throw error;
-          // Any other refusal means the list is out of date; refetch it and say why in plain words.
-          void qc.invalidateQueries({ queryKey: posKeys.parked });
-          throw new ApiError('conflict', parkedErrorMessage(error));
+          // Any refusal other than "needs a PIN" means the list may be out of date; the error itself passes through untouched.
+          if (!needsApproverPin(error)) void qc.invalidateQueries({ queryKey: posKeys.parked });
+          throw error;
         }
       }, () => {
         toast.success(`Discarded ${parkedName(cart)}`);
         void qc.invalidateQueries({ queryKey: posKeys.parked });
-      });
+      }, parkedErrorMessage);
     } finally {
       setBusyId(null);
     }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useToastStore, type Toast, type ToastTone } from './toastStore';
 
 const TONE_CLASS: Record<ToastTone, string> = {
@@ -13,8 +14,10 @@ export function Toaster() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
 
-  return (
+  // Portalled to body as its own root (data-toast-root) so a modal drawer that makes the app inert never silences it.
+  return createPortal(
     <div
+      data-toast-root
       aria-live="polite"
       className="pointer-events-none print:hidden fixed inset-x-4 bottom-24 z-50 flex flex-col items-center gap-2 md:bottom-6 md:items-end md:right-6 md:left-auto"
     >
@@ -41,7 +44,8 @@ export function Toaster() {
           </button>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

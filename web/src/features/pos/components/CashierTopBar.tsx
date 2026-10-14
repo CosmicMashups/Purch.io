@@ -8,7 +8,10 @@ export interface MenuAction {
   onSelect?: () => void;
 }
 
-const barButton = 'inline-flex h-10 items-center gap-2 rounded-control border border-line bg-surface px-4 text-sm font-semibold hover:border-brand';
+const barButtonBase = 'inline-flex items-center gap-2 rounded-control border border-line bg-surface px-4 text-sm font-semibold hover:border-brand';
+const barButton = `${barButtonBase} h-10`;
+/** Full 48px touch target (PRODUCT.md) for the till's own actions such as Parked. */
+const barButtonTall = `${barButtonBase} h-12`;
 
 /** The Cashier page's own bar: who is signed in, the Kiosk queue, a price refresh, and the less-used till pages in a menu. */
 export function CashierTopBar({
@@ -37,7 +40,7 @@ export function CashierTopBar({
             onClick={onOpenParked}
             aria-haspopup="dialog"
             aria-label={`Parked carts, ${parkedCount ? `${parkedCount} waiting` : 'none waiting'}`}
-            className={barButton.replace('h-10', 'h-12')}
+            className={barButtonTall}
           >
             <Pause size={18} aria-hidden="true" />
             Parked
