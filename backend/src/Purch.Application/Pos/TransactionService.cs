@@ -122,8 +122,9 @@ public sealed class TransactionService(
     private const int MaxLineNoteLength = 200;
     private const decimal MaxOpenItemUnitPrice = 999999.99m;
     private const decimal MaxOpenItemQuantity = 99999m;
-    private const decimal MaxOpenItemLineTotal = 9_999_999.99m;
-    private const decimal MaxCartTotal = 9_999_999_999.99m;
+    /// <summary>Transactions.TotalAmount/DiscountAmount are numeric(12,2); a cart past this is a 400, never a 500 on save.
+    /// Enforced centrally in RecalculateTotalAsync so every add/merge/update path is covered.</summary>
+    public const decimal MaxCartAmount = 9_999_999_999.99m;
 
     public async Task<TransactionDto> AddOpenItemAsync(AddOpenItemRequest request, CancellationToken cancellationToken = default)
     {
@@ -159,10 +160,6 @@ public sealed class TransactionService(
 
         var unitPrice = request.UnitPrice;
         var lineTotal = Math.Round(unitPrice * request.Quantity, 2, MidpointRounding.AwayFromZero);
-        if (lineTotal > MaxOpenItemLineTotal)
-        {
-            throw new ValidationException(nameof(request.Quantity), $"The line total can be at most {MaxOpenItemLineTotal:0.00}.");
-        }
 
         // Never merged with another line: each open item is its own line, with no catalog item, cost or stock.
         var line = new TransactionLine
@@ -203,11 +200,6 @@ public sealed class TransactionService(
         }
 
         await RecalculateTotalAsync(cart, cancellationToken, knownLines: stage.Lines);
-        if (cart.TotalAmount > MaxCartTotal)
-        {
-            throw new ValidationException(nameof(request.Quantity), "The cart total would be too large.");
-        }
-
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await ToDtoAsync(cart, cancellationToken);
@@ -1003,6 +995,12 @@ public sealed class TransactionService(
             ?? throw new NotFoundException("Transaction", line.TransactionId);
 
         var approver = await RequireKitchenEditAllowedAsync(cart, request.ApproverPin, cancellationToken);
+
+        // A line is flushed before the cart is re-priced, so an oversized one must be refused up front.
+        if (request.Quantity * line.UnitPrice > MaxCartAmount)
+        {
+            throw new ValidationException(nameof(request.Quantity), "The line total is too large.");
+        }
 
         var oldQuantity = line.Quantity;
         line.Quantity = request.Quantity;
@@ -2230,6 +2228,11 @@ public sealed class TransactionService(
         transaction.DiscountAmount = seniorPwdAmount + appliedPromoCodeAmount + lineManualTotal + cartManualAmount;
         transaction.VatExemptAmount = vatExemptAmount;
         transaction.TotalAmount = grossSubtotal - appliedItemPromoAmount - vatExemptAmount - transaction.DiscountAmount;
+
+        if (grossSubtotal > MaxCartAmount || transaction.TotalAmount > MaxCartAmount || transaction.DiscountAmount > MaxCartAmount)
+        {
+            throw new ValidationException("TotalAmount", "The cart total is too large.");
+        }
     }
 
     /// <summary>The discount the cart's promo code WOULD give on the regular subtotal (0 if there is no code).

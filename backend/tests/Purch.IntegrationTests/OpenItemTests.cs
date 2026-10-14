@@ -236,4 +236,28 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
 
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("", -5m, 0m))).StatusCode);
     }
+
+    [Fact]
+    public async Task Every_path_that_would_overflow_the_cart_total_is_a_400()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var big = await CreateItemAsync(admin, "Gold bar", 999999.99m);
+
+        var tooMany = await admin.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(big.Id, null, 99999m));
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+
+        var line = (await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(big.Id, null, 1m)))).Lines[0];
+        var update = await admin.PutAsJsonAsync($"/transactions/cart/lines/{line.Id}", new UpdateTransactionLineRequest(99999m));
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+
+        // A merge add on top of a line already near the cap.
+        var near = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{line.Id}", new UpdateTransactionLineRequest(9000m)));
+        Assert.True(near.TotalAmount < 10_000_000_000m);
+        var merge = await admin.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(big.Id, null, 2000m));
+        Assert.Equal(HttpStatusCode.BadRequest, merge.StatusCode);
+
+        var openMax = await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Big", 999999.99m, 99999m));
+        Assert.Equal(HttpStatusCode.BadRequest, openMax.StatusCode);
+    }
 }

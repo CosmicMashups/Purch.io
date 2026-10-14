@@ -81,6 +81,11 @@ public sealed class ManualDiscountService(
 
             var before = line.UnitPrice;
             var newPrice = Math.Round(request.NewUnitPrice, 2, MidpointRounding.AwayFromZero);
+            if (newPrice * line.Quantity > TransactionService.MaxCartAmount)
+            {
+                throw new ValidationException(nameof(request.NewUnitPrice), "The line total is too large.");
+            }
+
             // The first override remembers the catalog price; later ones keep it so the audit trail starts from it.
             line.PriceOverrideFrom ??= before;
             line.UnitPrice = newPrice;
