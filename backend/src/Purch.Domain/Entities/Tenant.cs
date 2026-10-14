@@ -55,4 +55,10 @@ public class Tenant : Entity
 
     /// <summary>Whether this shop monitors sales and stock per department (concessionaire). Off hides every department screen, field and report; the data is kept.</summary>
     public bool UseDepartmentTracking { get; set; }
+
+    public int ParkedCartTtlHours { get; set; } = 24;
+
+    public bool OpenItemEnabled { get; set; } = true;
+
+    public bool UpdateCostOnReceiving { get; set; }
 }

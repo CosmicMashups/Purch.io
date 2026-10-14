@@ -173,6 +173,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         // Lookups that run on every kiosk poll miss, cart read, order-list page and sale, and had no index on
         // the column they filter by (EF only indexes foreign keys it can infer; these are plain Guid columns).
         _ = modelBuilder.Entity<Payment>().HasIndex(p => p.TransactionId).HasDatabaseName("IX_Payments_TransactionId");
+        _ = modelBuilder.Entity<Payment>().HasIndex(p => new { p.TransactionId, p.Sequence }).IsUnique().HasDatabaseName("IX_Payments_TransactionId_Sequence");
+        _ = modelBuilder.Entity<InventoryItem>().Property(i => i.UnitCost).HasPrecision(18, 2);
         _ = modelBuilder.Entity<TransactionLineComboSelection>().HasIndex(s => s.TransactionLineId).HasDatabaseName("IX_ComboSelections_TransactionLineId");
         _ = modelBuilder.Entity<TransactionLineModifierSelection>().HasIndex(s => s.TransactionLineId).HasDatabaseName("IX_ModifierSelections_TransactionLineId");
         _ = modelBuilder.Entity<CreditTransaction>().HasIndex(c => c.TransactionId).HasDatabaseName("IX_CreditTransactions_TransactionId");

@@ -7,4 +7,5 @@ public enum TransactionStatus
     Completed,
     Voided,
     Refunded,
+    Parked,
 }

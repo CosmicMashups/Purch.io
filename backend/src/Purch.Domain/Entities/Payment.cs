@@ -16,4 +16,9 @@ public class Payment : TenantScopedEntity
     public decimal? AmountTendered { get; set; }
 
     public decimal? ChangeGiven { get; set; }
+
+    /// <summary>Order of this tender within a split payment; 0 for the first.</summary>
+    public int Sequence { get; set; }
+
+    public string? Reference { get; set; }
 }

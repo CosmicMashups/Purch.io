@@ -1217,6 +1217,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1306,6 +1310,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CostPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2035,6 +2043,12 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<int>("Method")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Reference")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -2051,6 +2065,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TransactionId")
                         .HasDatabaseName("IX_Payments_TransactionId");
+
+                    b.HasIndex("TransactionId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Payments_TransactionId_Sequence");
 
                     b.ToTable("Payments");
                 });
@@ -2589,6 +2607,12 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("OpenItemEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ParkedCartTtlHours")
+                        .HasColumnType("integer");
+
                     b.Property<string>("RegisteredAddress")
                         .HasColumnType("text");
 
@@ -2601,6 +2625,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<string>("Tin")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("UpdateCostOnReceiving")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2661,6 +2688,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
 
@@ -2684,11 +2714,27 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<int>("KitchenStatus")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("ManualDiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ManualDiscountReason")
+                        .HasColumnType("text");
+
                     b.Property<string>("OrderType")
                         .HasColumnType("text");
 
                     b.Property<bool>("OriginatedFromKiosk")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("ParkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ParkedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ParkedLabel")
+                        .HasColumnType("text");
 
                     b.Property<string>("PromoCode")
                         .HasColumnType("text");
@@ -2725,9 +2771,28 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("VatAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("VatDerived")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal>("VatExemptAmount")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("VatExemptSales")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("VatRateApplied")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)");
+
+                    b.Property<decimal>("VatableSales")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -2737,6 +2802,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<int?>("ZReadingNumber")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("ZeroRatedSales")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.HasKey("Id");
 
@@ -2781,7 +2850,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("ItemId")
+                    b.Property<bool>("IsOpenItem")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ItemId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("ItemVariantId")
@@ -2790,6 +2862,20 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("LineTotal")
                         .HasPrecision(14, 4)
                         .HasColumnType("numeric(14,4)");
+
+                    b.Property<decimal>("ManualDiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OpenItemName")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("PriceOverrideFrom")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("PromoDiscountAmount")
                         .HasPrecision(14, 4)
@@ -2804,6 +2890,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("TransactionId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(14, 4)

@@ -8,6 +8,10 @@ public class TransactionLineConfiguration : IEntityTypeConfiguration<Transaction
 {
     public void Configure(EntityTypeBuilder<TransactionLine> builder)
     {
+        _ = builder.Property(l => l.UnitCost).HasPrecision(18, 2);
+        _ = builder.Property(l => l.ManualDiscountAmount).HasPrecision(18, 2);
+        _ = builder.Property(l => l.PriceOverrideFrom).HasPrecision(18, 2);
+
         _ = builder.HasIndex(l => l.TransactionId)
             .HasDatabaseName("IX_TransactionLines_TransactionId");
     }

@@ -89,6 +89,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
                 from line in dbContext.TransactionLines.AsNoTracking()
                 join transaction in CompletedTransactions(branchId, fromUtc, toUtc)
                     on line.TransactionId equals transaction.Id
+                where line.ItemId != null
                 group line by line.ItemId into itemGroup
                 orderby itemGroup.Sum(l => l.LineTotal) descending
                 select new
@@ -100,7 +101,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .Take(take)
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId, r.Quantity, r.Revenue))];
+        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId!.Value, r.Quantity, r.Revenue))];
     }
 
     public async Task<IReadOnlyList<ItemSalesTotals>> GetTopItemsByQuantityAsync(
@@ -114,6 +115,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
                 from line in dbContext.TransactionLines.AsNoTracking()
                 join transaction in CompletedTransactions(branchId, fromUtc, toUtc)
                     on line.TransactionId equals transaction.Id
+                where line.ItemId != null
                 group line by line.ItemId into itemGroup
                 orderby itemGroup.Sum(l => l.Quantity) descending
                 select new
@@ -125,7 +127,7 @@ public sealed class EfReportingRepository(PurchDbContext dbContext) : IReporting
             .Take(take)
             .ToListAsync(cancellationToken);
 
-        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId, r.Quantity, r.Revenue))];
+        return [.. rows.Select(r => new ItemSalesTotals(r.ItemId!.Value, r.Quantity, r.Revenue))];
     }
 
     private IQueryable<Transaction> CompletedTransactions(Guid? branchId, DateTimeOffset fromUtc, DateTimeOffset toUtc)

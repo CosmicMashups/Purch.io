@@ -21,6 +21,9 @@ public class Item : TenantScopedEntity, ISoftDeletable
 
     public decimal BasePrice { get; set; }
 
+    /// <summary>What one unit costs the shop; null when unknown.</summary>
+    public decimal? CostPrice { get; set; }
+
     public string? ImageUrl { get; set; }
 
     public PricingType PricingType { get; set; }

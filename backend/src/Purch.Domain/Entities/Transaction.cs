@@ -91,4 +91,31 @@ public class Transaction : TenantScopedEntity
     /// <summary>Only meaningful when OriginatedFromKiosk is true — Kitchen Display
     /// advances it, Order Board reads it, both orthogonal to Status (payment).</summary>
     public KitchenStatus KitchenStatus { get; set; } = KitchenStatus.Queued;
+
+    // --- Parked carts ---
+    public string? ParkedLabel { get; set; }
+
+    public DateTimeOffset? ParkedAt { get; set; }
+
+    public Guid? ParkedByUserId { get; set; }
+
+    public Guid? CustomerId { get; set; }
+
+    // --- Manual discount ---
+    public decimal ManualDiscountAmount { get; set; }
+
+    public string? ManualDiscountReason { get; set; }
+
+    // --- VAT stamping ---
+    public decimal VatableSales { get; set; }
+
+    public decimal VatAmount { get; set; }
+
+    public decimal VatExemptSales { get; set; }
+
+    public decimal ZeroRatedSales { get; set; }
+
+    public decimal? VatRateApplied { get; set; }
+
+    public bool VatDerived { get; set; }
 }

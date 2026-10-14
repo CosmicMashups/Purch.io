@@ -26,6 +26,9 @@ public class InventoryItem : TenantScopedEntity, ISoftDeletable
 
     public decimal QuantityOnHand { get; set; }
 
+    /// <summary>What one base unit costs the shop; null when unknown.</summary>
+    public decimal? UnitCost { get; set; }
+
     public decimal? LowStockThreshold { get; set; }
 
     /// <summary>True when this record was created automatically alongside an Item (see LinkedItemId) rather than by a user.</summary>

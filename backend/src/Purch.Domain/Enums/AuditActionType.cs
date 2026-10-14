@@ -51,4 +51,12 @@ public enum AuditActionType
 
     /// <summary>A piece of equipment's status changed (for example to out of service) — see EquipmentService.SetStatusAsync.</summary>
     EquipmentStatusChanged,
+
+    CartParked,
+
+    CartResumed,
+
+    CartExpired,
+
+    OpenItemAdded,
 }

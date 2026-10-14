@@ -1277,7 +1277,12 @@ public sealed class TransactionService(
 
         foreach (var line in lines)
         {
-            var pricingType = await PricingTypeOfAsync(line.ItemId);
+            if (line.ItemId is not { } lineItemId)
+            {
+                continue;
+            }
+
+            var pricingType = await PricingTypeOfAsync(lineItemId);
             if (pricingType == PricingType.Service)
             {
                 continue;
@@ -1293,7 +1298,7 @@ public sealed class TransactionService(
                 continue;
             }
 
-            units[line.ItemId] = units.GetValueOrDefault(line.ItemId) + line.Quantity;
+            units[lineItemId] = units.GetValueOrDefault(lineItemId) + line.Quantity;
         }
 
         // An item chosen as an add-on through a category-linked modifier group is handed over too, so it
@@ -2001,7 +2006,8 @@ public sealed class TransactionService(
         }
 
         var lineInputs = lines
-            .Select(line => new ItemPromoPricingCalculator.LineInput(line.Id, line.ItemId, line.Quantity, line.UnitPrice))
+            .Where(line => line.ItemId is not null)
+            .Select(line => new ItemPromoPricingCalculator.LineInput(line.Id, line.ItemId!.Value, line.Quantity, line.UnitPrice))
             .ToList();
 
         return ItemPromoPricingCalculator.Calculate(lineInputs, bogoRules, comboRules, itemDiscountRules);
@@ -2029,7 +2035,7 @@ public sealed class TransactionService(
         var comboSelections = await transactionRepository.ListComboSelectionsByLinesAsync(lineIds, cancellationToken);
         var modifierSelections = await transactionRepository.ListModifierSelectionsByLinesAsync(lineIds, cancellationToken);
 
-        var itemIds = lines.Select(line => line.ItemId)
+        var itemIds = lines.Where(line => line.ItemId is not null).Select(line => line.ItemId!.Value)
             .Concat(comboSelections.Select(selection => selection.SelectedItemId))
             .Concat(modifierSelections.Where(selection => selection.ItemId is not null).Select(selection => selection.ItemId!.Value))
             .Distinct()
@@ -2050,8 +2056,8 @@ public sealed class TransactionService(
 
         var slotsByItem = new Dictionary<Guid, IReadOnlyList<ItemComboComponent>>();
         foreach (var comboItemId in lines
-            .Where(line => itemsById.TryGetValue(line.ItemId, out var comboItem) && comboItem.PricingType == PricingType.Combo)
-            .Select(line => line.ItemId)
+            .Where(line => line.ItemId is { } comboLineItemId && itemsById.TryGetValue(comboLineItemId, out var comboItem) && comboItem.PricingType == PricingType.Combo)
+            .Select(line => line.ItemId!.Value)
             .Distinct())
         {
             slotsByItem[comboItemId] = await comboComponentRepository.ListByItemAsync(comboItemId, cancellationToken);
@@ -2070,12 +2076,13 @@ public sealed class TransactionService(
                 lineDtosByTransaction[line.TransactionId] = lineDtos;
             }
 
-            _ = itemsById.TryGetValue(line.ItemId, out var item);
+            Item? item = null;
+            _ = line.ItemId is { } resolvedItemId && itemsById.TryGetValue(resolvedItemId, out item);
 
             var comboSelectionDtos = new List<ComboSelectionDto>();
             if (item?.PricingType == PricingType.Combo)
             {
-                var slots = slotsByItem[line.ItemId];
+                var slots = slotsByItem[line.ItemId!.Value];
 
                 foreach (var selection in comboSelectionsByLine[line.Id])
                 {
@@ -2125,8 +2132,8 @@ public sealed class TransactionService(
 
             lineDtos.Add(new TransactionLineDto(
                 line.Id,
-                line.ItemId,
-                item?.Name ?? "(deleted item)",
+                line.ItemId ?? Guid.Empty,
+                line.OpenItemName ?? item?.Name ?? "(deleted item)",
                 line.ItemVariantId,
                 itemVariantAttributes,
                 line.Quantity,

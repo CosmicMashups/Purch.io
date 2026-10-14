@@ -12,6 +12,13 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         _ = builder.Property(t => t.DiscountAmount).HasPrecision(12, 2);
         _ = builder.Property(t => t.VatExemptAmount).HasPrecision(12, 2);
 
+        _ = builder.Property(t => t.ManualDiscountAmount).HasPrecision(18, 2);
+        _ = builder.Property(t => t.VatableSales).HasPrecision(18, 2);
+        _ = builder.Property(t => t.VatAmount).HasPrecision(18, 2);
+        _ = builder.Property(t => t.VatExemptSales).HasPrecision(18, 2);
+        _ = builder.Property(t => t.ZeroRatedSales).HasPrecision(18, 2);
+        _ = builder.Property(t => t.VatRateApplied).HasPrecision(5, 4);
+
         // Matches ReceiptSequence's own per-(branch,device) uniqueness. Filtered to
         // issued receipts only — Postgres already treats NULLs as distinct for a
         // unique index, but this is explicit about the intent and matches
