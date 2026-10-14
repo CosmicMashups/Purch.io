@@ -48,6 +48,8 @@ describe('parked carts', () => {
     await act(async () => {
       await result.current.mutateAsync('Table 4');
     });
+    client.post.mockResolvedValueOnce({ data: '' });
+    await expect(posApi.parkCart()).resolves.toBeUndefined();
     expect(client.post).toHaveBeenCalledWith('/transactions/cart/park', { label: 'Table 4' });
     expect(qc.getQueryData(posKeys.cart)).toBeUndefined();
     expect(spy).toHaveBeenCalledWith({ queryKey: ['pos', 'parked'] });

@@ -115,7 +115,7 @@ export interface Transaction {
 /** Mirrors Purch.Application.Pos.ChangedLineDto. */
 export interface ChangedLine {
   lineId: string;
-  reason: 'PriceChanged' | 'Unavailable';
+  reason: 'PriceChanged' | 'Unavailable' | 'NotRepriced';
 }
 
 export type ManualDiscountKind = 'Percent' | 'Fixed';

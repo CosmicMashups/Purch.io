@@ -27,10 +27,8 @@ export const posApi = {
   /** How much of each line can still be returned, after earlier exchanges. */
   returnableLines: (transactionId: string) =>
     apiClient.get<{ lineId: string; remainingQuantity: number }[]>(`/transactions/${transactionId}/returnable-lines`).then((r) => r.data),
-  /** Finds a completed sale by its receipt number, to refund or exchange one the cashier doesn't already
-   * have open. Receipt numbers are only unique per device, so more than one sale can come back. */
-  /** Sets the cart aside and returns it; the register gets a fresh cart on its next getCart. */
-  parkCart: (label?: string) => apiClient.post<Transaction>('/transactions/cart/park', { label }).then((r) => r.data),
+  /** Sets the cart aside (204 No Content); the register gets a fresh cart on its next getCart. */
+  parkCart: (label?: string) => apiClient.post<void>('/transactions/cart/park', { label }).then(() => undefined),
   listParked: () => apiClient.get<ParkedCartSummary[]>('/transactions/parked').then((r) => r.data),
   /** Returns the repriced cart; changedLines lists what moved. 409 if another register got it first. */
   resumeCart: (id: string) => apiClient.post<Transaction>(`/transactions/${id}/resume`).then((r) => r.data),
@@ -46,5 +44,7 @@ export const posApi = {
   /** approverPin only on a claimed kiosk order. */
   setLineNote: (lineId: string, note: string | null, approverPin?: string) =>
     apiClient.put<Transaction>(`/transactions/cart/lines/${lineId}/note`, { note, approverPin }).then((r) => r.data),
+  /** Finds a completed sale by its receipt number, to refund or exchange one the cashier doesn't already
+   * have open. Receipt numbers are only unique per device, so more than one sale can come back. */
   findByReceiptNumber: (receiptNumber: number) => apiClient.get<Transaction[]>(`/transactions/by-receipt/${receiptNumber}`).then((r) => r.data),
 };
