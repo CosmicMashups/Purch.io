@@ -313,6 +313,56 @@ describe('PaymentPage split payment', () => {
     expect(screen.getByTestId('split-remaining')).toHaveTextContent('₱12.50');
   });
 
+  it('shows the server message for a 409 that is not a moved total', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'This receipt number is already used on this device.'));
+    renderPayment();
+    await splitCashThenGcash();
+    fireEvent.click(screen.getByRole('button', { name: /Complete sale/ }));
+    expect(await within(screen.getByRole('region', { name: 'Split payment' })).findByText('This receipt number is already used on this device.')).toBeInTheDocument();
+    expect(screen.queryByText(/The cart changed/)).not.toBeInTheDocument();
+  });
+
+  it('names the new total on a moved-total 409, warns when payments now exceed it, and clears the error on edit', async () => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 120.00 (the device showed 137.50). Review the cart and try again.'));
+    renderPayment();
+    await splitCashThenGcash();
+    vi.mocked(posApi.getCart).mockResolvedValue(cartWithTotal(120));
+    fireEvent.click(screen.getByRole('button', { name: /Complete sale/ }));
+    expect(await screen.findByText(/The cart changed, review the total\. It is now ₱120\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('Payments exceed the new total by ₱17.50. Remove a payment.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Complete sale/ })).toBeDisabled();
+    expect(screen.getByTestId('split-remaining').parentElement).not.toHaveClass('text-ok');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove GCash ₱100.00' }));
+    expect(screen.queryByText(/The cart changed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Payments exceed/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('split-remaining')).toHaveTextContent('₱82.50');
+  });
+
+  it("shows the branch's GCash QR while adding a GCash part", async () => {
+    renderPayment();
+    fireEvent.click(await screen.findByRole('button', { name: 'Split payment' }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Method for this part' })).getByRole('radio', { name: 'GCash' }));
+    expect(await screen.findByAltText('GCash QR code for this branch')).toBeInTheDocument();
+    expect(screen.getByText('Kape Katipunan, 0917 555 0101')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('when the cart is gone after a lost response (split %s), points to Recent sales instead of charging again', async (split) => {
+    const { ApiError } = await import('../../lib/apiError');
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', 'Open cart not found.'));
+    renderPayment();
+    if (split) await splitCashThenGcash();
+    else fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '200' } });
+    vi.mocked(posApi.getCart).mockResolvedValue(makeCart());
+    fireEvent.click(screen.getByRole('button', { name: split ? /Complete sale/ : 'Confirm ₱137.50' }));
+    expect(await screen.findByText('This sale may already be recorded. Check Recent sales before charging again.')).toBeInTheDocument();
+    await waitFor(() => expect(posApi.getCart).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Sell home')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Recent sales' })).toHaveAttribute('href', '/sell/find-sale');
+  });
+
   it('keeps the single cash payment as the default, unchanged', async () => {
     renderPayment();
     expect(await screen.findByRole('radio', { name: 'Cash' })).toHaveAttribute('aria-checked', 'true');

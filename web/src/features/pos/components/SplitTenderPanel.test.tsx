@@ -99,6 +99,28 @@ describe('SplitTenderPanel', () => {
     expect(screen.getByTestId('split-remaining')).toHaveTextContent('₱300.00');
   });
 
+  it('moves focus to Complete when the last part leaves nothing remaining', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Add payment' }));
+    expect(screen.getByRole('button', { name: /Complete sale/ })).toHaveFocus();
+  });
+
+  it('wires the amount error to the field for screen readers', () => {
+    renderPanel();
+    fireEvent.click(chip('GCash'));
+    fireEvent.change(amountField(), { target: { value: '400' } });
+    const describedBy = amountField().getAttribute('aria-describedby') ?? '';
+    expect(describedBy).not.toBe('');
+    expect(document.getElementById(describedBy.split(' ').pop()!)).toHaveTextContent(/Only cash can be more/);
+  });
+
+  it('asks the page to clear a shown refusal once the parts or the draft change', () => {
+    const onEdit = vi.fn();
+    renderPanel(300, { error: 'Refused', onEdit });
+    fireEvent.change(amountField(), { target: { value: '100' } });
+    expect(onEdit).toHaveBeenCalled();
+  });
+
   it('shows a server refusal inline', async () => {
     renderPanel(300, { error: 'The cart changed, review the total' });
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('The cart changed, review the total'));

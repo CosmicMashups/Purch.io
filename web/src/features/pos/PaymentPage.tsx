@@ -1,6 +1,6 @@
 import { ArrowsSplit } from '@phosphor-icons/react';
 import { useRef, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ErrorState } from '../../components/ErrorState';
 import { Skeleton } from '../../components/Skeleton';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
@@ -15,6 +15,7 @@ import { stateForPayment, vatOf } from '../../hardware/display/channel';
 import { usePublishCustomerDisplay } from '../../hardware/display/usePublishCustomerDisplay';
 import { tenderCoversTotal } from './catalogView';
 import { CashKeypad } from './components/CashKeypad';
+import { GcashQr } from './components/GcashQr';
 import { SplitTenderPanel } from './components/SplitTenderPanel';
 import { usePosStore } from './posStore';
 import { useCart, usePay } from './queries';
@@ -37,11 +38,18 @@ const UNAVAILABLE = [
 /** Roles holding the SplitPay permission (backend Permissions.SplitPay). The API still enforces it. */
 const SPLIT_ROLES: readonly string[] = ['Admin', 'Manager', 'Cashier'];
 
-/** A refused split, shown in the panel: a moved total gets one plain instruction, anything else the server's words. */
+/** A refused split, shown in the panel. The expected-total mismatch gets one plain instruction with the new total;
+ * every other refusal (other 409s included) is shown in the server's own words. */
 function splitErrorText(error: unknown): string {
-  if (error instanceof ApiError && error.kind === 'conflict') return 'The cart changed, review the total before completing the sale.';
+  if (error instanceof ApiError && error.kind === 'conflict') {
+    const moved = /the total is now (\d+(?:\.\d+)?)/i.exec(error.message);
+    if (moved) return `The cart changed, review the total. It is now ${formatPeso(Number(moved[1]))}.`;
+  }
   return userMessage(error);
 }
+
+/** 404 on pay: the open cart is gone, most likely because an earlier attempt completed the sale and its answer was lost. */
+const isLostSale = (error: unknown) => error instanceof ApiError && error.kind === 'notFound';
 
 export function PaymentPage() {
   const navigate = useNavigate();
@@ -54,6 +62,8 @@ export function PaymentPage() {
   const [tendered, setTendered] = useState('');
   const [ledgerId, setLedgerId] = useState('');
   const [splitting, setSplitting] = useState(false);
+  // The last split refusal, cleared as soon as the cashier changes the parts.
+  const [splitError, setSplitError] = useState<string | null>(null);
   // One request per attempt: a double tap lands before React re-renders the button as busy.
   const inFlight = useRef(false);
   const canSplit = role !== null && SPLIT_ROLES.includes(role);
@@ -64,6 +74,8 @@ export function PaymentPage() {
   if (!claims?.deviceId) return <Navigate to="/sell" replace />;
   if (cart.isPending) return <Skeleton className="h-96 w-full max-w-3xl" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
+  // The sale may already be recorded: never offer to charge again, send the cashier to look it up.
+  if (pay.isError && isLostSale(pay.error)) return <LostSale />;
   // A completed sale empties the cart on the server; that must not bounce us off before the receipt shows.
   if (cart.data.lines.length === 0 && !pay.isSuccess) return <Navigate to="/sell" replace />;
 
@@ -93,17 +105,22 @@ export function PaymentPage() {
 
   function openSplit(open: boolean) {
     pay.reset();
+    setSplitError(null);
     setSplitting(open);
   }
 
   function submit(body: RecordPaymentRequest) {
     if (inFlight.current) return;
     inFlight.current = true;
+    setSplitError(null);
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
     pay.mutate(body, {
       onSuccess: (completed) => {
         showReceipt(completed);
         navigate('/sell/receipt', { replace: true, state: { justSold: true } });
+      },
+      onError: (error) => {
+        if (body.parts) setSplitError(splitErrorText(error));
       },
       onSettled: () => {
         inFlight.current = false;
@@ -128,7 +145,11 @@ export function PaymentPage() {
           total={total}
           creditOn={creditOn}
           busy={pay.isPending}
-          error={pay.isError ? splitErrorText(pay.error) : null}
+          branch={branch}
+          error={splitError}
+          onEdit={() => {
+            setSplitError(null);
+          }}
           onComplete={completeSplit}
           onCancel={() => openSplit(false)}
         />
@@ -174,16 +195,7 @@ export function PaymentPage() {
             {choice === 'gcash' && (
               <div className="flex flex-col gap-3">
                 <p className="text-base">Show this QR to the customer. Confirm only after you see the payment of {formatPeso(total)} land.</p>
-                {branch?.manualGcashQrImageUrl ? (
-                  <img src={branch.manualGcashQrImageUrl} alt="GCash QR code for this branch" className="size-56 rounded-control border border-line object-contain" />
-                ) : (
-                  <p className="rounded-control border border-dashed border-ink-soft/40 p-4 text-base text-ink-soft">No QR is set for this branch. An admin can add one in the branch settings.</p>
-                )}
-                {(branch?.manualGcashAccountName || branch?.manualGcashAccountNumber) && (
-                  <p className="text-base font-semibold">
-                    {[branch.manualGcashAccountName, branch.manualGcashAccountNumber].filter(Boolean).join(', ')}
-                  </p>
-                )}
+                <GcashQr branch={branch} />
               </div>
             )}
 
@@ -220,6 +232,26 @@ export function PaymentPage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function LostSale() {
+  return (
+    <div className="flex max-w-2xl flex-col gap-5">
+      <PageHeader title="Payment" backTo={{ to: '/sell', label: 'the cart' }} />
+      <div role="alert" className="rounded-panel border border-warn bg-warn/10 p-6">
+        <p className="text-xl font-bold">This sale may already be recorded. Check Recent sales before charging again.</p>
+        <p className="mt-2 text-base text-ink-soft">The register could not find the open cart. That usually means the last payment went through but its answer was lost.</p>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <Link to="/sell/find-sale" className="flex h-14 items-center rounded-control bg-brand px-6 text-lg font-bold text-on-brand hover:bg-brand-strong">
+          Open Recent sales
+        </Link>
+        <Link to="/sell" className="flex h-14 items-center rounded-control border border-line bg-surface px-6 text-lg font-semibold hover:border-brand">
+          Back to the register
+        </Link>
+      </div>
     </div>
   );
 }

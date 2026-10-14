@@ -12,7 +12,8 @@
  * html-tailwind, dials 6/4/3, not persisted).
  */
 import { CheckCircle, Trash, Warning } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Branch } from '../../branches/types';
 import { ErrorState } from '../../../components/ErrorState';
 import { Skeleton } from '../../../components/Skeleton';
 import { FormField, controlClass } from '../../../components/forms/FormField';
@@ -22,6 +23,7 @@ import { formatPeso } from '../../dashboard/format';
 import { MAX_REFERENCE_LENGTH, MAX_SPLIT_PARTS, parseAmount, remaining, splitChange, validateParts } from '../rules';
 import { PaymentMethod, type PaymentPart } from '../types';
 import { CashKeypad } from './CashKeypad';
+import { GcashQr } from './GcashQr';
 
 type Method = typeof PaymentMethod.Cash | typeof PaymentMethod.BankTransfer | typeof PaymentMethod.ManualGcashQr | typeof PaymentMethod.UtangCredit;
 
@@ -42,17 +44,33 @@ export interface SplitTenderPanelProps {
   busy: boolean;
   /** The server's refusal of the last attempt, shown inline. */
   error: string | null;
+  /** The branch whose manual GCash QR is shown while a GCash part is being taken. */
+  branch?: Branch;
+  /** Parts or the draft changed: a refusal shown for the last attempt no longer applies. */
+  onEdit?: () => void;
   onComplete: (parts: PaymentPart[]) => void;
   onCancel: () => void;
 }
 
-export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onCancel }: SplitTenderPanelProps) {
+export function SplitTenderPanel({ total, creditOn, busy, error, branch, onEdit, onComplete, onCancel }: SplitTenderPanelProps) {
   const [parts, setParts] = useState<PaymentPart[]>([]);
   const [method, setMethod] = useState<Method>(PaymentMethod.Cash);
   const [amount, setAmount] = useState(() => amountText(total));
   const [tendered, setTendered] = useState('');
   const [reference, setReference] = useState('');
   const [ledgerId, setLedgerId] = useState('');
+  const completeRef = useRef<HTMLButtonElement>(null);
+  const focusComplete = useRef(false);
+  // Add unmounts once nothing remains; focus moves to the next thing to press instead of the page body.
+  useEffect(() => {
+    if (focusComplete.current) {
+      focusComplete.current = false;
+      completeRef.current?.focus();
+    }
+  }, [parts]);
+  const edited = () => {
+    if (error) onEdit?.();
+  };
   const ledgers = useCreditLedgers(creditOn);
   // The server's total can move (a refused sale reloads the cart): offer what is now left.
   const [seenTotal, setSeenTotal] = useState(total);
@@ -62,11 +80,14 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
   }
 
   const left = remaining(total, parts);
-  const paid = Math.max(0, cents(total) - cents(left)) / 100;
+  const partsCents = parts.reduce((sum, p) => sum + cents(p.amount), 0);
+  // After a refused sale the total can drop below what was already added: never show that as settled.
+  const over = Math.max(0, partsCents - cents(total)) / 100;
+  const paid = Math.min(partsCents, cents(total)) / 100;
   const change = splitChange(parts);
   const hasUtang = parts.some((p) => p.method === PaymentMethod.UtangCredit);
   const full = parts.length >= MAX_SPLIT_PARTS;
-  const ready = cents(left) === 0 && validateParts(total, parts) === null;
+  const ready = over === 0 && cents(left) === 0 && validateParts(total, parts) === null;
   const activeLedgers = ledgers.data?.filter((l) => l.isActive) ?? [];
 
   // The draft part, checked as it is typed.
@@ -91,6 +112,7 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
     (method !== PaymentMethod.UtangCredit || (ledgerId !== '' && !hasUtang));
 
   function resetDraft(nextLeft: number, nextMethod: Method = method) {
+    edited();
     setMethod(nextMethod);
     setAmount(amountText(nextLeft));
     setTendered('');
@@ -112,6 +134,7 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
       reference: method === PaymentMethod.BankTransfer || method === PaymentMethod.ManualGcashQr ? reference.trim() || null : null,
     };
     const next = [...parts, part];
+    focusComplete.current = remaining(total, next) === 0;
     setParts(next);
     // After a non-cash part, cash is the usual way to settle what is left.
     resetDraft(remaining(total, next), method === PaymentMethod.UtangCredit ? PaymentMethod.Cash : method);
@@ -128,7 +151,7 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
       <dl className="grid grid-cols-3 gap-3">
         <Figure label="Total" value={formatPeso(total)} />
         <Figure label="Paid" value={formatPeso(paid)} />
-        <div className={`rounded-control px-4 py-3 motion-safe:transition-colors ${cents(left) === 0 ? 'bg-ok/10 text-ok' : 'bg-brand-tint text-ink'}`}>
+        <div className={`rounded-control px-4 py-3 motion-safe:transition-colors ${over > 0 ? 'bg-warn/10 text-ink' : cents(left) === 0 ? 'bg-ok/10 text-ok' : 'bg-brand-tint text-ink'}`}>
           <dt className="text-sm font-semibold">Remaining</dt>
           <dd data-testid="split-remaining" aria-live="polite" className="text-3xl font-bold tabular-nums tracking-tight sm:text-4xl">
             {formatPeso(left)}
@@ -167,6 +190,13 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
         </ol>
       )}
 
+      {over > 0 && (
+        <p role="alert" className="flex items-start gap-2 rounded-control border border-warn bg-warn/10 px-4 py-3 text-base font-semibold text-ink">
+          <Warning size={22} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+          Payments exceed the new total by {formatPeso(over)}. Remove a payment.
+        </p>
+      )}
+
       {change > 0 && (
         <p className="flex items-baseline justify-between rounded-control bg-brand-tint px-4 py-3 text-lg font-bold text-brand-strong">
           <span>Change to give</span>
@@ -203,17 +233,39 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
               inputMode="decimal"
               autoComplete="off"
               value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+              onChange={(e) => {
+                edited();
+                setAmount(e.target.value.replace(/[^0-9.]/g, ''));
+              }}
               className="h-14 w-full rounded-control border border-ink-soft/40 bg-surface px-4 text-right text-2xl font-bold tabular-nums focus:border-brand"
             />
           </FormField>
 
-          {method === PaymentMethod.Cash && amountValue > 0 && <CashKeypad total={amountValue} value={tendered} onChange={setTendered} />}
+          {method === PaymentMethod.Cash && amountValue > 0 && (
+            <CashKeypad
+              total={amountValue}
+              value={tendered}
+              onChange={(v) => {
+                edited();
+                setTendered(v);
+              }}
+            />
+          )}
 
           {(method === PaymentMethod.BankTransfer || method === PaymentMethod.ManualGcashQr) && (
             <FormField label="Reference (optional)" hint="The transaction or reference number, to match it later">
-              <input autoComplete="off" value={reference} maxLength={MAX_REFERENCE_LENGTH + 20} onChange={(e) => setReference(e.target.value)} className={controlClass} />
+              <input autoComplete="off" value={reference} maxLength={MAX_REFERENCE_LENGTH + 20} onChange={(e) => {
+                  edited();
+                  setReference(e.target.value);
+                }} className={controlClass} />
             </FormField>
+          )}
+
+          {method === PaymentMethod.ManualGcashQr && (
+            <div className="flex flex-col gap-3">
+              <p className="text-base">Show this QR to the customer. Add the part only after you see {amountValue > 0 ? formatPeso(amountValue) : 'the payment'} land.</p>
+              <GcashQr branch={branch} />
+            </div>
           )}
 
           {method === PaymentMethod.UtangCredit &&
@@ -226,7 +278,12 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
             ) : (
               <>
                 <FormField label="Customer account" hint="The server checks the credit limit when you complete the sale">
-                  <select value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} className={controlClass}>
+                  <select
+                    value={ledgerId}
+                    onChange={(e) => {
+                      edited();
+                      setLedgerId(e.target.value);
+                    }} className={controlClass}>
                     <option value="">Choose a customer</option>
                     {activeLedgers.map((l) => (
                       <option key={l.id} value={l.id}>
@@ -267,6 +324,7 @@ export function SplitTenderPanel({ total, creditOn, busy, error, onComplete, onC
           Back to single payment
         </button>
         <button
+          ref={completeRef}
           type="button"
           onClick={() => ready && onComplete(parts)}
           disabled={!ready || busy}
