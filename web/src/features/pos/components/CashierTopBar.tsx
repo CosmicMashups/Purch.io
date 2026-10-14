@@ -37,7 +37,7 @@ export function CashierTopBar({
             onClick={onOpenParked}
             aria-haspopup="dialog"
             aria-label={`Parked carts, ${parkedCount ? `${parkedCount} waiting` : 'none waiting'}`}
-            className={barButton}
+            className={barButton.replace('h-10', 'h-12')}
           >
             <Pause size={18} aria-hidden="true" />
             Parked

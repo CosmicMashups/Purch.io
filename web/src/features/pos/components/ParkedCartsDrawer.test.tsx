@@ -193,6 +193,74 @@ describe('Parked carts drawer', () => {
     await waitFor(() => expect(posApi.discardParked).toHaveBeenLastCalledWith(parked[0].id, '5678'));
     await waitFor(() => expect(toastMessages()).toContain('Discarded Table 4'));
   });
+
+  it.each([
+    ['conflict', 'Another register already resumed this cart'],
+    ['notFound', 'This parked cart is no longer available'],
+    ['forbidden', 'This cart belongs to another branch'],
+  ] as const)('a %s on resume says why in plain words and refetches the list', async (kind, message) => {
+    vi.mocked(posApi.resumeCart).mockRejectedValue(new ApiError(kind, 'raw server text'));
+    const drawer = await openDrawer();
+    await within(drawer).findByRole('button', { name: 'Resume Table 4' });
+    const before = vi.mocked(posApi.listParked).mock.calls.length;
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Resume Table 4' }));
+    await waitFor(() => expect(toastMessages()).toContain(message));
+    await waitFor(() => expect(vi.mocked(posApi.listParked).mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it('a stale discard says why and refetches the list', async () => {
+    vi.mocked(posApi.discardParked).mockRejectedValue(new ApiError('notFound', 'raw'));
+    const drawer = await openDrawer();
+    fireEvent.click(await within(drawer).findByRole('button', { name: 'Discard Cart abcd1234' }));
+    const before = vi.mocked(posApi.listParked).mock.calls.length;
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Discard Cart abcd1234?' })).getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(toastMessages()).toContain('This parked cart is no longer available'));
+    await waitFor(() => expect(vi.mocked(posApi.listParked).mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it.each(['Manager', 'Admin'])('a %s discards a zero-total cart with no PIN', async (role) => {
+    signInAs(role, driveSession);
+    vi.mocked(posApi.discardParked).mockResolvedValue(undefined);
+    const drawer = await openDrawer();
+    fireEvent.click(await within(drawer).findByRole('button', { name: 'Discard Cart abcd1234' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Discard Cart abcd1234?' })).getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(posApi.discardParked).toHaveBeenCalledWith(parked[1].id, undefined));
+    expect(screen.queryByLabelText('Manager or admin PIN')).not.toBeInTheDocument();
+  });
+
+  it('keeps rows disabled while the PIN dialog is open', async () => {
+    vi.mocked(posApi.discardParked).mockRejectedValue(pinRefusal());
+    const drawer = await openDrawer();
+    fireEvent.click(await within(drawer).findByRole('button', { name: 'Discard Table 4' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Discard Table 4?' })).getByRole('button', { name: 'Discard' }));
+    await screen.findByLabelText('Manager or admin PIN');
+    expect(within(drawer).getByRole('button', { name: 'Resume Table 4' })).toBeDisabled();
+    expect(within(drawer).getByRole('button', { name: 'Discard Cart abcd1234' })).toBeDisabled();
+  });
+
+  it('Escape closes the confirm on top, not the drawer', async () => {
+    const drawer = await openDrawer();
+    fireEvent.click(await within(drawer).findByRole('button', { name: 'Discard Table 4' }));
+    await screen.findByRole('dialog', { name: 'Discard Table 4?' });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Discard Table 4?' })).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Parked carts' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Parked carts' })).not.toBeInTheDocument());
+  });
+
+  it('starts on Close, keeps Tab inside the drawer, and makes the till inert', async () => {
+    const drawer = await openDrawer();
+    const close = within(drawer).getByRole('button', { name: 'Close parked carts' });
+    await waitFor(() => expect(close).toHaveFocus());
+    const last = await within(drawer).findByRole('button', { name: 'Resume Cart abcd1234' });
+    last.focus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    expect(screen.getByTestId('cart-total').closest('[inert]')).not.toBeNull();
+  });
 });
 
 describe('Parked carts drawer offline', () => {

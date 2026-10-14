@@ -10,6 +10,7 @@
  */
 import { ClockCounterClockwise, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { EmptyState } from '../../../components/EmptyState';
@@ -18,7 +19,8 @@ import { Skeleton } from '../../../components/Skeleton';
 import { relativeAge } from '../../../components/charts/scale';
 import { toast } from '../../../components/feedback/toastStore';
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus';
-import { userMessage } from '../../../lib/apiError';
+import { ApiError, userMessage } from '../../../lib/apiError';
+import { needsApproverPin } from '../approverPin';
 import { formatPeso } from '../../dashboard/format';
 import { posApi } from '../api';
 import { posKeys, useParkedCarts, useResumeCart } from '../queries';
@@ -42,6 +44,18 @@ function resumeSummary(name: string, changed: ChangedLine[] | null | undefined):
   return parts.length === 0 ? `Resumed ${name}` : `Resumed ${name}. ${parts.join(', ')}.`;
 }
 
+/** Why a resume or discard failed, in words a cashier can act on. Only validation text comes from the server. */
+function parkedErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.kind === 'conflict') return 'Another register already resumed this cart';
+    if (error.kind === 'notFound') return 'This parked cart is no longer available';
+    if (error.kind === 'forbidden') return 'This cart belongs to another branch';
+  }
+  return userMessage(error);
+}
+
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+
 interface ParkedCartsDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -59,6 +73,8 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
   const [busyId, setBusyId] = useState<string | null>(null);
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const nestedOpen = confirm !== null || gated.dialogProps !== null;
   // Escape belongs to whichever dialog is on top: read through refs so the listener is registered once per open.
   const nested = useRef(nestedOpen);
@@ -72,12 +88,32 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
+    // Everything behind the drawer is inert while it is open, so neither Tab nor a screen reader wanders into the till.
+    const host = hostRef.current;
+    const background = Array.from(document.body.children).filter((el) => el !== host && !el.contains(host) && !el.hasAttribute('inert'));
+    background.forEach((el) => el.setAttribute('inert', ''));
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !nested.current) close.current();
+      if (nested.current) return; // the confirm or PIN dialog on top owns the keyboard
+      if (event.key === 'Escape') close.current();
+      if (event.key === 'Tab' && panelRef.current) {
+        const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        const inside = panelRef.current.contains(document.activeElement);
+        if (event.shiftKey && (document.activeElement === first || !inside)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !inside)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      background.forEach((el) => el.removeAttribute('inert'));
       previous?.focus?.();
     };
   }, [open]);
@@ -94,7 +130,11 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
         else toast.success(message);
         onClose();
       },
-      onError: (error) => toast.error(userMessage(error)),
+      onError: (error) => {
+        toast.error(parkedErrorMessage(error));
+        // The row is stale (another register took it, or it is gone): refetch so it drops out of the list.
+        void qc.invalidateQueries({ queryKey: posKeys.parked });
+      },
       onSettled: () => setBusyId(null),
     });
   }
@@ -103,7 +143,16 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
     setConfirm(null);
     setBusyId(cart.id);
     try {
-      await gated.run(`Discard ${parkedName(cart)}`, (approverPin) => posApi.discardParked(cart.id, approverPin), () => {
+      await gated.run(`Discard ${parkedName(cart)}`, async (approverPin) => {
+        try {
+          return await posApi.discardParked(cart.id, approverPin);
+        } catch (error) {
+          if (needsApproverPin(error)) throw error;
+          // Any other refusal means the list is out of date; refetch it and say why in plain words.
+          void qc.invalidateQueries({ queryKey: posKeys.parked });
+          throw new ApiError('conflict', parkedErrorMessage(error));
+        }
+      }, () => {
         toast.success(`Discarded ${parkedName(cart)}`);
         void qc.invalidateQueries({ queryKey: posKeys.parked });
       });
@@ -112,11 +161,12 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
     }
   }
 
-  const disabled = !online || resume.isPending || busyId !== null;
+  const disabled = !online || resume.isPending || busyId !== null || nestedOpen;
 
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+  return createPortal(
+    <div ref={hostRef} className="fixed inset-0 z-40 flex justify-end bg-black/40" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -208,6 +258,7 @@ export function ParkedCartsDrawer({ open, onClose, cartHasItems }: ParkedCartsDr
         onCancel={() => setConfirm(null)}
       />
       {gated.dialogProps && <ApproverPinDialog open {...gated.dialogProps} />}
-    </div>
+    </div>,
+    document.body,
   );
 }

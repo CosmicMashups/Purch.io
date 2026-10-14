@@ -22,6 +22,8 @@ interface CartPanelProps {
   onCheckout: () => void;
   /** Adds still on their way to the server. Shown with the device's preview price when it has one, and the cart cannot be changed or charged until they land. */
   pending?: PendingRow[];
+  /** After a park lands, e.g. to close the phone-width cart overlay. */
+  onParked?: () => void;
 }
 
 const stepper = 'grid size-9 place-items-center rounded-control border border-line text-lg font-semibold hover:border-brand disabled:opacity-40';
@@ -34,7 +36,7 @@ function lineDetails(line: TransactionLine): string[] {
   ];
 }
 
-export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: CartPanelProps) {
+export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onParked }: CartPanelProps) {
   const promo = useApplyPromoCode();
   const senior = useApplySeniorPwd();
   const orderType = useSetOrderType();
@@ -70,6 +72,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [] }: Cart
     park.mutate(label, {
       onSuccess: () => {
         setParkOpen(false);
+        onParked?.();
         toast.success(label ? `Cart parked as "${label}"` : 'Cart parked');
       },
       onError: (error) => toast.error(userMessage(error)),

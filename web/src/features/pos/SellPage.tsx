@@ -199,7 +199,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
             Back to items
           </button>
           <div className="min-h-0 flex-1">
-            <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
+            <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} onParked={() => setCartOpen(false)} />
           </div>
         </div>
       )}
@@ -223,8 +223,20 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
   );
 }
 
-function CartArea({ cart, isSupervisor, pending, onCheckout }: { cart: ReturnType<typeof useCart>; isSupervisor: boolean; pending: PendingRow[]; onCheckout: () => void }) {
+function CartArea({
+  cart,
+  isSupervisor,
+  pending,
+  onCheckout,
+  onParked,
+}: {
+  cart: ReturnType<typeof useCart>;
+  isSupervisor: boolean;
+  pending: PendingRow[];
+  onCheckout: () => void;
+  onParked?: () => void;
+}) {
   if (cart.isPending) return <Skeleton className="h-full min-h-96 w-full" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
-  return <CartPanel cart={withPending(cart.data, pending)} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} />;
+  return <CartPanel cart={withPending(cart.data, pending)} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} onParked={onParked} />;
 }
