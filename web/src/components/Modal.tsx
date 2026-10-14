@@ -8,16 +8,20 @@ interface ModalProps {
   footer?: ReactNode;
   /** For long forms: a wider panel. */
   wide?: boolean;
+  /** Another dialog is open on top of this one: Escape is left to it, and this one keeps its contents. */
+  suspended?: boolean;
 }
 
 /** A dialog for picking things. Escape closes it, focus moves inside it, and it scrolls on short screens. */
-export function Modal({ open, title, onClose, children, footer, wide = false }: ModalProps) {
+export function Modal({ open, title, onClose, children, footer, wide = false, suspended = false }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   // Read through a ref so a parent that passes a fresh function each render does not re-run the focus handling.
   const close = useRef(onClose);
+  const suspendedRef = useRef(suspended);
   useEffect(() => {
     close.current = onClose;
+    suspendedRef.current = suspended;
   });
 
   useEffect(() => {
@@ -25,7 +29,7 @@ export function Modal({ open, title, onClose, children, footer, wide = false }: 
     const previous = document.activeElement as HTMLElement | null;
     panel.current?.querySelector<HTMLElement>('input, select, button:not([data-close])')?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close.current();
+      if (event.key === 'Escape' && !suspendedRef.current) close.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {

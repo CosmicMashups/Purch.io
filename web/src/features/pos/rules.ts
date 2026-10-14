@@ -56,8 +56,9 @@ export function fieldErrors(error: z.ZodError | undefined): Record<string, strin
 /** What the discount would take off, before the server confirms it. */
 export function discountPreview(kind: ManualDiscountKind, value: number, total: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
-  const raw = kind === 'Percent' ? (total * Math.min(value, 100)) / 100 : Math.min(value, total);
-  return Math.round(raw * 100) / 100;
+  // In cents, rounded half away from zero as the server does; the epsilon absorbs float noise (2.01 * 50 = 100.4999...).
+  const cents = kind === 'Percent' ? total * Math.min(value, 100) : Math.min(value, total) * 100;
+  return (Math.sign(cents) * Math.round(Math.abs(cents) + 1e-6)) / 100;
 }
 
 /** "-10% (-₱20.00)" or "-₱15.00"; null when the line has no manual discount. */
@@ -66,6 +67,16 @@ export function discountMarker(line: Pick<TransactionLine, 'manualDiscountAmount
   if (amount <= 0) return null;
   if (line.manualDiscountKind === 'Percent' && line.manualDiscountValue) return `-${line.manualDiscountValue}% (-${formatPeso(amount)})`;
   return `-${formatPeso(amount)}`;
+}
+
+/**
+ * What a manual discount applies to, matching the server: a line's lineTotal (gross, before its own manual
+ * discount), or for the cart the subtotal after line manual discounts.
+ */
+export function discountBase(cart: Transaction, line: TransactionLine | null): number {
+  if (line) return line.lineTotal;
+  const lineDiscounts = cart.lines.reduce((sum, l) => sum + (l.manualDiscountAmount ?? 0), 0);
+  return Math.max(0, Math.round((cart.subtotal - lineDiscounts) * 100) / 100);
 }
 
 export function hasManualDiscount(cart: Transaction): boolean {

@@ -14,10 +14,11 @@ interface PriceOverrideDialogProps {
   busy: boolean;
   onApply: (body: OverridePriceRequest) => void;
   onClose: () => void;
+  suspended?: boolean;
 }
 
 /** Manager/Admin only. Sets a new unit price for one line; the reason goes on the audit trail. */
-export function PriceOverrideDialog({ itemName, currentUnitPrice, originalUnitPrice, busy, onApply, onClose }: PriceOverrideDialogProps) {
+export function PriceOverrideDialog({ itemName, currentUnitPrice, originalUnitPrice, busy, onApply, onClose, suspended = false }: PriceOverrideDialogProps) {
   const [price, setPrice] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,7 +32,7 @@ export function PriceOverrideDialog({ itemName, currentUnitPrice, originalUnitPr
   }
 
   return (
-    <Modal open title={`Override price of ${itemName}`} onClose={onClose}>
+    <Modal open title={`Override price of ${itemName}`} onClose={onClose} suspended={suspended}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <p className="text-base text-ink-soft">
           Now {formatPeso(currentUnitPrice)} each

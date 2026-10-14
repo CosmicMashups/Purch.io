@@ -125,6 +125,19 @@ describe('line display', () => {
     expect(screen.getByText(/Cart discount/)).toBeInTheDocument();
   });
 
+  it('does not label a manual discount as Senior/PWD (discountAmount totals every discount)', async () => {
+    signInAs('Manager', session);
+    vi.mocked(posApi.getCart).mockResolvedValue({
+      ...cart,
+      lines: [{ ...latte, manualDiscountKind: 'Percent', manualDiscountValue: 10, manualDiscountAmount: 15 }],
+      discountAmount: 15,
+      totalAmount: 135,
+    });
+    renderPage(<SellPage />);
+    expect(await screen.findByText('Item discounts')).toBeInTheDocument();
+    expect(screen.queryByText('Senior / PWD (20%)')).toBeNull();
+  });
+
   it("shows an overridden price with what it was", async () => {
     signInAs('Manager', session);
     vi.mocked(posApi.getCart).mockResolvedValue({ ...cart, lines: [{ ...latte, unitPrice: 120, lineTotal: 120, priceOverrideFrom: 150 }] });
@@ -193,5 +206,39 @@ describe('line note', () => {
     fireEvent.change(within(pinDialog).getByLabelText(/PIN/), { target: { value: '1234' } });
     fireEvent.submit(within(pinDialog).getByLabelText(/PIN/).closest('form') as HTMLFormElement);
     await waitFor(() => expect(posApi.setLineNote).toHaveBeenLastCalledWith('l1', 'Less ice', '1234'));
+  });
+
+  it('closes only the PIN dialog on Escape and keeps the typed note, with save disabled meanwhile', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.setLineNote).mockRejectedValue(new ApiError('validation', 'PIN needed', { approverPin: ['An Admin or Manager PIN is required to approve this.'] }));
+    renderPage(<SellPage />);
+    const menu = await openLineMenu();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Add note/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Note for Iced Latte/ });
+    fireEvent.change(within(dialog).getByLabelText('Note'), { target: { value: 'Less ice' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save note' }));
+    await screen.findByText(/An Admin or Manager PIN is required/);
+    expect(within(dialog).getByRole('button', { name: 'Save note' })).toBeDisabled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByText(/An Admin or Manager PIN is required/)).toBeNull());
+    expect(screen.getByRole('dialog', { name: /Note for Iced Latte/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('Note')).toHaveValue('Less ice');
+  });
+});
+
+describe('manager discount', () => {
+  it('sends a line discount without any PIN and shows a refusal as a toast, not a PIN prompt', async () => {
+    signInAs('Manager', session);
+    vi.mocked(posApi.setLineDiscount).mockRejectedValue(new ApiError('validation', 'Refused', { approverPin: ['x'] }));
+    renderPage(<SellPage />);
+    const menu = await openLineMenu();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Discount/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Discount Iced Latte/ });
+    fireEvent.change(within(dialog).getByLabelText('Percent off'), { target: { value: '10' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Loyal customer' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply discount' }));
+    await waitFor(() => expect(posApi.setLineDiscount).toHaveBeenCalledWith('l1', { kind: 'Percent', value: 10, reason: 'Loyal customer' }));
+    expect(posApi.setLineDiscount).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('x')).toBeNull();
   });
 });

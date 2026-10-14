@@ -15,13 +15,15 @@ interface OpenItemDialogProps {
   busy: boolean;
   onAdd: (item: OpenItemInput) => void;
   onClose: () => void;
+  /** True while the approver PIN dialog is on top: Escape and submit belong to it. */
+  suspended?: boolean;
 }
 
 /**
  * Rings up something that is not in the catalog. Plain inputs with a decimal keypad rather than CashKeypad: that
  * keypad is built around a tender and its change, and three fields here would each need their own.
  */
-export function OpenItemDialog({ busy, onAdd, onClose }: OpenItemDialogProps) {
+export function OpenItemDialog({ busy, onAdd, onClose, suspended = false }: OpenItemDialogProps) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -39,7 +41,7 @@ export function OpenItemDialog({ busy, onAdd, onClose }: OpenItemDialogProps) {
   }
 
   return (
-    <Modal open title="Add an open item" onClose={onClose}>
+    <Modal open title="Add an open item" onClose={onClose} suspended={suspended}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <FormField label="Name" error={errors.name}>
           <input maxLength={80} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} placeholder="Gift wrap" className={controlClass} />

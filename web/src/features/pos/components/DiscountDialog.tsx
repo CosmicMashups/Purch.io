@@ -12,10 +12,9 @@ import { useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { controlClass, FormField, PrimaryButton, SecondaryButton } from '../../../components/forms/FormField';
 import { formatPeso } from '../../dashboard/format';
-import { discountPreview, discountSchema, fieldErrors, parseAmount } from '../rules';
+import { discountPreview, discountSchema, fieldErrors, parseAmount, REASON_CHIPS } from '../rules';
 import type { ManualDiscountKind, ManualDiscountRequest } from '../types';
 
-import { REASON_CHIPS } from '../rules';
 
 interface DiscountDialogProps {
   /** "Iced Latte", or "the whole cart". */
@@ -28,9 +27,11 @@ interface DiscountDialogProps {
   /** Shown only when a discount is already on; sends value 0. */
   onRemove?: () => void;
   onClose: () => void;
+  /** True while a dialog on top of this one (the approver PIN) owns Escape. */
+  suspended?: boolean;
 }
 
-export function DiscountDialog({ subject, total, initial, busy, onApply, onRemove, onClose }: DiscountDialogProps) {
+export function DiscountDialog({ subject, total, initial, busy, onApply, onRemove, onClose, suspended = false }: DiscountDialogProps) {
   const [kind, setKind] = useState<ManualDiscountKind>(initial?.kind ?? 'Percent');
   const [value, setValue] = useState(initial ? String(initial.value) : '');
   const [reason, setReason] = useState(initial?.reason ?? '');
@@ -46,7 +47,7 @@ export function DiscountDialog({ subject, total, initial, busy, onApply, onRemov
   }
 
   return (
-    <Modal open title={`Discount ${subject}`} onClose={onClose}>
+    <Modal open title={`Discount ${subject}`} onClose={onClose} suspended={suspended}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <div role="radiogroup" aria-label="Discount type" className="grid grid-cols-2 gap-2">
           {(
@@ -72,7 +73,7 @@ export function DiscountDialog({ subject, total, initial, busy, onApply, onRemov
           <input inputMode="decimal" autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} className={`${controlClass} text-lg tabular-nums`} />
         </FormField>
 
-        <div className="flex items-baseline justify-between rounded-control bg-amber-50 px-3 py-2 text-amber-900">
+        <div className="flex items-baseline justify-between rounded-control bg-warn/10 px-3 py-2 text-warn">
           <span className="text-sm font-semibold">Takes off</span>
           <span data-testid="discount-preview" className="text-lg font-bold tabular-nums">
             -{formatPeso(amount)}

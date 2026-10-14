@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeLine } from '../../test/pos';
-import { discountMarker, discountPreview, discountSchema, hasManualDiscount, lineNoteSchema, openItemSchema, priceOverrideSchema } from './rules';
+import { discountBase, discountMarker, discountPreview, discountSchema, hasManualDiscount, lineNoteSchema, openItemSchema, priceOverrideSchema } from './rules';
 import { makeCart } from '../../test/pos';
 
 const ok = (r: { success: boolean }) => r.success;
@@ -66,6 +66,22 @@ describe('markers', () => {
     expect(discountPreview('Percent', 10, 200)).toBe(20);
     expect(discountPreview('Fixed', 15, 200)).toBe(15);
     expect(discountPreview('Percent', NaN, 200)).toBe(0);
+  });
+  it('rounds the preview half away from zero on cents, like the server', () => {
+    expect(discountPreview('Percent', 10.5, 9.99)).toBe(1.05);
+    expect(discountPreview('Percent', 50, 2.01)).toBe(1.01);
+    expect(discountPreview('Fixed', 1.005, 9)).toBe(1.01);
+  });
+  it('uses the gross line total as the base of a line discount, even with one already on', () => {
+    const line = makeLine({ id: 'l', itemName: 'A', lineTotal: 200, manualDiscountAmount: 20, manualDiscountKind: 'Fixed', manualDiscountValue: 20 });
+    expect(discountBase(makeCart({ lines: [line], subtotal: 200 }), line)).toBe(200);
+    expect(discountSchema(200).safeParse({ kind: 'Fixed', value: 220, reason: 'r' }).success).toBe(false);
+  });
+  it('uses the subtotal after line discounts as the base of a cart discount', () => {
+    const lines = [makeLine({ id: 'a', itemName: 'A', lineTotal: 200, manualDiscountAmount: 20 }), makeLine({ id: 'b', itemName: 'B', lineTotal: 100 })];
+    const base = discountBase(makeCart({ lines, subtotal: 300 }), null);
+    expect(base).toBe(280);
+    expect(discountPreview('Percent', 10, base)).toBe(28);
   });
   it('detects a manual discount on the cart or any line', () => {
     expect(hasManualDiscount(makeCart())).toBe(false);

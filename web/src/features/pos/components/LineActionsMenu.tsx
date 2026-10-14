@@ -37,9 +37,10 @@ interface LineNoteDialogProps {
   /** Null clears the note. */
   onSave: (note: string | null) => void;
   onClose: () => void;
+  suspended?: boolean;
 }
 
-export function LineNoteDialog({ itemName, initial, busy, onSave, onClose }: LineNoteDialogProps) {
+export function LineNoteDialog({ itemName, initial, busy, onSave, onClose, suspended = false }: LineNoteDialogProps) {
   const [note, setNote] = useState(initial ?? '');
   const [error, setError] = useState<string>();
 
@@ -52,7 +53,7 @@ export function LineNoteDialog({ itemName, initial, busy, onSave, onClose }: Lin
   }
 
   return (
-    <Modal open title={`Note for ${itemName}`} onClose={onClose}>
+    <Modal open title={`Note for ${itemName}`} onClose={onClose} suspended={suspended}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <FormField label="Note" error={error} hint={`Shown under the item in the cart. ${note.length}/200`}>
           <input maxLength={200} autoComplete="off" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Less ice" className={controlClass} />
