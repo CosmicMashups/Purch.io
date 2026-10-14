@@ -1,0 +1,80 @@
+import { z } from 'zod';
+import { formatPeso } from '../dashboard/format';
+import type { ManualDiscountKind, Transaction, TransactionLine } from './types';
+
+/** Client copies of the server's rules for manual discounts, price overrides, open items and notes. The server still decides. */
+
+const MAX_PRICE = 999_999.99;
+const decimals = (n: number, places: number) => Math.abs(Math.round(n * 10 ** places) - n * 10 ** places) < 1e-6;
+const money = (field: string) =>
+  z
+    .number({ invalid_type_error: `Enter ${field}` })
+    .finite(`Enter ${field}`)
+    .gt(0, `${field[0].toUpperCase()}${field.slice(1)} must be more than 0`)
+    .refine((n) => decimals(n, 2), 'Use at most 2 decimal places');
+
+export const reasonSchema = z.string().trim().min(1, 'Give a reason').max(200, 'Keep the reason to 200 characters');
+
+/** `total` is what the discount applies to: the line total for a line, the cart subtotal for the cart. */
+export const discountSchema = (total: number) =>
+  z
+    .object({ kind: z.enum(['Percent', 'Fixed']), value: money('a value'), reason: reasonSchema })
+    .superRefine((v, ctx) => {
+      if (v.kind === 'Percent' && v.value > 100) ctx.addIssue({ code: 'custom', path: ['value'], message: 'A percent discount can be at most 100%' });
+      if (v.kind === 'Fixed' && v.value > total + 1e-9) ctx.addIssue({ code: 'custom', path: ['value'], message: `Can't be more than ${formatPeso(total)}` });
+    });
+
+export const priceOverrideSchema = z.object({
+  newUnitPrice: money('a price').refine((n) => n <= MAX_PRICE, `At most ${formatPeso(MAX_PRICE)}`),
+  reason: reasonSchema,
+});
+
+export const lineNoteSchema = z.string().max(200, 'Keep the note to 200 characters');
+
+export const openItemSchema = z.object({
+  name: z.string().trim().min(1, 'Name the item').max(80, 'Keep the name to 80 characters'),
+  unitPrice: money('a price').refine((n) => n <= MAX_PRICE, `At most ${formatPeso(MAX_PRICE)}`),
+  quantity: z
+    .number({ invalid_type_error: 'Enter a quantity' })
+    .finite('Enter a quantity')
+    .gt(0, 'Quantity must be more than 0')
+    .max(99_999, 'At most 99,999')
+    .refine((n) => decimals(n, 3), 'Use at most 3 decimal places'),
+  note: lineNoteSchema.optional(),
+});
+
+/** The first error message for each field, for showing under the inputs. */
+export function fieldErrors(error: z.ZodError | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const issue of error?.issues ?? []) {
+    const key = String(issue.path[0] ?? '');
+    if (!(key in out)) out[key] = issue.message;
+  }
+  return out;
+}
+
+/** What the discount would take off, before the server confirms it. */
+export function discountPreview(kind: ManualDiscountKind, value: number, total: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const raw = kind === 'Percent' ? (total * Math.min(value, 100)) / 100 : Math.min(value, total);
+  return Math.round(raw * 100) / 100;
+}
+
+/** "-10% (-₱20.00)" or "-₱15.00"; null when the line has no manual discount. */
+export function discountMarker(line: Pick<TransactionLine, 'manualDiscountAmount' | 'manualDiscountKind' | 'manualDiscountValue'>): string | null {
+  const amount = line.manualDiscountAmount ?? 0;
+  if (amount <= 0) return null;
+  if (line.manualDiscountKind === 'Percent' && line.manualDiscountValue) return `-${line.manualDiscountValue}% (-${formatPeso(amount)})`;
+  return `-${formatPeso(amount)}`;
+}
+
+export function hasManualDiscount(cart: Transaction): boolean {
+  return (cart.manualDiscountAmount ?? 0) > 0 || cart.lines.some((l) => (l.manualDiscountAmount ?? 0) > 0);
+}
+
+/** Text typed into a number field: "" and "12." read as NaN / 12 the way a till expects. */
+export const parseAmount = (text: string): number => (text.trim() === '' ? NaN : Number(text));
+
+export const REASON_CHIPS = ['Loyal customer', 'Damaged item', 'Price match', 'Staff meal'] as const;
+
+export const SENIOR_EXCLUSIVE = 'Senior/PWD discount is applied - remove it to give a manual discount';

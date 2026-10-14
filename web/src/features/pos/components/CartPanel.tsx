@@ -1,4 +1,4 @@
-import { Pause } from '@phosphor-icons/react';
+import { Pause, PlusCircle } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
@@ -8,10 +8,22 @@ import { vatOf } from '../../../hardware/display/channel';
 import { userMessage } from '../../../lib/apiError';
 import { posApi } from '../api';
 import { useApplyPromoCode, useApplySeniorPwd, useParkCart, useSetOrderType } from '../queries';
+import { useTenantSettings } from '../../tenant/queries';
+import { discountMarker, hasManualDiscount, SENIOR_EXCLUSIVE } from '../rules';
+import { DiscountDialog } from './DiscountDialog';
+import { LineActionsMenu, LineNoteDialog } from './LineActionsMenu';
+import { OpenItemDialog, type OpenItemInput } from './OpenItemDialog';
+import { PriceOverrideDialog } from './PriceOverrideDialog';
 import { ParkCartDialog } from './ParkCartDialog';
 import { useApproverGatedAction } from '../useApproverGatedAction';
 import type { PendingRow } from '../addQueue';
-import type { Transaction, TransactionLine } from '../types';
+import type { ManualDiscountRequest, Transaction, TransactionLine } from '../types';
+
+type LineDialog =
+  | { kind: 'discount'; line: TransactionLine | null }
+  | { kind: 'override'; line: TransactionLine }
+  | { kind: 'note'; line: TransactionLine }
+  | { kind: 'openItem' };
 
 const ORDER_TYPES = ['Dine In', 'Take Out'] as const;
 
@@ -46,6 +58,10 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
   const [gatedActionBusy, setGatedActionBusy] = useState(false);
   const [parkOpen, setParkOpen] = useState(false);
   const park = useParkCart();
+  const openItemEnabled = useTenantSettings().data?.openItemEnabled === true;
+  const [dialog, setDialog] = useState<LineDialog | null>(null);
+  const [confirmSenior, setConfirmSenior] = useState(false);
+  const seniorApplied = cart.seniorPwdDiscountApplied;
 
   const updating = pending.length > 0;
   const busy = updating || gatedActionBusy || park.isPending || promo.isPending || senior.isPending || orderType.isPending;
@@ -79,6 +95,33 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
     });
   }
 
+  /** Dialog actions go through the gated runner too: on a claimed kiosk order the server may ask for a PIN. The dialog closes once it lands. */
+  function submitDialog(title: string, send: (approverPin?: string) => Promise<Transaction>, done: string) {
+    void runGated(title, send, () => {
+      setDialog(null);
+      toast.success(done);
+    });
+  }
+
+  function applyDiscount(line: TransactionLine | null, body: ManualDiscountRequest) {
+    const removing = body.value === 0;
+    const what = line ? line.itemName : 'the cart';
+    submitDialog(
+      removing ? `Remove the discount on ${what}` : `Discount ${what}`,
+      () => (line ? posApi.setLineDiscount(line.id, body) : posApi.setCartDiscount(body)),
+      removing ? 'Discount removed' : 'Discount applied',
+    );
+  }
+
+  function addOpenItem(item: OpenItemInput) {
+    submitDialog(`Add ${item.name}`, (approverPin) => posApi.addOpenItem({ ...item, approverPin }), `${item.name} added`);
+  }
+
+  function onSeniorToggle(apply: boolean) {
+    if (apply && hasManualDiscount(cart)) return setConfirmSenior(true);
+    senior.mutate(apply);
+  }
+
   function onVoid() {
     setConfirmVoid(false);
     void runGated('Clear the cart', (approverPin) => posApi.voidCart(approverPin), () => toast.info('Cart cleared'));
@@ -88,11 +131,19 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
     <section aria-label="Cart" className="flex h-full min-h-0 flex-col rounded-panel border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line px-4 py-2">
         <h2 className="text-base font-bold">Cart</h2>
+        <div className="flex items-center gap-1">
+        {openItemEnabled && (
+          <button type="button" disabled={busy} onClick={() => setDialog({ kind: 'openItem' })} className="inline-flex h-12 items-center gap-1 rounded-control px-2 text-sm font-semibold text-brand-strong hover:bg-brand-tint disabled:opacity-40">
+            <PlusCircle size={20} aria-hidden="true" />
+            Open item
+          </button>
+        )}
         {!empty && (
           <button type="button" disabled={busy} onClick={() => setConfirmVoid(true)} className="h-9 px-2 text-sm font-semibold text-danger underline disabled:opacity-40">
             Clear cart
           </button>
         )}
+        </div>
       </header>
 
       <div className="min-h-24 flex-1 overflow-y-auto px-4">
@@ -107,11 +158,32 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
                 <li key={line.id} className="py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">{line.itemName}</p>
+                      <p className="text-sm font-semibold">
+                        {line.isOpenItem ? (line.openItemName ?? line.itemName) : line.itemName}
+                        {line.isOpenItem && <span className="ml-2 rounded-full border border-line px-2 py-0.5 text-xs font-semibold text-ink-soft">Open item</span>}
+                      </p>
+                      {line.note && <p className="text-xs italic text-ink-soft">{line.note}</p>}
                       {details.length > 0 && <p className="text-xs text-ink-soft">{details.join(', ')}</p>}
                       {line.appliedPromoLabel && <p className="text-xs font-semibold text-brand-strong">Promo: {line.appliedPromoLabel}</p>}
+                      {line.priceOverrideFrom != null && line.priceOverrideFrom !== line.unitPrice && (
+                        <p className="text-xs font-semibold text-amber-800">
+                          {formatPeso(line.unitPrice)} each <s className="font-normal text-ink-soft">was {formatPeso(line.priceOverrideFrom)}</s>
+                        </p>
+                      )}
+                      {discountMarker(line) && <p className="text-xs font-semibold text-amber-800">Discount {discountMarker(line)}</p>}
                     </div>
-                    <p className="shrink-0 text-sm font-semibold tabular-nums">{formatPeso(line.lineTotal)}</p>
+                    <div className="flex shrink-0 items-start gap-1">
+                      <p className="pt-3 text-sm font-semibold tabular-nums">{formatPeso(line.lineTotal)}</p>
+                      <LineActionsMenu
+                        line={line}
+                        isSupervisor={isSupervisor}
+                        seniorApplied={seniorApplied}
+                        disabled={busy}
+                        onDiscount={() => setDialog({ kind: 'discount', line })}
+                        onOverride={() => setDialog({ kind: 'override', line })}
+                        onNote={() => setDialog({ kind: 'note', line })}
+                      />
+                    </div>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -215,15 +287,31 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
             role="switch"
             checked={cart.seniorPwdDiscountApplied}
             disabled={busy || !isSupervisor}
-            onChange={(e) => senior.mutate(e.target.checked)}
+            onChange={(e) => onSeniorToggle(e.target.checked)}
             className="size-6 accent-brand"
           />
         </label>
+
+        {isSupervisor && !empty && (
+          seniorApplied ? (
+            <p className="text-xs text-ink-soft">{SENIOR_EXCLUSIVE}</p>
+          ) : (
+            <button type="button" disabled={busy} onClick={() => setDialog({ kind: 'discount', line: null })} className="h-12 rounded-control border border-dashed border-amber-600/60 text-sm font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-40">
+              {(cart.manualDiscountAmount ?? 0) > 0 ? 'Change cart discount' : 'Add discount'}
+            </button>
+          )
+        )}
 
         <dl className="flex flex-col text-sm">
           <Row label="Subtotal" value={cart.subtotal} />
           {cart.itemPromoDiscountAmount > 0 && <Row label="Item promotions" value={-cart.itemPromoDiscountAmount} />}
           {cart.promoDiscountAmount > 0 && <Row label={`Promo code ${cart.promoCode ?? ''}`.trim()} value={-cart.promoDiscountAmount} />}
+          {(cart.manualDiscountAmount ?? 0) > 0 && (
+            <Row
+              label={`Cart discount${cart.manualDiscountKind === 'Percent' && cart.manualDiscountValue ? ` ${cart.manualDiscountValue}%` : ''}${cart.manualDiscountReason ? ` (${cart.manualDiscountReason})` : ''}`}
+              value={-(cart.manualDiscountAmount ?? 0)}
+            />
+          )}
           {cart.vatExemptAmount > 0 && <Row label="VAT exemption (12%)" value={-cart.vatExemptAmount} />}
           {cart.discountAmount > 0 && <Row label="Senior / PWD (20%)" value={-cart.discountAmount} />}
           <Row label="VAT (12%)" value={vatOf(cart)} />
@@ -267,10 +355,60 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
         onCancel={() => setConfirmVoid(false)}
       />
 
+      <ConfirmModal
+        open={confirmSenior}
+        title="Apply Senior/PWD discount?"
+        description="Senior/PWD can't be combined with a manual discount. Applying it removes the manual discounts on this cart."
+        confirmLabel="Apply Senior/PWD"
+        onConfirm={() => {
+          setConfirmSenior(false);
+          senior.mutate(true);
+        }}
+        onCancel={() => setConfirmSenior(false)}
+      />
+
+      {dialog?.kind === 'discount' && (
+        <DiscountDialog
+          subject={dialog.line ? dialog.line.itemName : 'the whole cart'}
+          total={dialog.line ? dialog.line.lineTotal + (dialog.line.manualDiscountAmount ?? 0) : cart.subtotal}
+          initial={initialDiscount(dialog.line ?? cart)}
+          busy={gatedActionBusy}
+          onApply={(body) => applyDiscount(dialog.line, body)}
+          onRemove={initialDiscount(dialog.line ?? cart) ? () => applyDiscount(dialog.line, { kind: 'Percent', value: 0, reason: 'Removed' }) : undefined}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'override' && (
+        <PriceOverrideDialog
+          itemName={dialog.line.itemName}
+          currentUnitPrice={dialog.line.unitPrice}
+          originalUnitPrice={dialog.line.priceOverrideFrom}
+          busy={gatedActionBusy}
+          onApply={(body) => submitDialog(`Override price of ${dialog.line.itemName}`, () => posApi.overrideLinePrice(dialog.line.id, body), 'Price changed')}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'note' && (
+        <LineNoteDialog
+          itemName={dialog.line.itemName}
+          initial={dialog.line.note}
+          busy={gatedActionBusy}
+          onSave={(note) => submitDialog(`Note for ${dialog.line.itemName}`, (approverPin) => posApi.setLineNote(dialog.line.id, note, approverPin), note ? 'Note saved' : 'Note removed')}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'openItem' && <OpenItemDialog busy={gatedActionBusy} onAdd={addOpenItem} onClose={() => setDialog(null)} />}
+
       {gated.dialogProps && <ApproverPinDialog open {...gated.dialogProps} />}
       {parkOpen && <ParkCartDialog open busy={park.isPending} onPark={onPark} onClose={() => setParkOpen(false)} />}
     </section>
   );
+}
+
+/** The discount already on a line or the cart, to start the dialog from; undefined when there is none. */
+function initialDiscount(target: { manualDiscountAmount?: number; manualDiscountKind?: Transaction['manualDiscountKind']; manualDiscountValue?: number | null; manualDiscountReason?: string | null }) {
+  if (!target.manualDiscountKind || !target.manualDiscountValue || (target.manualDiscountAmount ?? 0) <= 0) return undefined;
+  return { kind: target.manualDiscountKind, value: target.manualDiscountValue, reason: target.manualDiscountReason ?? '' };
 }
 
 function Row({ label, value }: { label: string; value: number }) {
