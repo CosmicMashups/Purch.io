@@ -4,7 +4,9 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { ITEM_SAMPLES } from '../../../lib/images';
-import { createItemSchema, updateItemSchema } from '../schemas';
+import { createItemSchema, parseCostPrice, updateItemSchema } from '../schemas';
+import { marginHint } from '../margin';
+import { useSession } from '../../auth/useSession';
 import { PricingType, TingiMode, type Item } from '../types';
 import { pricingTypeLabels } from '../labels';
 import { catalogApi } from '../api';
@@ -72,6 +74,40 @@ function ThresholdField({ value, onChange, error }: { value: string; onChange: (
   );
 }
 
+/** Cost is for Admin, Manager and Warehouse only; the server returns it as null to a Cashier, so they never see the field or a margin. */
+function useCanSeeCost() {
+  const { role } = useSession();
+  return role === 'Admin' || role === 'Manager' || role === 'Warehouse';
+}
+
+function CostField({ value, onChange, error, price, savedCost }: { value: string; onChange: (v: string) => void; error: string | null; price: number; savedCost: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Field label="Cost price (optional)" error={error ?? undefined}>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Unknown"
+            className={inputClass}
+          />
+          {savedCost && value !== '' && (
+            <button type="button" onClick={() => onChange('')} className="h-12 shrink-0 rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-700">
+              Clear cost
+            </button>
+          )}
+        </div>
+      </Field>
+      <p className="text-sm text-gray-600" data-testid="margin-hint">
+        {marginHint(price, value)}
+      </p>
+      {savedCost && value === '' && <p className="text-sm text-gray-600">The saved cost will be removed when you save.</p>}
+    </div>
+  );
+}
+
 function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: boolean) => void }) {
   const { data: categories } = useCategories();
   const createItem = useCreateItem();
@@ -87,6 +123,9 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
   const [equipmentIds, setEquipmentIds] = useState<string[]>([]);
   const [threshold, setThreshold] = useState('');
   const [thresholdError, setThresholdError] = useState<string | null>(null);
+  const canSeeCost = useCanSeeCost();
+  const [cost, setCost] = useState('');
+  const [costError, setCostError] = useState<string | null>(null);
 
   useEffect(() => onBusy(createItem.isPending), [createItem.isPending, onBusy]);
 
@@ -102,6 +141,7 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
   });
 
   const pricingType = Number(watch('pricingType'));
+  const priceNow = Number(watch('basePrice'));
   const imageUrl = watch('imageUrl');
 
   // Sub-module fields — best-effort, mirroring add_item_screen.dart: if these don't parse to
@@ -177,9 +217,15 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
     setSubmitError(null);
     setRecipeError(null);
     setThresholdError(null);
+    setCostError(null);
     const parsedThreshold = parseThreshold(threshold);
     if (!parsedThreshold.ok) {
       setThresholdError(parsedThreshold.message);
+      return;
+    }
+    const parsedCost = canSeeCost ? parseCostPrice(cost) : { ok: true as const, value: null };
+    if (!parsedCost.ok) {
+      setCostError(parsedCost.message);
       return;
     }
     // Checked up front so a bad quantity never leaves a half-made item behind.
@@ -198,6 +244,7 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
         imageUrl: values.imageUrl ?? null,
         pricingType: values.pricingType,
         sortOrder: values.sortOrder,
+        ...(parsedCost.value !== null ? { costPrice: parsedCost.value } : {}),
       });
 
       await createSubResourceIfValid(item.id, values);
@@ -263,6 +310,8 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
       <Field label="Base Price" error={errors.basePrice?.message}>
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
       </Field>
+
+      {canSeeCost && <CostField value={cost} onChange={setCost} error={costError} price={priceNow} savedCost={false} />}
 
       <Field label="Sort order" error={errors.sortOrder?.message}>
         <input type="number" {...register('sortOrder')} className={inputClass} />
@@ -358,6 +407,10 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(item.lowStockThreshold === null ? '' : String(item.lowStockThreshold));
   const [thresholdError, setThresholdError] = useState<string | null>(null);
+  const canSeeCost = useCanSeeCost();
+  const hadCost = item.costPrice !== null && item.costPrice !== undefined;
+  const [cost, setCost] = useState(hadCost ? String(item.costPrice) : '');
+  const [costError, setCostError] = useState<string | null>(null);
 
   const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
   const inventoryItems = useInventoryItems();
@@ -419,16 +472,31 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
   });
 
   const imageUrl = useWatch({ control, name: 'imageUrl' });
+  const priceNow = Number(useWatch({ control, name: 'basePrice' }));
 
   async function onSubmit(values: EditValues) {
     setSubmitError(null);
     setRecipeError(null);
     setThresholdError(null);
+    setCostError(null);
     const parsedThreshold = parseThreshold(threshold);
     if (!parsedThreshold.ok) {
       setThresholdError(parsedThreshold.message);
       return;
     }
+    const parsedCost = canSeeCost ? parseCostPrice(cost) : { ok: true as const, value: null };
+    if (!parsedCost.ok) {
+      setCostError(parsedCost.message);
+      return;
+    }
+    // Omitting the cost keeps it; only a visible, emptied field on an item that had one clears it.
+    const costFields = !canSeeCost
+      ? {}
+      : parsedCost.value !== null
+        ? { costPrice: parsedCost.value }
+        : hadCost
+          ? { clearCostPrice: true }
+          : {};
     const recipeChanged = tracksIngredients && initialRecipe !== null && JSON.stringify(sorted(recipe)) !== JSON.stringify(sorted(initialRecipe));
     const recipeLines = recipeChanged ? buildRecipeLines(recipe) : { ok: true as const, lines: [] };
     if (!recipeLines.ok) {
@@ -449,6 +517,7 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
           sortOrder: values.sortOrder,
           isActive: values.isActive,
           departmentId: values.departmentId ?? null,
+          ...costFields,
         },
       });
       if (parsedThreshold.value !== item.lowStockThreshold) {
@@ -497,6 +566,8 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
       <Field label="Base Price" error={errors.basePrice?.message}>
         <input type="number" step="0.01" {...register('basePrice')} className={inputClass} />
       </Field>
+
+      {canSeeCost && <CostField value={cost} onChange={setCost} error={costError} price={priceNow} savedCost={hadCost} />}
 
       <Field label="Sort order" error={errors.sortOrder?.message}>
         <input type="number" {...register('sortOrder')} className={inputClass} />

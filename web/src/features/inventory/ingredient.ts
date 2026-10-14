@@ -12,6 +12,8 @@ export const ingredientSchema = z.object({
   /** Empty string means uncategorised. */
   categoryId: z.string(),
   isActive: z.boolean(),
+  /** Peso text per base unit; blank means unknown. */
+  unitCost: z.string().optional(),
 });
 
 export type IngredientForm = z.infer<typeof ingredientSchema>;
@@ -23,6 +25,16 @@ export function parseThreshold(text: string): { ok: true; value: number | null }
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return { ok: false, message: 'Enter a number' };
   if (value < 0) return { ok: false, message: 'Cannot be negative' };
+  return { ok: true, value };
+}
+
+/** Blank means unknown (null). A typed unit cost is a peso amount from 0 up to 999999.99, at most 4 decimals (per-gram costs are small). */
+export function parseUnitCost(text: string): { ok: true; value: number | null } | { ok: false; message: string } {
+  const trimmed = text.trim();
+  if (trimmed === '') return { ok: true, value: null };
+  if (!/^\d+(\.\d{1,4})?$/.test(trimmed)) return { ok: false, message: /^-/.test(trimmed) ? 'Cost cannot be negative' : 'Enter an amount with up to 4 decimals' };
+  const value = Number(trimmed);
+  if (value > 999999.99) return { ok: false, message: 'Cost cannot be more than 999,999.99' };
   return { ok: true, value };
 }
 

@@ -44,3 +44,13 @@ describe('receiveSchema', () => {
     expect(first(receiveSchema.safeParse({ branchId: 'b', packagesReceived: 0, supplierReference: '' }))).toBe('Must be more than 0');
   });
 });
+
+describe('parseUnitCost', () => {
+  it('blank is unknown, not zero; a typed value is 0 to 999999.99', async () => {
+    const { parseUnitCost } = await import('./ingredient');
+    expect(parseUnitCost('')).toEqual({ ok: true, value: null });
+    expect(parseUnitCost('0.0125')).toEqual({ ok: true, value: 0.0125 });
+    expect(parseUnitCost('-1').ok).toBe(false);
+    expect(parseUnitCost('1000000').ok).toBe(false);
+  });
+});

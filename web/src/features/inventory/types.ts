@@ -15,6 +15,8 @@ export interface InventoryItem {
   sortOrder: number;
   /** True when recipes use it but none deducts it on a sale, so only a count changes its stock. */
   isCountedByHand?: boolean;
+  /** Cost of one base unit. Null means unknown, or hidden from the Cashier role. */
+  unitCost?: number | null;
 }
 
 /** Mirrors Purch.Application.Inventory.InventoryCategoryDto. */
@@ -37,10 +39,14 @@ export interface CreateInventoryItemRequest {
   packagingSize: number;
   lowStockThreshold: number | null;
   categoryId?: string | null;
+  /** Omit or null for unknown (on update, omitted keeps the saved cost). */
+  unitCost?: number | null;
 }
 
 export interface UpdateInventoryItemRequest extends CreateInventoryItemRequest {
   isActive: boolean;
+  /** Deliberately clears the saved unit cost. */
+  clearUnitCost?: boolean;
 }
 
 /** Mirrors Purch.Domain.Enums.MovementType (serialized as an integer). */

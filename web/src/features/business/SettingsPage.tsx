@@ -5,7 +5,7 @@ import { userMessage } from '../../lib/apiError';
 import { useTenantSettings } from '../tenant/queries';
 import { BirSection } from './components/BirSection';
 import { BrandingSection } from './components/BrandingSection';
-import { OptionsSection } from './components/OptionsSection';
+import { OptionsSection, PosSection } from './components/OptionsSection';
 
 export function SettingsPage() {
   const settings = useTenantSettings();
@@ -25,6 +25,7 @@ export function SettingsPage() {
           <BrandingSection settings={settings.data} />
           <BirSection settings={settings.data} />
           <OptionsSection settings={settings.data} />
+          <PosSection settings={settings.data} />
         </>
       )}
     </div>

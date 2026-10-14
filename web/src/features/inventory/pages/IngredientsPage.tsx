@@ -18,7 +18,7 @@ import { useSession } from '../../auth/useSession';
 import { IngredientCategories } from '../components/IngredientCategories';
 import type { Branch } from '../../branches/types';
 import { useSelectableBranches } from '../../branches/queries';
-import { ingredientSchema, parseThreshold, receiveSchema, type IngredientForm, type ReceiveForm } from '../ingredient';
+import { ingredientSchema, parseThreshold, parseUnitCost, receiveSchema, type IngredientForm, type ReceiveForm } from '../ingredient';
 import {
   useCreateInventoryItem,
   useInventoryCategories,
@@ -228,6 +228,10 @@ export function IngredientsPage() {
 }
 
 function IngredientDialog({ item, onDone }: { item: InventoryItem | null; onDone: () => void }) {
+  const { role } = useSession();
+  // The server returns cost as null to a Cashier, so they never see or edit it.
+  const canSeeCost = role === 'Admin' || role === 'Manager' || role === 'Warehouse';
+  const hadCost = item?.unitCost !== null && item?.unitCost !== undefined;
   const create = useCreateInventoryItem();
   const update = useUpdateInventoryItem();
   const categories = useInventoryCategories();
@@ -248,8 +252,9 @@ function IngredientDialog({ item, onDone }: { item: InventoryItem | null; onDone
           lowStockThreshold: item.lowStockThreshold === null ? '' : String(item.lowStockThreshold),
           categoryId: item.categoryId ?? '',
           isActive: item.isActive,
+          unitCost: item.unitCost === null || item.unitCost === undefined ? '' : String(item.unitCost),
         }
-      : { name: '', sku: '', baseUnit: '', packagingUnit: '', lowStockThreshold: '', categoryId: '', isActive: true },
+      : { name: '', sku: '', baseUnit: '', packagingUnit: '', lowStockThreshold: '', categoryId: '', isActive: true, unitCost: '' },
   });
 
   const submit = handleSubmit(async (v) => {
@@ -258,7 +263,15 @@ function IngredientDialog({ item, onDone }: { item: InventoryItem | null; onDone
       setError('lowStockThreshold', { message: threshold.message });
       return;
     }
+    const cost = canSeeCost ? parseUnitCost(v.unitCost ?? '') : { ok: true as const, value: null };
+    if (!cost.ok) {
+      setError('unitCost', { message: cost.message });
+      return;
+    }
+    // Omitting the cost keeps it; only an emptied field on an ingredient that had one clears it.
+    const costFields = !canSeeCost ? {} : cost.value !== null ? { unitCost: cost.value } : hadCost ? { clearUnitCost: true } : {};
     const body = {
+      ...costFields,
       name: v.name,
       sku: v.sku.trim() || null,
       baseUnit: v.baseUnit,
@@ -318,6 +331,11 @@ function IngredientDialog({ item, onDone }: { item: InventoryItem | null; onDone
       <FormField label="Low stock alert (optional)" error={errors.lowStockThreshold?.message}>
         <input inputMode="decimal" {...register('lowStockThreshold')} className={controlClass} />
       </FormField>
+      {canSeeCost && (
+        <FormField label="Cost per base unit (optional)" hint="Pesos for one base unit. Leave blank if you do not know it." error={errors.unitCost?.message}>
+          <input inputMode="decimal" placeholder="Unknown" {...register('unitCost')} className={controlClass} />
+        </FormField>
+      )}
       {item && (
         <label className="flex h-12 items-center gap-3 text-base font-semibold">
           <input type="checkbox" {...register('isActive')} className="size-6 accent-brand" />

@@ -30,6 +30,11 @@ function useSettingsMutation<TVars>(fn: (vars: TVars) => ReturnType<typeof tenan
 export const useUpdateBranding = () => useSettingsMutation((body: Parameters<typeof tenantApi.updateBranding>[0]) => tenantApi.updateBranding(body));
 export const useUpdateBir = () => useSettingsMutation((body: Parameters<typeof tenantApi.updateBir>[0]) => tenantApi.updateBir(body));
 export const useUpdateBarcode = () => useSettingsMutation((value: boolean) => tenantApi.updateBarcode(value));
+export const useUpdatePos = () => useSettingsMutation((body: Parameters<typeof tenantApi.updatePos>[0]) => tenantApi.updatePos(body));
+export const useUpdateCostOnReceiving = () =>
+  useSettingsMutation((v: { useSeparateInventoryTracking: boolean; updateCostOnReceiving: boolean }) =>
+    tenantApi.updateCostOnReceiving(v.useSeparateInventoryTracking, v.updateCostOnReceiving),
+  );
 export const useUpdateCreditLedger = () => useSettingsMutation((value: boolean) => tenantApi.updateCreditLedger(value));
 export const useUpdateInventoryTracking = () => useSettingsMutation((value: boolean) => tenantApi.updateInventoryTracking(value));
 export const useUpdateDepartmentTracking = () => useSettingsMutation((value: boolean) => tenantApi.updateDepartmentTracking(value));

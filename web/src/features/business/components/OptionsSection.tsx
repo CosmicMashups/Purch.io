@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { useUpdateBarcode, useUpdateCreditLedger, useUpdateDepartmentTracking, useUpdateInventoryTracking } from '../../tenant/queries';
+import { useUpdateCostOnReceiving, useUpdatePos, useUpdateBarcode, useUpdateCreditLedger, useUpdateDepartmentTracking, useUpdateInventoryTracking } from '../../tenant/queries';
 import type { TenantSettings } from '../../tenant/types';
 
 function Switch({ label, description, checked, busy, onChange }: { label: string; description: string; checked: boolean; busy: boolean; onChange: (next: boolean) => void }) {
@@ -13,6 +13,97 @@ function Switch({ label, description, checked, busy, onChange }: { label: string
       </div>
       <input type="checkbox" role="switch" aria-label={label} checked={checked} disabled={busy} onChange={(e) => onChange(e.target.checked)} className="size-8 shrink-0 accent-brand" />
     </li>
+  );
+}
+
+export function PosSection({ settings }: { settings: TenantSettings }) {
+  const pos = useUpdatePos();
+  const costOnReceiving = useUpdateCostOnReceiving();
+  const saved = settings.parkedCartTtlHours ?? 24;
+  const [typed, setHours] = useState<string | null>(null);
+  const hours = typed ?? String(saved);
+  const [error, setError] = useState<string | null>(null);
+
+  function saveHours() {
+    const value = Number(hours);
+    if (hours.trim() === '' || !Number.isInteger(value) || value < 1 || value > 168) {
+      setError('Enter a whole number of hours from 1 to 168');
+      return;
+    }
+    setError(null);
+    pos.mutate(
+      { requiresBarcodePerItem: settings.requiresBarcodePerItem, parkedCartTtlHours: value },
+      { onSuccess: () => { setHours(null); toast.success('Parked cart time saved'); } },
+    );
+  }
+
+  return (
+    <section aria-labelledby="pos-heading" className="rounded-panel border border-line bg-surface p-6">
+      <h2 id="pos-heading" className="text-xl font-bold">
+        Point of sale
+      </h2>
+      <ul className="mt-2 divide-y divide-line">
+        <Switch
+          label="Allow open items"
+          description="Lets a cashier ring up something that is not in the catalog by typing a name and price."
+          checked={settings.openItemEnabled ?? true}
+          busy={pos.isPending}
+          onChange={(next) =>
+            pos.mutate(
+              { requiresBarcodePerItem: settings.requiresBarcodePerItem, openItemEnabled: next },
+              { onSuccess: () => toast.success(next ? 'Open items are on' : 'Open items are off') },
+            )
+          }
+        />
+        <Switch
+          label="Update item cost when stock is received"
+          description="Receiving stock replaces the saved cost with the cost on that delivery. Off keeps the cost you entered."
+          checked={settings.updateCostOnReceiving ?? false}
+          busy={costOnReceiving.isPending}
+          onChange={(next) =>
+            costOnReceiving.mutate(
+              { useSeparateInventoryTracking: settings.useSeparateInventoryTracking, updateCostOnReceiving: next },
+              { onSuccess: () => toast.success(next ? 'Cost will update on receiving' : 'Cost will stay as entered') },
+            )
+          }
+        />
+        <li className="flex flex-col gap-2 py-4">
+          <label htmlFor="parked-ttl" className="text-base font-semibold">
+            Keep parked carts for (hours)
+          </label>
+          <p id="parked-ttl-help" className="text-sm text-ink-soft">
+            A parked cart that waits longer than this is released and its items go back on the shelf. From 1 to 168 hours.
+          </p>
+          <div className="flex items-start gap-3">
+            <input
+              id="parked-ttl"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={168}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              aria-describedby="parked-ttl-help"
+              aria-invalid={error !== null}
+              className="h-12 w-32 rounded-control border border-line bg-surface px-3 text-base"
+            />
+            <button
+              type="button"
+              onClick={saveHours}
+              disabled={pos.isPending}
+              className="h-12 rounded-control bg-brand px-6 text-base font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-50"
+            >
+              Save hours
+            </button>
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+        </li>
+      </ul>
+    </section>
   );
 }
 

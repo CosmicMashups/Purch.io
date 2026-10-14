@@ -8,6 +8,26 @@ const optionalTrimmed = z
   .nullable()
   .optional();
 
+/** Blank means the cost is unknown (null), never 0. A typed value is a peso amount from 0 to 999999.99 with at most 2 decimals. */
+export function parseCostPrice(text: string): { ok: true; value: number | null } | { ok: false; message: string } {
+  const trimmed = text.trim();
+  if (trimmed === '') return { ok: true, value: null };
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    return { ok: false, message: /^-/.test(trimmed) ? 'Cost cannot be negative' : 'Enter an amount with up to 2 decimals' };
+  }
+  const value = Number(trimmed);
+  if (value > 999999.99) return { ok: false, message: 'Cost cannot be more than 999,999.99' };
+  return { ok: true, value };
+}
+
+const costPriceField = z
+  .string()
+  .optional()
+  .superRefine((v, ctx) => {
+    const parsed = parseCostPrice(v ?? '');
+    if (!parsed.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: parsed.message });
+  });
+
 // Matches add_item_screen.dart / edit_item_screen.dart: name required non-empty after trim,
 // price parses to a number >= 0 (zero allowed).
 export const itemBaseSchema = z.object({
@@ -17,6 +37,7 @@ export const itemBaseSchema = z.object({
   categoryId: optionalTrimmed,
   basePrice: z.coerce.number({ invalid_type_error: 'Enter a valid amount' }).min(0, 'Price cannot be negative'),
   imageUrl: optionalTrimmed,
+  costPrice: costPriceField,
   sortOrder: z.coerce.number({ invalid_type_error: 'Enter a number' }).int('Whole numbers only'),
 });
 

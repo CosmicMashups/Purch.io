@@ -23,4 +23,6 @@ export interface TenantSettings {
   updateCostOnReceiving?: boolean;
   /** Lets the cashier ring up something not in the catalog. */
   openItemEnabled?: boolean;
+  /** Hours a parked cart is kept before it is released, 1 to 168. */
+  parkedCartTtlHours?: number;
 }

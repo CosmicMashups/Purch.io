@@ -15,6 +15,8 @@ vi.mock('../tenant/api', () => ({
     updateBarcode: vi.fn(),
     updateCreditLedger: vi.fn(),
     updateInventoryTracking: vi.fn(),
+    updatePos: vi.fn(),
+    updateCostOnReceiving: vi.fn(),
   },
 }));
 vi.mock('../uploads/api', () => ({ uploadsApi: { uploadImage: vi.fn() } }));
@@ -149,5 +151,32 @@ describe('SettingsPage', () => {
     fireEvent.click(toggle);
     await waitFor(() => expect(useToastStore.getState().toasts[0]?.message).toBe('Some items have no barcode yet.'));
     expect(toggle).not.toBeChecked();
+  });
+
+  describe('Point of sale', () => {
+    it('saves open items and parked cart hours through the barcode endpoint, leaving the barcode rule as it is', async () => {
+      vi.mocked(tenantApi.updatePos).mockResolvedValue({ ...settings, openItemEnabled: false, parkedCartTtlHours: 48 });
+      renderPage(<SettingsPage />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Allow open items' }));
+      await waitFor(() => expect(tenantApi.updatePos).toHaveBeenCalledWith({ requiresBarcodePerItem: false, openItemEnabled: false }));
+      fireEvent.change(screen.getByLabelText('Keep parked carts for (hours)'), { target: { value: '48' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save hours' }));
+      await waitFor(() => expect(tenantApi.updatePos).toHaveBeenCalledWith({ requiresBarcodePerItem: false, parkedCartTtlHours: 48 }));
+    });
+
+    it('refuses hours outside 1 to 168 before calling the API', async () => {
+      renderPage(<SettingsPage />);
+      fireEvent.change(await screen.findByLabelText('Keep parked carts for (hours)'), { target: { value: '200' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save hours' }));
+      expect(await screen.findByText('Enter a whole number of hours from 1 to 168')).toBeInTheDocument();
+      expect(tenantApi.updatePos).not.toHaveBeenCalled();
+    });
+
+    it('saves update cost on receiving', async () => {
+      vi.mocked(tenantApi.updateCostOnReceiving).mockResolvedValue({ ...settings, updateCostOnReceiving: true });
+      renderPage(<SettingsPage />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Update item cost when stock is received' }));
+      await waitFor(() => expect(tenantApi.updateCostOnReceiving).toHaveBeenCalledWith(false, true));
+    });
   });
 });
