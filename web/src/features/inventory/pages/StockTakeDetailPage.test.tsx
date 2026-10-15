@@ -57,7 +57,7 @@ describe('StockTakeDetailPage', () => {
   it('omits value impact when costs are absent', async () => {
     const lines = [line({ state: StockTakeLineState.Counted, countedQty: 8, varianceQty: -2, varianceValue: null, unitCostSnapshot: null })];
     show('Manager', take({ status: StockTakeStatus.Review, lines }));
-    await screen.findByText('Flour');
+    await screen.findAllByText('Flour');
     expect(screen.queryByText('Value impact')).toBeNull();
   });
 
@@ -99,5 +99,37 @@ describe('StockTakeDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save count' }));
     await waitFor(() => expect(err).toHaveBeenCalledWith(expect.stringMatching(/changed/i)));
     await waitFor(() => expect(inventoryApi.stockTakes.get).toHaveBeenCalledTimes(2));
+  });
+
+  it('asks before cancelling', async () => {
+    show('Manager', take({}));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel take' }));
+    expect(await screen.findByText(/counted lines will be discarded/i)).toBeInTheDocument();
+    expect(inventoryApi.stockTakes.cancel).not.toHaveBeenCalled();
+  });
+
+  it('a double submit of the apply PIN sends one request', async () => {
+    show('Manager', take({ status: StockTakeStatus.Review }));
+    let resolve: (t: StockTake) => void = () => {};
+    vi.mocked(inventoryApi.stockTakes.apply).mockReturnValue(new Promise((r) => (resolve = r)));
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply counts' }));
+    fireEvent.change(await screen.findByLabelText(/PIN/i), { target: { value: '1234' } });
+    const approve = screen.getByRole('button', { name: 'Approve' });
+    fireEvent.click(approve);
+    fireEvent.click(approve);
+    await waitFor(() => expect(inventoryApi.stockTakes.apply).toHaveBeenCalled());
+    expect(inventoryApi.stockTakes.apply).toHaveBeenCalledTimes(1);
+    resolve(take({ status: StockTakeStatus.Applied }));
+  });
+
+  it('lets a Manager recount in Review but not Warehouse', async () => {
+    show('Manager', take({ status: StockTakeStatus.Review, lines: [line({ needsRecount: true })] }));
+    expect(await screen.findByLabelText('Counted quantity for Flour')).toBeInTheDocument();
+  });
+
+  it('gives Warehouse no recount in Review', async () => {
+    show('Warehouse', take({ status: StockTakeStatus.Review }));
+    await screen.findByText('Flour');
+    expect(screen.queryByLabelText('Counted quantity for Flour')).toBeNull();
   });
 });

@@ -409,5 +409,6 @@ export interface CreateStockTakeRequest {
   scopeKind: StockTakeScopeKind;
   blind: boolean;
   categoryIds?: string[];
+  itemIds?: string[];
   inventoryItemIds?: string[];
 }

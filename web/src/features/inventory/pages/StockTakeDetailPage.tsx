@@ -1,6 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
+import { ConfirmModal } from '../../../components/ConfirmModal';
+import { formatPeso } from '../../dashboard/format';
 import { ErrorState } from '../../../components/ErrorState';
 import { toast } from '../../../components/feedback/toastStore';
 import { PrimaryButton, SecondaryButton } from '../../../components/forms/FormField';
@@ -27,6 +29,7 @@ export function StockTakeDetailPage() {
   const review = useStockTakeTransition(id, 'review');
   const cancel = useStockTakeTransition(id, 'cancel');
   const apply = useApplyStockTake(id);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const applying = useRef<Promise<unknown> | null>(null);
 
   const describe = (error: unknown) => {
@@ -93,7 +96,7 @@ export function StockTakeDetailPage() {
               </PrimaryButton>
             )}
             {open && (
-              <SecondaryButton type="button" disabled={busy} onClick={() => void run(() => cancel.mutateAsync())}>
+              <SecondaryButton type="button" disabled={busy} onClick={() => setConfirmCancel(true)}>
                 Cancel take
               </SecondaryButton>
             )}
@@ -120,10 +123,33 @@ export function StockTakeDetailPage() {
         />
       )}
       {t.status === StockTakeStatus.Review && <ReviewLines lines={t.lines} />}
+      {t.status === StockTakeStatus.Review && canReview && (
+        <section aria-label="Recount" className="flex flex-col gap-3">
+          <h2 className="text-lg font-bold">Recount a line</h2>
+          <StockTakeCountList
+            lines={[...t.lines].sort((a, b) => Number(!!b.needsRecount) - Number(!!a.needsRecount))}
+            busy={count.isPending}
+            onCount={(lineId, counted, skip) => {
+              if (count.isPending) return;
+              void run(() => count.mutateAsync({ lineId, counted, skip }));
+            }}
+          />
+        </section>
+      )}
       {(t.status === StockTakeStatus.Applied || t.status === StockTakeStatus.Cancelled || t.status === StockTakeStatus.Draft) && (
-        <ResultLines lines={t.lines} />
+        <ResultLines lines={t.lines} hideExpected={t.blind && t.status === StockTakeStatus.Draft} />
       )}
 
+      <ConfirmModal
+        open={confirmCancel}
+        destructive
+        busy={cancel.isPending}
+        title="Cancel this stock take?"
+        description="The counted lines will be discarded and no stock will change."
+        confirmLabel="Cancel take"
+        onConfirm={() => void run(() => cancel.mutateAsync()).finally(() => setConfirmCancel(false))}
+        onCancel={() => setConfirmCancel(false)}
+      />
       {pin.dialogProps && <ApproverPinDialog open {...pin.dialogProps} />}
     </div>
   );
@@ -152,7 +178,9 @@ function ReviewLines({ lines }: { lines: StockTakeLine[] }) {
   );
 }
 
-function ResultLines({ lines }: { lines: StockTakeLine[] }) {
+const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+
+function ResultLines({ lines, hideExpected = false }: { lines: StockTakeLine[]; hideExpected?: boolean }) {
   const showValue = lines.some((l) => l.varianceValue !== null);
   return (
     <div className="overflow-x-auto rounded-panel border border-line bg-surface">
@@ -160,7 +188,7 @@ function ResultLines({ lines }: { lines: StockTakeLine[] }) {
         <thead>
           <tr className="border-b border-line text-sm text-ink-soft">
             <th className="p-3">Item</th>
-            <th className="p-3 text-right">Expected</th>
+            {!hideExpected && <th className="p-3 text-right">Expected</th>}
             <th className="p-3 text-right">Counted</th>
             <th className="p-3 text-right">Variance</th>
             {showValue && <th className="p-3 text-right">Value impact</th>}
@@ -174,10 +202,10 @@ function ResultLines({ lines }: { lines: StockTakeLine[] }) {
                 {l.state === StockTakeLineState.Skipped && <span className="ml-2 text-sm text-ink-soft">Skipped</span>}
                 {l.needsRecount && <span className="ml-2 text-sm font-semibold text-danger">Needs recount</span>}
               </td>
-              <td className="p-3 text-right tabular-nums">{l.expectedQty ?? ''}</td>
+              {!hideExpected && <td className="p-3 text-right tabular-nums">{l.expectedQty ?? ''}</td>}
               <td className="p-3 text-right tabular-nums">{l.countedQty ?? ''}</td>
-              <td className="p-3 text-right tabular-nums">{l.varianceQty ?? ''}</td>
-              {showValue && <td className="p-3 text-right tabular-nums">{l.varianceValue ?? ''}</td>}
+              <td className="p-3 text-right tabular-nums">{l.varianceQty === null ? '' : signed(l.varianceQty)}</td>
+              {showValue && <td className="p-3 text-right tabular-nums">{l.varianceValue === null ? '' : formatPeso(l.varianceValue)}</td>}
             </tr>
           ))}
         </tbody>

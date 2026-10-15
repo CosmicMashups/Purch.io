@@ -26,7 +26,7 @@ function CountRow({ line, busy, onCount }: { line: StockTakeLine; busy: boolean;
   const stateLabel = line.state === StockTakeLineState.Counted ? 'Counted' : line.state === StockTakeLineState.Skipped ? 'Skipped' : 'Not counted';
 
   return (
-    <li className="flex flex-col gap-3 rounded-panel border border-line bg-surface p-4 sm:flex-row sm:items-center">
+    <li className={`flex flex-col gap-3 rounded-panel border bg-surface p-4 sm:flex-row sm:items-center ${line.needsRecount ? 'border-2 border-danger' : 'border-line'}`}>
       <div className="min-w-0 flex-1">
         <p className="text-base font-semibold text-ink">{line.name}</p>
         <p className="text-sm text-ink-soft">
@@ -64,6 +64,16 @@ function CountRow({ line, busy, onCount }: { line: StockTakeLine; busy: boolean;
         >
           Skip
         </button>
+        {line.state === StockTakeLineState.Counted && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onCount(line.id, null, false)}
+            className="h-12 rounded-control border border-line bg-surface px-4 text-base font-semibold text-ink hover:border-brand disabled:opacity-60"
+          >
+            Clear
+          </button>
+        )}
       </div>
     </li>
   );
