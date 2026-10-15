@@ -71,7 +71,7 @@ Then promote the deployment.
 
 1. Park a cart, list parked, resume it on a register; discard one with a manager PIN.
 2. Split a payment (cash + GCash) and confirm the receipt and `Payments.Sequence` 0/1.
-3. Manager applies a line discount and a price override; a cashier gets 403.
+3. A cashier applies a line discount and a price override with a Manager/Admin approver PIN every time (a missing PIN is a 400 `approverPin`; five wrong PINs lock the terminal for 5 minutes, like void/refund). Warehouse and kiosk devices get 403. The Senior/PWD toggle stays Manager/Admin only.
 4. Add an open item and a line note; check out; refund it.
 5. Take an X reading and confirm VAT figures match the receipts; open Orders and export CSV.
 

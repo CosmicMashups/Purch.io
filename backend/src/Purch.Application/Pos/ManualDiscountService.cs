@@ -15,6 +15,7 @@ namespace Purch.Application.Pos;
 public sealed class ManualDiscountService(
     ITransactionRepository transactionRepository,
     ITransactionService transactionService,
+    IApproverAuthorizationService approverAuthorizationService,
     IAuditLogRepository auditLogRepository,
     ICurrentTenantProvider currentTenantProvider,
     ICurrentActorProvider currentActorProvider,
@@ -25,7 +26,7 @@ public sealed class ManualDiscountService(
     public Task<TransactionDto> SetLineDiscountAsync(Guid lineId, SetManualDiscountRequest request, CancellationToken cancellationToken = default)
     {
         Validate(request);
-        return unitOfWork.ExecuteInTransactionAsync(async ct =>
+        return AuthorizedAsync(lineId, request.ApproverPin, async (approver, ct) =>
         {
             var cart = await RequireDiscountableCartAsync(ct);
             var line = await RequireLineAsync(cart, lineId, ct);
@@ -35,7 +36,7 @@ public sealed class ManualDiscountService(
             line.ManualDiscountKind = request.Value > 0m ? kind : null;
             line.ManualDiscountValue = request.Value > 0m ? request.Value : null;
             line.ManualDiscountAmount = request.Value > 0m ? ManualDiscountPricing.Amount(kind, request.Value, line.LineTotal) : 0m;
-            Audit(AuditActionType.DiscountOverride, cart,
+            Audit(AuditActionType.DiscountOverride, cart, approver,
                 new { scope = "line", lineId, manualDiscountAmount = before, total = cart.TotalAmount },
                 new { scope = "line", lineId, kind = request.Kind, value = request.Value, manualDiscountAmount = line.ManualDiscountAmount, reason = request.Reason.Trim() });
             return await SaveAndPriceAsync(cart, ct);
@@ -45,7 +46,7 @@ public sealed class ManualDiscountService(
     public Task<TransactionDto> SetCartDiscountAsync(SetManualDiscountRequest request, CancellationToken cancellationToken = default)
     {
         Validate(request);
-        return unitOfWork.ExecuteInTransactionAsync(async ct =>
+        return AuthorizedAsync(null, request.ApproverPin, async (approver, ct) =>
         {
             var cart = await RequireDiscountableCartAsync(ct);
             var lines = await transactionRepository.ListLinesAsync(cart.Id, ct);
@@ -59,7 +60,7 @@ public sealed class ManualDiscountService(
                 ? ManualDiscountPricing.Amount(kind, request.Value, lines.Sum(line => line.LineTotal - line.ManualDiscountAmount))
                 : 0m;
             cart.ManualDiscountReason = request.Value > 0m ? request.Reason.Trim() : null;
-            Audit(AuditActionType.DiscountOverride, cart,
+            Audit(AuditActionType.DiscountOverride, cart, approver,
                 new { scope = "cart", manualDiscountAmount = before, total = cart.TotalAmount },
                 new { scope = "cart", kind = request.Kind, value = request.Value, manualDiscountAmount = cart.ManualDiscountAmount, reason = request.Reason.Trim() });
             return await SaveAndPriceAsync(cart, ct);
@@ -74,7 +75,7 @@ public sealed class ManualDiscountService(
             throw new ValidationException(nameof(request.NewUnitPrice), "The price cannot be negative.");
         }
 
-        return unitOfWork.ExecuteInTransactionAsync(async ct =>
+        return AuthorizedAsync(lineId, request.ApproverPin, async (approver, ct) =>
         {
             var cart = await RequireDiscountableCartAsync(ct);
             var line = await RequireLineAsync(cart, lineId, ct);
@@ -90,11 +91,34 @@ public sealed class ManualDiscountService(
             line.PriceOverrideFrom ??= before;
             line.UnitPrice = newPrice;
             line.LineTotal = line.Quantity * newPrice;
-            Audit(AuditActionType.PriceOverride, cart,
+            Audit(AuditActionType.PriceOverride, cart, approver,
                 new { lineId, unitPrice = before, lineTotal = before * line.Quantity },
                 new { lineId, unitPrice = newPrice, lineTotal = line.LineTotal, priceOverrideFrom = line.PriceOverrideFrom, reason = request.Reason.Trim() });
             return await SaveAndPriceAsync(cart, ct);
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// A manager/admin PIN approves every manual discount, removal and price override (the signed-in person may be
+    /// a cashier). The PIN is checked BEFORE the transaction opens, after a read-only look at the cart so a bad
+    /// request does not burn an attempt: a wrong PIN records a failed attempt that must survive the error, and the
+    /// five-failure lockout would never accumulate if that write were rolled back with the transaction. The cart and
+    /// line are loaded again inside the transaction, which may be retried.
+    /// </summary>
+    private async Task<TransactionDto> AuthorizedAsync(
+        Guid? lineId,
+        string? approverPin,
+        Func<User, CancellationToken, Task<TransactionDto>> work,
+        CancellationToken cancellationToken)
+    {
+        var preview = await RequireDiscountableCartAsync(cancellationToken);
+        if (lineId is { } id)
+        {
+            _ = await RequireLineAsync(preview, id, cancellationToken);
+        }
+
+        var approver = await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
+        return await unitOfWork.ExecuteInTransactionAsync(ct => work(approver, ct), cancellationToken);
     }
 
     private async Task<TransactionDto> SaveAndPriceAsync(Transaction cart, CancellationToken cancellationToken)
@@ -126,7 +150,7 @@ public sealed class ManualDiscountService(
             : line;
     }
 
-    private void Audit(AuditActionType type, Transaction cart, object before, object after)
+    private void Audit(AuditActionType type, Transaction cart, User approver, object before, object after)
     {
         auditLogRepository.Add(new AuditLog
         {
@@ -135,6 +159,7 @@ public sealed class ManualDiscountService(
             ActionType = type,
             TargetEntityType = nameof(Transaction),
             TargetEntityId = cart.Id,
+            ApprovedByUserId = approver.Id,
             BeforeStateJson = JsonSerializer.Serialize(before),
             AfterStateJson = JsonSerializer.Serialize(after),
         });

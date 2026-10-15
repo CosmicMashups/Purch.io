@@ -154,11 +154,11 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
         using var admin = await TestSessions.AdminClientAsync(factory);
         var lineId = (await ReadAsync(await admin.PostAsJsonAsync("/transactions/cart/lines/open", Open("Custom order", 200m)))).Lines[0].Id;
 
-        var discounted = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", new { kind = "Percent", value = 10m, reason = "Regular" }));
+        var discounted = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", new { kind = "Percent", value = 10m, reason = "Regular", approverPin = TestSessions.AdminPin }));
         Assert.Equal(20m, discounted.Lines[0].ManualDiscountAmount);
         Assert.Equal(180m, discounted.TotalAmount);
 
-        var overridden = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Quote" }));
+        var overridden = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Quote", approverPin = TestSessions.AdminPin }));
         Assert.Equal(150m, overridden.Lines[0].UnitPrice);
         Assert.Equal(135m, overridden.TotalAmount);
         Assert.True(overridden.Lines[0].IsOpenItem);
@@ -290,7 +290,7 @@ public sealed class OpenItemTests(PostgresContainerFixture postgres)
         Assert.Equal(before + 999999.99m, ok.TotalAmount);
 
         // Each override alone fits (8000 x 1,249,900 < cap) but with the other line the cart overflows: 400, nothing changed.
-        var priceOver = await admin.PutAsJsonAsync($"/transactions/cart/lines/{first.Lines[0].Id}/price", new { newUnitPrice = 1249900m, reason = "x" });
+        var priceOver = await admin.PutAsJsonAsync($"/transactions/cart/lines/{first.Lines[0].Id}/price", new { newUnitPrice = 1249900m, reason = "x", approverPin = TestSessions.AdminPin });
         Assert.Equal(HttpStatusCode.BadRequest, priceOver.StatusCode);
         var after = (await admin.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
         Assert.Equal(ok.TotalAmount, after.TotalAmount);

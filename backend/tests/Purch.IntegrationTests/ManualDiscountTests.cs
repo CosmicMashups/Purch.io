@@ -4,6 +4,7 @@ using System.Text.Json;
 using Npgsql;
 using Purch.Application.Catalog;
 using Purch.Application.Pos;
+using Purch.Application.Onboarding;
 using Purch.Application.Promotions;
 using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
@@ -53,10 +54,37 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         return rows;
     }
 
-    private static object Discount(string kind, decimal value, string reason = "Damaged box") => new { kind, value, reason };
+    private static object Discount(string kind, decimal value, string reason = "Damaged box", string? approverPin = TestSessions.AdminPin) => new { kind, value, reason, approverPin };
+
+    private async Task<List<(Guid Actor, Guid? Approver)>> AuditActorsAsync(Guid transactionId, AuditActionType type)
+    {
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT \"ActorUserId\", \"ApprovedByUserId\" FROM \"AuditLogs\" WHERE \"TargetEntityId\" = @id AND \"ActionType\" = @type", connection);
+        _ = command.Parameters.AddWithValue("id", transactionId);
+        _ = command.Parameters.AddWithValue("type", (int)type);
+        var rows = new List<(Guid, Guid?)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1)));
+        }
+
+        return rows;
+    }
+
+    private async Task<int> UserRoleAsync(Guid userId)
+    {
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT \"Role\" FROM \"Memberships\" WHERE \"Id\" = @id", connection);
+        _ = command.Parameters.AddWithValue("id", userId);
+        return (int)(await command.ExecuteScalarAsync())!;
+    }
 
     [Fact]
-    public async Task A_cashier_is_refused_every_manual_discount_and_price_route()
+    public async Task A_cashier_needs_an_approver_pin_for_every_route_and_nothing_changes_without_it()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await TestSessions.AdminClientAsync(factory);
@@ -65,9 +93,78 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         var cart = await AddAsync(cashier, item);
         var lineId = cart.Lines[0].Id;
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m))).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync("/transactions/cart/discount", Discount("Percent", 10m))).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match" })).StatusCode);
+        foreach (var response in new[]
+        {
+            await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m, approverPin: null)),
+            await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m, approverPin: " ")),
+            await cashier.PutAsJsonAsync("/transactions/cart/discount", Discount("Percent", 10m, approverPin: null)),
+            await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match" }),
+            // Removing a discount (value 0) needs the PIN as well.
+            await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 0m, approverPin: null)),
+        })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("approverPin", await response.Content.ReadAsStringAsync());
+        }
+
+        var unchanged = (await cashier.GetFromJsonAsync<TransactionDto>("/transactions/cart", JsonOptions))!;
+        Assert.Equal(200m, unchanged.TotalAmount);
+        Assert.Null(unchanged.Lines[0].PriceOverrideFrom);
+        Assert.Empty(await AuditAfterStatesAsync(cart.Id, AuditActionType.DiscountOverride));
+        Assert.Empty(await AuditAfterStatesAsync(cart.Id, AuditActionType.PriceOverride));
+    }
+
+    [Fact]
+    public async Task A_cashier_with_a_managers_pin_discounts_and_the_audit_names_both_people()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin, name: "Cal Cashier");
+        var item = await CreateItemAsync(admin, "Rice", 200m);
+        var lineId = (await AddAsync(cashier, item)).Lines[0].Id;
+
+        var priced = await ReadAsync(await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m, "Dented can", "567812")));
+        Assert.Equal(180m, priced.TotalAmount);
+        var overridden = await ReadAsync(await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Match", approverPin = "567812" }));
+        Assert.Equal(150m, overridden.Lines[0].UnitPrice);
+
+        foreach (var type in new[] { AuditActionType.DiscountOverride, AuditActionType.PriceOverride })
+        {
+            var (actor, approver) = Assert.Single(await AuditActorsAsync(priced.Id, type));
+            Assert.Equal((int)MembershipRole.Staff, await UserRoleAsync(actor));
+            Assert.Equal((int)MembershipRole.Manager, await UserRoleAsync(approver!.Value));
+        }
+    }
+
+    [Fact]
+    public async Task Wrong_pins_persist_failed_attempts_and_lock_the_terminal_after_five()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var item = await CreateItemAsync(admin, "Rice", 200m);
+        _ = await AddAsync(cashier, item);
+
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await cashier.PutAsJsonAsync("/transactions/cart/discount", Discount("Fixed", 10m, approverPin: "999999"))).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync("/transactions/cart/discount", Discount("Fixed", 10m, approverPin: "567812"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_senior_pwd_toggle_is_still_manager_or_admin_only()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var item = await CreateItemAsync(admin, "Rice", 200m);
+        _ = await AddAsync(cashier, item);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync("/transactions/cart/senior-pwd-discount", new ApplySeniorPwdDiscountRequest(true))).StatusCode);
     }
 
     [Fact]
@@ -125,7 +222,7 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         Assert.Equal(45m, priced.ManualDiscountAmount);
 
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync("/transactions/cart/discount", Discount("Percent", 5m, "  "))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/transactions/cart/lines/{riceLine}/price", new { newUnitPrice = 90m, reason = "" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/transactions/cart/lines/{riceLine}/price", new { newUnitPrice = 90m, reason = "", approverPin = TestSessions.AdminPin })).StatusCode);
     }
 
     [Fact]
@@ -187,7 +284,7 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         var item = await CreateItemAsync(admin, "Rice", 200m);
         var lineId = (await AddAsync(admin, item, 2m)).Lines[0].Id;
 
-        var priced = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match" }));
+        var priced = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match", approverPin = TestSessions.AdminPin }));
 
         var line = priced.Lines[0];
         Assert.Equal(150m, line.UnitPrice);
@@ -264,7 +361,7 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         using var admin = await TestSessions.AdminClientAsync(factory);
         var item = await CreateItemAsync(admin, "Rice", 200m);
         var lineId = (await AddAsync(admin, item)).Lines[0].Id;
-        _ = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match" }));
+        _ = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 150m, reason = "Price match", approverPin = TestSessions.AdminPin }));
 
         var cart = await AddAsync(admin, item);
 
@@ -292,7 +389,7 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         var cart = await AddAsync(admin, item);
         Assert.Equal(50m, cart.ItemPromoDiscountAmount);
 
-        var priced = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{cart.Lines[0].Id}/price", new { newUnitPrice = 90m, reason = "Final price" }));
+        var priced = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{cart.Lines[0].Id}/price", new { newUnitPrice = 90m, reason = "Final price", approverPin = TestSessions.AdminPin }));
 
         Assert.Equal(0m, priced.ItemPromoDiscountAmount);
         Assert.Equal(90m, priced.TotalAmount);

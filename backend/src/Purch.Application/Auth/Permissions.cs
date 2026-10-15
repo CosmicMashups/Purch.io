@@ -17,7 +17,7 @@ public static class Permissions
     private static readonly IReadOnlySet<string> Empty = new HashSet<string>();
 
     private static readonly IReadOnlySet<string> CashierKeys =
-        new HashSet<string> { CartPark, OpenItemAdd, SplitPay };
+        new HashSet<string> { CartPark, DiscountApply, PriceOverride, OpenItemAdd, SplitPay };
 
     private static readonly IReadOnlySet<string> AdminKeys = new HashSet<string>(AllKeys);
 

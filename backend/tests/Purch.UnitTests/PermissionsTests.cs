@@ -9,14 +9,14 @@ public sealed class PermissionsTests
         [Permissions.CartPark, Permissions.DiscountApply, Permissions.PriceOverride, Permissions.OpenItemAdd, Permissions.SplitPay];
 
     [Fact]
-    public void Cashier_gets_park_open_item_and_split_only()
+    public void Cashier_may_attempt_discount_and_override_but_the_pin_approves()
     {
         var set = Permissions.For(Role.Cashier);
         Assert.Contains(Permissions.CartPark, set);
         Assert.Contains(Permissions.OpenItemAdd, set);
         Assert.Contains(Permissions.SplitPay, set);
-        Assert.DoesNotContain(Permissions.DiscountApply, set);
-        Assert.DoesNotContain(Permissions.PriceOverride, set);
+        Assert.Contains(Permissions.DiscountApply, set);
+        Assert.Contains(Permissions.PriceOverride, set);
     }
 
     [Fact]
@@ -33,6 +33,7 @@ public sealed class PermissionsTests
     [Fact]
     public void RolesFor_lists_roles_holding_the_key()
     {
-        Assert.Equal(["Admin", "Manager"], Permissions.RolesFor(Permissions.DiscountApply).OrderBy(r => r));
+        Assert.Equal(["Admin", "Cashier", "Manager"], Permissions.RolesFor(Permissions.DiscountApply).OrderBy(r => r));
+        Assert.DoesNotContain("Warehouse", Permissions.RolesFor(Permissions.PriceOverride));
     }
 }
