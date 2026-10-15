@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '../../components/Skeleton';
 import { PageHeader } from '../../components/PageHeader';
@@ -9,7 +9,9 @@ import { BirPanel } from './components/BirPanel';
 import { ExportsPanel } from './components/ExportsPanel';
 import { DepartmentPanel, MovementPanel, StaffPanels } from './components/RangePanels';
 import { RangeControl } from './components/RangeControl';
-import { choiceToParams, defaultChoice, type RangeChoice } from './params';
+import { ReportPicker } from './components/ReportPicker';
+import { choiceToParams } from './params';
+import { useRememberedChoice } from './useRememberedChoice';
 import { useDepartmentTracking } from '../tenant/queries';
 
 // The newer report tabs load on demand: most visits open one tab, and the page shell should not carry the rest.
@@ -48,32 +50,18 @@ export function ReportsPage() {
   const tab = TABS.find((t) => t.id === active)!;
   const { role } = useSession();
   const { branches } = useSelectableBranches();
-  const [choice, setChoice] = useState<RangeChoice>(defaultChoice('30d'));
+  const [choice, setChoice] = useRememberedChoice();
   const params = choiceToParams(choice);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Reports" backTo={{ to: '/business', label: 'Business' }} />
 
-      <div role="tablist" aria-label="Report" className="flex flex-wrap gap-2 print:hidden">
-        {tabs.map((t) => {
-          const selected = t.id === active;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`report-tab-${t.id}`}
-              aria-selected={selected}
-              aria-controls={`report-panel-${t.id}`}
-              onClick={() => setSearch({ tab: t.id }, { replace: true })}
-              className={`h-12 rounded-control px-5 text-base font-semibold ${selected ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <ReportPicker
+        active={active}
+        available={(id) => tabs.some((t) => t.id === id)}
+        onSelect={(id) => setSearch({ tab: id }, { replace: true })}
+      />
 
       {tab.usesRange && (
         <div className="print:hidden">

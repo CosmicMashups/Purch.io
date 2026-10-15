@@ -140,7 +140,7 @@ function Heatmap({ cells }: { cells: { dayOfWeek: number; hour: number; sales: n
               {range.map((h) => {
                 const value = byKey.get(`${d}-${h}`) ?? 0;
                 return (
-                  <td key={h} title={`${day} ${hourLabel(h)}: ${formatPeso(value)}`} className="h-10 rounded bg-surface-sunken p-0">
+                  <td key={h} title={`${day} ${hourLabel(h)}: ${formatPeso(value)}`} className="h-10 rounded bg-canvas p-0">
                     <div className="h-full w-full rounded bg-brand" style={{ opacity: value === 0 ? 0 : 0.15 + 0.85 * (value / max) }} />
                     <span className="sr-only">{formatPeso(value)}</span>
                   </td>

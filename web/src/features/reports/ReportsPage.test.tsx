@@ -58,6 +58,7 @@ const reading = (over: Partial<BirReading> = {}): BirReading => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
   useToastStore.setState({ toasts: [] });
   signInAs('Manager', { device_id: 'dev1', branch_id: 'kat', scope_type: 'Tenant' });
   // Department reports only show when the shop monitors departments (Options).
@@ -111,9 +112,39 @@ describe('range reports', () => {
     expect((new Date(params.to).getTime() - new Date(params.from).getTime()) / 86_400_000).toBe(30);
   });
 
+  it('groups the reports and shows only the chosen group underneath as tabs', async () => {
+    renderPage(<ReportsPage />);
+    await screen.findByText('30 sales');
+    expect(screen.getByRole('button', { name: 'People and stock' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('tab', { name: 'Tax' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sales' }));
+
+    expect(await screen.findByRole('tab', { name: 'Sales mix', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sales' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('tab', { name: 'Tax' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Staff' })).not.toBeInTheDocument();
+  });
+
+  it('shows the period as one chip with its dates and keeps the choice for the next visit', async () => {
+    const first = renderPage(<ReportsPage />);
+    await screen.findByText('30 sales');
+    const chip = screen.getByRole('button', { name: /^Period/ });
+    expect(chip).toHaveTextContent('Last 30 days');
+    fireEvent.click(chip);
+    fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
+    expect(chip).toHaveTextContent('Last 7 days');
+    first.unmount();
+
+    renderPage(<ReportsPage />);
+    await screen.findByText('30 sales');
+    expect(screen.getByRole('button', { name: /^Period/ })).toHaveTextContent('Last 7 days');
+  });
+
   it('re-queries when a preset or a branch is chosen', async () => {
     renderPage(<ReportsPage />);
     await screen.findByText('30 sales');
+    fireEvent.click(screen.getByRole('button', { name: /^Period/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Today' }));
     await waitFor(() => {
       const last = vi.mocked(reportsApi.staffPerformance).mock.calls.at(-1)![0];
@@ -126,6 +157,7 @@ describe('range reports', () => {
   it('does not fetch while a custom range is reversed, and says why', async () => {
     renderPage(<ReportsPage />);
     await screen.findByText('30 sales');
+    fireEvent.click(screen.getByRole('button', { name: /^Period/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
     fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-09-10' } });
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-09-20' } });
@@ -292,6 +324,7 @@ describe('exports', () => {
     signInAs('Admin', { device_id: 'dev1', branch_id: 'kat', scope_type: 'Tenant' });
     vi.mocked(reportsApi.transactionsCsv).mockResolvedValue('Receipt,Total\r\n41,137.5\r\n');
     renderPage(<ReportsPage />, { route: '/?tab=exports' });
+    fireEvent.click(await screen.findByRole('button', { name: /^Period/ }));
     fireEvent.change(await screen.findByLabelText('Branch'), { target: { value: 'kam' } });
     fireEvent.click(screen.getAllByRole('button', { name: 'Download CSV' })[1]);
     await waitFor(() => expect(reportsApi.transactionsCsv).toHaveBeenCalledTimes(1));
