@@ -186,6 +186,11 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.BranchId, t.CompletedAt }).HasDatabaseName("IX_Transactions_Completed");
         _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.StaffUserId }).HasDatabaseName("IX_Transactions_Staff");
 
+        // The refund report filters on when the refund happened; only refunded rows carry a value.
+        _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.BranchId, t.RefundedAt })
+            .HasFilter("\"RefundedAt\" IS NOT NULL")
+            .HasDatabaseName("IX_Transactions_Refunded");
+
         // The kiosk / kitchen / order-board polls only ever look at orders waiting for a cashier: a tiny slice of a
         // table that grows forever, so a partial index keeps that lookup flat. Status 1 = AwaitingPayment.
         _ = modelBuilder.Entity<Transaction>().HasIndex(t => new { t.TenantId, t.BranchId })

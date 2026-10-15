@@ -259,6 +259,9 @@ namespace Purch.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "CreatedAt")
                         .HasDatabaseName("IX_AuditLogs_TenantCreatedAt");
 
+                    b.HasIndex("TenantId", "ActionType", "CreatedAt")
+                        .HasDatabaseName("IX_AuditLogs_Action_CreatedAt");
+
                     b.HasIndex("TenantId", "ActorUserId", "ActionType")
                         .HasDatabaseName("IX_AuditLogs_Actor_Action");
 
@@ -2838,6 +2841,10 @@ namespace Purch.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "BranchId", "CompletedAt")
                         .HasDatabaseName("IX_Transactions_Completed");
+
+                    b.HasIndex("TenantId", "BranchId", "RefundedAt")
+                        .HasDatabaseName("IX_Transactions_Refunded")
+                        .HasFilter("\"RefundedAt\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "BranchId", "DeviceId", "ReceiptNumber")
                         .IsUnique()
