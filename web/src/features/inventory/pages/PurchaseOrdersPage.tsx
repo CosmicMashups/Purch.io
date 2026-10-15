@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { Pill } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 import { PageHeader } from '../../../components/PageHeader';
 import { useSelectableBranches } from '../../branches/queries';
 import type { Branch } from '../../branches/types';
@@ -31,6 +33,7 @@ const actionButton = 'h-12 rounded-control bg-brand px-5 text-base font-semibold
 const dangerButton = 'h-12 rounded-control bg-danger px-5 text-base font-semibold text-white hover:opacity-90 disabled:opacity-60';
 
 export function PurchaseOrdersPage() {
+  const navigate = useNavigate();
   const orders = usePurchaseOrders();
   const items = useItems();
   const ingredients = useInventoryItems();
@@ -58,6 +61,108 @@ export function PurchaseOrdersPage() {
     }
   }
 
+  const columns: DataColumn<PurchaseOrder>[] = [
+    {
+      header: 'Order',
+      sortValue: (o) => o.controlNumber ?? '',
+      cell: (o) => <span className="font-medium text-gray-900">{o.controlNumber || 'Purchase order'}</span>,
+    },
+    {
+      header: 'Supplier',
+      sortValue: (o) => o.supplierName,
+      cell: (o) => (
+        <div>
+          <p className="font-medium text-gray-900">{o.supplierName}</p>
+          {o.paymentAccountNumber && (
+            <p className="text-xs text-gray-500">
+              Pay to {o.paymentAccountName ? `${o.paymentAccountName}, ` : ''}
+              {o.paymentAccountNumber}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'Deliver to',
+      className: 'text-gray-600',
+      sortValue: (o) => o.branchName,
+      cell: (o) => (
+        <div>
+          <p>{o.branchName}</p>
+          {o.deliveryAddress && <p className="text-xs text-gray-500">{o.deliveryAddress}</p>}
+        </div>
+      ),
+    },
+    {
+      header: 'Items',
+      className: 'text-gray-600',
+      sortValue: (o) => o.lines.length,
+      cell: (o) => {
+        const ordered = o.lines.reduce((n, l) => n + l.quantityOrdered, 0);
+        const received = o.lines.reduce((n, l) => n + l.quantityReceived, 0);
+        return (
+          <div>
+            <p>{o.lines.length} {o.lines.length === 1 ? 'item' : 'items'}</p>
+            <p className="text-xs text-gray-500">{received} of {ordered} delivered</p>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Total',
+      className: 'text-right tabular-nums',
+      sortValue: (o) => o.orderTotal ?? null,
+      cell: (o) =>
+        o.orderTotal !== undefined && o.orderTotal > 0 ? (
+          <div>
+            <p className="font-semibold text-gray-900">{formatPeso(o.orderTotal)}</p>
+            <p className="text-xs text-gray-500">VAT {o.vatInclusive ? 'included' : 'added'}: {formatPeso(o.vatAmount ?? 0)}</p>
+          </div>
+        ) : (
+          ''
+        ),
+    },
+    {
+      header: 'Status',
+      sortValue: (o) => purchaseOrderStatusLabel[o.status].label,
+      cell: (o) => <Pill tone={purchaseOrderStatusLabel[o.status].tone}>{purchaseOrderStatusLabel[o.status].label}</Pill>,
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (order) => {
+        const actions = purchaseOrderActions(order.status);
+        return (
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className="h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand" onClick={() => printPurchaseOrder(order)}>
+              Print
+            </button>
+            {order.status === PurchaseOrderStatus.Draft && (
+              <button type="button" className={actionButton} onClick={() => setEditing(order)}>
+                Edit order
+              </button>
+            )}
+            {actions.includes('send') && (
+              <button type="button" className={actionButton} disabled={send.isPending} onClick={() => void onSend(order)}>
+                Submit order
+              </button>
+            )}
+            {actions.includes('record-delivery') && (
+              <Link to={`/inventory/incoming-receiving?po=${order.id}`} className={`${actionButton} inline-flex items-center`}>
+                Record delivery
+              </Link>
+            )}
+            {actions.includes('cancel') && (
+              <button type="button" className={dangerButton} onClick={() => setCancelling(order)}>
+                Cancel order
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -70,90 +175,15 @@ export function PurchaseOrdersPage() {
         }
       />
       <div>
-        <QueryList
+        <QueryTable
           query={orders}
+          label="Purchase orders"
+          columns={columns}
+          getId={(o) => o.id}
+          rowLabel={(o) => `Open ${o.controlNumber || `order to ${o.supplierName}`}`}
+          onRowClick={(o) => navigate(`/inventory/purchase-orders/${o.id}`)}
           errorTitle="Purchase orders could not be loaded"
           emptyMessage="No purchase orders yet."
-          renderRow={(order) => {
-            const status = purchaseOrderStatusLabel[order.status];
-            const actions = purchaseOrderActions(order.status);
-            return (
-              <ListCard key={order.id}>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold">
-                    {order.controlNumber ? `${order.controlNumber}: ` : ''}
-                    {order.supplierName}
-                  </p>
-                  <p className="text-sm text-ink-soft">
-                    Deliver to {order.branchName}
-                    {order.deliveryAddress ? `, ${order.deliveryAddress}` : ''}
-                  </p>
-                  {order.paymentAccountNumber && (
-                    <p className="text-sm text-ink-soft">
-                      Pay to {order.paymentAccountName ? `${order.paymentAccountName}, ` : ''}
-                      {order.paymentAccountNumber}
-                    </p>
-                  )}
-                  <ul className="mt-2 flex flex-col gap-1">
-                    {order.lines.map((line) => (
-                      <li key={line.id} className="text-base tabular-nums">
-                        {line.itemName}: {line.quantityReceived} of {line.quantityOrdered} {line.unit ?? ''} delivered at {formatPeso(line.expectedUnitCost)} each
-                      </li>
-                    ))}
-                  </ul>
-                  {order.orderTotal !== undefined && order.orderTotal > 0 && (
-                    <dl className="mt-2 grid max-w-xs grid-cols-[1fr_auto] gap-x-4 text-sm tabular-nums">
-                      <dt className="text-ink-soft">Subtotal</dt>
-                      <dd>{formatPeso(order.subtotal ?? 0)}</dd>
-                      {(order.discountAmount ?? 0) > 0 && (
-                        <>
-                          <dt className="text-ink-soft">Less discount</dt>
-                          <dd>{formatPeso(order.discountAmount ?? 0)}</dd>
-                        </>
-                      )}
-                      <dt className="text-ink-soft">VAT {order.vatInclusive ? '(included)' : '(added)'}</dt>
-                      <dd>{formatPeso(order.vatAmount ?? 0)}</dd>
-                      <dt className="font-semibold">Order total</dt>
-                      <dd className="font-semibold">{formatPeso(order.orderTotal)}</dd>
-                    </dl>
-                  )}
-                  {order.receipts.length > 0 && (
-                    <p className="mt-2 text-sm text-ink-soft">
-                      {order.receipts.length} delivery {order.receipts.length === 1 ? 'report' : 'reports'}, last on {order.receipts[order.receipts.length - 1].deliveryDate}
-                    </p>
-                  )}
-                  <button type="button" className="mt-3 h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand" onClick={() => printPurchaseOrder(order)}>
-                    Print
-                  </button>
-                  {actions.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {order.status === PurchaseOrderStatus.Draft && (
-                        <button type="button" className={actionButton} onClick={() => setEditing(order)}>
-                          Edit order
-                        </button>
-                      )}
-                      {actions.includes('send') && (
-                        <button type="button" className={actionButton} disabled={send.isPending} onClick={() => void onSend(order)}>
-                          Submit order
-                        </button>
-                      )}
-                      {actions.includes('record-delivery') && (
-                        <Link to={`/inventory/incoming-receiving?po=${order.id}`} className={`${actionButton} inline-flex items-center`}>
-                          Record delivery
-                        </Link>
-                      )}
-                      {actions.includes('cancel') && (
-                        <button type="button" className={dangerButton} onClick={() => setCancelling(order)}>
-                          Cancel order
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <Pill tone={status.tone}>{status.label}</Pill>
-              </ListCard>
-            );
-          }}
         />
 
       </div>

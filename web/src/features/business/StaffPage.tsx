@@ -3,7 +3,9 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { toast } from '../../components/feedback/toastStore';
 import { FormDialog, FormDialogLoader } from '../../components/forms/FormDialog';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
-import { ListCard, Pill, QueryList } from '../../components/lists/QueryList';
+import { ListCard, Pill } from '../../components/lists/QueryList';
+import { QueryTable } from '../../components/lists/QueryTable';
+import type { DataColumn } from '../../components/lists/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/dates';
 import { useSession } from '../auth/useSession';
@@ -55,6 +57,46 @@ export function StaffPage() {
   // A Manager looks after staff only; the server refuses the rest, so the buttons are simply not offered.
   const mayManage = (member: Member) => isAdmin || member.role === MembershipRole.Staff;
 
+  const columns: DataColumn<Member>[] = [
+    {
+      header: 'Name',
+      sortValue: (m) => m.name,
+      cell: (m) => (
+        <span className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
+          {m.name}
+          {!m.isActive && <Pill>Inactive</Pill>}
+        </span>
+      ),
+    },
+    { header: 'Email', className: 'text-gray-600', sortValue: (m) => m.email, cell: (m) => m.email },
+    { header: 'Role', className: 'text-gray-600', sortValue: (m) => labelOf(membershipRoleLabels, m.role), cell: (m) => labelOf(membershipRoleLabels, m.role) },
+    {
+      header: 'Access',
+      sortValue: (m) => describeAccess(m, branches.data ?? []),
+      cell: (m) => describeAccess(m, branches.data ?? []),
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (member) => {
+        if (!mayManage(member)) return null;
+        const actions: RowAction[] = [
+          { label: 'Edit', onSelect: () => setEditing(member) },
+          { label: 'Password reset link', onSelect: () => resetLink.mutate(member.id, { onSuccess: setShown }) },
+          member.isActive
+            ? { label: 'Make inactive', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'deactivate'), separated: true }
+            : { label: 'Make active', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'reactivate'), separated: true },
+          { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'delete') },
+        ];
+        return (
+          <div className="flex justify-end">
+            <RowActionsMenu subject={member.name} actions={actions} />
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -73,34 +115,14 @@ export function StaffPage() {
           {view === 'deleted' ? (
             <DeletedRecordsPanel kind="Staff" noun="staff" />
           ) : (
-            <QueryList
+            <QueryTable
               query={members}
+              label="Staff"
+              columns={columns}
+              getId={(m) => m.id}
               errorTitle="Staff could not be loaded"
               emptyMessage={view === 'active' ? 'No one here yet. Invite your first person.' : 'No inactive staff.'}
               transform={(rows) => rows.filter((m) => (view === 'active' ? m.isActive : !m.isActive))}
-              renderRow={(member) => {
-                const actions: RowAction[] = [
-                  { label: 'Edit', onSelect: () => setEditing(member) },
-                  { label: 'Password reset link', onSelect: () => resetLink.mutate(member.id, { onSuccess: setShown }) },
-                  member.isActive
-                    ? { label: 'Make inactive', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'deactivate'), separated: true }
-                    : { label: 'Make active', onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'reactivate'), separated: true },
-                  { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Staff', id: member.id, name: member.name }, 'delete') },
-                ];
-                return (
-                  <ListCard key={member.id}>
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
-                        {member.name}
-                        {!member.isActive && <Pill>Inactive</Pill>}
-                      </p>
-                      <p className="text-sm text-ink-soft">{member.email}</p>
-                      <p className="text-base">{describeAccess(member, branches.data ?? [])}</p>
-                    </div>
-                    {mayManage(member) && <RowActionsMenu subject={member.name} actions={actions} />}
-                  </ListCard>
-                );
-              }}
             />
           )}
 

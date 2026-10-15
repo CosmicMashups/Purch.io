@@ -15,10 +15,14 @@ import { EquipmentPage } from './features/equipment/pages/EquipmentPage';
 import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
 import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPage';
 import { PurchaseRequestsPage } from './features/inventory/pages/PurchaseRequestsPage';
+import { PurchaseRequestDetailPage } from './features/inventory/pages/PurchaseRequestDetailPage';
+import { PurchaseOrderDetailPage } from './features/inventory/pages/PurchaseOrderDetailPage';
+import { IncomingReceivingDetailPage } from './features/inventory/pages/IncomingReceivingDetailPage';
 import { LegacyRecordMovementRedirect } from './features/inventory/pages/LegacyRecordMovementRedirect';
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { ReportsPage } from './features/reports/ReportsPage';
+import { ReportsRedirect } from './features/reports/ReportsRedirect';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { BusinessPage } from './features/business/BusinessPage';
 import { CustomersPage } from './features/credit/CustomersPage';
@@ -127,16 +131,23 @@ export function App() {
             <Route path="/inventory/equipment" element={<EquipmentPage />} />
             <Route path="/inventory/suppliers" element={<SuppliersPage />} />
             <Route path="/inventory/purchase-requests" element={<PurchaseRequestsPage />} />
+            <Route path="/inventory/purchase-requests/:id" element={<PurchaseRequestDetailPage />} />
             <Route path="/inventory/purchase-orders" element={<PurchaseOrdersPage />} />
+            <Route path="/inventory/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
             <Route path="/inventory/incoming-receiving" element={<IncomingReceivingPage />} />
+            <Route path="/inventory/incoming-receiving/:id" element={<IncomingReceivingDetailPage />} />
             <Route path="/inventory/transfers" element={<TransfersPage />} />
             <Route path="/inventory/*" element={<Navigate to="/inventory" replace />} />
+          </Route>
+
+          <Route element={<RequireTab tab="reports" />}>
+            <Route path="/reports" element={<ReportsPage />} />
           </Route>
 
           <Route element={<RequireTab tab="business" />}>
             <Route path="/business" element={<BusinessPage />} />
             <Route path="/business/promotions" element={<PromotionsPage />} />
-            <Route path="/business/reports" element={<ReportsPage />} />
+            <Route path="/business/reports" element={<ReportsRedirect />} />
             <Route path="/business/customers" element={<CustomersPage />} />
             <Route path="/business/orders" element={<OrdersPage />} />
             <Route path="/business/sync-conflicts" element={<SyncConflictsPage />} />

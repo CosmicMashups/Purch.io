@@ -185,7 +185,7 @@ export function HomePage() {
             <h2 id="month-heading" className="text-2xl font-bold tracking-tight">
               Last 30 days
             </h2>
-            <Link to="/business/reports" className="inline-flex h-12 items-center text-base font-semibold text-brand-strong underline">
+            <Link to="/reports" className="inline-flex h-12 items-center text-base font-semibold text-brand-strong underline">
               More reports and exports
             </Link>
           </div>

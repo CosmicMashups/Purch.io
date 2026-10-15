@@ -99,6 +99,7 @@ export function IngredientsPage() {
   const columns: SortableColumn<InventoryItem>[] = [
     {
       header: 'Ingredient',
+      sortValue: (item) => item.name,
       cell: (item) => (
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">{item.name}</p>
@@ -108,15 +109,18 @@ export function IngredientsPage() {
     },
     {
       header: 'On hand',
+      sortValue: (item) => item.quantityOnHand,
       cell: (item) => <StockStepper value={item.quantityOnHand} unit={item.baseUnit} label={item.name} disabled={physicalCount.isPending || !stockBranch.branchId} onSet={(next) => setStock(item, next)} />,
     },
     {
       header: 'Packaging',
       className: 'text-gray-600',
+      sortValue: (item) => item.packagingUnit,
       cell: (item) => `1 ${item.packagingUnit} = ${item.packagingSize} ${item.baseUnit}${item.lowStockThreshold !== null ? `, alert at ${item.lowStockThreshold}` : ''}`,
     },
     {
       header: 'Status',
+      sortValue: (item) => (item.isActive ? 0 : 1),
       cell: (item) => (
         <div className="flex flex-wrap gap-1">
           {!item.isActive && <Pill>Inactive</Pill>}

@@ -12,6 +12,7 @@ namespace Purch.Application.Inventory;
 /// This is the one place stock arrives against a purchase order.</summary>
 public sealed class IncomingReceivingService(
     IIncomingReceivingRepository reportRepository,
+    IPurchaseRequestRepository sequenceRepository,
     IPurchaseOrderRepository purchaseOrderRepository,
     IInventoryMovementRepository movementRepository,
     ISupplierRepository supplierRepository,
@@ -54,7 +55,7 @@ public sealed class IncomingReceivingService(
         await branchScopeGuard.EnsureAllowedAsync(request.BranchId, cancellationToken);
         _ = await supplierRepository.GetByIdAsync(request.SupplierId, cancellationToken)
             ?? throw new NotFoundException("Supplier", request.SupplierId);
-        _ = await branchRepository.GetByIdAsync(request.BranchId, cancellationToken)
+        var branch = await branchRepository.GetByIdAsync(request.BranchId, cancellationToken)
             ?? throw new NotFoundException("Branch", request.BranchId);
 
         var items = new Dictionary<Guid, Item>();
@@ -97,6 +98,7 @@ public sealed class IncomingReceivingService(
         var report = new IncomingReceivingReport
         {
             TenantId = CurrentTenantId,
+            ControlNumber = await PurchaseDocuments.NextControlNumberAsync(sequenceRepository, CurrentTenantId, branch, PurchaseDocuments.ReceivingKind, cancellationToken),
             SupplierId = request.SupplierId,
             BranchId = request.BranchId,
             ReceivedByUserId = CurrentUserId,
@@ -308,7 +310,8 @@ public sealed class IncomingReceivingService(
             report.DeliveryDate,
             report.Remarks,
             report.CreatedAt,
-            lineDtos);
+            lineDtos,
+            report.ControlNumber);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId

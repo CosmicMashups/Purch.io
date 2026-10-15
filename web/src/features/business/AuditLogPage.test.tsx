@@ -29,9 +29,10 @@ describe('AuditLogPage', () => {
     vi.mocked(auditApi.list).mockResolvedValue([entry('1', { actionType: 8 }), entry('2', { actorUserId: 'gone', actionType: 6 })]);
     renderPage(<AuditLogPage />);
     expect(await screen.findByText('Staff access changed')).toBeInTheDocument();
-    expect(await screen.findByText(/Mario Cruz, Transaction #3fa85f64/)).toBeInTheDocument();
-    const items = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
-    expect(items.some((t) => t.includes('Credit limit override') && t.includes('A former staff member, Transaction'))).toBe(true);
+    expect((await screen.findAllByText('Mario Cruz')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Transaction #3fa85f64/).length).toBeGreaterThan(0);
+    const items = screen.getAllByRole('row').map((r) => r.textContent ?? '');
+    expect(items.some((t) => t.includes('Credit limit override') && t.includes('A former staff member') && t.includes('Transaction'))).toBe(true);
   });
 
   it('pages older entries using the last one as the cursor', async () => {

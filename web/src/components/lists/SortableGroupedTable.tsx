@@ -2,11 +2,14 @@ import type { CSSProperties, ReactNode } from 'react';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { SortHeader, useTableSort, type SortValue } from './tableSort';
 
 export interface SortableColumn<T> {
   header: string;
   className?: string;
   cell: (row: T) => ReactNode;
+  /** Makes the column sortable by clicking its header. Sorting applies inside each group and pauses reordering. */
+  sortValue?: (row: T) => SortValue;
 }
 
 export interface SortableGroup<T> {
@@ -35,25 +38,31 @@ export function SortableGroupedTable<T>({
   /** Turns the handles off, for example while a search hides part of a group. */
   disabled?: boolean;
 }) {
+  const sort = useTableSort(columns);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+    <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 bg-white">
       <table className="min-w-full text-sm">
         <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
           <tr>
-            <th className="w-10 px-2 py-2">
+            <th className="w-10 px-2 py-3">
               <span className="sr-only">Reorder</span>
             </th>
             {columns.map((column) => (
-              <th key={column.header} className={`px-4 py-2 ${column.className ?? ''}`}>
-                {column.header}
-              </th>
+              <SortHeader
+                key={column.header}
+                header={column.header}
+                className={column.className}
+                direction={sort.directionFor(column.header)}
+                onToggle={column.sortValue ? () => sort.toggle(column.header) : undefined}
+              />
             ))}
           </tr>
         </thead>
         {groups.map((group) => {
-          const ids = group.rows.map(getId);
+          const rows = sort.apply(group.rows);
+          const ids = rows.map(getId);
           const handleDragEnd = ({ active, over }: DragEndEvent) => {
             if (!over || active.id === over.id) return;
             const from = ids.indexOf(String(active.id));
@@ -66,14 +75,14 @@ export function SortableGroupedTable<T>({
               <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                 <tbody className="divide-y divide-gray-100 border-t border-gray-200">
                   <tr className="bg-gray-50">
-                    <th colSpan={columns.length + 1} scope="colgroup" className="px-4 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    <th colSpan={columns.length + 1} scope="colgroup" className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
                       {group.title} <span className="font-normal text-gray-400">({group.rows.length})</span>
                     </th>
                   </tr>
-                  {group.rows.map((row) => (
-                    <SortableRow key={getId(row)} id={getId(row)} label={rowLabel(row)} disabled={disabled || group.rows.length < 2}>
+                  {rows.map((row) => (
+                    <SortableRow key={getId(row)} id={getId(row)} label={rowLabel(row)} disabled={disabled || sort.sorted || rows.length < 2}>
                       {columns.map((column) => (
-                        <td key={column.header} className={`px-4 py-2 ${column.className ?? ''}`}>
+                        <td key={column.header} className={`px-4 py-3 ${column.className ?? ''}`}>
                           {column.cell(row)}
                         </td>
                       ))}
@@ -94,7 +103,7 @@ function SortableRow({ id, label, disabled, children }: { id: string; label: str
   const style: CSSProperties = { transform: CSS.Transform.toString(transform), transition, position: 'relative', zIndex: isDragging ? 1 : undefined };
   return (
     <tr ref={setNodeRef} style={style} className={isDragging ? 'bg-white shadow-md' : undefined}>
-      <td className="w-10 px-2 py-2 align-middle">
+      <td className="w-10 px-2 py-3 align-middle">
         <button
           type="button"
           ref={setActivatorNodeRef}

@@ -7,6 +7,7 @@ internal static class PurchaseDocuments
 {
     public const string RequestKind = "PR";
     public const string OrderKind = "PO";
+    public const string ReceivingKind = "IRR";
 
     public static async Task<string> NextControlNumberAsync(
         IPurchaseRequestRepository repository, Guid tenantId, Branch branch, string kind, CancellationToken cancellationToken)

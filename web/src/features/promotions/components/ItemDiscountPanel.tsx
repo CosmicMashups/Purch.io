@@ -14,7 +14,8 @@ import { itemNameOf } from '../format';
 import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
 import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
-import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 
 const EMPTY: ItemDiscountForm = {
   name: '',
@@ -31,6 +32,23 @@ export function ItemDiscountPanel({ items, view }: { items: Item[]; view: Status
   const rules = useItemDiscountRules();
   const [dialog, setDialog] = useState<'new' | ItemDiscountRule | null>(null);
 
+  const columns: DataColumn<ItemDiscountRule>[] = [
+    { header: 'Discount', sortValue: (r) => r.name, cell: (r) => <span className="font-medium text-gray-900">{r.name}</span> },
+    { header: 'Item', className: 'text-gray-600', sortValue: (r) => itemNameOf(items, r.itemId), cell: (r) => itemNameOf(items, r.itemId) },
+    { header: 'Discount value', className: 'text-gray-600', sortValue: (r) => r.discountValue, cell: (r) => describeDiscount(r.discountType, r.discountValue) },
+    { header: 'Runs', className: 'text-gray-600', sortValue: (r) => r.startsAt, cell: (r) => describeWindow(r.startsAt, r.endsAt) },
+    { header: 'Status', sortValue: (r) => (r.isActive ? 'Active' : 'Off'), cell: (r) => <ActiveBadge active={r.isActive} /> },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (r) => (
+        <div className="flex justify-end">
+          <PromoRowMenu subject={r.name} active={r.isActive} onEdit={() => setDialog(r)} onLifecycle={(action) => run({ kind: 'ItemDiscountPromo', id: r.id, name: r.name }, action)} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -41,26 +59,13 @@ export function ItemDiscountPanel({ items, view }: { items: Item[]; view: Status
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="ItemDiscountPromo" noun="item discounts" />
       ) : (
-      <RuleList
-        columns
+      <QueryTable
         query={rules}
+        label="Item discounts"
+        columns={columns}
+        getId={(r) => r.id}
         transform={(rows) => rows.filter((r) => (view === 'active' ? r.isActive : !r.isActive))}
         emptyMessage={view === 'active' ? "No item discounts yet." : "No inactive item discounts."}
-        renderRow={(rule) => (
-          <RuleCard key={rule.id}>
-            <div className="min-w-0">
-              <p className="text-base font-semibold">{rule.name}</p>
-              <p className="text-base">
-                {itemNameOf(items, rule.itemId)}: {describeDiscount(rule.discountType, rule.discountValue)}
-              </p>
-              <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <ActiveBadge active={rule.isActive} />
-              <PromoRowMenu subject={rule.name} active={rule.isActive} onEdit={() => setDialog(rule)} onLifecycle={(action) => run({ kind: 'ItemDiscountPromo', id: rule.id, name: rule.name }, action)} />
-            </div>
-          </RuleCard>
-        )}
       />
       )}
       {lifecycleDialog}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { DataTable, type DataColumn } from '../../../components/lists/DataTable';
 import { Pill } from '../../../components/lists/QueryList';
 import { ErrorState } from '../../../components/ErrorState';
 import { RowActionsMenu, type RowAction } from '../../../components/RowActionsMenu';
@@ -10,17 +11,12 @@ import { userMessage } from '../../../lib/apiError';
 import { useSession } from '../../auth/useSession';
 import { useApprovePurchaseRequest, useCancelPurchaseRequest, usePurchaseRequests, useRestockSuggestions, useSuppliers } from '../queries';
 import { PurchaseRequestStatus, type PurchaseRequest } from '../types';
+import { purchaseRequestStatusLabel } from '../workflow';
 import { ConvertRequestDialog } from './ConvertRequestDialog';
-
-const statusLabel: Record<PurchaseRequestStatus, { label: string; tone: 'neutral' | 'brand' | 'warn' | 'danger' }> = {
-  [PurchaseRequestStatus.Open]: { label: 'Awaiting approval', tone: 'warn' },
-  [PurchaseRequestStatus.Approved]: { label: 'Approved', tone: 'brand' },
-  [PurchaseRequestStatus.Converted]: { label: 'Ordered', tone: 'brand' },
-  [PurchaseRequestStatus.Cancelled]: { label: 'Cancelled', tone: 'neutral' },
-};
 
 /** Purchase requests as a compact list; approve, convert and cancel live in each row's menu. */
 export function PurchaseRequestsPanel() {
+  const navigate = useNavigate();
   const requests = usePurchaseRequests();
   const suppliers = useSuppliers();
   const suggestions = useRestockSuggestions();
@@ -57,6 +53,33 @@ export function PurchaseRequestsPanel() {
     return list;
   }
 
+  const columns: DataColumn<PurchaseRequest>[] = [
+    { header: 'Request', sortValue: (r) => r.controlNumber, cell: (r) => <span className="font-medium text-gray-900">{r.controlNumber}</span> },
+    {
+      header: 'Items',
+      className: 'text-gray-600',
+      sortValue: (r) => r.lines.length,
+      cell: (r) => `${r.lines.length} ${r.lines.length === 1 ? 'item' : 'items'}`,
+    },
+    { header: 'Branch', className: 'text-gray-600', sortValue: (r) => r.branchName, cell: (r) => r.branchName },
+    { header: 'Requested', className: 'whitespace-nowrap text-gray-600', sortValue: (r) => r.requestDate, cell: (r) => `${r.requestDate} by ${r.requestedByName || 'unknown'}` },
+    { header: 'Needed by', className: 'whitespace-nowrap text-gray-600', sortValue: (r) => r.dateNeeded, cell: (r) => r.dateNeeded ?? '' },
+    {
+      header: 'Status',
+      sortValue: (r) => purchaseRequestStatusLabel[r.status].label,
+      cell: (r) => <Pill tone={purchaseRequestStatusLabel[r.status].tone}>{purchaseRequestStatusLabel[r.status].label}</Pill>,
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (r) => (
+        <div className="flex justify-end">
+          <RowActionsMenu subject={r.controlNumber} actions={actionsFor(r)} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <section aria-labelledby="purchase-requests-heading" className="flex flex-col gap-3">
       <h2 id="purchase-requests-heading" className="sr-only">
@@ -68,30 +91,14 @@ export function PurchaseRequestsPanel() {
         <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No purchase requests yet. Start one from Restock first.</p>
       )}
       {requests.isSuccess && requests.data.length > 0 && (
-        <CompactList label="Purchase requests">
-          {requests.data.map((request) => {
-            const status = statusLabel[request.status];
-            return (
-              <CompactRow
-                key={request.id}
-                title={request.controlNumber}
-                detail={
-                  <>
-                    <p className="truncate">
-                      {request.lines.map((l) => `${l.name} ${l.quantity} ${l.unit}`).join(', ')}
-                    </p>
-                    <p className="truncate">
-                      {request.requestDate} by {request.requestedByName || 'unknown'}
-                      {request.dateNeeded ? `, needed by ${request.dateNeeded}` : ''}, to {request.branchName}
-                    </p>
-                  </>
-                }
-                aside={<Pill tone={status.tone}>{status.label}</Pill>}
-                menu={<RowActionsMenu subject={request.controlNumber} actions={actionsFor(request)} />}
-              />
-            );
-          })}
-        </CompactList>
+        <DataTable
+          label="Purchase requests"
+          rows={requests.data}
+          columns={columns}
+          getId={(r) => r.id}
+          rowLabel={(r) => `Open ${r.controlNumber}`}
+          onRowClick={(r) => navigate(`/inventory/purchase-requests/${r.id}`)}
+        />
       )}
       {converting && suppliers.data && (
         <ConvertRequestDialog request={converting} suppliers={suppliers.data} suggestions={suggestions.data ?? []} onClose={() => setConverting(null)} />

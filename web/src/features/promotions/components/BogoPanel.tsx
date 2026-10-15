@@ -13,7 +13,8 @@ import { itemNameOf } from '../format';
 import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
 import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
-import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 
 const EMPTY: BogoForm = {
   name: '',
@@ -32,6 +33,27 @@ export function BogoPanel({ items, view }: { items: Item[]; view: StatusView }) 
   // null: closed; 'new': adding; otherwise the rule being edited.
   const [dialog, setDialog] = useState<'new' | BogoRule | null>(null);
 
+  const columns: DataColumn<BogoRule>[] = [
+    { header: 'Promotion', sortValue: (r) => r.name, cell: (r) => <span className="font-medium text-gray-900">{r.name}</span> },
+    {
+      header: 'Deal',
+      className: 'text-gray-600',
+      sortValue: (r) => itemNameOf(items, r.triggerItemId),
+      cell: (r) => `Buy ${r.triggerQuantity} ${itemNameOf(items, r.triggerItemId)}, get ${r.freeQuantity} ${itemNameOf(items, r.freeItemId)} free`,
+    },
+    { header: 'Runs', className: 'text-gray-600', sortValue: (r) => r.startsAt, cell: (r) => describeWindow(r.startsAt, r.endsAt) },
+    { header: 'Status', sortValue: (r) => (r.isActive ? 'Active' : 'Off'), cell: (r) => <ActiveBadge active={r.isActive} /> },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (r) => (
+        <div className="flex justify-end">
+          <PromoRowMenu subject={r.name} active={r.isActive} onEdit={() => setDialog(r)} onLifecycle={(action) => run({ kind: 'BogoPromo', id: r.id, name: r.name }, action)} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -42,26 +64,13 @@ export function BogoPanel({ items, view }: { items: Item[]; view: StatusView }) 
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="BogoPromo" noun="Buy 1 Take 1 promotions" />
       ) : (
-      <RuleList
-        columns
+      <QueryTable
         query={rules}
+        label="Buy 1 Take 1 promotions"
+        columns={columns}
+        getId={(r) => r.id}
         transform={(rows) => rows.filter((r) => (view === 'active' ? r.isActive : !r.isActive))}
         emptyMessage={view === 'active' ? "No Buy 1 Take 1 promotions yet." : "No inactive Buy 1 Take 1 promotions."}
-        renderRow={(rule) => (
-          <RuleCard key={rule.id}>
-            <div className="min-w-0">
-              <p className="text-base font-semibold">{rule.name}</p>
-              <p className="text-base">
-                Buy {rule.triggerQuantity} {itemNameOf(items, rule.triggerItemId)}, get {rule.freeQuantity} {itemNameOf(items, rule.freeItemId)} free
-              </p>
-              <p className="text-sm text-ink-soft">{describeWindow(rule.startsAt, rule.endsAt)}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <ActiveBadge active={rule.isActive} />
-              <PromoRowMenu subject={rule.name} active={rule.isActive} onEdit={() => setDialog(rule)} onLifecycle={(action) => run({ kind: 'BogoPromo', id: rule.id, name: rule.name }, action)} />
-            </div>
-          </RuleCard>
-        )}
       />
       )}
       {lifecycleDialog}

@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorState } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { DataTable, type DataColumn } from '../../../components/lists/DataTable';
 import { Pill } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
 import { GroupedCombobox } from '../../../components/forms/GroupedCombobox';
@@ -11,7 +11,7 @@ import { userMessage } from '../../../lib/apiError';
 import { useBranches } from '../../branches/queries';
 import { FILTERABLE_TYPES, initialMovementType, movementLabel } from '../movement';
 import { useMovementLog } from '../queries';
-import { MovementType, type MovementFilter } from '../types';
+import { MovementType, type MovementFilter, type InventoryMovement } from '../types';
 import { ingredientRef, itemRef, parseStockRef, useStockOptions } from '../stockOptions';
 import { RecordMovementDialog } from './RecordMovementDialog';
 
@@ -60,6 +60,43 @@ export function MovementLogPage() {
   }
 
   const rows = log.data?.pages.flat() ?? [];
+  const columns: DataColumn<InventoryMovement>[] = [
+    {
+      header: 'Date',
+      className: 'whitespace-nowrap text-gray-600',
+      sortValue: (r) => new Date(r.createdAt),
+      cell: (r) => formatDateTime(r.createdAt),
+    },
+    {
+      header: 'Item',
+      sortValue: (r) => r.inventoryItemName ?? r.itemName,
+      cell: (r) => (
+        <div>
+          <p className="font-medium text-gray-900">{r.inventoryItemName ?? r.itemName}</p>
+          {r.inventoryItemName && r.inventoryItemName !== r.itemName && r.itemId && <p className="text-xs text-gray-500">For {r.itemName}</p>}
+        </div>
+      ),
+    },
+    { header: 'Branch', className: 'text-gray-600', sortValue: (r) => r.branchName, cell: (r) => r.branchName },
+    { header: 'Staff', className: 'text-gray-600', sortValue: (r) => r.staffUserName, cell: (r) => r.staffUserName },
+    {
+      header: 'Type',
+      sortValue: (r) => movementLabel(r.type),
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          {movementLabel(r.type)}
+          {r.type === MovementType.Sale && <Pill>Automatic</Pill>}
+        </div>
+      ),
+    },
+    { header: 'Quantity', className: 'text-right font-semibold tabular-nums', sortValue: (r) => r.quantity, cell: (r) => r.quantity },
+    {
+      header: 'Notes',
+      className: 'max-w-xs text-xs text-gray-500',
+      cell: (r) =>
+        [r.reasonCategory && `Reason: ${r.reasonCategory}`, r.supplierReference && `Supplier ref: ${r.supplierReference}`, r.note].filter(Boolean).join(' | '),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -118,37 +155,7 @@ export function MovementLogPage() {
         <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No movements match these filters.</p>
       )}
       {log.isSuccess && rows.length > 0 && (
-        <CompactList label="Stock movements">
-          {rows.map((row) => (
-            <CompactRow
-              key={row.id}
-              title={row.inventoryItemName ?? row.itemName}
-              detail={
-                <>
-                  <p className="truncate">
-                    {row.inventoryItemName && row.inventoryItemName !== row.itemName && row.itemId ? `For ${row.itemName}. ` : ''}
-                    {row.branchName}, {row.staffUserName}, {formatDateTime(row.createdAt)}
-                  </p>
-                  {(row.reasonCategory || row.supplierReference || row.note) && (
-                    <p className="truncate">
-                      {[row.reasonCategory && `Reason: ${row.reasonCategory}`, row.supplierReference && `Supplier ref: ${row.supplierReference}`, row.note]
-                        .filter(Boolean)
-                        .join(' | ')}
-                    </p>
-                  )}
-                </>
-              }
-              aside={
-                <div className="flex items-center gap-2">
-                  {row.type === MovementType.Sale && <Pill>Automatic</Pill>}
-                  <span className="text-base font-semibold tabular-nums">
-                    {movementLabel(row.type)}: {row.quantity}
-                  </span>
-                </div>
-              }
-            />
-          ))}
-        </CompactList>
+        <DataTable label="Stock movements" rows={rows} columns={columns} getId={(r) => r.id} />
       )}
       {recording && (
         <RecordMovementDialog

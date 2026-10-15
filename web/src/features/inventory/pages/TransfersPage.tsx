@@ -7,7 +7,7 @@ import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDial
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { FormCombobox, type ComboboxGroup } from '../../../components/forms/GroupedCombobox';
 import { ErrorState } from '../../../components/ErrorState';
-import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { DataTable, type DataColumn } from '../../../components/lists/DataTable';
 import { Pill } from '../../../components/lists/QueryList';
 import { RowActionsMenu } from '../../../components/RowActionsMenu';
 import { SkeletonList } from '../../../components/Skeleton';
@@ -67,6 +67,43 @@ export function TransfersPage() {
     }
   }
 
+  const transferLabel: Record<TransferAction, string> = { ship: 'Send', receive: 'Mark received', cancel: 'Cancel transfer' };
+  const columns: DataColumn<BranchTransfer>[] = [
+    {
+      header: 'Transfer',
+      sortValue: (t) => `${t.sourceBranchName} to ${t.destinationBranchName}`,
+      cell: (t) => <span className="font-medium text-gray-900">{`${t.sourceBranchName} to ${t.destinationBranchName}`}</span>,
+    },
+    {
+      header: 'Items',
+      className: 'text-gray-600',
+      sortValue: (t) => t.lines.length,
+      cell: (t) => t.lines.map((line) => `${line.itemName} ${line.quantity}`).join(', '),
+    },
+    {
+      header: 'Status',
+      sortValue: (t) => transferStatusLabel[t.status].label,
+      cell: (t) => <Pill tone={transferStatusLabel[t.status].tone}>{transferStatusLabel[t.status].label}</Pill>,
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (t) => (
+        <div className="flex justify-end">
+          <RowActionsMenu
+            subject={`${t.sourceBranchName} to ${t.destinationBranchName}`}
+            actions={transferActions(t.status).map((action) => ({
+              label: transferLabel[action],
+              danger: action === 'cancel',
+              separated: action === 'cancel',
+              onSelect: () => setPending({ action, transfer: t }),
+            }))}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -85,27 +122,7 @@ export function TransfersPage() {
           <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No transfers yet.</p>
         )}
         {transfers.isSuccess && transfers.data.length > 0 && (
-          <CompactList label="Stock transfers">
-            {transfers.data.map((transfer) => {
-              const status = transferStatusLabel[transfer.status];
-              const label: Record<TransferAction, string> = { ship: 'Send', receive: 'Mark received', cancel: 'Cancel transfer' };
-              const actions = transferActions(transfer.status).map((action) => ({
-                label: label[action],
-                danger: action === 'cancel',
-                separated: action === 'cancel',
-                onSelect: () => setPending({ action, transfer }),
-              }));
-              return (
-                <CompactRow
-                  key={transfer.id}
-                  title={`${transfer.sourceBranchName} to ${transfer.destinationBranchName}`}
-                  detail={<p className="truncate">{transfer.lines.map((line) => `${line.itemName} ${line.quantity}`).join(', ')}</p>}
-                  aside={<Pill tone={status.tone}>{status.label}</Pill>}
-                  menu={<RowActionsMenu subject={`${transfer.sourceBranchName} to ${transfer.destinationBranchName}`} actions={actions} />}
-                />
-              );
-            })}
-          </CompactList>
+          <DataTable label="Stock transfers" rows={transfers.data} columns={columns} getId={(t) => t.id} />
         )}
       </div>
 

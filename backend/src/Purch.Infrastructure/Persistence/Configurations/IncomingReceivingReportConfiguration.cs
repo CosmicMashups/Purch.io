@@ -8,6 +8,7 @@ public class IncomingReceivingReportConfiguration : IEntityTypeConfiguration<Inc
 {
     public void Configure(EntityTypeBuilder<IncomingReceivingReport> builder)
     {
+        _ = builder.Property(report => report.ControlNumber).HasMaxLength(40);
         _ = builder.HasIndex(report => report.PurchaseOrderId);
         _ = builder.HasIndex(report => report.SupplierId);
     }

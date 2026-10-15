@@ -28,7 +28,8 @@ describe('DevicesPage', () => {
     expect(await screen.findByText('Front counter')).toBeInTheDocument();
     expect(screen.getByText('Paired')).toBeInTheDocument();
     expect(screen.getByText('Waiting for its code')).toBeInTheDocument();
-    expect(screen.getByText('Register, Katipunan')).toBeInTheDocument();
+    expect(screen.getByText('Register')).toBeInTheDocument();
+    expect(screen.getAllByText('Katipunan').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Never seen').length).toBeGreaterThan(0);
     // A revoked device is out of service, so it is under Inactive rather than in the working list.
     expect(screen.queryByText('Old tablet')).not.toBeInTheDocument();

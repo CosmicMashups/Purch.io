@@ -16,6 +16,7 @@ import { IngredientSelector } from '../components/IngredientSelector';
 import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
 import type { Modifier, ModifierCategoryItem, ModifierGroup } from '../types';
 import { useState, type FormEvent } from 'react';
+import { DataTable, type DataColumn } from '../../../components/lists/DataTable';
 import { PageHeader } from '../../../components/PageHeader';
 import { RowActionsMenu } from '../../../components/RowActionsMenu';
 import { StatusBadge } from '../../../components/StatusBadge';
@@ -43,6 +44,78 @@ export function ModifierGroupsPage() {
 
   const shown = (groups ?? []).filter((g) => (view === 'active' ? g.isActive !== false : g.isActive === false));
 
+  const columns: DataColumn<ModifierGroup>[] = [
+    {
+      header: 'Group',
+      sortValue: (g) => g.name,
+      cell: (g) => (
+        <div>
+          <p className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
+            {g.name}
+            {g.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+          </p>
+          {g.categoryId && <p className="text-xs text-gray-500">Includes all items in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}</p>}
+        </div>
+      ),
+    },
+    {
+      header: 'Choice',
+      className: 'whitespace-nowrap text-gray-600',
+      sortValue: (g) => `${g.allowMultipleSelection ? 'Choose several' : 'Choose one'} ${g.isRequired ? 'Required' : 'Optional'}`,
+      cell: (g) => `${g.allowMultipleSelection ? 'Choose several' : 'Choose one'} · ${g.isRequired ? 'Required' : 'Optional'}`,
+    },
+    {
+      header: 'Modifiers',
+      className: 'min-w-64',
+      sortValue: (g) => g.modifiers.length,
+      cell: (g) =>
+        g.modifiers.length > 0 ? (
+          <ul className="flex flex-col divide-y divide-line" aria-label={`${g.name} modifiers`}>
+            {g.modifiers.map((m) => (
+              <ModifierRow
+                key={m.id}
+                modifier={m}
+                tracksIngredients={tracksIngredients}
+                onEdit={() => setModifierDialog({ groupId: g.id, modifier: m })}
+                onLifecycle={(action) => run({ kind: 'Modifier', id: m.id, name: m.name }, action)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <span className="text-gray-400">None yet</span>
+        ),
+    },
+    {
+      header: '',
+      className: 'text-right align-top',
+      cell: (g) => (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            aria-label={`Add modifier to ${g.name}`}
+            onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
+            className="hidden h-12 items-center rounded-control bg-brand text-on-brand hover:bg-brand-strong px-4 text-base font-semibold sm:inline-flex"
+          >
+            Add modifier
+          </button>
+          <RowActionsMenu
+            subject={g.name}
+            actions={[
+              { label: 'Edit group', onSelect: () => setGroupDialog(g) },
+              { label: 'Add modifier', onSelect: () => setModifierDialog({ groupId: g.id, modifier: null }) },
+              { label: 'Linked category', onSelect: () => setCategoryGroupId(g.id) },
+              { label: 'Add to items', onSelect: () => setApplyGroupId(g.id) },
+              g.isActive === false
+                ? { label: 'Make active', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'reactivate'), separated: true }
+                : { label: 'Make inactive', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'deactivate'), separated: true },
+              { label: 'Delete', danger: true, onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'delete') },
+            ]}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -64,67 +137,7 @@ export function ModifierGroupsPage() {
           {isLoading && <SkeletonList />}
           {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
           {!isLoading && !isError && shown.length === 0 && <EmptyState title={view === 'active' ? 'No modifier groups yet' : 'No inactive modifier groups'} />}
-          <ul className="flex flex-col gap-3">
-            {!isError &&
-              shown.map((g) => (
-                <li key={g.id} className="rounded-panel border border-line bg-surface p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 text-lg font-semibold">
-                        {g.name}
-                        {g.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
-                      </p>
-                      <p className="text-sm text-ink-soft">
-                        {g.allowMultipleSelection ? 'Choose several' : 'Choose one'} · {g.isRequired ? 'Required' : 'Optional'}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={`Add modifier to ${g.name}`}
-                        onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
-                        className="hidden h-12 items-center rounded-control bg-brand text-on-brand hover:bg-brand-strong px-4 text-base font-semibold sm:inline-flex"
-                      >
-                        Add modifier
-                      </button>
-                      <RowActionsMenu
-                        subject={g.name}
-                        actions={[
-                          { label: 'Edit group', onSelect: () => setGroupDialog(g) },
-                          { label: 'Add modifier', onSelect: () => setModifierDialog({ groupId: g.id, modifier: null }) },
-                          { label: 'Linked category', onSelect: () => setCategoryGroupId(g.id) },
-                          { label: 'Add to items', onSelect: () => setApplyGroupId(g.id) },
-                          g.isActive === false
-                            ? { label: 'Make active', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'reactivate'), separated: true }
-                            : { label: 'Make inactive', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'deactivate'), separated: true },
-                          { label: 'Delete', danger: true, onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'delete') },
-                        ]}
-                      />
-                    </div>
-                  </div>
-
-                  {g.categoryId && (
-                    <p className="mt-1 text-sm text-ink-soft">
-                      Includes all items in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
-                    </p>
-                  )}
-
-                  {g.modifiers.length > 0 && (
-                    <ul className="mt-2 flex flex-col divide-y divide-line" aria-label={`${g.name} modifiers`}>
-                      {g.modifiers.map((m) => (
-                        <ModifierRow
-                          key={m.id}
-                          modifier={m}
-                          tracksIngredients={tracksIngredients}
-                          onEdit={() => setModifierDialog({ groupId: g.id, modifier: m })}
-                          onLifecycle={(action) => run({ kind: 'Modifier', id: m.id, name: m.name }, action)}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-          </ul>
+          {!isError && shown.length > 0 && <DataTable label="Modifier groups" rows={shown} columns={columns} getId={(g) => g.id} />}
         </>
       )}
 

@@ -3,7 +3,7 @@ import { isBusinessTileVisible, landingPath, staffRoleFromClaim, tabsForRole } f
 
 describe('tabsForRole', () => {
   it('gives Admin and Manager all four tabs', () => {
-    const all = ['home', 'sell', 'inventory', 'business'];
+    const all = ['home', 'sell', 'inventory', 'reports', 'business'];
     expect(tabsForRole('Admin')).toEqual(all);
     expect(tabsForRole('Manager')).toEqual(all);
   });

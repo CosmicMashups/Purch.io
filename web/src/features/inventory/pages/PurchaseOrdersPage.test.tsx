@@ -55,7 +55,7 @@ describe('PurchaseOrdersPage', () => {
       order(PurchaseOrderStatus.Received, 'b'),
     ]);
     renderPage(<PurchaseOrdersPage />);
-    await screen.findAllByText('Deliver to Katipunan');
+    await screen.findAllByText('Katipunan');
     expect(screen.getAllByRole('button', { name: 'Submit order' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Cancel order' })).toHaveLength(1);
     expect(screen.queryAllByRole('link', { name: 'Record delivery' })).toHaveLength(0);
@@ -98,7 +98,7 @@ describe('PurchaseOrdersPage', () => {
   it('creates a draft order', async () => {
     vi.mocked(inventoryApi.createPurchaseOrder).mockResolvedValue({} as never);
     renderPage(<PurchaseOrdersPage />);
-    await screen.findByText('Deliver to Katipunan');
+    await screen.findByText('Katipunan');
     expect(screen.queryByLabelText('Supplier')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
     const dialog = await screen.findByRole('dialog', { name: 'New purchase order' });
@@ -124,7 +124,7 @@ describe('PurchaseOrdersPage', () => {
   it('orders an ingredient and hides the item-paired records', async () => {
     vi.mocked(inventoryApi.createPurchaseOrder).mockResolvedValue({} as never);
     renderPage(<PurchaseOrdersPage />);
-    await screen.findByText('Deliver to Katipunan');
+    await screen.findByText('Katipunan');
     fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
     const dialog = await screen.findByRole('dialog', { name: 'New purchase order' });
     await within(dialog).findByRole('option', { name: 'Flour (kg)' });
@@ -169,7 +169,7 @@ describe('PurchaseOrdersPage', () => {
 
   it('will not create an order without a supplier', async () => {
     renderPage(<PurchaseOrdersPage />);
-    await screen.findByText('Deliver to Katipunan');
+    await screen.findByText('Katipunan');
     fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Create draft' }));
     expect(await screen.findByText('Choose a supplier')).toBeInTheDocument();

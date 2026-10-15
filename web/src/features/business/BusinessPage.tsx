@@ -45,7 +45,7 @@ export function BusinessPage() {
       {canManage && <NeedsAttention creditOn={creditOn} />}
 
       {canManage && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className={`grid gap-6 ${creditOn ? 'lg:grid-cols-2' : ''}`}>
           {creditOn && <MoneyOwed />}
           <TeamPanel />
         </div>

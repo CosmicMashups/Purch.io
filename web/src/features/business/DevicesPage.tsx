@@ -6,7 +6,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { toast } from '../../components/feedback/toastStore';
 import { FormDialog, FormDialogLoader } from '../../components/forms/FormDialog';
 import { FormField, PrimaryButton, controlClass } from '../../components/forms/FormField';
-import { ListCard, QueryList } from '../../components/lists/QueryList';
+import { QueryTable } from '../../components/lists/QueryTable';
+import type { DataColumn } from '../../components/lists/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime } from '../../lib/dates';
 import { useBranches } from '../branches/queries';
@@ -46,6 +47,56 @@ export function DevicesPage() {
     revoke.mutate(device.id, { onSuccess: () => toast.success(`${nameOf(device)} was revoked and signed out`) });
   }
 
+  const branchName = (device: Device) => branches.data?.find((b) => b.id === device.branchId)?.name ?? 'branch';
+  const columns: DataColumn<Device>[] = [
+    {
+      header: 'Device',
+      sortValue: (d) => nameOf(d),
+      cell: (d) => (
+        <div>
+          <p className="font-medium text-gray-900">{nameOf(d)}</p>
+          {d.linkedRegisterDeviceId && <p className="text-xs text-gray-500">Shows {nameOf(devices.data?.find((x) => x.id === d.linkedRegisterDeviceId))}</p>}
+        </div>
+      ),
+    },
+    { header: 'Type', className: 'text-gray-600', sortValue: (d) => labelOf(deviceTypeLabels, d.deviceType), cell: (d) => labelOf(deviceTypeLabels, d.deviceType) },
+    { header: 'Branch', className: 'text-gray-600', sortValue: (d) => branchName(d), cell: (d) => branchName(d) },
+    { header: 'Status', sortValue: (d) => statusOf(d).label, cell: (d) => <StatusBadge {...statusOf(d)} /> },
+    {
+      header: 'Last seen',
+      className: 'whitespace-nowrap text-gray-600',
+      sortValue: (d) => (d.lastSeenAt ? new Date(d.lastSeenAt) : null),
+      cell: (d) => (d.lastSeenAt ? formatDateTime(d.lastSeenAt) : 'Never seen'),
+    },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (device) => {
+        const subject = nameOf(device);
+        const actions: RowAction[] = [
+          { label: 'New pairing code', onSelect: () => (device.status === DeviceStatus.Pending ? pairAgain(device) : setCodeFor(device)) },
+        ];
+        if (device.status === DeviceStatus.Active || device.status === DeviceStatus.Pending) {
+          actions.push({ label: 'Make inactive', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'deactivate'), separated: true });
+        }
+        if (device.status === DeviceStatus.Inactive) {
+          actions.push({ label: 'Make active', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'reactivate'), separated: true });
+        }
+        if (device.status !== DeviceStatus.Revoked) {
+          actions.push({ label: 'Revoke (lost or stolen)', danger: true, onSelect: () => setRevokeFor(device) });
+        }
+        if (isAdmin && (device.status === DeviceStatus.Inactive || device.status === DeviceStatus.Revoked)) {
+          actions.push({ label: 'Delete', danger: true, onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'delete') });
+        }
+        return (
+          <div className="flex justify-end">
+            <RowActionsMenu subject={subject} actions={actions} />
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -62,48 +113,14 @@ export function DevicesPage() {
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="Device" noun="devices" />
       ) : (
-        <QueryList
-          columns
+        <QueryTable
           query={devices}
+          label="Devices"
+          columns={columns}
+          getId={(d) => d.id}
           errorTitle="Devices could not be loaded"
           emptyMessage={view === 'active' ? 'No devices yet. Add one, then enter its code on the device.' : 'No inactive devices.'}
           transform={(rows) => rows.filter((d) => (view === 'active' ? d.status !== DeviceStatus.Inactive && d.status !== DeviceStatus.Revoked : d.status === DeviceStatus.Inactive || d.status === DeviceStatus.Revoked))}
-          renderRow={(device) => {
-            const subject = nameOf(device);
-            const actions: RowAction[] = [
-              { label: 'New pairing code', onSelect: () => (device.status === DeviceStatus.Pending ? pairAgain(device) : setCodeFor(device)) },
-            ];
-            if (device.status === DeviceStatus.Active || device.status === DeviceStatus.Pending) {
-              actions.push({ label: 'Make inactive', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'deactivate'), separated: true });
-            }
-            if (device.status === DeviceStatus.Inactive) {
-              actions.push({ label: 'Make active', onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'reactivate'), separated: true });
-            }
-            if (device.status !== DeviceStatus.Revoked) {
-              actions.push({ label: 'Revoke (lost or stolen)', danger: true, onSelect: () => setRevokeFor(device) });
-            }
-            if (isAdmin && (device.status === DeviceStatus.Inactive || device.status === DeviceStatus.Revoked)) {
-              actions.push({ label: 'Delete', danger: true, onSelect: () => run({ kind: 'Device', id: device.id, name: subject }, 'delete') });
-            }
-            return (
-              <ListCard key={device.id}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold">{subject}</p>
-                    <StatusBadge {...statusOf(device)} />
-                  </div>
-                  <p className="text-base">
-                    {labelOf(deviceTypeLabels, device.deviceType)}, {branches.data?.find((b) => b.id === device.branchId)?.name ?? 'branch'}
-                  </p>
-                  {device.linkedRegisterDeviceId && (
-                    <p className="text-sm text-ink-soft">Shows {nameOf(devices.data?.find((d) => d.id === device.linkedRegisterDeviceId))}</p>
-                  )}
-                  <p className="text-sm text-ink-soft">{device.lastSeenAt ? `Last seen ${formatDateTime(device.lastSeenAt)}` : 'Never seen'}</p>
-                </div>
-                <RowActionsMenu subject={subject} actions={actions} />
-              </ListCard>
-            );
-          }}
         />
       )}
 

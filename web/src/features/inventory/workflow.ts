@@ -1,4 +1,4 @@
-import { BranchTransferStatus, PurchaseOrderStatus, ReceivingCondition, ReceivingRemark } from './types';
+import { BranchTransferStatus, PurchaseOrderStatus, PurchaseRequestStatus, ReceivingCondition, ReceivingRemark } from './types';
 
 type Tone = 'brand' | 'neutral' | 'warn' | 'danger';
 
@@ -8,6 +8,13 @@ export const purchaseOrderStatusLabel: Record<PurchaseOrderStatus, { label: stri
   [PurchaseOrderStatus.PartiallyReceived]: { label: 'Partially delivered', tone: 'warn' },
   [PurchaseOrderStatus.Received]: { label: 'Delivered', tone: 'brand' },
   [PurchaseOrderStatus.Cancelled]: { label: 'Cancelled', tone: 'danger' },
+};
+
+export const purchaseRequestStatusLabel: Record<PurchaseRequestStatus, { label: string; tone: Tone }> = {
+  [PurchaseRequestStatus.Open]: { label: 'Awaiting approval', tone: 'warn' },
+  [PurchaseRequestStatus.Approved]: { label: 'Approved', tone: 'brand' },
+  [PurchaseRequestStatus.Converted]: { label: 'Ordered', tone: 'brand' },
+  [PurchaseRequestStatus.Cancelled]: { label: 'Cancelled', tone: 'neutral' },
 };
 
 export const transferStatusLabel: Record<BranchTransferStatus, { label: string; tone: Tone }> = {

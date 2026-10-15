@@ -1,7 +1,7 @@
 export const STAFF_ROLES = ['Admin', 'Manager', 'Cashier', 'Warehouse'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-export type AppTab = 'home' | 'sell' | 'inventory' | 'business';
+export type AppTab = 'home' | 'sell' | 'inventory' | 'reports' | 'business';
 
 export const BUSINESS_TILES = {
   devices: 'devices',
@@ -26,7 +26,7 @@ export function tabsForRole(role: StaffRole | null): readonly AppTab[] {
   switch (role) {
     case 'Admin':
     case 'Manager':
-      return ['home', 'sell', 'inventory', 'business'];
+      return ['home', 'sell', 'inventory', 'reports', 'business'];
     case 'Warehouse':
       return ['inventory'];
     case 'Cashier':
@@ -50,6 +50,7 @@ const TAB_ROOTS: Record<AppTab, string> = {
   home: '/',
   sell: '/sell',
   inventory: '/inventory',
+  reports: '/reports',
   business: '/business',
 };
 

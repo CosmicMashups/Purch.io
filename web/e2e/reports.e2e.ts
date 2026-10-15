@@ -12,7 +12,7 @@ test.describe('the new reports', () => {
   for (const { tab, heading } of TABS) {
     test(`the ${tab} tab loads with no error and offers CSV and PDF`, async ({ page, signInAs }) => {
       await signInAs('admin');
-      await page.goto(`/business/reports?tab=${tab}`);
+      await page.goto(`/reports?tab=${tab}`);
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Save as PDF' })).toBeVisible();
@@ -34,7 +34,7 @@ test.describe('the new reports', () => {
 
   test('a manager can read the reports but the Admin-only listing downloads are hidden', async ({ page, signInAs }) => {
     await signInAs('manager');
-    await page.goto('/business/reports?tab=voids');
+    await page.goto('/reports?tab=voids');
     await expect(page.getByRole('heading', { name: 'Voids', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Download all voids CSV/ })).toHaveCount(0);
   });

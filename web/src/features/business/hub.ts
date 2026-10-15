@@ -25,10 +25,12 @@ export const TILE_GROUPS: readonly TileGroup[] = [
     ],
   },
   {
-    title: 'Sell and stock',
+    title: 'Selling',
     tiles: [
       { id: 'catalog-modifiers', label: 'Modifier groups', hint: 'Add-ons and options', to: '/catalog/modifier-groups' },
       { id: 'promotions', label: 'Promotions', hint: 'Buy 1 Take 1, combos, discounts, codes', to: '/business/promotions' },
+      { id: 'orders', label: 'Orders', hint: 'Every sale and its receipt', to: '/business/orders' },
+      { id: 'customers', label: 'Customers', hint: 'Utang accounts, payments, reminders', to: '/business/customers' },
     ],
   },
   {
@@ -37,14 +39,6 @@ export const TILE_GROUPS: readonly TileGroup[] = [
       { id: 'audit-log', label: 'Audit log', hint: 'Who did what, and when', to: '/business/audit-log' },
       { id: 'sync-conflicts', label: 'Sync conflicts', hint: 'Changes that clashed between devices', to: '/business/sync-conflicts' },
       { id: 'business-settings', label: 'Business settings', hint: 'Logo, colours, BIR details, options', to: '/business/settings' },
-    ],
-  },
-  {
-    title: 'Money',
-    tiles: [
-      { id: 'orders', label: 'Orders', hint: 'Every sale and its receipt', to: '/business/orders' },
-      { id: 'customers', label: 'Customers', hint: 'Utang accounts, payments, reminders', to: '/business/customers' },
-      { id: 'reports', label: 'Reports', hint: 'Staff, stock, X and Z readings, exports', to: '/business/reports' },
     ],
   },
 ];

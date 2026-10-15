@@ -25,7 +25,8 @@ public sealed record IncomingReceivingDto(
     DateOnly DeliveryDate,
     string? Remarks,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<IncomingReceivingLineDto> Lines);
+    IReadOnlyList<IncomingReceivingLineDto> Lines,
+    string ControlNumber = "");
 
 public sealed record CreateIncomingReceivingRequest(
     Guid? PurchaseOrderId,

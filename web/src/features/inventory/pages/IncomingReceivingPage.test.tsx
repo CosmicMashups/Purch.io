@@ -65,10 +65,9 @@ describe('IncomingReceivingPage', () => {
 
   it('shows who received a delivery, its lines, and that it is not linked yet', async () => {
     renderPage(<IncomingReceivingPage />);
-    expect(await screen.findByText(/Received by Joy/)).toBeInTheDocument();
+    expect(await screen.findByText('Joy')).toBeInTheDocument();
     expect(screen.getByText('Not linked')).toBeInTheDocument();
-    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Not good').length).toBeGreaterThan(0);
+    expect(screen.getByText(/\d+ rejected/)).toBeInTheDocument();
   });
 
   it('links an unlinked report to a matching open order', async () => {

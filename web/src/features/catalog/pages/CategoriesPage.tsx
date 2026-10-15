@@ -17,6 +17,7 @@ import type { Category } from '../types';
 import { PageHeader } from '../../../components/PageHeader';
 import { RowActionsMenu } from '../../../components/RowActionsMenu';
 import { StatusBadge } from '../../../components/StatusBadge';
+import { DataTable, type DataColumn } from '../../../components/lists/DataTable';
 import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
 import { useLifecycle } from '../../lifecycle/useLifecycle';
 
@@ -32,6 +33,43 @@ export function CategoriesPage() {
   const shown = [...(categories ?? [])]
     .filter((c) => (view === 'active' ? c.isActive !== false : c.isActive === false))
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const columns: DataColumn<Category>[] = [
+    {
+      header: 'Category',
+      sortValue: (c) => c.name,
+      cell: (c) => (
+        <button type="button" onClick={() => setDialog(c)} aria-label={`Edit ${c.name}`} className="flex min-h-10 items-center gap-3 text-left">
+          {c.imageUrl ? (
+            <PurchImage src={c.imageUrl} alt="" className="size-10 rounded object-cover" errorNode={<span className="size-10 rounded bg-canvas" />} />
+          ) : (
+            <span className="size-10 rounded bg-canvas" />
+          )}
+          <span className="font-medium text-gray-900">{c.name}</span>
+          {c.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+        </button>
+      ),
+    },
+    { header: 'Sort order', className: 'text-gray-600 tabular-nums', sortValue: (c) => c.sortOrder, cell: (c) => c.sortOrder },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (c) => (
+        <div className="flex justify-end">
+          <RowActionsMenu
+            subject={c.name}
+            actions={[
+              { label: 'Edit', onSelect: () => setDialog(c) },
+              c.isActive === false
+                ? { label: 'Make active', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'reactivate'), separated: true }
+                : { label: 'Make inactive', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'deactivate'), separated: true },
+              { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'delete') },
+            ]}
+          />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,33 +92,7 @@ export function CategoriesPage() {
           {isError && <ErrorState message={describeQueryError(error)} onRetry={() => refetch()} />}
           {!isLoading && !isError && shown.length === 0 && <EmptyState title={view === 'active' ? 'No categories yet' : 'No inactive categories'} />}
           {!isError && shown.length > 0 && (
-            <ul className="divide-y divide-line rounded-panel border border-line bg-surface">
-              {shown.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-2">
-                  <button type="button" onClick={() => setDialog(c)} aria-label={`Edit ${c.name}`} className="flex min-h-12 min-w-0 flex-1 items-center gap-3 text-left">
-                    {c.imageUrl ? (
-                      <PurchImage src={c.imageUrl} alt="" className="size-10 rounded object-cover" errorNode={<span className="size-10 rounded bg-canvas" />} />
-                    ) : (
-                      <span className="size-10 rounded bg-canvas" />
-                    )}
-                    <span className="min-w-0 truncate text-base font-semibold">
-                      {c.name} <span className="font-normal text-ink-soft">#{c.sortOrder}</span>
-                    </span>
-                    {c.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
-                  </button>
-                  <RowActionsMenu
-                    subject={c.name}
-                    actions={[
-                      { label: 'Edit', onSelect: () => setDialog(c) },
-                      c.isActive === false
-                        ? { label: 'Make active', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'reactivate'), separated: true }
-                        : { label: 'Make inactive', onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'deactivate'), separated: true },
-                      { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Category', id: c.id, name: c.name }, 'delete') },
-                    ]}
-                  />
-                </li>
-              ))}
-            </ul>
+            <DataTable label="Categories" rows={shown} columns={columns} getId={(c) => c.id} />
           )}
         </>
       )}

@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
 import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { Pill } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 import { PageHeader } from '../../../components/PageHeader';
 import { useSession } from '../../auth/useSession';
 import { useSelectableBranches } from '../../branches/queries';
 import type { Branch } from '../../branches/types';
 import { useItems } from '../../catalog/queries';
 import type { Item } from '../../catalog/types';
-import { formatPeso } from '../../dashboard/format';
 import { incomingReceivingSchema, type IncomingReceivingForm } from '../purchasing';
 import { useCreateIncomingReceiving, useIncomingReceiving, useInventoryItems, useLinkIncomingReceiving, usePurchaseOrders, useSuppliers } from '../queries';
 import { PurchaseOrderStatus, ReceivingCondition, ReceivingRemark, type IncomingReceiving, type InventoryItem, type PurchaseOrder } from '../types';
-import { conditionLabel, isPurchaseOrderOpen, remarkLabel } from '../workflow';
+import { isPurchaseOrderOpen } from '../workflow';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -33,6 +34,7 @@ const blankForm = (branchId = ''): IncomingReceivingForm => ({
 });
 
 export function IncomingReceivingPage() {
+  const navigate = useNavigate();
   const reports = useIncomingReceiving();
   const orders = usePurchaseOrders();
   const items = useItems();
@@ -53,6 +55,38 @@ export function IncomingReceivingPage() {
     }
   }
 
+  const columns: DataColumn<IncomingReceiving>[] = [
+    {
+      header: 'Report',
+      className: 'whitespace-nowrap',
+      sortValue: (r) => r.controlNumber ?? '',
+      cell: (r) => <span className="font-medium text-gray-900">{r.controlNumber || 'Not numbered'}</span>,
+    },
+    { header: 'Delivered', className: 'whitespace-nowrap text-gray-600', sortValue: (r) => r.deliveryDate, cell: (r) => r.deliveryDate },
+    { header: 'Supplier', sortValue: (r) => r.supplierName, cell: (r) => <span className="font-medium text-gray-900">{r.supplierName}</span> },
+    { header: 'Branch', className: 'text-gray-600', sortValue: (r) => r.branchName, cell: (r) => r.branchName },
+    { header: 'Received by', className: 'text-gray-600', sortValue: (r) => r.receivedByName, cell: (r) => r.receivedByName },
+    {
+      header: 'Items',
+      className: 'text-gray-600',
+      sortValue: (r) => r.lines.length,
+      cell: (r) => {
+        const rejected = r.lines.filter((l) => l.remark === ReceivingRemark.Rejected).length;
+        return (
+          <div>
+            <p>{r.lines.length} {r.lines.length === 1 ? 'item' : 'items'}</p>
+            {rejected > 0 && <p className="text-xs text-danger">{rejected} rejected</p>}
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Purchase order',
+      sortValue: (r) => (r.purchaseOrderId === null ? 'Not linked' : (() => { const po = orders.data?.find((o) => o.id === r.purchaseOrderId); return po?.controlNumber || `PO to ${po?.supplierName ?? ''}`; })()),
+      cell: (r) => <ReportLink report={r} orders={orders.data ?? []} canLink={canLink} />,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -65,11 +99,15 @@ export function IncomingReceivingPage() {
         }
       />
       <div>
-        <QueryList
+        <QueryTable
           query={reports}
+          label="Incoming receiving reports"
+          columns={columns}
+          getId={(r) => r.id}
+          rowLabel={(r) => `Open ${r.controlNumber || `delivery from ${r.supplierName}`}`}
+          onRowClick={(r) => navigate(`/inventory/incoming-receiving/${r.id}`)}
           errorTitle="Receiving reports could not be loaded"
           emptyMessage="No deliveries recorded yet."
-          renderRow={(report) => <ReportRow key={report.id} report={report} orders={orders.data ?? []} canLink={canLink} />}
         />
       </div>
 
@@ -89,7 +127,7 @@ export function IncomingReceivingPage() {
   );
 }
 
-function ReportRow({ report, orders, canLink }: { report: IncomingReceiving; orders: PurchaseOrder[]; canLink: boolean }) {
+function ReportLink({ report, orders, canLink }: { report: IncomingReceiving; orders: PurchaseOrder[]; canLink: boolean }) {
   const link = useLinkIncomingReceiving();
   const [chosen, setChosen] = useState('');
   const linked = orders.find((o) => o.id === report.purchaseOrderId);
@@ -103,52 +141,31 @@ function ReportRow({ report, orders, canLink }: { report: IncomingReceiving; ord
   }
 
   return (
-    <ListCard>
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-semibold">{report.supplierName}</p>
-        <p className="text-sm text-ink-soft">
-          Delivered {report.deliveryDate} to {report.branchName}. Received by {report.receivedByName}.
-        </p>
-        <ul className="mt-2 flex flex-col gap-1">
-          {report.lines.map((line) => {
-            const remark = remarkLabel[line.remark];
-            return (
-              <li key={line.id} className="flex flex-wrap items-center gap-x-2 text-base tabular-nums">
-                <span>
-                  {line.itemName}: {line.quantityReceived} {line.uom} at {formatPeso(line.unitPrice)}
-                </span>
-                <span className="text-sm text-ink-soft">{conditionLabel[line.condition]}</span>
-                <Pill tone={remark.tone}>{remark.label}</Pill>
-              </li>
-            );
-          })}
-        </ul>
-        {report.remarks && <p className="mt-2 text-sm text-ink-soft">{report.remarks}</p>}
-        {report.purchaseOrderId === null && canLink && (
-          <div className="mt-3 flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Link to purchase order
-              <select value={chosen} onChange={(e) => setChosen(e.target.value)} className={controlClass}>
-                <option value="">{candidates.length > 0 ? 'Choose a purchase order' : 'No matching open order'}</option>
-                {candidates.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.supplierName}: {o.lines.map((l) => l.itemName).join(', ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <SecondaryButton type="button" onClick={() => void onLink()} disabled={!chosen || link.isPending}>
-              Link
-            </SecondaryButton>
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col items-start gap-2">
       {report.purchaseOrderId === null ? (
         <Pill tone="warn">Not linked</Pill>
       ) : (
-        <Pill tone="brand">{linked ? `PO to ${linked.supplierName}` : 'Linked to PO'}</Pill>
+        <Pill tone="brand">{linked ? linked.controlNumber || `PO to ${linked.supplierName}` : 'Linked to PO'}</Pill>
       )}
-    </ListCard>
+      {report.purchaseOrderId === null && canLink && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Link to purchase order
+            <select value={chosen} onChange={(e) => setChosen(e.target.value)} className={controlClass}>
+              <option value="">{candidates.length > 0 ? 'Choose a purchase order' : 'No matching open order'}</option>
+              {candidates.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.supplierName}: {o.lines.map((l) => l.itemName).join(', ')}
+                </option>
+              ))}
+            </select>
+          </label>
+          <SecondaryButton type="button" onClick={() => void onLink()} disabled={!chosen || link.isPending}>
+            Link
+          </SecondaryButton>
+        </div>
+      )}
+    </div>
   );
 }
 

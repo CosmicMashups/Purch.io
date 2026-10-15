@@ -6,6 +6,9 @@ namespace Purch.Domain.Entities;
 /// It may exist before its purchase order does; an admin links the two later.</summary>
 public class IncomingReceivingReport : TenantScopedEntity
 {
+    /// <summary>The report's own number, for example MAIN-IRR-00001; blank on reports saved before numbering.</summary>
+    public string ControlNumber { get; set; } = string.Empty;
+
     public Guid? PurchaseOrderId { get; set; }
 
     public Guid SupplierId { get; set; }

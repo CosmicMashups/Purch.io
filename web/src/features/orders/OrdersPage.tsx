@@ -6,6 +6,7 @@ import { ErrorState, describeQueryError } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { controlClass } from '../../components/forms/FormField';
 import { PageHeader } from '../../components/PageHeader';
+import { DataTable, type DataColumn } from '../../components/lists/DataTable';
 import { SkeletonList } from '../../components/Skeleton';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatDateTime } from '../../lib/dates';
@@ -137,6 +138,41 @@ export function OrdersPage() {
   const totalPages = orders.data ? Math.max(1, Math.ceil(orders.data.total / orders.data.pageSize)) : 1;
   const branchList = (branches.data ?? []).filter((b) => b.isActive !== false || b.id === branchId);
 
+  const columns: DataColumn<OrderRow>[] = [
+    {
+      header: 'Receipt',
+      sortValue: (r) => r.receiptNumber,
+      cell: (r) => (
+        <button
+          type="button"
+          onClick={() => void openReceipt(r)}
+          disabled={opening === r.id}
+          aria-label={`Open receipt ${r.receiptNumber ?? ''} ${r.deviceName}`.trim()}
+          className="font-bold tabular-nums text-brand-strong underline disabled:opacity-60"
+        >
+          {r.receiptNumber ? `#${r.receiptNumber}` : 'No receipt'}
+        </button>
+      ),
+    },
+    { header: 'Date', className: 'whitespace-nowrap text-gray-600', sortValue: (r) => new Date(r.at), cell: (r) => formatDateTime(r.at) },
+    {
+      header: 'Status',
+      sortValue: (r) => r.status,
+      cell: (r) => <StatusBadge label={r.hasExchange ? `${r.status}, exchanged` : r.status} tone={statusTone(r)} />,
+    },
+    { header: 'Branch', className: 'text-gray-600', sortValue: (r) => r.branchName, cell: (r) => r.branchName },
+    { header: 'Device', className: 'text-gray-600', sortValue: (r) => r.deviceName, cell: (r) => r.deviceName },
+    { header: 'Cashier', className: 'text-gray-600', sortValue: (r) => r.staffName, cell: (r) => r.staffName },
+    { header: 'Customer', className: 'text-gray-600', sortValue: (r) => r.customerName, cell: (r) => r.customerName },
+    {
+      header: 'Paid with',
+      className: 'text-gray-600',
+      sortValue: (r) => r.paymentMethods.map((m) => METHOD_LABEL[m] ?? m).join(' + '),
+      cell: (r) => r.paymentMethods.map((m) => METHOD_LABEL[m] ?? m).join(' + '),
+    },
+    { header: 'Total', className: 'text-right font-semibold tabular-nums', sortValue: (r) => r.totalAmount, cell: (r) => formatPeso(r.totalAmount) },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -248,31 +284,7 @@ export function OrdersPage() {
           <p className="text-sm text-ink-soft" aria-live="polite">
             {orders.data.total} {orders.data.total === 1 ? 'order' : 'orders'}
           </p>
-          <ul className="flex flex-col gap-2" aria-label="Orders">
-            {orders.data.items.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => void openReceipt(row)}
-                  disabled={opening === row.id}
-                  aria-label={`Open receipt ${row.receiptNumber ?? ''} ${row.deviceName}`.trim()}
-                  className="grid w-full gap-x-4 gap-y-1 rounded-panel border border-line bg-surface p-4 text-left hover:border-brand disabled:opacity-60 sm:grid-cols-[1fr_auto]"
-                >
-                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-base font-bold tabular-nums">{row.receiptNumber ? `#${row.receiptNumber}` : 'No receipt'}</span>
-                    <StatusBadge label={row.hasExchange ? `${row.status}, exchanged` : row.status} tone={statusTone(row)} />
-                    <span className="text-sm text-ink-soft">{formatDateTime(row.at)}</span>
-                  </span>
-                  <span className="text-lg font-bold tabular-nums sm:text-right">{formatPeso(row.totalAmount)}</span>
-                  <span className="text-sm text-ink-soft sm:col-span-2">
-                    {[row.branchName, row.deviceName, row.staffName, row.customerName && `Customer: ${row.customerName}`, row.paymentMethods.map((m) => METHOD_LABEL[m] ?? m).join(' + ')]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <DataTable label="Orders" rows={orders.data.items} columns={columns} getId={(r) => r.id} />
           {totalPages > 1 && (
             <nav aria-label="Pages" className="flex items-center justify-between gap-3">
               <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-40">

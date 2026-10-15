@@ -7,12 +7,13 @@ import { formatDateTime, localInputToIso } from '../../../lib/dates';
 import { describeDiscount } from '../format';
 import { useCreatePromoCode, usePromoCodes } from '../queries';
 import { promoCodeSchema, type PromoCodeForm } from '../schemas';
-import { PromoDiscountType } from '../types';
+import { PromoDiscountType, type PromoCode } from '../types';
 import { ActiveBadge, PromoRowMenu, ScheduleFields } from './shared';
 import { DeletedRecordsPanel, type StatusView } from '../../lifecycle/StatusFilter';
 import { useLifecycle } from '../../lifecycle/useLifecycle';
 import { FormDialog } from '../../../components/forms/FormDialog';
-import { ListCard as RuleCard, QueryList as RuleList } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 
 const EMPTY: PromoCodeForm = { code: '', discountType: PromoDiscountType.Percentage, discountValue: 0, expiresAt: '' };
 
@@ -21,6 +22,27 @@ export function PromoCodePanel({ view }: { view: StatusView }) {
   const { run, dialog: lifecycleDialog } = useLifecycle();
   const codes = usePromoCodes();
   const [adding, setAdding] = useState(false);
+
+  const columns: DataColumn<PromoCode>[] = [
+    { header: 'Code', sortValue: (r) => r.code, cell: (r) => <span className="font-mono font-semibold tracking-wide text-gray-900">{r.code}</span> },
+    { header: 'Discount', className: 'text-gray-600', sortValue: (r) => r.discountValue, cell: (r) => describeDiscount(r.discountType, r.discountValue) },
+    {
+      header: 'Expires',
+      className: 'text-gray-600',
+      sortValue: (r) => (r.expiresAt ? new Date(r.expiresAt) : null),
+      cell: (r) => (r.expiresAt ? formatDateTime(r.expiresAt) : 'Never expires'),
+    },
+    { header: 'Status', sortValue: (r) => (r.isActive ? 'Active' : 'Off'), cell: (r) => <ActiveBadge active={r.isActive} /> },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (r) => (
+        <div className="flex justify-end">
+          <PromoRowMenu subject={r.code} active={r.isActive} onLifecycle={(action) => run({ kind: 'PromoCode', id: r.id, name: r.code }, action)} />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -32,24 +54,13 @@ export function PromoCodePanel({ view }: { view: StatusView }) {
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="PromoCode" noun="promo codes" />
       ) : (
-      <RuleList
-        columns
+      <QueryTable
         query={codes}
+        label="Promo codes"
+        columns={columns}
+        getId={(r) => r.id}
         transform={(rows) => rows.filter((c) => (view === 'active' ? c.isActive : !c.isActive))}
         emptyMessage={view === 'active' ? 'No promo codes yet.' : 'No inactive promo codes.'}
-        renderRow={(code) => (
-          <RuleCard key={code.id}>
-            <div className="min-w-0">
-              <p className="font-mono text-lg font-semibold tracking-wide">{code.code}</p>
-              <p className="text-base">{describeDiscount(code.discountType, code.discountValue)}</p>
-              <p className="text-sm text-ink-soft">{code.expiresAt ? `Expires ${formatDateTime(code.expiresAt)}` : 'Never expires'}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <ActiveBadge active={code.isActive} />
-              <PromoRowMenu subject={code.code} active={code.isActive} onLifecycle={(action) => run({ kind: 'PromoCode', id: code.id, name: code.code }, action)} />
-            </div>
-          </RuleCard>
-        )}
       />
       )}
       {lifecycleDialog}

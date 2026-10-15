@@ -55,7 +55,7 @@ export function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Reports" backTo={{ to: '/business', label: 'Business' }} />
+      <PageHeader title="Reports" />
 
       <ReportPicker
         active={active}

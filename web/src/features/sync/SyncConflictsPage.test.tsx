@@ -32,9 +32,9 @@ beforeEach(() => {
 describe('SyncConflictsPage', () => {
   it('lists the record that needs review first, with a plain explanation', async () => {
     renderPage(<SyncConflictsPage />);
-    const items = await screen.findAllByRole('listitem');
+    const items = (await screen.findAllByRole('row')).slice(1);
     expect(items[0]).toHaveTextContent('Sale #3fa85f64');
-    expect(items[0]).toHaveTextContent('Lost the sync race');
+    expect(items[0]).toHaveTextContent('Needs review');
     expect(items[0]).toContainElement(screen.getByRole('button', { name: 'Acknowledge' }));
     expect(items[1]).toHaveTextContent('Reviewed');
     expect(screen.getAllByRole('button', { name: 'Acknowledge' })).toHaveLength(1);

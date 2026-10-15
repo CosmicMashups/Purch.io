@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { ErrorState } from '../../components/ErrorState';
 import { SkeletonList } from '../../components/Skeleton';
 import { FormField, SecondaryButton, controlClass } from '../../components/forms/FormField';
-import { ListCard } from '../../components/lists/QueryList';
+import { DataTable, type DataColumn } from '../../components/lists/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { userMessage } from '../../lib/apiError';
 import { formatDateTime } from '../../lib/dates';
@@ -40,6 +40,22 @@ export function AuditLogPage() {
   });
   const rows = log.data?.pages.flat() ?? [];
   const nameOf = (id: string) => staff.data?.find((s) => s.id === id)?.name ?? 'A former staff member';
+
+  const columns: DataColumn<(typeof rows)[number]>[] = [
+    { header: 'When', className: 'whitespace-nowrap text-gray-600', sortValue: (r) => new Date(r.createdAt), cell: (r) => formatDateTime(r.createdAt) },
+    {
+      header: 'Action',
+      sortValue: (r) => labelOf(auditActionLabels, r.actionType),
+      cell: (r) => <span className="font-medium text-gray-900">{labelOf(auditActionLabels, r.actionType)}</span>,
+    },
+    { header: 'Staff member', sortValue: (r) => nameOf(r.actorUserId), cell: (r) => nameOf(r.actorUserId) },
+    {
+      header: 'Record',
+      className: 'text-gray-600',
+      sortValue: (r) => `${r.targetEntityType} ${shortId(r.targetEntityId)}`,
+      cell: (r) => `${r.targetEntityType} ${shortId(r.targetEntityId)}`,
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,19 +95,7 @@ export function AuditLogPage() {
       {log.isError && <ErrorState title="The audit log could not be loaded" message={userMessage(log.error)} onRetry={() => void log.refetch()} />}
       {log.isSuccess && rows.length === 0 && <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">Nothing matches these filters.</p>}
       {log.isSuccess && rows.length > 0 && (
-        <ul className="flex flex-col gap-3">
-          {rows.map((row) => (
-            <ListCard key={row.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{labelOf(auditActionLabels, row.actionType)}</p>
-                <p className="text-base">
-                  {nameOf(row.actorUserId)}, {row.targetEntityType} {shortId(row.targetEntityId)}
-                </p>
-                <p className="text-sm text-ink-soft">{formatDateTime(row.createdAt)}</p>
-              </div>
-            </ListCard>
-          ))}
-        </ul>
+        <DataTable label="Audit log" rows={rows} columns={columns} getId={(r) => r.id} />
       )}
       {log.hasNextPage && (
         <div>

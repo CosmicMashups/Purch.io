@@ -43,7 +43,7 @@ export function ExecutiveInsights({ range, periodLabel }: { range: RangeParams |
         <h2 id="insights-heading" className="text-2xl font-bold tracking-tight">
           Profit and leakage
         </h2>
-        <Link to="/business/reports?tab=profit" className="inline-flex h-12 items-center text-base font-semibold text-brand-strong underline">
+        <Link to="/reports?tab=profit" className="inline-flex h-12 items-center text-base font-semibold text-brand-strong underline">
           Full profit report
         </Link>
       </div>

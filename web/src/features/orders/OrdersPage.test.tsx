@@ -51,7 +51,7 @@ describe('OrdersPage', () => {
     expect(await screen.findAllByText('#1047')).toHaveLength(2);
     expect(screen.getByText(/Front counter/)).toBeInTheDocument();
     expect(screen.getByText(/Back counter/)).toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: 'Orders' })).getByText('Refunded')).toBeInTheDocument();
+    expect(within(screen.getByRole('table', { name: 'Orders' })).getByText('Refunded')).toBeInTheDocument();
     const first = vi.mocked(ordersApi.list).mock.calls[0][0];
     expect(first.from).toBeTruthy();
     expect(first.to).toBeTruthy();

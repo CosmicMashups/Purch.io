@@ -71,18 +71,18 @@ describe('Business page for an admin', () => {
   it('groups the links by what they are for', async () => {
     signInAs('Admin');
     renderPage(<BusinessPage />);
-    for (const name of ['Sell and stock', 'People and places', 'Money', 'Records and settings']) {
+    for (const name of ['Selling', 'People and places', 'Records and settings']) {
       expect(await screen.findByRole('heading', { name })).toBeInTheDocument();
     }
     const order = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(order.filter((t) => ['People and places', 'Sell and stock', 'Records and settings', 'Money'].includes(t ?? ''))).toEqual([
+    expect(order.filter((t) => ['People and places', 'Selling', 'Records and settings'].includes(t ?? ''))).toEqual([
       'People and places',
-      'Sell and stock',
+      'Selling',
       'Records and settings',
-      'Money',
     ]);
-    const money = screen.getByRole('heading', { name: 'Money' }).closest('section') as HTMLElement;
-    expect(within(money).getByRole('link', { name: /^Reports/ })).toBeInTheDocument();
+    const money = screen.getByRole('heading', { name: 'Selling' }).closest('section') as HTMLElement;
+    expect(within(money).getByRole('link', { name: /^Orders/ })).toBeInTheDocument();
+    expect(within(money).queryByRole('link', { name: /^Reports/ })).not.toBeInTheDocument();
   });
 });
 

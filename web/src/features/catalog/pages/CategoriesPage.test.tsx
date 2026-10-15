@@ -29,7 +29,7 @@ describe('CategoriesPage', () => {
 
   it('lists categories in sort order', async () => {
     renderPage();
-    const rows = await screen.findAllByRole('listitem');
+    const rows = (await screen.findAllByRole('row')).slice(1);
     expect(rows[0]).toHaveTextContent('Coffee');
     expect(rows[1]).toHaveTextContent('Pastries');
   });

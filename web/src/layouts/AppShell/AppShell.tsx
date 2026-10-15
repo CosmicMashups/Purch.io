@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Cube, House, CashRegister, List, LockSimple, SignOut, Storefront, WifiSlash, X } from '@phosphor-icons/react';
+import { ChartBar, Cube, House, CashRegister, List, LockSimple, SignOut, Storefront, WifiSlash, X } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import { BrandMark } from '../../components/brand/Brand';
 import { signOut } from '../../features/auth/signOut';
@@ -15,6 +15,7 @@ const TAB_META: Record<AppTab, { label: string; icon: Icon; matches: (path: stri
   home: { label: 'Home', icon: House, matches: (p) => p === '/' },
   sell: { label: 'Cashier', icon: CashRegister, matches: (p) => p.startsWith('/sell') },
   inventory: { label: 'Inventory', icon: Cube, matches: (p) => p.startsWith('/inventory') },
+  reports: { label: 'Reports', icon: ChartBar, matches: (p) => p.startsWith('/reports') },
   business: {
     label: 'Business',
     icon: Storefront,

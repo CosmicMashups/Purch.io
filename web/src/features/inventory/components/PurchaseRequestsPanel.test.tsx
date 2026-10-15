@@ -63,7 +63,8 @@ describe('PurchaseRequestsPanel', () => {
     renderPage(<PurchaseRequestsPanel />);
     await screen.findByText('MAIN-PR-00001');
     expect(screen.getByText(/Wanda Warehouse/)).toBeInTheDocument();
-    expect(screen.getByText(/Rice 10 kg/)).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: 'Open MAIN-PR-00001' })).toBeInTheDocument();
+    expect(screen.getByText(/\d+ items?/)).toBeInTheDocument();
   });
 
   it('lets only an Admin or Manager approve', async () => {

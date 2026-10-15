@@ -5,7 +5,8 @@ import { toast } from '../../components/feedback/toastStore';
 import { FormDialog } from '../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../components/forms/FormField';
 import { ImageUploadField } from '../../components/forms/ImageUploadField';
-import { ListCard, QueryList } from '../../components/lists/QueryList';
+import { QueryTable } from '../../components/lists/QueryTable';
+import type { DataColumn } from '../../components/lists/DataTable';
 import { Modal } from '../../components/Modal';
 import { PageHeader } from '../../components/PageHeader';
 import { Skeleton } from '../../components/Skeleton';
@@ -32,6 +33,43 @@ export function BranchesPage() {
   const [view, setView] = useState<StatusView>('active');
   const { run, dialog: lifecycleDialog } = useLifecycle();
 
+  const columns: DataColumn<Branch>[] = [
+    {
+      header: 'Branch',
+      sortValue: (b) => b.name,
+      cell: (b) => (
+        <span className="flex flex-wrap items-center gap-2 font-medium text-gray-900">
+          {b.name}
+          {b.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
+        </span>
+      ),
+    },
+    { header: 'Code', className: 'text-gray-600', sortValue: (b) => b.code, cell: (b) => b.code },
+    { header: 'Address', className: 'text-gray-600', sortValue: (b) => b.address, cell: (b) => b.address },
+    ...(isAdmin
+      ? [
+          {
+            header: '',
+            className: 'text-right',
+            cell: (branch: Branch) => (
+              <div className="flex justify-end">
+                <RowActionsMenu
+                  subject={branch.name}
+                  actions={[
+                    { label: 'Settings', onSelect: () => setSelectedId(branch.id) },
+                    branch.isActive === false
+                      ? { label: 'Make active', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'reactivate'), separated: true }
+                      : { label: 'Make inactive', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'deactivate'), separated: true },
+                    { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'delete') },
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -50,36 +88,14 @@ export function BranchesPage() {
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="Branch" noun="branches" />
       ) : (
-        <QueryList
-          columns
+        <QueryTable
           query={branches}
+          label="Branches"
+          columns={columns}
+          getId={(b) => b.id}
           errorTitle="Branches could not be loaded"
           emptyMessage={view === 'active' ? 'No branches yet.' : 'No inactive branches.'}
           transform={(rows) => rows.filter((b) => (view === 'active' ? b.isActive !== false : b.isActive === false))}
-          renderRow={(branch) => (
-            <ListCard key={branch.id}>
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
-                  {branch.name}
-                  {branch.code && <span className="rounded-control bg-canvas px-2 py-0.5 text-sm font-semibold text-ink-soft">{branch.code}</span>}
-                  {branch.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
-                </p>
-                {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
-              </div>
-              {isAdmin && (
-                <RowActionsMenu
-                  subject={branch.name}
-                  actions={[
-                    { label: 'Settings', onSelect: () => setSelectedId(branch.id) },
-                    branch.isActive === false
-                      ? { label: 'Make active', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'reactivate'), separated: true }
-                      : { label: 'Make inactive', onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'deactivate'), separated: true },
-                    { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Branch', id: branch.id, name: branch.name }, 'delete') },
-                  ]}
-                />
-              )}
-            </ListCard>
-          )}
         />
       )}
       {lifecycleDialog}

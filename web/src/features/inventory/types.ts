@@ -306,6 +306,8 @@ export interface IncomingReceiving {
   remarks: string | null;
   createdAt: string;
   lines: IncomingReceivingLine[];
+  /** Blank on reports saved before numbering. */
+  controlNumber?: string;
 }
 
 export interface CreateIncomingReceivingRequest {

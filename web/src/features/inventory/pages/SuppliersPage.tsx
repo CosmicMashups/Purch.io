@@ -4,7 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '../../../components/feedback/toastStore';
 import { FormDialog } from '../../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { Pill } from '../../../components/lists/QueryList';
+import { QueryTable } from '../../../components/lists/QueryTable';
+import type { DataColumn } from '../../../components/lists/DataTable';
 import { PageHeader } from '../../../components/PageHeader';
 import { emptyContact, emptySupplierForm, supplierSchema, type SupplierForm } from '../purchasing';
 import { useCreateSupplier, useSuppliers, useUpdateSupplier } from '../queries';
@@ -62,6 +64,40 @@ export function SuppliersPage() {
   const [view, setView] = useState<StatusView>('active');
   const { run, dialog: lifecycleDialog } = useLifecycle();
 
+  const columns: DataColumn<Supplier>[] = [
+    {
+      header: 'Supplier',
+      sortValue: (s) => s.name,
+      cell: (s) => (
+        <button type="button" onClick={() => setDialog(s)} aria-label={`Edit ${s.name}`} className="flex flex-wrap items-center gap-2 rounded-control text-left font-medium text-gray-900">
+          {s.name}
+          {!s.isActive && <Pill>Inactive</Pill>}
+        </button>
+      ),
+    },
+    { header: 'Specialization', className: 'text-gray-600', sortValue: (s) => s.specialization, cell: (s) => s.specialization },
+    { header: 'Address', className: 'text-gray-600', sortValue: (s) => s.address, cell: (s) => s.address },
+    { header: 'Contact', className: 'text-gray-600', sortValue: (s) => s.contactInfo, cell: (s) => s.contactInfo },
+    {
+      header: '',
+      className: 'text-right',
+      cell: (s) => (
+        <div className="flex justify-end">
+          <RowActionsMenu
+            subject={s.name}
+            actions={[
+              { label: 'Edit', onSelect: () => setDialog(s) },
+              s.isActive
+                ? { label: 'Make inactive', onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'deactivate'), separated: true }
+                : { label: 'Make active', onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'reactivate'), separated: true },
+              { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'delete') },
+            ]}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -77,34 +113,14 @@ export function SuppliersPage() {
       {view === 'deleted' ? (
         <DeletedRecordsPanel kind="Supplier" noun="suppliers" />
       ) : (
-        <QueryList
+        <QueryTable
           query={suppliers}
+          label="Suppliers"
+          columns={columns}
+          getId={(s) => s.id}
           errorTitle="Suppliers could not be loaded"
           emptyMessage={view === 'active' ? 'No suppliers yet. Add the first one to start ordering stock.' : 'No inactive suppliers.'}
           transform={(rows) => rows.filter((s) => (view === 'active' ? s.isActive : !s.isActive))}
-          renderRow={(s) => (
-            <ListCard key={s.id}>
-              <button type="button" onClick={() => setDialog(s)} aria-label={`Edit ${s.name}`} className="min-w-0 flex-1 rounded-control text-left">
-                <span className="flex flex-wrap items-center gap-2 text-base font-semibold">
-                  {s.name}
-                  {!s.isActive && <Pill>Inactive</Pill>}
-                </span>
-                {s.specialization && <span className="block text-sm text-ink-soft">{s.specialization}</span>}
-                {s.address && <span className="block text-sm text-ink-soft">{s.address}</span>}
-                {s.contactInfo && <span className="block text-base text-ink-soft">{s.contactInfo}</span>}
-              </button>
-              <RowActionsMenu
-                subject={s.name}
-                actions={[
-                  { label: 'Edit', onSelect: () => setDialog(s) },
-                  s.isActive
-                    ? { label: 'Make inactive', onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'deactivate'), separated: true }
-                    : { label: 'Make active', onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'reactivate'), separated: true },
-                  { label: 'Delete', danger: true, onSelect: () => run({ kind: 'Supplier', id: s.id, name: s.name }, 'delete') },
-                ]}
-              />
-            </ListCard>
-          )}
         />
       )}
       {dialog && <SupplierDialog supplier={dialog === 'new' ? null : dialog} onClose={() => setDialog(null)} />}

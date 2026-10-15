@@ -82,6 +82,7 @@ export function ItemListPage() {
   const columns: SortableColumn<Item>[] = [
     {
       header: 'Item',
+      sortValue: (item) => item.name,
       cell: (item) => (
         <div className="flex items-center gap-2">
           {item.imageUrl ? (
@@ -96,10 +97,11 @@ export function ItemListPage() {
         </div>
       ),
     },
-    { header: 'Pricing', className: 'text-gray-600', cell: (item) => pricingTypeLabels[item.pricingType] },
-    { header: 'Price', className: 'text-gray-900', cell: (item) => `₱${item.basePrice.toFixed(2)}` },
+    { header: 'Pricing', className: 'text-gray-600', sortValue: (item) => pricingTypeLabels[item.pricingType], cell: (item) => pricingTypeLabels[item.pricingType] },
+    { header: 'Price', className: 'text-gray-900', sortValue: (item) => item.basePrice, cell: (item) => `₱${item.basePrice.toFixed(2)}` },
     {
       header: 'Stock',
+      sortValue: (item) => (item.hasOwnStock === false ? null : (item.countOnHand ?? item.stockOnHand)),
       cell: (item) => (
         <div className="flex flex-col items-start gap-1">
           {item.hasOwnStock === false ? (
