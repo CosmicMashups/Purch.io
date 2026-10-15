@@ -132,6 +132,8 @@ export interface Supplier {
   tin: string | null;
   remarks: string | null;
   contacts: SupplierContact[];
+  paymentAccountName?: string | null;
+  paymentAccountNumber?: string | null;
 }
 
 export interface SupplierRequest {
@@ -141,6 +143,8 @@ export interface SupplierRequest {
   tin: string | null;
   remarks: string | null;
   contacts: SupplierContact[];
+  paymentAccountName?: string | null;
+  paymentAccountNumber?: string | null;
 }
 
 /** Mirrors Purch.Domain.Enums.PurchaseOrderStatus. */
@@ -160,6 +164,9 @@ export interface PurchaseOrderLine {
   quantityOrdered: number;
   quantityReceived: number;
   expectedUnitCost: number;
+  inventoryItemId?: string | null;
+  unit?: string;
+  amount?: number;
 }
 
 export interface PurchaseOrder {
@@ -172,6 +179,80 @@ export interface PurchaseOrder {
   sentAt: string | null;
   lines: PurchaseOrderLine[];
   receipts: { reportId: string; deliveryDate: string }[];
+  controlNumber?: string;
+  purchaseRequestId?: string | null;
+  requestDate?: string;
+  dateNeeded?: string | null;
+  requestedByName?: string;
+  deliveryAddress?: string | null;
+  remarks?: string | null;
+  paymentAccountName?: string | null;
+  paymentAccountNumber?: string | null;
+  vatInclusive?: boolean;
+  subtotal?: number;
+  discountAmount?: number;
+  vatRate?: number;
+  vatAmount?: number;
+  orderTotal?: number;
+}
+
+/** Mirrors Purch.Domain.Enums.PurchaseRequestStatus. */
+export const PurchaseRequestStatus = { Open: 0, Approved: 1, Converted: 2, Cancelled: 3 } as const;
+export type PurchaseRequestStatus = (typeof PurchaseRequestStatus)[keyof typeof PurchaseRequestStatus];
+
+export interface PurchaseRequestLine {
+  id: string;
+  itemId: string;
+  inventoryItemId: string | null;
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface PurchaseRequest {
+  id: string;
+  controlNumber: string;
+  branchId: string;
+  branchName: string;
+  requestDate: string;
+  dateNeeded: string | null;
+  requestedByName: string;
+  deliveryAddress: string | null;
+  remarks: string | null;
+  status: PurchaseRequestStatus;
+  lines: PurchaseRequestLine[];
+}
+
+export interface CreatePurchaseRequestRequest {
+  branchId: string;
+  dateNeeded: string | null;
+  remarks: string | null;
+  lines: { itemId: string | null; inventoryItemId: string | null; quantity: number; unit: string | null }[];
+}
+
+export interface ConvertPurchaseRequestRequest {
+  orders: { supplierId: string; lineIds: string[]; vatInclusive: boolean; discountAmount: number }[];
+}
+
+export interface SupplierLink {
+  supplierId: string;
+  supplierName: string;
+  isPreferred: boolean;
+  unitCost: number | null;
+}
+
+/** An item or ingredient that needs restocking. `pending` is the control number already covering it. */
+export interface RestockSuggestion {
+  itemId: string | null;
+  inventoryItemId: string | null;
+  name: string;
+  onHand: number;
+  threshold: number;
+  suggestedQuantity: number;
+  unit: string;
+  unitCost: number | null;
+  suppliers: SupplierLink[];
+  pending: string | null;
 }
 
 export interface CreatePurchaseOrderRequest {

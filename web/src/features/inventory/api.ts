@@ -14,6 +14,11 @@ import type {
   MovementCursor,
   MovementFilter,
   PurchaseOrder,
+  ConvertPurchaseRequestRequest,
+  CreatePurchaseRequestRequest,
+  PurchaseRequest,
+  RestockSuggestion,
+  SupplierLink,
   RecordMovementRequest,
   Supplier,
   UpdateInventoryItemRequest,
@@ -55,6 +60,18 @@ export const inventoryApi = {
   createPurchaseOrder: (body: CreatePurchaseOrderRequest) => apiClient.post<PurchaseOrder>('/purchase-orders', body).then((r) => r.data),
   markPurchaseOrderSent: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/mark-sent`).then((r) => r.data),
   cancelPurchaseOrder: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`).then((r) => r.data),
+
+  listRestockSuggestions: () => apiClient.get<RestockSuggestion[]>('/inventory/restock-suggestions').then((r) => r.data),
+  listPurchaseRequests: () => apiClient.get<PurchaseRequest[]>('/purchase-requests').then((r) => r.data),
+  createPurchaseRequest: (body: CreatePurchaseRequestRequest) => apiClient.post<PurchaseRequest>('/purchase-requests', body).then((r) => r.data),
+  approvePurchaseRequest: (id: string) => apiClient.post<PurchaseRequest>(`/purchase-requests/${id}/approve`).then((r) => r.data),
+  cancelPurchaseRequest: (id: string) => apiClient.post<PurchaseRequest>(`/purchase-requests/${id}/cancel`).then((r) => r.data),
+  convertPurchaseRequest: (id: string, body: ConvertPurchaseRequestRequest) =>
+    apiClient.post<PurchaseOrder[]>(`/purchase-requests/${id}/convert`, body).then((r) => r.data),
+  setSuppliers: (owner: { itemId: string } | { inventoryItemId: string }, suppliers: { supplierId: string; isPreferred: boolean; unitCost: number | null }[]) => {
+    const path = 'itemId' in owner ? `/items/${owner.itemId}/suppliers` : `/inventory-items/${owner.inventoryItemId}/suppliers`;
+    return apiClient.put<SupplierLink[]>(path, { suppliers }).then((r) => r.data);
+  },
 
   listIncomingReceiving: () => apiClient.get<IncomingReceiving[]>('/incoming-receiving').then((r) => r.data),
   createIncomingReceiving: (body: CreateIncomingReceivingRequest) =>

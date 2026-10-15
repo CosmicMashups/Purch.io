@@ -13,6 +13,7 @@ import type { Branch } from '../../branches/types';
 import { useItems } from '../../catalog/queries';
 import type { Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
+import { PurchaseRequestsPanel } from '../components/PurchaseRequestsPanel';
 import { purchaseOrderSchema, type PurchaseOrderForm } from '../purchasing';
 import {
   useCancelPurchaseOrder,
@@ -63,6 +64,8 @@ export function PurchaseOrdersPage() {
           </PrimaryButton>
         }
       />
+      <PurchaseRequestsPanel />
+      <h2 className="text-lg font-semibold">Purchase orders</h2>
       <div>
         <QueryList
           query={orders}
@@ -74,15 +77,43 @@ export function PurchaseOrdersPage() {
             return (
               <ListCard key={order.id}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold">{order.supplierName}</p>
-                  <p className="text-sm text-ink-soft">Deliver to {order.branchName}</p>
+                  <p className="text-base font-semibold">
+                    {order.controlNumber ? `${order.controlNumber}: ` : ''}
+                    {order.supplierName}
+                  </p>
+                  <p className="text-sm text-ink-soft">
+                    Deliver to {order.branchName}
+                    {order.deliveryAddress ? `, ${order.deliveryAddress}` : ''}
+                  </p>
+                  {order.paymentAccountNumber && (
+                    <p className="text-sm text-ink-soft">
+                      Pay to {order.paymentAccountName ? `${order.paymentAccountName}, ` : ''}
+                      {order.paymentAccountNumber}
+                    </p>
+                  )}
                   <ul className="mt-2 flex flex-col gap-1">
                     {order.lines.map((line) => (
                       <li key={line.id} className="text-base tabular-nums">
-                        {line.itemName}: {line.quantityReceived} of {line.quantityOrdered} delivered at {formatPeso(line.expectedUnitCost)} each
+                        {line.itemName}: {line.quantityReceived} of {line.quantityOrdered} {line.unit ?? ''} delivered at {formatPeso(line.expectedUnitCost)} each
                       </li>
                     ))}
                   </ul>
+                  {order.orderTotal !== undefined && order.orderTotal > 0 && (
+                    <dl className="mt-2 grid max-w-xs grid-cols-[1fr_auto] gap-x-4 text-sm tabular-nums">
+                      <dt className="text-ink-soft">Subtotal</dt>
+                      <dd>{formatPeso(order.subtotal ?? 0)}</dd>
+                      {(order.discountAmount ?? 0) > 0 && (
+                        <>
+                          <dt className="text-ink-soft">Less discount</dt>
+                          <dd>{formatPeso(order.discountAmount ?? 0)}</dd>
+                        </>
+                      )}
+                      <dt className="text-ink-soft">VAT {order.vatInclusive ? '(included)' : '(added)'}</dt>
+                      <dd>{formatPeso(order.vatAmount ?? 0)}</dd>
+                      <dt className="font-semibold">Order total</dt>
+                      <dd className="font-semibold">{formatPeso(order.orderTotal)}</dd>
+                    </dl>
+                  )}
                   {order.receipts.length > 0 && (
                     <p className="mt-2 text-sm text-ink-soft">
                       {order.receipts.length} delivery {order.receipts.length === 1 ? 'report' : 'reports'}, last on {order.receipts[order.receipts.length - 1].deliveryDate}

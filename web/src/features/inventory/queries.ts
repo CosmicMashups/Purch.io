@@ -9,6 +9,8 @@ export const inventoryKeys = {
   movements: ['inventory', 'movements'] as const,
   suppliers: ['inventory', 'suppliers'] as const,
   purchaseOrders: ['inventory', 'purchase-orders'] as const,
+  purchaseRequests: ['inventory', 'purchase-requests'] as const,
+  restock: ['inventory', 'restock-suggestions'] as const,
   incomingReceiving: ['inventory', 'incoming-receiving'] as const,
   transfers: ['inventory', 'transfers'] as const,
 };
@@ -18,6 +20,9 @@ export const useInventoryCategories = () => useQuery({ queryKey: inventoryKeys.c
 export const useSuppliers = () => useQuery({ queryKey: inventoryKeys.suppliers, queryFn: inventoryApi.listSuppliers });
 export const useIncomingReceiving = () => useQuery({ queryKey: inventoryKeys.incomingReceiving, queryFn: inventoryApi.listIncomingReceiving });
 export const usePurchaseOrders = () => useQuery({ queryKey: inventoryKeys.purchaseOrders, queryFn: inventoryApi.listPurchaseOrders });
+export const usePurchaseRequests = () => useQuery({ queryKey: inventoryKeys.purchaseRequests, queryFn: inventoryApi.listPurchaseRequests });
+export const useRestockSuggestions = (enabled = true) =>
+  useQuery({ queryKey: inventoryKeys.restock, queryFn: inventoryApi.listRestockSuggestions, enabled });
 export const useTransfers = () => useQuery({ queryKey: inventoryKeys.transfers, queryFn: inventoryApi.listTransfers });
 
 /** The movement log, newest first, loaded a page at a time by the API's (createdAt, id) cursor. */
@@ -120,6 +125,29 @@ export function useCreateSupplier() {
 export const useCreatePurchaseOrder = () => useStockMutation(inventoryApi.createPurchaseOrder);
 export const useMarkPurchaseOrderSent = () => useStockMutation(inventoryApi.markPurchaseOrderSent);
 export const useCancelPurchaseOrder = () => useStockMutation(inventoryApi.cancelPurchaseOrder);
+/** A request change moves what is "already requested" and, on convert, adds purchase orders. */
+function useRequestMutation<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: TVars) => fn(vars),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: inventoryKeys.purchaseRequests }),
+        qc.invalidateQueries({ queryKey: inventoryKeys.purchaseOrders }),
+        qc.invalidateQueries({ queryKey: inventoryKeys.restock }),
+      ]),
+  });
+}
+
+export const useCreatePurchaseRequest = () => useRequestMutation(inventoryApi.createPurchaseRequest);
+export const useApprovePurchaseRequest = () => useRequestMutation(inventoryApi.approvePurchaseRequest);
+export const useCancelPurchaseRequest = () => useRequestMutation(inventoryApi.cancelPurchaseRequest);
+export const useConvertPurchaseRequest = () =>
+  useRequestMutation(({ id, body }: { id: string; body: Parameters<Api['convertPurchaseRequest']>[1] }) => inventoryApi.convertPurchaseRequest(id, body));
+export const useSetItemSuppliers = () =>
+  useRequestMutation(({ owner, suppliers }: { owner: Parameters<Api['setSuppliers']>[0]; suppliers: Parameters<Api['setSuppliers']>[1] }) =>
+    inventoryApi.setSuppliers(owner, suppliers));
+
 export const useCreateIncomingReceiving = () => useStockMutation(inventoryApi.createIncomingReceiving);
 export const useLinkIncomingReceiving = () =>
   useStockMutation(({ id, purchaseOrderId }: { id: string; purchaseOrderId: string }) => inventoryApi.linkIncomingReceiving(id, purchaseOrderId));
