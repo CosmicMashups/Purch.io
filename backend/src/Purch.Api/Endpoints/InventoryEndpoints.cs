@@ -9,6 +9,19 @@ public static class InventoryEndpoints
     {
         var inventoryManager = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse) };
 
+        // --- CSV export (tenant-wide; cost column dropped for actors who cannot see costs) ---
+        _ = app.MapGet("/inventory/export/items.csv", async (IInventoryExportService exports, CancellationToken cancellationToken) =>
+            Results.Text(await exports.ExportItemsAsync(cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/inventory/export/ingredients.csv", async (IInventoryExportService exports, CancellationToken cancellationToken) =>
+            Results.Text(await exports.ExportIngredientsAsync(cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/inventory/export/stock.csv", async (IInventoryExportService exports, CancellationToken cancellationToken) =>
+            Results.Text(await exports.ExportStockAsync(cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- C1 — overview cards + low-stock alert list ---
         _ = app.MapGet("/inventory/dashboard", async (
             IInventoryDashboardService dashboardService,

@@ -103,4 +103,7 @@ export const inventoryApi = {
   markTransferInTransit: (id: string) => apiClient.post<BranchTransfer>(`/branch-transfers/${id}/mark-in-transit`).then((r) => r.data),
   markTransferReceived: (id: string) => apiClient.post<BranchTransfer>(`/branch-transfers/${id}/mark-received`).then((r) => r.data),
   cancelTransfer: (id: string) => apiClient.post<BranchTransfer>(`/branch-transfers/${id}/cancel`).then((r) => r.data),
+  /** One of items | ingredients | stock. The server prefixes a BOM; downloadTextFile adds its own, so it is dropped here. */
+  exportCsv: (kind: 'items' | 'ingredients' | 'stock') =>
+    apiClient.get<string>(`/inventory/export/${kind}.csv`, { responseType: 'text' }).then((r) => r.data.replace(/^﻿/, '')),
 };

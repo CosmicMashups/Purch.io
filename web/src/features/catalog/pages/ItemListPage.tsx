@@ -21,6 +21,7 @@ import { PageHeader } from '../../../components/PageHeader';
 import { RowActionsMenu, type RowAction } from '../../../components/RowActionsMenu';
 import { DeletedRecordsPanel, StatusFilter, type StatusView } from '../../lifecycle/StatusFilter';
 import { useLifecycle } from '../../lifecycle/useLifecycle';
+import { ExportCsvButton } from '../../inventory/components/ExportCsvButton';
 
 export function ItemListPage() {
   const { data: items, isLoading, isError, error, refetch, dataUpdatedAt } = useItems();
@@ -127,9 +128,12 @@ export function ItemListPage() {
         title="Items"
         backTo={{ to: '/business', label: 'Business' }}
         action={
-          <button type="button" onClick={() => setDialog('new')} className="h-12 whitespace-nowrap rounded-control bg-brand px-6 text-base font-semibold text-on-brand hover:bg-brand-strong">
-            Add item
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <ExportCsvButton kind="items" label="Export items" />
+            <button type="button" onClick={() => setDialog('new')} className="h-12 whitespace-nowrap rounded-control bg-brand px-6 text-base font-semibold text-on-brand hover:bg-brand-strong">
+              Add item
+            </button>
+          </div>
         }
       />
       <div className="flex flex-wrap items-center gap-3">
