@@ -66,6 +66,7 @@ public sealed class EfStockTakeRepository(PurchDbContext dbContext) : IStockTake
             return [];
         }
 
+        // No branch filter on purpose: stock is tenant-wide, so a sale at any branch moves the counted quantity.
         return await dbContext.InventoryMovements
             .AsNoTracking()
             .Where(movement => movement.TenantId == tenantId

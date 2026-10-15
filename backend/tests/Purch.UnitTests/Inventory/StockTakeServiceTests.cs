@@ -299,7 +299,10 @@ public sealed class StockTakeServiceTests
         _ = await service.ApplyAsync(take.Id, "1234");
 
         Assert.Equal(-2m, rice.StockOnHand);
-        Assert.Contains("\"negativeStockLines\":[{", Assert.Single(audit.Added).AfterStateJson);
+        using var json = System.Text.Json.JsonDocument.Parse(Assert.Single(audit.Added).AfterStateJson!);
+        var negative = Assert.Single(json.RootElement.GetProperty("negativeStockLines").EnumerateArray());
+        Assert.Equal(LineOf(take, rice), negative.GetProperty("lineId").GetGuid());
+        Assert.Equal(-2m, negative.GetProperty("onHand").GetDecimal());
     }
 
     private sealed class FakeTenant : ICurrentTenantProvider

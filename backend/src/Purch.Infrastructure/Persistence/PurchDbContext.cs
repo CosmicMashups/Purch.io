@@ -236,6 +236,7 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<PurchaseRequest>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<DocumentSequence>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<StockTake>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<StockTakeLine>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<DocumentSequence>().HasIndex(s => new { s.TenantId, s.BranchId, s.Kind }).IsUnique();
         _ = modelBuilder.Entity<PurchaseRequest>().HasIndex(r => new { r.TenantId, r.ControlNumber }).IsUnique();
         _ = modelBuilder.Entity<PurchaseRequest>().Property(r => r.ControlNumber).HasMaxLength(40);

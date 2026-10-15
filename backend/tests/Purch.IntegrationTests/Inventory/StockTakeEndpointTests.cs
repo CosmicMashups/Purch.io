@@ -1,7 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Purch.Application.Common;
+using Purch.Application.Pos;
+using Purch.Common.TestUtilities;
+using Purch.Domain.Entities;
+using Purch.Infrastructure.Persistence;
+using Purch.Infrastructure.Repositories;
 using Purch.Application.Catalog;
 using Purch.Application.Inventory;
 using Purch.Application.Onboarding;
@@ -188,48 +195,161 @@ public sealed class StockTakeEndpointTests(PostgresContainerFixture postgres)
         Assert.Equal(10m, await StockOfAsync(item.Id));
     }
 
-    [Fact]
-    public async Task Concurrent_applies_post_the_variance_exactly_once()
+    // --- Deterministic concurrency tests: the real StockTakeService over separate DbContexts, so one context can
+    // hold a stale tracked take while another commits. ---
+
+    private sealed class Actor(Guid userId) : ICurrentActorProvider
     {
-        await using var factory = new PurchApiFactory(postgres.ConnectionString);
-        using var admin = await TestSessions.AdminClientAsync(factory);
-        var item = await StockedItemAsync(admin, "Rice", 10m);
-        var take = await ReviewTakeWithCountAsync(admin, item, 7m);
+        public Guid? UserId => userId;
+        public Guid? DeviceId => null;
+        public Guid? BranchId => null;
+        public ScopeType? ScopeType => Domain.Enums.ScopeType.Tenant;
+        public Guid? ScopeId => null;
+        public Role? Role => Domain.Enums.Role.Admin;
+    }
 
-        var responses = await Task.WhenAll(
-            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)),
-            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)));
+    private sealed class Approver(Guid userId) : IApproverAuthorizationService
+    {
+        public Task<User> AuthorizeAsync(string? pin, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new User { Id = userId, Role = Role.Manager, Name = "Approver" });
+    }
 
-        Assert.All(responses, r => Assert.True(r.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict, r.StatusCode.ToString()));
-        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
-        Assert.Equal(7m, await StockOfAsync(item.Id));
-        Assert.Equal(1, await AuditCountAsync(take.Id));
+    private sealed class AnyBranch : IBranchScopeGuard
+    {
+        public Task EnsureAllowedAsync(Guid branchId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task EnsureAnyAllowedAsync(IReadOnlyCollection<Guid> branchIds, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private PurchDbContext NewContext(Guid tenantId) =>
+        new(new DbContextOptionsBuilder<PurchDbContext>().UseNpgsql(postgres.ConnectionString).Options, new TestCurrentTenantProvider { TenantId = tenantId });
+
+    private static StockTakeService ServiceOver(PurchDbContext db, Guid tenantId, Guid userId)
+    {
+        var ingredients = new EfInventoryItemRepository(db);
+        return new StockTakeService(
+            new EfStockTakeRepository(db), new EfItemRepository(db), ingredients,
+            new ItemStockService(new EfTenantRepository(db), ingredients, new EfItemRecipeRepository(db)),
+            new EfInventoryMovementRepository(db), new EfAuditLogRepository(db), new Approver(userId), new AnyBranch(),
+            new TestCurrentTenantProvider { TenantId = tenantId }, new Actor(userId), new EfUnitOfWork(db));
+    }
+
+    /// <summary>Rice 10 counted 7 (variance -3), Salt 10 counted 10 (variance 0) when taken to Review; otherwise left
+    /// in Counting with nothing counted.</summary>
+    private static async Task<(StockTakeDto Take, ItemDto Rice, ItemDto Salt)> TwoLineTakeAsync(HttpClient admin, bool toReview)
+    {
+        var rice = await StockedItemAsync(admin, "Rice", 10m);
+        var salt = await StockedItemAsync(admin, "Salt", 10m);
+        var take = await ReadAsync<StockTakeDto>(await admin.PostAsJsonAsync("/stock-takes",
+            new CreateStockTakeRequest("Two lines", StockTakeScopeKind.Picked, ItemIds: [rice.Id, salt.Id])));
+        _ = await ReadAsync<StockTakeDto>(await admin.PostAsync($"/stock-takes/{take.Id}/start", null));
+        if (toReview)
+        {
+            _ = await ReadAsync<StockTakeDto>(await admin.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{take.Lines.Single(l => l.ItemId == rice.Id).Id}", new CountStockTakeLineRequest(7m)));
+            _ = await ReadAsync<StockTakeDto>(await admin.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{take.Lines.Single(l => l.ItemId == salt.Id).Id}", new CountStockTakeLineRequest(10m)));
+            _ = await ReadAsync<StockTakeDto>(await admin.PostAsync($"/stock-takes/{take.Id}/review", null));
+        }
+
+        return (take, rice, salt);
+    }
+
+    private async Task<int> AdjustmentCountAsync(Guid itemId)
+    {
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM \"InventoryMovements\" WHERE \"ItemId\" = @id AND \"Type\" = @type", connection);
+        _ = command.Parameters.AddWithValue("id", itemId);
+        _ = command.Parameters.AddWithValue("type", (int)MovementType.Adjustment);
+        return (int)(long)(await command.ExecuteScalarAsync())!;
     }
 
     [Fact]
-    public async Task A_count_racing_apply_never_leaves_the_line_and_its_movement_disagreeing()
+    public async Task A_count_loaded_before_apply_cannot_be_saved_after_it_on_either_kind_of_line()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);
         using var admin = await TestSessions.AdminClientAsync(factory);
-        var item = await StockedItemAsync(admin, "Rice", 10m);
-        var take = await ReviewTakeWithCountAsync(admin, item, 7m);
-        var lineId = take.Lines.Single().Id;
+        var shop = TestSessions.ShopOf(admin);
+        var (tenantId, userId) = (shop.Tenant.TenantId, shop.Tenant.AdminMembershipId);
+        var (take, rice, salt) = await TwoLineTakeAsync(admin, toReview: true);
+        var riceLine = take.Lines.Single(l => l.ItemId == rice.Id).Id;
+        var saltLine = take.Lines.Single(l => l.ItemId == salt.Id).Id;
 
-        _ = await Task.WhenAll(
-            admin.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{lineId}", new CountStockTakeLineRequest(4m)),
-            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)));
+        await using var staleRice = NewContext(tenantId);
+        await using var staleSalt = NewContext(tenantId);
+        await using var applier = NewContext(tenantId);
+        _ = await new EfStockTakeRepository(staleRice).GetAsync(take.Id); // tracked while still in Review
+        _ = await new EfStockTakeRepository(staleSalt).GetAsync(take.Id);
+
+        var applied = await ServiceOver(applier, tenantId, userId).ApplyAsync(take.Id, "pin");
+        Assert.Equal(StockTakeStatus.Applied, applied.Status);
+
+        // A variance line (has a movement) and a zero-variance line (no movement): both stale saves must fail.
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => ServiceOver(staleRice, tenantId, userId).CountLineAsync(take.Id, riceLine, 4m, false));
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => ServiceOver(staleSalt, tenantId, userId).CountLineAsync(take.Id, saltLine, 4m, false));
 
         var final = await ReadAsync<StockTakeDto>(await admin.GetAsync($"/stock-takes/{take.Id}"));
-        var line = final.Lines.Single();
-        if (final.Status == StockTakeStatus.Applied)
+        var riceDto = final.Lines.Single(l => l.Id == riceLine);
+        Assert.Equal(-3m, riceDto.VarianceQty);
+        Assert.Equal(-3m, await MovementQuantityAsync(riceDto.MovementId!.Value));
+        Assert.Equal(0m, final.Lines.Single(l => l.Id == saltLine).VarianceQty);
+        Assert.Equal(7m, await StockOfAsync(rice.Id));
+        Assert.Equal(10m, await StockOfAsync(salt.Id));
+    }
+
+    [Fact]
+    public async Task Two_counters_on_different_lines_of_one_take_never_conflict()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var shop = TestSessions.ShopOf(admin);
+        var (tenantId, userId) = (shop.Tenant.TenantId, shop.Tenant.AdminMembershipId);
+        var (take, rice, salt) = await TwoLineTakeAsync(admin, toReview: false);
+
+        await using var first = NewContext(tenantId);
+        await using var second = NewContext(tenantId);
+        _ = await new EfStockTakeRepository(first).GetAsync(take.Id); // both counters hold the same take version
+        _ = await new EfStockTakeRepository(second).GetAsync(take.Id);
+
+        _ = await ServiceOver(first, tenantId, userId).CountLineAsync(take.Id, take.Lines.Single(l => l.ItemId == rice.Id).Id, 6m, false);
+        _ = await ServiceOver(second, tenantId, userId).CountLineAsync(take.Id, take.Lines.Single(l => l.ItemId == salt.Id).Id, 9m, false);
+
+        var final = await ReadAsync<StockTakeDto>(await admin.GetAsync($"/stock-takes/{take.Id}"));
+        Assert.Equal(6m, final.Lines.Single(l => l.ItemId == rice.Id).CountedQty);
+        Assert.Equal(9m, final.Lines.Single(l => l.ItemId == salt.Id).CountedQty);
+    }
+
+    [Fact]
+    public async Task Two_applies_from_stale_contexts_post_one_adjustment_per_counted_line()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var shop = TestSessions.ShopOf(admin);
+        var (tenantId, userId) = (shop.Tenant.TenantId, shop.Tenant.AdminMembershipId);
+        var (take, rice, salt) = await TwoLineTakeAsync(admin, toReview: true);
+
+        await using var first = NewContext(tenantId);
+        await using var second = NewContext(tenantId);
+        _ = await new EfStockTakeRepository(first).GetAsync(take.Id);
+        _ = await new EfStockTakeRepository(second).GetAsync(take.Id);
+
+        var one = await ServiceOver(first, tenantId, userId).ApplyAsync(take.Id, "pin");
+        try
         {
-            Assert.Equal(line.VarianceQty, await MovementQuantityAsync(line.MovementId!.Value));
-            Assert.Equal(10m + line.VarianceQty, await StockOfAsync(item.Id));
+            var two = await ServiceOver(second, tenantId, userId).ApplyAsync(take.Id, "pin");
+            // Idempotent: the first result (AppliedAt is compared to Postgres' microsecond precision).
+            Assert.Equal(StockTakeStatus.Applied, two.Status);
+            Assert.Equal(one.Lines.Select(l => l.MovementId), two.Lines.Select(l => l.MovementId));
+            Assert.True((one.AppliedAt!.Value - two.AppliedAt!.Value).Duration() < TimeSpan.FromMilliseconds(1));
         }
-        else
+        catch (DbUpdateConcurrencyException)
         {
-            Assert.Null(line.MovementId);
-            Assert.Equal(10m, await StockOfAsync(item.Id));
+            // Also acceptable: surfaces as a 409.
         }
+
+        Assert.Equal(1, await AdjustmentCountAsync(rice.Id));
+        Assert.Equal(0, await AdjustmentCountAsync(salt.Id)); // zero variance posts nothing
+        Assert.Equal(7m, await StockOfAsync(rice.Id));
+        Assert.Equal(1, await AuditCountAsync(take.Id));
     }
 }

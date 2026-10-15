@@ -129,14 +129,12 @@ public sealed class StockTakeService(
             line.CountedAt = DateTimeOffset.UtcNow;
         }
 
+        // Only the line row is written (it carries its own xmin row version), never the take: counters on
+        // different lines never conflict, while a count racing apply on the same line fails with a 409 because
+        // apply writes every counted line.
         line.UpdatedAt = DateTimeOffset.UtcNow;
-
-        // Touch the take as well: its row version (xmin) then guards every line edit, so a count saved after a
-        // concurrent apply (or apply racing a count) fails with a 409 instead of leaving a line and its posted
-        // movement disagreeing.
-        take.UpdatedAt = line.UpdatedAt;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await ToDtoAsync(take, cancellationToken);
+        return await ToDtoAsync(take, cancellationToken, onlyLineId: line.Id);
     }
 
     public Task<StockTakeDto> StartAsync(Guid id, CancellationToken cancellationToken = default)
@@ -188,6 +186,15 @@ public sealed class StockTakeService(
             var posted = new List<object>();
             var missing = new List<object>();
             var negative = new List<object>();
+            var now = DateTimeOffset.UtcNow;
+
+            // Every counted line is written (even a zero-variance one), so its row version moves and a count that was
+            // loaded before this apply cannot be saved over the applied figures.
+            foreach (var line in take.Lines.Where(l => l.State == StockTakeLineState.Counted))
+            {
+                line.UpdatedAt = now;
+            }
+
             foreach (var line in take.Lines.Where(l => l.State == StockTakeLineState.Counted && l.VarianceQty is not null and not 0m))
             {
                 var (movementId, resultingOnHand) = await PostAdjustmentAsync(take, line, ct);
@@ -198,7 +205,6 @@ public sealed class StockTakeService(
                 }
 
                 line.MovementId = movementId;
-                line.UpdatedAt = DateTimeOffset.UtcNow;
                 posted.Add(new { lineId = line.Id, name = line.Name, variance = line.VarianceQty });
 
                 // Apply intentionally does not refuse a negative result (owner rule: the variance is a delta on top
@@ -209,7 +215,6 @@ public sealed class StockTakeService(
                 }
             }
 
-            var now = DateTimeOffset.UtcNow;
             take.Status = StockTakeStatus.Applied;
             take.AppliedAt = now;
             take.ApprovedByUserId = approver.Id;
@@ -432,10 +437,12 @@ public sealed class StockTakeService(
 
     /// <summary>Signed net stock movement per counted line since it was counted, excluding this take's own
     /// adjustments. Only computed while the take is Counting or Review, and not for a blind take while Counting.</summary>
-    private async Task<Dictionary<Guid, decimal>> MovementsSinceCountAsync(StockTake take, bool hideExpected, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, decimal>> MovementsSinceCountAsync(StockTake take, bool hideExpected, Guid? onlyLineId, CancellationToken cancellationToken)
     {
         var result = new Dictionary<Guid, decimal>();
-        var counted = take.Lines.Where(l => l.State == StockTakeLineState.Counted && l.CountedAt is not null).ToList();
+        var counted = take.Lines
+            .Where(l => l.State == StockTakeLineState.Counted && l.CountedAt is not null && (onlyLineId is null || l.Id == onlyLineId))
+            .ToList();
         if (hideExpected || take.Status is not (StockTakeStatus.Counting or StockTakeStatus.Review) || counted.Count == 0)
         {
             return result;
@@ -449,22 +456,27 @@ public sealed class StockTakeService(
             counted.Min(l => l.CountedAt!.Value),
             cancellationToken);
 
+        var relevant = movements.Where(m => !ownMovements.Contains(m.Id)).ToList();
+        var byItem = relevant.Where(m => m.ItemId is not null).ToLookup(m => m.ItemId!.Value);
+        var byIngredient = relevant.Where(m => m.InventoryItemId is not null).ToLookup(m => m.InventoryItemId!.Value);
         foreach (var line in counted)
         {
-            result[line.Id] = movements
-                .Where(m => !ownMovements.Contains(m.Id) && m.CreatedAt > line.CountedAt!.Value
-                    && (line.ItemId is { } itemId ? m.ItemId == itemId : m.InventoryItemId == line.InventoryItemId))
+            var forTarget = line.ItemId is { } itemId ? byItem[itemId] : byIngredient[line.InventoryItemId!.Value];
+            result[line.Id] = forTarget
+                .Where(m => m.CreatedAt > line.CountedAt!.Value)
                 .Sum(m => InventoryMovementService.StockDelta(m.Type, m.Quantity));
         }
 
         return result;
     }
 
-    private async Task<StockTakeDto> ToDtoAsync(StockTake take, CancellationToken cancellationToken, IReadOnlyList<string>? warnings = null)
+    /// <summary><paramref name="onlyLineId"/> limits the movements-since-count lookup to that one line (a single count
+    /// entry), so a count does not re-scan the movement history of the whole take.</summary>
+    private async Task<StockTakeDto> ToDtoAsync(StockTake take, CancellationToken cancellationToken, IReadOnlyList<string>? warnings = null, Guid? onlyLineId = null)
     {
         var hideExpected = take.Blind && take.Status == StockTakeStatus.Counting;
         var canSeeCosts = currentActorProvider.CanSeeCosts;
-        var sinceCount = await MovementsSinceCountAsync(take, hideExpected, cancellationToken);
+        var sinceCount = await MovementsSinceCountAsync(take, hideExpected, onlyLineId, cancellationToken);
         var lines = take.Lines
             .OrderBy(line => line.Name, StringComparer.OrdinalIgnoreCase)
             .Select(line => new StockTakeLineDto(

@@ -2826,6 +2826,12 @@ namespace Purch.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 4)
                         .HasColumnType("numeric(14,4)");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("StockTakeId", "InventoryItemId")
