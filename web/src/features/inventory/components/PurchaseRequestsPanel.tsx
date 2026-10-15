@@ -9,10 +9,10 @@ import { ConvertRequestDialog } from './ConvertRequestDialog';
 
 const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
 
-const statusLabel: Record<PurchaseRequestStatus, { label: string; tone: 'neutral' | 'info' | 'success' | 'warn' | 'danger' }> = {
+const statusLabel: Record<PurchaseRequestStatus, { label: string; tone: 'neutral' | 'brand' | 'warn' | 'danger' }> = {
   [PurchaseRequestStatus.Open]: { label: 'Awaiting approval', tone: 'warn' },
-  [PurchaseRequestStatus.Approved]: { label: 'Approved', tone: 'info' },
-  [PurchaseRequestStatus.Converted]: { label: 'Ordered', tone: 'success' },
+  [PurchaseRequestStatus.Approved]: { label: 'Approved', tone: 'brand' },
+  [PurchaseRequestStatus.Converted]: { label: 'Ordered', tone: 'brand' },
   [PurchaseRequestStatus.Cancelled]: { label: 'Cancelled', tone: 'neutral' },
 };
 
