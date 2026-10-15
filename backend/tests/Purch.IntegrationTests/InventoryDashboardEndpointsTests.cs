@@ -76,9 +76,10 @@ public sealed class InventoryDashboardEndpointsTests(PostgresContainerFixture po
         Assert.Equal(3, dashboard!.TotalSkus);
         Assert.Equal(1, dashboard.OutOfStockCount);
         Assert.Equal(1, dashboard.LowStockCount);
-        var lowStockAlert = Assert.Single(dashboard.LowStockItems);
-        Assert.Equal(lowStockItem.Id, lowStockAlert.ItemId);
-        Assert.DoesNotContain(dashboard.LowStockItems, alert => alert.ItemId == outOfStockItem!.Id);
+        // The restock list carries out-of-stock items too, ahead of the merely low ones.
+        Assert.Equal(2, dashboard.LowStockItems.Count);
+        Assert.Equal(outOfStockItem!.Id, dashboard.LowStockItems[0].ItemId);
+        Assert.Equal(lowStockItem.Id, dashboard.LowStockItems[1].ItemId);
     }
 
     private static async Task<Guid> MainBranchIdAsync(HttpClient client)

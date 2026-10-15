@@ -95,8 +95,7 @@ public sealed class InventoryCategoriesEndpointsTests(PostgresContainerFixture p
         Assert.Equal(3, ingredients.Total);
         Assert.Equal(1, ingredients.OutOfStockCount);
         Assert.Equal(1, ingredients.LowStockCount);
-        Assert.Equal(low.Id, Assert.Single(ingredients.LowStock).InventoryItemId);
-        Assert.NotEqual(empty.Id, low.Id);
+        Assert.Equal([empty.Id, low.Id], ingredients.LowStock.Select(i => i.InventoryItemId));
     }
 
     [Fact]

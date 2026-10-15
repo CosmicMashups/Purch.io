@@ -22,16 +22,18 @@ public sealed class InventoryDashboardService(
         var counted = activeItems.Where(item => onHand.ContainsKey(item.Id)).ToList();
         var outOfStockCount = counted.Count(item => onHand[item.Id] <= 0);
 
+        // The restock list: out-of-stock items first (even with no threshold), then those at or under their warning level.
         var lowStockItems = counted
-            .Where(item => item.LowStockThreshold is { } threshold && onHand[item.Id] > 0 && onHand[item.Id] <= threshold)
+            .Where(item => onHand[item.Id] <= 0 || (item.LowStockThreshold is { } threshold && onHand[item.Id] <= threshold))
             .OrderBy(item => onHand[item.Id])
-            .Select(item => new LowStockItemDto(item.Id, item.Name, onHand[item.Id], item.LowStockThreshold!.Value))
+            .Select(item => new LowStockItemDto(item.Id, item.Name, onHand[item.Id], item.LowStockThreshold ?? 0m))
             .ToList();
+        var lowCount = lowStockItems.Count(item => item.StockOnHand > 0);
 
         return new InventoryDashboardDto(
             activeItems.Count,
             outOfStockCount,
-            lowStockItems.Count,
+            lowCount,
             lowStockItems,
             await GetIngredientsAsync(cancellationToken));
     }
@@ -49,12 +51,12 @@ public sealed class InventoryDashboardService(
             .ToList();
 
         var low = ingredients
-            .Where(ingredient => ingredient.LowStockThreshold is { } threshold && ingredient.QuantityOnHand > 0 && ingredient.QuantityOnHand <= threshold)
+            .Where(ingredient => ingredient.QuantityOnHand <= 0 || (ingredient.LowStockThreshold is { } threshold && ingredient.QuantityOnHand <= threshold))
             .OrderBy(ingredient => ingredient.QuantityOnHand)
-            .Select(ingredient => new LowStockIngredientDto(ingredient.Id, ingredient.Name, ingredient.BaseUnit, ingredient.QuantityOnHand, ingredient.LowStockThreshold!.Value))
+            .Select(ingredient => new LowStockIngredientDto(ingredient.Id, ingredient.Name, ingredient.BaseUnit, ingredient.QuantityOnHand, ingredient.LowStockThreshold ?? 0m))
             .ToList();
 
-        return new IngredientStockDto(ingredients.Count, ingredients.Count(ingredient => ingredient.QuantityOnHand <= 0), low.Count, low);
+        return new IngredientStockDto(ingredients.Count, ingredients.Count(ingredient => ingredient.QuantityOnHand <= 0), low.Count(i => i.QuantityOnHand > 0), low);
     }
 
     private Guid CurrentTenantId => currentTenantProvider.TenantId
