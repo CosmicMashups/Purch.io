@@ -50,3 +50,11 @@ E. Overlap with U3: adds `DefaultSupplierId` and cost use; no conflict with valu
 ## Branch code and country (owner, 2026-10-15)
 - Branch gets a required short `Code` (unique per tenant, default derived from the name), used in control numbers.
 - Tenant gets `Country` (default PH). A single shared country table maps country to currency and VAT rate; ships with PH only (PHP, 12%). Purchase orders read the VAT rate from it. POS/receipts/reports stay on the existing hard-coded PHP and 12% until a separate currency-aware unit.
+
+## Implementation status (2026-10-15)
+Built on `feat/restock-purchase-requests`, not pushed.
+- Backend: `PurchaseRequest`(+lines), `ItemSupplier`, `DocumentSequence` (migration `AddRestockPurchaseRequests`, RLS on all four, backfills branch codes and defaults `Tenant.Country` to PH); PO control number, PR link, address, payment snapshot, VAT/discount totals; `Item.Unit`, `Supplier.PaymentAccountName/Number`, `Branch.Code` (+ `PUT /branches/{id}/details`), `PUT /tenant/settings/country`; receiving accepts ingredient lines (`InventoryItemId`).
+- Endpoints: `GET /inventory/restock-suggestions`, `/purchase-requests` (list, create, approve [Admin/Manager], cancel, convert), `/items/{id}/suppliers`, `/inventory-items/{id}/suppliers`.
+- Web: Restock first card (Request, Suppliers, bulk request), Purchase requests panel and convert dialog on the Purchase orders page, PO totals/payment/address, supplier payment fields, item unit, branch details and code, country setting.
+- Known gaps: PO print/PDF view not built; the existing manual "New purchase order" dialog still takes items only and has no VAT or discount inputs; per-supplier unit cost is stored but only editable via API (the supplier dialog preserves it); web per-line unit price edit on convert is not offered; default branch codes are generated from the first four letters of the name.
+- Deploy: run the migration out-of-band first (see the U4 deploy note for the procedure).
