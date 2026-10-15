@@ -140,6 +140,94 @@ public sealed class PurchaseOrderService(
         return await ToDtoAsync(purchaseOrder, cancellationToken);
     }
 
+    public async Task<PurchaseOrderDto> UpdateAsync(Guid purchaseOrderId, UpdatePurchaseOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        var purchaseOrder = await purchaseOrderRepository.GetByIdAsync(purchaseOrderId, cancellationToken)
+            ?? throw new NotFoundException("Purchase order", purchaseOrderId);
+
+        await branchScopeGuard.EnsureAllowedAsync(purchaseOrder.BranchId, cancellationToken);
+
+        if (purchaseOrder.Status != PurchaseOrderStatus.Draft)
+        {
+            throw new ValidationException(nameof(purchaseOrder.Status), "Only a Draft purchase order can be edited.");
+        }
+
+        if (request.Lines.Count == 0)
+        {
+            throw new ValidationException(nameof(request.Lines), "At least one item is required.");
+        }
+
+        var supplier = await supplierRepository.GetByIdAsync(request.SupplierId, cancellationToken)
+            ?? throw new NotFoundException("Supplier", request.SupplierId);
+
+        foreach (var line in request.Lines)
+        {
+            if (line.QuantityOrdered <= 0)
+            {
+                throw new ValidationException(nameof(line.QuantityOrdered), "Quantity ordered must be greater than zero.");
+            }
+
+            if (line.ExpectedUnitCost < 0)
+            {
+                throw new ValidationException(nameof(line.ExpectedUnitCost), "Expected unit cost cannot be negative.");
+            }
+
+            if (line.InventoryItemId is { } ingredientId)
+            {
+                _ = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken)
+                    ?? throw new NotFoundException("Ingredient", ingredientId);
+            }
+            else
+            {
+                _ = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
+                    ?? throw new NotFoundException("Item", line.ItemId);
+            }
+        }
+
+        var tenant = await tenantRepository.GetByIdAsync(CurrentTenantId, cancellationToken);
+        var vatRate = Purch.Domain.CountryProfiles.Get(tenant?.Country).VatRate;
+        var totals = PurchaseDocuments.Totals(
+            request.Lines.Select(line => (line.QuantityOrdered, line.ExpectedUnitCost)),
+            request.DiscountAmount,
+            request.VatInclusive,
+            vatRate);
+
+        purchaseOrder.SupplierId = supplier.Id;
+        purchaseOrder.PaymentAccountName = supplier.PaymentAccountName;
+        purchaseOrder.PaymentAccountNumber = supplier.PaymentAccountNumber;
+        purchaseOrder.DateNeeded = request.DateNeeded;
+        purchaseOrder.Remarks = string.IsNullOrWhiteSpace(request.Remarks) ? null : request.Remarks.Trim();
+        purchaseOrder.VatInclusive = request.VatInclusive;
+        purchaseOrder.DiscountAmount = totals.Discount;
+        purchaseOrder.VatRate = vatRate;
+        purchaseOrder.Subtotal = totals.Subtotal;
+        purchaseOrder.VatAmount = totals.Vat;
+        purchaseOrder.OrderTotal = totals.Total;
+
+        foreach (var existing in await purchaseOrderRepository.ListLinesAsync(purchaseOrder.Id, cancellationToken))
+        {
+            purchaseOrderRepository.RemoveLine(existing);
+        }
+
+        foreach (var line in request.Lines)
+        {
+            purchaseOrderRepository.AddLine(new PurchaseOrderLine
+            {
+                TenantId = CurrentTenantId,
+                PurchaseOrderId = purchaseOrder.Id,
+                ItemId = line.InventoryItemId is null ? line.ItemId : Guid.Empty,
+                InventoryItemId = line.InventoryItemId,
+                Unit = string.IsNullOrWhiteSpace(line.Unit) ? "pc" : line.Unit.Trim(),
+                QuantityOrdered = line.QuantityOrdered,
+                QuantityReceived = 0,
+                ExpectedUnitCost = line.ExpectedUnitCost,
+            });
+        }
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(purchaseOrder, cancellationToken);
+    }
+
     public async Task<PurchaseOrderDto> MarkSentAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default)
     {
         var purchaseOrder = await purchaseOrderRepository.GetByIdAsync(purchaseOrderId, cancellationToken)

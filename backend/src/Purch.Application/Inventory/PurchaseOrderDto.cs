@@ -52,6 +52,15 @@ public sealed record CreatePurchaseOrderRequest(
     decimal DiscountAmount = 0m,
     Guid? PurchaseRequestId = null);
 
+/// <summary>Replaces a Draft order's supplier, lines, VAT choice, discount and notes. The branch stays as it was.</summary>
+public sealed record UpdatePurchaseOrderRequest(
+    Guid SupplierId,
+    IReadOnlyList<CreatePurchaseOrderLineRequest> Lines,
+    DateOnly? DateNeeded = null,
+    string? Remarks = null,
+    bool VatInclusive = false,
+    decimal DiscountAmount = 0m);
+
 public sealed record CreatePurchaseOrderLineRequest(
     Guid ItemId,
     decimal QuantityOrdered,

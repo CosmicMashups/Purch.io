@@ -19,6 +19,7 @@ vi.mock('../api', () => ({
     createPurchaseOrder: vi.fn(),
     markPurchaseOrderSent: vi.fn(),
     cancelPurchaseOrder: vi.fn(),
+    updatePurchaseOrder: vi.fn(),
   },
 }));
 
@@ -115,6 +116,8 @@ describe('PurchaseOrdersPage', () => {
       lines: [{ itemId: 'milk', quantityOrdered: 24, expectedUnitCost: 80.5 }],
       vatInclusive: false,
       discountAmount: 0,
+      remarks: null,
+      dateNeeded: null,
     });
   });
 
@@ -137,6 +140,31 @@ describe('PurchaseOrdersPage', () => {
     expect(vi.mocked(inventoryApi.createPurchaseOrder).mock.calls[0][0].lines).toEqual([
       { itemId: '00000000-0000-0000-0000-000000000000', inventoryItemId: 'flour', quantityOrdered: 5, expectedUnitCost: 40, unit: 'kg' },
     ]);
+  });
+
+  it('edits a draft: changes a quantity and price, keeps the branch, and offers no edit once sent', async () => {
+    vi.mocked(inventoryApi.updatePurchaseOrder).mockResolvedValue({} as never);
+    vi.mocked(inventoryApi.listPurchaseOrders).mockResolvedValue([order(PurchaseOrderStatus.Draft, 'd1'), order(PurchaseOrderStatus.Sent, 's1')]);
+    renderPage(<PurchaseOrdersPage />);
+    const edits = await screen.findAllByRole('button', { name: 'Edit order' });
+    expect(edits).toHaveLength(1);
+    fireEvent.click(edits[0]);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit purchase order' });
+    expect(within(dialog).getByLabelText('Deliver to branch')).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '12' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit cost (PHP)'), { target: { value: '90' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(inventoryApi.updatePurchaseOrder).toHaveBeenCalledTimes(1));
+    expect(inventoryApi.updatePurchaseOrder).toHaveBeenCalledWith('d1', {
+      supplierId: 's1',
+      lines: [{ itemId: 'milk', quantityOrdered: 12, expectedUnitCost: 90 }],
+      vatInclusive: false,
+      discountAmount: 0,
+      remarks: null,
+      dateNeeded: null,
+    });
   });
 
   it('will not create an order without a supplier', async () => {

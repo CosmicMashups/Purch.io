@@ -265,6 +265,15 @@ export interface CreatePurchaseOrderRequest {
   dateNeeded?: string | null;
 }
 
+export interface UpdatePurchaseOrderRequest {
+  supplierId: string;
+  lines: CreatePurchaseOrderRequest['lines'];
+  dateNeeded?: string | null;
+  remarks?: string | null;
+  vatInclusive: boolean;
+  discountAmount: number;
+}
+
 /** Mirrors Purch.Domain.Enums.ReceivingCondition. */
 export const ReceivingCondition = { Good: 0, NotGood: 1 } as const;
 export type ReceivingCondition = (typeof ReceivingCondition)[keyof typeof ReceivingCondition];

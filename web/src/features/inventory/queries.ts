@@ -123,6 +123,8 @@ export function useCreateSupplier() {
 }
 
 export const useCreatePurchaseOrder = () => useStockMutation(inventoryApi.createPurchaseOrder);
+export const useUpdatePurchaseOrder = () =>
+  useStockMutation(({ id, body }: { id: string; body: Parameters<Api['updatePurchaseOrder']>[1] }) => inventoryApi.updatePurchaseOrder(id, body));
 export const useMarkPurchaseOrderSent = () => useStockMutation(inventoryApi.markPurchaseOrderSent);
 export const useCancelPurchaseOrder = () => useStockMutation(inventoryApi.cancelPurchaseOrder);
 /** A request change moves what is "already requested" and, on convert, adds purchase orders. */

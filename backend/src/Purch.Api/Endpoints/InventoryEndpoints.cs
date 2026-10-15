@@ -108,6 +108,14 @@ public static class InventoryEndpoints
             Results.Ok(await purchaseOrderService.CreateAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        _ = app.MapPut("/purchase-orders/{purchaseOrderId:guid}", async (
+            Guid purchaseOrderId,
+            UpdatePurchaseOrderRequest request,
+            IPurchaseOrderService purchaseOrderService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await purchaseOrderService.UpdateAsync(purchaseOrderId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         _ = app.MapPost("/purchase-orders/{purchaseOrderId:guid}/mark-sent", async (
             Guid purchaseOrderId,
             IPurchaseOrderService purchaseOrderService,

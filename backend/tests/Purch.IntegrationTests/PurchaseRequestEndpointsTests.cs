@@ -184,6 +184,45 @@ public sealed class PurchaseRequestEndpointsTests(PostgresContainerFixture postg
         Assert.Equal(5m, stock.QuantityOnHand);
     }
 
+    [Fact]
+    public async Task A_draft_order_can_be_edited_and_a_sent_one_cannot()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var first = await CreateSupplierAsync(client, "Echo Supply");
+        var second = await CreateSupplierAsync(client, "Foxtrot Supply", "Foxtrot Inc", "777");
+        var item = await CreateItemAsync(client, "Pasta", threshold: 5m, stockIn: 0m);
+        var other = await CreateItemAsync(client, "Sauce", threshold: 5m, stockIn: 0m);
+
+        var order = await PostOrderAsync(client, first.Id, branchId, item.Id, vatInclusive: false);
+
+        var edited = await client.PutAsJsonAsync(
+            $"/purchase-orders/{order.Id}",
+            new UpdatePurchaseOrderRequest(
+                second.Id,
+                [new CreatePurchaseOrderLineRequest(item.Id, 4m, 25m), new CreatePurchaseOrderLineRequest(other.Id, 2m, 10m)],
+                Remarks: "Deliver before noon",
+                VatInclusive: false,
+                DiscountAmount: 20m));
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var updated = (await edited.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions))!;
+        Assert.Equal(second.Id, updated.SupplierId);
+        Assert.Equal("Foxtrot Inc", updated.PaymentAccountName);
+        Assert.Equal(2, updated.Lines.Count);
+        Assert.Equal(120m, updated.Subtotal);
+        Assert.Equal(100m, updated.Subtotal - updated.DiscountAmount);
+        Assert.Equal(12m, updated.VatAmount);
+        Assert.Equal(112m, updated.OrderTotal);
+        Assert.Equal("Deliver before noon", updated.Remarks);
+
+        _ = await client.PostAsync($"/purchase-orders/{order.Id}/mark-sent", null);
+        var locked = await client.PutAsJsonAsync(
+            $"/purchase-orders/{order.Id}",
+            new UpdatePurchaseOrderRequest(second.Id, [new CreatePurchaseOrderLineRequest(item.Id, 1m, 1m)]));
+        Assert.Equal(HttpStatusCode.BadRequest, locked.StatusCode);
+    }
+
     private static async Task<PurchaseOrderDto> PostOrderAsync(HttpClient client, Guid supplierId, Guid branchId, Guid itemId, bool vatInclusive)
     {
         var response = await client.PostAsJsonAsync(

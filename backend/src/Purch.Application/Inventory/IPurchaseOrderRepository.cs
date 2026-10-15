@@ -15,4 +15,6 @@ public interface IPurchaseOrderRepository
     void Add(PurchaseOrder purchaseOrder);
 
     void AddLine(PurchaseOrderLine line);
+
+    void RemoveLine(PurchaseOrderLine line);
 }

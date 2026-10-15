@@ -37,6 +37,11 @@ public sealed class EfPurchaseOrderRepository(PurchDbContext dbContext) : IPurch
         _ = dbContext.PurchaseOrders.Add(purchaseOrder);
     }
 
+    public void RemoveLine(PurchaseOrderLine line)
+    {
+        _ = dbContext.PurchaseOrderLines.Remove(line);
+    }
+
     public void AddLine(PurchaseOrderLine line)
     {
         _ = dbContext.PurchaseOrderLines.Add(line);

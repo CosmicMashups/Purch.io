@@ -14,6 +14,7 @@ import type {
   MovementCursor,
   MovementFilter,
   PurchaseOrder,
+  UpdatePurchaseOrderRequest,
   ConvertPurchaseRequestRequest,
   CreatePurchaseRequestRequest,
   PurchaseRequest,
@@ -58,6 +59,8 @@ export const inventoryApi = {
 
   listPurchaseOrders: () => apiClient.get<PurchaseOrder[]>('/purchase-orders').then((r) => r.data),
   createPurchaseOrder: (body: CreatePurchaseOrderRequest) => apiClient.post<PurchaseOrder>('/purchase-orders', body).then((r) => r.data),
+  updatePurchaseOrder: (id: string, body: UpdatePurchaseOrderRequest) =>
+    apiClient.put<PurchaseOrder>(`/purchase-orders/${id}`, body).then((r) => r.data),
   markPurchaseOrderSent: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/mark-sent`).then((r) => r.data),
   cancelPurchaseOrder: (id: string) => apiClient.post<PurchaseOrder>(`/purchase-orders/${id}/cancel`).then((r) => r.data),
 

@@ -20,10 +20,11 @@ import {
   useCreatePurchaseOrder,
   useInventoryItems,
   useMarkPurchaseOrderSent,
+  useUpdatePurchaseOrder,
   usePurchaseOrders,
   useSuppliers,
 } from '../queries';
-import type { InventoryItem, PurchaseOrder } from '../types';
+import { PurchaseOrderStatus, type InventoryItem, type PurchaseOrder } from '../types';
 import { purchaseOrderActions, purchaseOrderStatusLabel } from '../workflow';
 
 const actionButton = 'h-12 rounded-control bg-brand px-5 text-base font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60';
@@ -39,6 +40,7 @@ export function PurchaseOrdersPage() {
   const cancel = useCancelPurchaseOrder();
   const [cancelling, setCancelling] = useState<PurchaseOrder | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<PurchaseOrder | null>(null);
 
   async function onSend(order: PurchaseOrder) {
     await send.mutateAsync(order.id);
@@ -125,6 +127,11 @@ export function PurchaseOrdersPage() {
                   </button>
                   {actions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {order.status === PurchaseOrderStatus.Draft && (
+                        <button type="button" className={actionButton} onClick={() => setEditing(order)}>
+                          Edit order
+                        </button>
+                      )}
                       {actions.includes('send') && (
                         <button type="button" className={actionButton} disabled={send.isPending} onClick={() => void onSend(order)}>
                           Submit order
@@ -151,12 +158,12 @@ export function PurchaseOrdersPage() {
 
       </div>
 
-      {creating && (
+      {(creating || editing) && (
         <FormDialogLoader
-          title="New purchase order"
+          title={editing ? 'Edit purchase order' : 'New purchase order'}
           failed={suppliers.isError ? suppliers : items.isError ? items : branchesFailed ? { error: branchesError, refetch: refetchBranches } : null}
           ready={!!(suppliers.data && items.data && branches)}
-          onClose={() => setCreating(false)}
+          onClose={() => (editing ? setEditing(null) : setCreating(false))}
         >
           {suppliers.data && items.data && branches && (
             <PurchaseOrderDialog
@@ -164,7 +171,9 @@ export function PurchaseOrdersPage() {
               branches={branches}
               items={items.data}
               ingredients={(ingredients.data ?? []).filter((i) => !i.isAutoCreatedForItem && i.isActive !== false)}
-              onClose={() => setCreating(false)} />
+              order={editing ?? undefined}
+              onClose={() => (editing ? setEditing(null) : setCreating(false))}
+            />
           )}
         </FormDialogLoader>
       )}
@@ -188,17 +197,23 @@ function PurchaseOrderDialog({
   branches,
   items,
   ingredients,
+  order,
   onClose,
 }: {
   suppliers: { id: string; name: string }[];
   branches: Branch[];
   items: Item[];
   ingredients: InventoryItem[];
+  /** Set to edit a draft instead of creating a new order. */
+  order?: PurchaseOrder;
   onClose: () => void;
 }) {
   const create = useCreatePurchaseOrder();
-  const [vatInclusive, setVatInclusive] = useState(false);
-  const [discount, setDiscount] = useState('');
+  const update = useUpdatePurchaseOrder();
+  const [vatInclusive, setVatInclusive] = useState(order?.vatInclusive ?? false);
+  const [discount, setDiscount] = useState(order?.discountAmount ? String(order.discountAmount) : '');
+  const [remarks, setRemarks] = useState(order?.remarks ?? '');
+  const [dateNeeded, setDateNeeded] = useState(order?.dateNeeded ?? '');
   const {
     register,
     control,
@@ -206,7 +221,17 @@ function PurchaseOrderDialog({
     formState: { errors },
   } = useForm<PurchaseOrderForm>({
     resolver: zodResolver(purchaseOrderSchema),
-    defaultValues: { supplierId: '', branchId: branches.length === 1 ? branches[0].id : '', lines: [{ itemId: '' }] as PurchaseOrderForm['lines'] },
+    defaultValues: order
+      ? {
+          supplierId: order.supplierId,
+          branchId: order.branchId,
+          lines: order.lines.map((l) => ({
+            itemId: l.inventoryItemId ? `ing:${l.inventoryItemId}` : l.itemId,
+            quantityOrdered: l.quantityOrdered,
+            expectedUnitCost: l.expectedUnitCost,
+          })) as PurchaseOrderForm['lines'],
+        }
+      : { supplierId: '', branchId: branches.length === 1 ? branches[0].id : '', lines: [{ itemId: '' }] as PurchaseOrderForm['lines'] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
@@ -217,13 +242,29 @@ function PurchaseOrderDialog({
         ? { itemId: '00000000-0000-0000-0000-000000000000', inventoryItemId: ingredient.id, quantityOrdered: line.quantityOrdered, expectedUnitCost: line.expectedUnitCost, unit: ingredient.baseUnit }
         : line;
     });
-    await create.mutateAsync({ ...v, lines, vatInclusive, discountAmount: Number(discount) || 0 });
+    if (order) {
+      await update.mutateAsync({
+        id: order.id,
+        body: { supplierId: v.supplierId, lines, vatInclusive, discountAmount: Number(discount) || 0, remarks: remarks.trim() || null, dateNeeded: dateNeeded || null },
+      });
+      toast.success('Purchase order updated');
+      onClose();
+      return;
+    }
+    await create.mutateAsync({ ...v, lines, vatInclusive, discountAmount: Number(discount) || 0, remarks: remarks.trim() || null, dateNeeded: dateNeeded || null });
     toast.success('Purchase order created as a draft');
     onClose();
   });
 
   return (
-    <FormDialog title="New purchase order" wide busy={create.isPending} submitLabel="Create draft" onSubmit={submit} onClose={onClose}>
+    <FormDialog
+      title={order ? 'Edit purchase order' : 'New purchase order'}
+      wide
+      busy={create.isPending || update.isPending}
+      submitLabel={order ? 'Save changes' : 'Create draft'}
+      onSubmit={submit}
+      onClose={onClose}
+    >
       <FormField label="Supplier" error={errors.supplierId?.message}>
         <select {...register('supplierId')} className={controlClass}>
           <option value="">Choose a supplier</option>
@@ -235,7 +276,7 @@ function PurchaseOrderDialog({
         </select>
       </FormField>
       <FormField label="Deliver to branch" error={errors.branchId?.message}>
-        <select {...register('branchId')} className={controlClass}>
+        <select {...register('branchId')} disabled={Boolean(order)} className={controlClass}>
           <option value="">Choose a branch</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>
@@ -252,6 +293,15 @@ function PurchaseOrderDialog({
         </label>
         <FormField label="Discount (whole order)">
           <input type="number" inputMode="decimal" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} className={controlClass} />
+        </FormField>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Date needed (optional)">
+          <input type="date" value={dateNeeded} onChange={(e) => setDateNeeded(e.target.value)} className={controlClass} />
+        </FormField>
+        <FormField label="Remarks (optional)">
+          <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={controlClass} />
         </FormField>
       </div>
 
