@@ -59,4 +59,7 @@ public enum AuditActionType
     CartExpired,
 
     OpenItemAdded,
+
+    /// <summary>A stock take was applied with an approver PIN; the entry lists counted, uncounted and skipped lines.</summary>
+    StockTakeApplied,
 }

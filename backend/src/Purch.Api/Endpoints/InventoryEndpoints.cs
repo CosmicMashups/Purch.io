@@ -37,6 +37,65 @@ public static class InventoryEndpoints
             Results.Ok(await movementService.RecordAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // --- U3 — stock-take sessions. Apply additionally needs an Admin/Manager approver PIN (checked in the service). ---
+        _ = app.MapPost("/stock-takes", async (
+            CreateStockTakeRequest request,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/stock-takes", async (
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/stock-takes/{id:guid}", async (
+            Guid id,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPut("/stock-takes/{id:guid}/lines/{lineId:guid}", async (
+            Guid id,
+            Guid lineId,
+            CountStockTakeLineRequest request,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CountLineAsync(id, lineId, request.Counted, request.Skip, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/stock-takes/{id:guid}/start", async (
+            Guid id,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.StartAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/stock-takes/{id:guid}/review", async (
+            Guid id,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ToReviewAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/stock-takes/{id:guid}/apply", async (
+            Guid id,
+            ApplyStockTakeRequest request,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ApplyAsync(id, request.ApproverPin, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/stock-takes/{id:guid}/cancel", async (
+            Guid id,
+            IStockTakeService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CancelAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- C4 — multi-branch stock transfer ---
         _ = app.MapGet("/branch-transfers", async (
             IBranchTransferService branchTransferService,
