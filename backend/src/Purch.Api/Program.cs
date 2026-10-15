@@ -241,6 +241,8 @@ builder.Services.AddScoped<IItemDiscountPromoRuleRepository, EfItemDiscountPromo
 builder.Services.AddScoped<IItemDiscountPromoRuleService, ItemDiscountPromoRuleService>();
 builder.Services.AddScoped<IBirReadingService, BirReadingService>();
 builder.Services.AddScoped<IReportingRepository, EfReportingRepository>();
+builder.Services.AddScoped<IReportInsightsRepository, EfReportInsightsRepository>();
+builder.Services.AddScoped<ISalesMixReportService, SalesMixReportService>();
 builder.Services.AddScoped<IReportScopeResolver, ReportScopeResolver>();
 builder.Services.AddScoped<IBranchScopeGuard, BranchScopeGuard>();
 builder.Services.AddScoped<ISalesDashboardService, SalesDashboardService>();

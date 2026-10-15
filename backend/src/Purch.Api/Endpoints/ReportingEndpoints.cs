@@ -120,6 +120,16 @@ public static class ReportingEndpoints
             Results.Ok(await departmentSalesReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        // --- U4 — payment type / category / hour in one response (Sales mix tab) ---
+        _ = app.MapGet("/reports/sales-mix", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            ISalesMixReportService salesMixReportService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await salesMixReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
         // --- Daily review of void/refund/kitchen-order-edit approvals, grouped by who approved them ---
         _ = app.MapGet("/reports/approvals-review", async (
             DateOnly? date,
