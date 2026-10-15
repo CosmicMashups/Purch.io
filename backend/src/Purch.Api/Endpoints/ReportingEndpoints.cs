@@ -130,6 +130,104 @@ public static class ReportingEndpoints
             Results.Ok(await salesMixReportService.GetReportAsync(branchId, fromUtc, toUtc, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        // --- U4 — tax, margin, discounts, voids, refunds, dashboard insights ---
+        _ = app.MapGet("/reports/tax", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetTaxAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/gross-profit", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetProfitAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/discounts", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetDiscountsAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/discounts/manual", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            int? offset,
+            int? limit,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListManualDiscountsAsync(branchId, fromUtc, toUtc, offset ?? 0, limit ?? 50, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/voids", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            int? offset,
+            int? limit,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetVoidsAsync(branchId, fromUtc, toUtc, offset ?? 0, limit ?? 50, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/refunds", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            int? offset,
+            int? limit,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetRefundsAsync(branchId, fromUtc, toUtc, offset ?? 0, limit ?? 50, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        _ = app.MapGet("/reports/dashboard-insights", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetInsightsAsync(branchId, fromUtc, toUtc, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
+
+        // Per-transaction listings name staff and approvers, so like the transactions export they are Admin only.
+        _ = app.MapGet("/reports/voids.csv", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Text(await service.ExportVoidsCsvAsync(branchId, fromUtc, toUtc, cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin)));
+
+        _ = app.MapGet("/reports/refunds.csv", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Text(await service.ExportRefundsCsvAsync(branchId, fromUtc, toUtc, cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin)));
+
+        _ = app.MapGet("/reports/discounts/manual.csv", async (
+            Guid? branchId,
+            [FromQuery(Name = "from")] DateTimeOffset fromUtc,
+            [FromQuery(Name = "to")] DateTimeOffset toUtc,
+            IRevenueReportService service,
+            CancellationToken cancellationToken) =>
+            Results.Text(await service.ExportManualDiscountsCsvAsync(branchId, fromUtc, toUtc, cancellationToken), "text/csv"))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin)));
+
         // --- Daily review of void/refund/kitchen-order-edit approvals, grouped by who approved them ---
         _ = app.MapGet("/reports/approvals-review", async (
             DateOnly? date,

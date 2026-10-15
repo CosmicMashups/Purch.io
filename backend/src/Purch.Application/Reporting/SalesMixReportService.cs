@@ -27,7 +27,7 @@ public sealed class SalesMixReportService(
         // Sequential on purpose: one scoped DbContext can not run concurrent queries.
         var payments = await insightsRepository.GetPaymentTotalsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
         var categories = await insightsRepository.GetCategoryTotalsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
-        var utcHours = await insightsRepository.GetUtcHourTotalsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
+        var utcHours = await insightsRepository.GetHourlySaleFactsAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
         var exchange = await insightsRepository.GetExchangePriceDifferenceAsync(resolvedBranchId, fromUtc, toUtc, cancellationToken);
 
         var tenantId = currentTenantProvider.TenantId
@@ -41,7 +41,7 @@ public sealed class SalesMixReportService(
             {
                 var shifted = new DateTime(row.UtcDate.Year, row.UtcDate.Month, row.UtcDate.Day, row.UtcHour, 0, 0)
                     .Add(ReportTimeZone.Offset);
-                return (Date: DateOnly.FromDateTime(shifted), shifted.Hour, row.Sales, row.TransactionCount);
+                return (Date: DateOnly.FromDateTime(shifted), shifted.Hour, Sales: row.Total, TransactionCount: row.SaleCount);
             })
             .ToList();
 
