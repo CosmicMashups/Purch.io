@@ -109,6 +109,12 @@
 | **REP-06** | Reports | Sales Transactions Export| `/business/reports` (Sales CSV)| `GET /reports/sales/transactions-export.csv`| `Transaction` | Admin | **CONFIRMED** (Admin-only raw CSV download) |
 | **REP-07** | Reports | Staff Performance Metrics| `/business/reports` (Staff) | `GET /reports/staff-performance` | `Transaction`, `User` | Manager, Admin | **CONFIRMED** (Volume & average transaction value) |
 | **REP-08** | Reports | Department Sales Attrib | `/business/reports` (Depts) | `GET /reports/department-sales` | `TransactionLine`, `Item` | Manager, Admin | **CONFIRMED** (Concessionaire breakdown) |
+| **REP-09** | Reports | Sales Mix (payment, category, hour) | `/business/reports?tab=sales` | `GET /reports/sales-mix` | `Transaction`, `Payment`, `TransactionLine` | Manager, Admin | **CONFIRMED** (Gross by completion time, UTC+8; CSV and print) |
+| **REP-10** | Reports | Tax Report | `/business/reports?tab=tax` | `GET /reports/tax` | `Transaction` (VAT stamps) | Manager, Admin | **CONFIRMED** (Stamped columns, `VatDerived` surfaced; may differ from X/Z by centavos) |
+| **REP-11** | Reports | Gross Profit and Margin | `/business/reports?tab=profit` | `GET /reports/gross-profit` | `TransactionLine.UnitCost` | Manager, Admin | **CONFIRMED** (Unknown cost excluded, coverage shown) |
+| **REP-12** | Reports | Discount Report | `/business/reports?tab=discounts` | `GET /reports/discounts`, `/discounts/manual` | `Transaction`, `AuditLog` | Manager, Admin | **CONFIRMED** (By type, cashier, approver) |
+| **REP-13** | Reports | Void and Refund Reports | `/business/reports?tab=voids` | `GET /reports/voids`, `/refunds` | `Transaction`, `Adjustment`, `AuditLog` | Manager, Admin | **CONFIRMED** (Listing CSVs Admin-only) |
+| **REP-14** | Reports | Executive Dashboard Insights | `/` | `GET /reports/dashboard-insights` | `Transaction`, `TransactionLine` | Manager, Admin | **CONFIRMED** (Margin, leakage, category mix; lazy-loaded) |
 | **KIOSK-01**| Kiosk | Kiosk Device Session | `/kiosk/pair` | `POST /kiosk/session` | `Device` | Anonymous | **CONFIRMED** (`KioskSessionService.cs`, 24h JWT) |
 | **KIOSK-02**| Kiosk | Kiosk Cart Management | `/kiosk/cart` | `GET/POST/PUT/DELETE /kiosk/cart/*`| `Transaction`, `Lines` | Kiosk Role | **CONFIRMED** (Server-backed pricing engine) |
 | **KIOSK-03**| Kiosk | Submit Kiosk Prep Ticket| `/kiosk/done` | `POST /kiosk/cart/submit` | `Transaction`, `KioskPrepSeq`| Kiosk Role | **CONFIRMED** (Allocates prep number) |
