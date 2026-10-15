@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from '../../../components/feedback/toastStore';
+import { Donut } from '../../../components/charts/Donut';
 import { BarList } from '../../../components/charts/RankedCharts';
+import { StackedColumnChart } from '../../../components/charts/StackedColumnChart';
+import { WaterfallChart } from '../../../components/charts/WaterfallChart';
 import { csvRowCount, datedFilename, downloadTextFile } from '../../../lib/download';
 import { AsyncPanel } from '../../dashboard/components/AsyncPanel';
-import { formatPeso } from '../../dashboard/format';
+import { formatDay, formatPeso, formatPesoCompact } from '../../dashboard/format';
 import { reportsApi } from '../api';
 import { toCsv } from '../csv';
-import { useDiscountReport, useManualDiscounts, useRefundReport, useVoidReport } from '../queries';
+import { useDashboardInsights, useDiscountReport, useManualDiscounts, useRefundReport, useVoidReport } from '../queries';
 import { businessToday } from '../range';
 import type { ExchangeRow, ManualDiscountRow, RefundRow, VoidRow } from '../revenueTypes';
 import type { RangeParams } from '../types';
@@ -79,6 +82,41 @@ export function DiscountsPanel({ params, isAdmin }: { params: RangeParams; isAdm
           <Stat label="Senior/PWD" value={formatPeso(d.seniorPwdDiscount)} />
         </div>
       )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)]">
+        <AsyncPanel title="From list price to takings" subtitle="Sales before discounts, each discount type taken off" query={summary} isEmpty={(r) => r.grossSales <= 0} emptyMessage="No sales in this period.">
+          {(r) => (
+            <WaterfallChart
+              steps={[
+                { key: 'gross', label: 'Before discounts', value: r.grossSales, kind: 'total' },
+                { key: 'promo', label: 'Promo code', value: -r.promoCodeDiscount, kind: 'delta' },
+                { key: 'item', label: 'Item promos', value: -r.itemPromoDiscount, kind: 'delta' },
+                { key: 'manual', label: 'Manual', value: -r.manualDiscount, kind: 'delta' },
+                { key: 'senior', label: 'Senior/PWD', value: -r.seniorPwdDiscount, kind: 'delta' },
+                { key: 'net', label: 'Sales taken', value: r.grossSales - r.totalDiscounts, kind: 'total' },
+              ]}
+              formatValue={formatPeso}
+              formatAxis={formatPesoCompact}
+              ariaLabel="Sales before discounts, less each type of discount, leaves the sales taken"
+            />
+          )}
+        </AsyncPanel>
+        <AsyncPanel title="Mix of discounts" query={summary} isEmpty={(r) => r.totalDiscounts <= 0} emptyMessage="No discounts in this period.">
+          {(r) => (
+            <Donut
+              ariaLabel="Share of discounts by type"
+              totalLabel="Discounts"
+              totalValue={formatPeso(r.totalDiscounts)}
+              formatValue={formatPeso}
+              slices={[
+                { key: 'promo', label: 'Promo code', value: r.promoCodeDiscount, color: 'var(--viz-1)' },
+                { key: 'item', label: 'Item promos', value: r.itemPromoDiscount, color: 'var(--viz-2)' },
+                { key: 'manual', label: 'Manual', value: r.manualDiscount, color: 'var(--viz-4)' },
+                { key: 'senior', label: 'Senior/PWD', value: r.seniorPwdDiscount, color: 'var(--viz-6)' },
+              ]}
+            />
+          )}
+        </AsyncPanel>
+      </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <AsyncPanel title="Discounts by cashier" subtitle="Total discounts given on each cashier's sales" query={summary} isEmpty={(r) => r.byCashier.length === 0} emptyMessage="No sales in this period.">
           {(r) => (
@@ -133,6 +171,7 @@ export function VoidsRefundsPanel({ params, isAdmin }: { params: RangeParams; is
   const [refundLimit, setRefundLimit] = useState(PAGE);
   const voids = useVoidReport(params, voidLimit);
   const refunds = useRefundReport(params, refundLimit);
+  const leakage = useDashboardInsights(params, true);
   const voidCsv = useListingCsv(reportsApi.voidsCsv, 'voids', params);
   const refundCsv = useListingCsv(reportsApi.refundsCsv, 'refunds', params);
   const v = voids.data;
@@ -174,6 +213,26 @@ export function VoidsRefundsPanel({ params, isAdmin }: { params: RangeParams; is
           <Stat label="Not counted as voids" value={String(v.emptyDiscardedCount + v.expiredParkedCount)} note={`${v.emptyDiscardedCount} empty, ${v.expiredParkedCount} expired parked`} />
         </div>
       )}
+
+      <AsyncPanel title="Leakage by day" subtitle="Discounts, voided carts and refunds each day, as peso amounts" query={leakage} isEmpty={(d) => d.leakage.length === 0} emptyMessage="No sales in this period.">
+        {(d) => (
+          <StackedColumnChart
+            points={d.leakage.map((day) => ({
+              key: day.date,
+              label: formatDay(day.date),
+              values: { discounts: day.discounts, voids: day.voids, refunds: day.refunds },
+            }))}
+            series={[
+              { key: 'discounts', label: 'Discounts', color: 'var(--viz-4)' },
+              { key: 'voids', label: 'Voided carts', color: 'var(--viz-8)' },
+              { key: 'refunds', label: 'Refunds', color: 'var(--viz-7)' },
+            ]}
+            formatValue={formatPeso}
+            formatAxis={formatPesoCompact}
+            ariaLabel="Discounts, voided carts and refunds for each day"
+          />
+        )}
+      </AsyncPanel>
 
       <AsyncPanel title="Voids" subtitle="Carts with items that were cancelled before payment. Empty and expired parked carts are left out." query={voids} isEmpty={(d) => d.voids.rows.length === 0} emptyMessage="No voids in this period.">
         {(d) => (

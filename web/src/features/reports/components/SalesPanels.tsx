@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { AreaLineChart } from '../../../components/charts/AreaLineChart';
+import { paretoRows } from '../../../components/charts/chartData';
+import { assignColors } from '../../../components/charts/colors';
+import { ComboChart } from '../../../components/charts/ComboChart';
+import { Donut, type DonutSlice } from '../../../components/charts/Donut';
+import { ParetoChart } from '../../../components/charts/ParetoChart';
 import { BarList } from '../../../components/charts/RankedCharts';
+import { ScatterChart } from '../../../components/charts/ScatterChart';
+import { StackedColumnChart } from '../../../components/charts/StackedColumnChart';
+import { WaterfallChart } from '../../../components/charts/WaterfallChart';
 import { AsyncPanel } from '../../dashboard/components/AsyncPanel';
-import { formatDay, formatPeso } from '../../dashboard/format';
+import { formatDay, formatPeso, formatPesoCompact } from '../../dashboard/format';
 import { toCsv } from '../csv';
 import { useProfitReport, useSalesMix, useTaxReport } from '../queries';
 import { PAYMENT_METHOD_LABELS, type ProfitGroup, type TaxDay } from '../revenueTypes';
@@ -14,6 +22,13 @@ const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 type MixView = 'payment' | 'category' | 'hour';
+
+function paymentSlices(payments: { method: number; amount: number }[]): DonutSlice[] {
+  const colors = assignColors(payments.map((p) => String(p.method)));
+  return payments
+    .filter((p) => p.amount > 0)
+    .map((p) => ({ key: String(p.method), label: PAYMENT_METHOD_LABELS[p.method] ?? 'Other', value: p.amount, color: colors.get(String(p.method)) as string }));
+}
 
 export function SalesMixPanel({ params }: { params: RangeParams }) {
   const [view, setView] = useState<MixView>('payment');
@@ -56,7 +71,14 @@ export function SalesMixPanel({ params }: { params: RangeParams }) {
       {view === 'payment' && (
         <AsyncPanel title="Sales by payment type" subtitle="What customers paid with. A split sale counts each part under its own method." query={query} isEmpty={(d) => d.payments.length === 0} emptyMessage="No payments in this period.">
           {(d) => (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6">
+              <Donut
+                ariaLabel="Share of sales by payment type"
+                totalLabel="Paid"
+                totalValue={formatPeso(d.payments.reduce((s, p) => s + p.amount, 0))}
+                formatValue={formatPeso}
+                slices={paymentSlices(d.payments)}
+              />
               <BarList
                 formatValue={formatPeso}
                 rows={d.payments.map((p) => ({
@@ -77,24 +99,47 @@ export function SalesMixPanel({ params }: { params: RangeParams }) {
       {view === 'category' && (
         <AsyncPanel title="Sales by category" subtitle="Follows each item's current category. Open items are shown on their own." query={query} isEmpty={(d) => d.categories.length === 0} emptyMessage="No sales in this period.">
           {(d) => (
-            <BarList
-              formatValue={formatPeso}
-              rows={d.categories.map((c) => ({ key: c.categoryId ?? c.name, label: c.name, value: c.revenue, detail: `${c.quantity.toLocaleString('en-PH', { maximumFractionDigits: 2 })} sold` }))}
-            />
+            <div className="flex flex-col gap-6">
+              <ParetoChart
+                rows={paretoRows(d.categories.map((c) => ({ key: c.categoryId ?? c.name, label: c.name, value: c.revenue })))}
+                seriesName="Sales"
+                formatValue={formatPeso}
+                formatAxis={formatPesoCompact}
+                ariaLabel="Sales by category, biggest first, with the running share of all sales"
+              />
+              <BarList
+                formatValue={formatPeso}
+                rows={d.categories.map((c) => ({ key: c.categoryId ?? c.name, label: c.name, value: c.revenue, detail: `${c.quantity.toLocaleString('en-PH', { maximumFractionDigits: 2 })} sold` }))}
+              />
+            </div>
           )}
         </AsyncPanel>
       )}
 
       {view === 'hour' && (
         <>
-          <AsyncPanel title="Sales by hour" subtitle="Total sales in each hour of the business day" query={query} isEmpty={(d) => d.transactionCount === 0} emptyMessage="No sales in this period.">
+          <AsyncPanel title="Sales by hour" subtitle="Total sales in each hour (bars) and the average basket (line)" query={query} isEmpty={(d) => d.transactionCount === 0} emptyMessage="No sales in this period.">
             {(d) => (
-              <AreaLineChart
-                points={d.hours.map((h) => ({ key: String(h.hour), label: hourLabel(h.hour), value: h.sales }))}
-                seriesName="Sales"
+              <ComboChart
+                points={d.hours.map((h) => ({ key: String(h.hour), label: hourLabel(h.hour), bar: h.sales, line: h.averageBasket }))}
+                barName="Sales"
+                lineName="Average basket"
+                formatBar={formatPeso}
+                formatLine={formatPeso}
+                formatBarAxis={formatPesoCompact}
+                formatLineAxis={formatPesoCompact}
+                ariaLabel="Sales and average basket for each hour of the day"
+              />
+            )}
+          </AsyncPanel>
+          <AsyncPanel title="Sales by weekday" subtitle="Which days of the week carry the sales" query={query} isEmpty={(d) => d.heatmap.length === 0} emptyMessage="Fills in as sales are recorded.">
+            {(d) => (
+              <StackedColumnChart
+                points={DAYS.map((day, i) => ({ key: day, label: day, values: { sales: d.heatmap.filter((c) => c.dayOfWeek === i).reduce((s, c) => s + c.sales, 0) } }))}
+                series={[{ key: 'sales', label: 'Sales', color: 'var(--viz-accent)' }]}
                 formatValue={formatPeso}
-                formatAxis={formatPeso}
-                ariaLabel="Sales for each hour of the day"
+                formatAxis={formatPesoCompact}
+                ariaLabel="Total sales for each weekday"
               />
             )}
           </AsyncPanel>
@@ -154,6 +199,16 @@ function Heatmap({ cells }: { cells: { dayOfWeek: number; hour: number; sales: n
   );
 }
 
+const TAX_SERIES = [
+  { key: 'vatable', label: 'Vatable sales', color: 'var(--viz-1)' },
+  { key: 'vat', label: 'VAT', color: 'var(--viz-4)' },
+  { key: 'exempt', label: 'VAT-exempt', color: 'var(--viz-6)' },
+  { key: 'zero', label: 'Zero-rated', color: 'var(--viz-5)' },
+];
+
+const taxValue = (totals: TaxDay, key: string): number =>
+  key === 'vatable' ? totals.vatableSales : key === 'vat' ? totals.vatAmount : key === 'exempt' ? totals.vatExemptSales : totals.zeroRatedSales;
+
 export function TaxPanel({ params }: { params: RangeParams }) {
   const query = useTaxReport(params);
   const data = query.data;
@@ -190,6 +245,34 @@ export function TaxPanel({ params }: { params: RangeParams }) {
           Senior/PWD exempt sales are the sale total plus its discount, which also includes any promo discount on that sale. Confirm with your accountant before filing.
         </p>
       )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)]">
+        <AsyncPanel title="What each day's sales were made of" subtitle="Vatable, VAT, exempt and zero-rated, stacked" query={query} isEmpty={(d) => d.days.length === 0} emptyMessage="No sales in this period.">
+          {(d) => (
+            <StackedColumnChart
+              points={d.days.map((day) => ({
+                key: day.date,
+                label: formatDay(day.date),
+                values: { vatable: day.vatableSales, vat: day.vatAmount, exempt: day.vatExemptSales, zero: day.zeroRatedSales },
+              }))}
+              series={TAX_SERIES}
+              formatValue={formatPeso}
+              formatAxis={formatPesoCompact}
+              ariaLabel="Vatable sales, VAT, exempt sales and zero-rated sales for each day"
+            />
+          )}
+        </AsyncPanel>
+        <AsyncPanel title="Split of the period" query={query} isEmpty={(d) => d.totals.grossSales <= 0} emptyMessage="No sales in this period.">
+          {(d) => (
+            <Donut
+              ariaLabel="Share of the period's sales by tax treatment"
+              totalLabel="Gross"
+              totalValue={formatPeso(d.totals.grossSales)}
+              formatValue={formatPeso}
+              slices={TAX_SERIES.map((s) => ({ key: s.key, label: s.label, color: s.color, value: taxValue(d.totals, s.key) }))}
+            />
+          )}
+        </AsyncPanel>
+      </div>
       <AsyncPanel title="Tax by day" subtitle="Business days in Philippine time" query={query} isEmpty={(d) => d.days.length === 0} emptyMessage="No sales in this period.">
         {(d) => (
           <ReportTable<TaxDay>
@@ -261,11 +344,41 @@ export function ProfitPanel({ params }: { params: RangeParams }) {
             points={d.days.map((p) => ({ key: p.date, label: formatDay(p.date), value: p.grossProfit }))}
             seriesName="Gross profit"
             formatValue={formatPeso}
-            formatAxis={formatPeso}
+            formatAxis={formatPesoCompact}
             ariaLabel="Gross profit for each day"
           />
         )}
       </AsyncPanel>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AsyncPanel title="From sales to profit" subtitle="Revenue with a known cost, less that cost" query={query} isEmpty={(d) => d.knownCostRevenue <= 0} emptyMessage="Profit shows once items with a cost price are sold.">
+          {(d) => (
+            <WaterfallChart
+              steps={[
+                { key: 'revenue', label: 'Revenue', value: d.knownCostRevenue, kind: 'total' },
+                { key: 'cost', label: 'Cost of goods', value: -d.cost, kind: 'delta' },
+                { key: 'profit', label: 'Gross profit', value: d.grossProfit, kind: 'total' },
+              ]}
+              formatValue={formatPeso}
+              formatAxis={formatPesoCompact}
+              ariaLabel="Revenue, less cost of goods, leaves gross profit"
+            />
+          )}
+        </AsyncPanel>
+        <AsyncPanel title="Category performance" subtitle="Sales against margin. Dashed lines are the middle of your categories." query={query} isEmpty={(d) => d.categories.filter((c) => c.marginPercent !== null).length < 2} emptyMessage="Needs two categories with a recorded cost.">
+          {(d) => (
+            <ScatterChart
+              points={d.categories
+                .filter((c) => c.marginPercent !== null)
+                .map((c) => ({ key: c.id ?? c.name, label: c.name, x: c.knownCostRevenue, y: c.marginPercent as number }))}
+              xName="Sales"
+              yName="Margin"
+              formatX={formatPesoCompact}
+              formatY={(v) => `${v.toFixed(0)}%`}
+              ariaLabel="Each category by its sales and its margin"
+            />
+          )}
+        </AsyncPanel>
+      </div>
       <AsyncPanel title="Profit by category" query={query} isEmpty={(d) => d.categories.length === 0} emptyMessage="No categorised sales in this period.">
         {(d) => <ReportTable<ProfitGroup> caption="Profit by category" rowKey={(r) => r.id ?? r.name} rows={d.categories} columns={groupColumns('Category')} />}
       </AsyncPanel>

@@ -51,7 +51,8 @@ describe('report export', () => {
   it('exports the payment mix as a CSV that matches the figures on screen', async () => {
     vi.mocked(reportsApi.salesMix).mockResolvedValue(mix);
     renderPage(<SalesMixPanel params={params} />);
-    await screen.findByText('Utang (credit)');
+    // Shown in the donut's legend and in the list beneath it.
+    expect((await screen.findAllByText('Utang (credit)')).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
 
