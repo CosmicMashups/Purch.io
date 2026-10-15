@@ -8,6 +8,7 @@ import { BarList } from '../../components/charts/RankedCharts';
 import { StackedStrip } from '../../components/charts/Proportions';
 import { useSession } from '../auth/useSession';
 import { AsyncPanel } from './components/AsyncPanel';
+import { ExecutiveInsights } from './components/ExecutiveInsights';
 import { RevenueOverview } from './components/RevenueOverview';
 import { StockHealth } from './components/StockHealth';
 import { formatDay, formatPeso, greetingFor } from './format';
@@ -155,6 +156,8 @@ export function HomePage() {
           </AsyncPanel>
         </div>
       )}
+
+      {canReport && <ExecutiveInsights range={periodParams} periodLabel={periodLabel} />}
 
       {canSeeStock && <StockHealth />}
 
