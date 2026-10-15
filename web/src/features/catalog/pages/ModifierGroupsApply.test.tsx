@@ -44,7 +44,7 @@ describe('ModifierGroupsPage apply to items', () => {
     renderPage();
     await chooseFromMenu('Sweetness', 'Add to items');
     fireEvent.change(await screen.findByLabelText('Category to give Sweetness to'), { target: { value: 'drinks' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(catalogApi.attachModifierGroupToItems).toHaveBeenCalledWith('g1', { categoryId: 'drinks' }));
   });
 
@@ -53,7 +53,7 @@ describe('ModifierGroupsPage apply to items', () => {
     await chooseFromMenu('Sweetness', 'Add to items');
     fireEvent.click(screen.getByLabelText('Selected items'));
     fireEvent.click(await screen.findByLabelText('Cake'));
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(catalogApi.attachModifierGroupToItems).toHaveBeenCalledWith('g1', { itemIds: ['cake'] }));
   });
 });

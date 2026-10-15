@@ -3,8 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { modifierGroupSchema, modifierSchema } from '../schemas';
 import { useAddModifier, useAttachModifierGroupToItems, useCategories, useItems, useCreateModifierGroup, useModifierGroups, useReplaceModifierIngredients, useUpdateModifier, useUpdateModifierCategoryItem, useUpdateModifierGroup } from '../queries';
-import { Field, inputClass } from '../../../components/Field';
-import { FormDialog } from '../../../components/forms/FormDialog';
+import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
 import { FormField, PrimaryButton, controlClass } from '../../../components/forms/FormField';
 import { EmptyState } from '../../../components/EmptyState';
 import { ErrorState, describeQueryError } from '../../../components/ErrorState';
@@ -16,7 +15,7 @@ import { useTenantSettings } from '../../tenant/queries';
 import { IngredientSelector } from '../components/IngredientSelector';
 import { buildRecipeLines, selectionFromRecipe, type RecipeSelection } from '../recipe';
 import type { Modifier, ModifierCategoryItem, ModifierGroup } from '../types';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { PageHeader } from '../../../components/PageHeader';
 import { RowActionsMenu } from '../../../components/RowActionsMenu';
 import { StatusBadge } from '../../../components/StatusBadge';
@@ -34,6 +33,8 @@ export function ModifierGroupsPage() {
   const [modifierDialog, setModifierDialog] = useState<{ groupId: string; modifier: Modifier | null } | null>(null);
   const [categoryGroupId, setCategoryGroupId] = useState<string | null>(null);
   const [applyGroupId, setApplyGroupId] = useState<string | null>(null);
+  const categoryGroup = (groups ?? []).find((g) => g.id === categoryGroupId) ?? null;
+  const applyGroup = (groups ?? []).find((g) => g.id === applyGroupId) ?? null;
   const [view, setView] = useState<StatusView>('active');
   const categories = useCategories();
   const { run, dialog } = useLifecycle();
@@ -91,8 +92,8 @@ export function ModifierGroupsPage() {
                         actions={[
                           { label: 'Edit group', onSelect: () => setGroupDialog(g) },
                           { label: 'Add modifier', onSelect: () => setModifierDialog({ groupId: g.id, modifier: null }) },
-                          { label: 'Linked category', onSelect: () => setCategoryGroupId(categoryGroupId === g.id ? null : g.id) },
-                          { label: 'Add to items', onSelect: () => setApplyGroupId(applyGroupId === g.id ? null : g.id) },
+                          { label: 'Linked category', onSelect: () => setCategoryGroupId(g.id) },
+                          { label: 'Add to items', onSelect: () => setApplyGroupId(g.id) },
                           g.isActive === false
                             ? { label: 'Make active', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'reactivate'), separated: true }
                             : { label: 'Make inactive', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'deactivate'), separated: true },
@@ -107,8 +108,6 @@ export function ModifierGroupsPage() {
                       Includes all items in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
                     </p>
                   )}
-                  {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
-                  {applyGroupId === g.id && <ApplyToItemsPanel group={g} categories={categories.data ?? []} />}
 
                   {g.modifiers.length > 0 && (
                     <ul className="mt-2 flex flex-col divide-y divide-line" aria-label={`${g.name} modifiers`}>
@@ -131,6 +130,8 @@ export function ModifierGroupsPage() {
 
       {groupDialog && <GroupDialog group={groupDialog === 'new' ? null : groupDialog} categories={categories.data ?? []} onClose={() => setGroupDialog(null)} />}
       {modifierDialog && <ModifierDialog groupId={modifierDialog.groupId} modifier={modifierDialog.modifier} onClose={() => setModifierDialog(null)} />}
+      {categoryGroup && <CategoryDialog group={categoryGroup} categories={categories.data ?? []} onClose={() => setCategoryGroupId(null)} />}
+      {applyGroup && <ApplyToItemsDialog group={applyGroup} categories={categories.data ?? []} onClose={() => setApplyGroupId(null)} />}
       {dialog}
     </div>
   );
@@ -170,7 +171,7 @@ function ModifierRow({
           subject={modifier.name}
           actions={[
             { label: 'Edit', onSelect: onEdit },
-            ...(tracksIngredients ? [{ label: panel === 'ingredients' ? 'Hide ingredients' : 'Ingredients', onSelect: () => setPanel(panel === 'ingredients' ? null : 'ingredients') }] : []),
+            ...(tracksIngredients ? [{ label: 'Ingredients', onSelect: () => setPanel('ingredients') }] : []),
             inactive
               ? { label: 'Make active', onSelect: () => onLifecycle('reactivate'), separated: true }
               : { label: 'Make inactive', onSelect: () => onLifecycle('deactivate'), separated: true },
@@ -178,13 +179,13 @@ function ModifierRow({
           ]}
         />
       </div>
-      {panel === 'ingredients' && <ModifierIngredientsEditor modifier={modifier} onDone={() => setPanel(null)} />}
+      {panel === 'ingredients' && <ModifierIngredientsDialog modifier={modifier} onClose={() => setPanel(null)} />}
     </li>
   );
 }
 
 /** The inventory a modifier takes when it is chosen, set the same way an item's recipe is. */
-function ModifierIngredientsEditor({ modifier, onDone }: { modifier: Modifier; onDone: () => void }) {
+function ModifierIngredientsDialog({ modifier, onClose }: { modifier: Modifier; onClose: () => void }) {
   const inventory = useInventoryItems();
   const save = useReplaceModifierIngredients(modifier.id);
   const [selection, setSelection] = useState<RecipeSelection>(() =>
@@ -192,7 +193,8 @@ function ModifierIngredientsEditor({ modifier, onDone }: { modifier: Modifier; o
   );
   const [lineError, setLineError] = useState<{ id: string; message: string } | null>(null);
 
-  async function onSave() {
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
     const result = buildRecipeLines(selection);
     if (!result.ok) {
       setLineError({ id: result.inventoryItemId, message: result.message });
@@ -201,32 +203,31 @@ function ModifierIngredientsEditor({ modifier, onDone }: { modifier: Modifier; o
     try {
       await save.mutateAsync({ lines: result.lines });
       toast.success(`${modifier.name} ingredients saved`);
-      onDone();
+      onClose();
     } catch (error) {
       toast.error(userMessage(error));
     }
   }
 
-  if (inventory.isPending) return <p className="mt-2 text-sm text-gray-500">Loading ingredients…</p>;
-  if (inventory.isError) return <ErrorState message={describeQueryError(inventory.error)} onRetry={() => void inventory.refetch()} />;
-  if (inventory.data.length === 0) return <p className="mt-2 text-sm text-gray-500">Add ingredients in Inventory first, then choose which ones this option uses.</p>;
-
   return (
-    <div className="mt-2 flex max-w-lg flex-col gap-3 rounded-md bg-gray-50 p-3">
-      <IngredientSelector
-        subject="modifier"
-        ingredients={inventory.data}
-        selection={selection}
-        onChange={(next) => {
-          setLineError(null);
-          setSelection(next);
-        }}
-        lineError={lineError}
-      />
-      <button type="button" onClick={() => void onSave()} disabled={save.isPending} className="self-start rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-        {save.isPending ? 'Saving…' : 'Save ingredients'}
-      </button>
-    </div>
+    <FormDialogLoader title={`${modifier.name} ingredients`} ready={Boolean(inventory.data)} failed={inventory.isError ? inventory : null} onClose={onClose}>
+      <FormDialog title={`${modifier.name} ingredients`} submitLabel="Save" wide busy={save.isPending} onSubmit={(e) => void onSubmit(e)} onClose={onClose}>
+        {(inventory.data ?? []).length === 0 ? (
+          <p className="text-base text-ink-soft">Add ingredients in Inventory first, then choose which ones this option uses.</p>
+        ) : (
+          <IngredientSelector
+            subject="modifier"
+            ingredients={inventory.data ?? []}
+            selection={selection}
+            onChange={(next) => {
+              setLineError(null);
+              setSelection(next);
+            }}
+            lineError={lineError}
+          />
+        )}
+      </FormDialog>
+    </FormDialogLoader>
   );
 }
 
@@ -331,7 +332,7 @@ function GroupDialog({ group, categories, onClose }: { group: ModifierGroup | nu
 }
 
 /** Gives the group to every item of a category, or to the items ticked, so it need not be attached item by item. */
-function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; categories: { id: string; name: string }[] }) {
+function ApplyToItemsDialog({ group, categories, onClose }: { group: ModifierGroup; categories: { id: string; name: string }[]; onClose: () => void }) {
   const attach = useAttachModifierGroupToItems(group.id);
   const items = useItems();
   const [mode, setMode] = useState<'category' | 'items'>('category');
@@ -353,7 +354,9 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
     });
   }
 
-  async function onApply() {
+  async function onApply(event: FormEvent) {
+    event.preventDefault();
+    if (!ready) return;
     try {
       const result = await attach.mutateAsync(mode === 'category' ? { categoryId } : { itemIds: [...chosen] });
       toast.success(
@@ -361,29 +364,29 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
           ? `${group.name} added to ${result.attached} items; ${result.alreadyAttached} already had it`
           : `${group.name} added to ${result.attached} items`,
       );
-      setChosen(new Set());
+      onClose();
     } catch (error) {
       toast.error(userMessage(error));
     }
   }
 
   return (
-    <div className="mt-2 flex max-w-lg flex-col gap-3 rounded-md bg-gray-50 p-3">
-      <fieldset className="flex flex-col gap-1 text-sm text-gray-700">
-        <legend className="mb-1 font-medium">Add {group.name} to</legend>
-        <label className="flex items-center gap-2">
-          <input type="radio" name={`apply-${group.id}`} checked={mode === 'category'} onChange={() => setMode('category')} />
+    <FormDialog title={`Add ${group.name} to items`} submitLabel="Add" busy={attach.isPending} onSubmit={(e) => void onApply(e)} onClose={onClose}>
+      <fieldset className="flex flex-col gap-1 text-base">
+        <legend className="mb-1 font-semibold">Add {group.name} to</legend>
+        <label className="flex min-h-12 items-center gap-3">
+          <input type="radio" name={`apply-${group.id}`} checked={mode === 'category'} onChange={() => setMode('category')} className="size-5 accent-brand" />
           All items of a category
         </label>
-        <label className="flex items-center gap-2">
-          <input type="radio" name={`apply-${group.id}`} checked={mode === 'items'} onChange={() => setMode('items')} />
+        <label className="flex min-h-12 items-center gap-3">
+          <input type="radio" name={`apply-${group.id}`} checked={mode === 'items'} onChange={() => setMode('items')} className="size-5 accent-brand" />
           Selected items
         </label>
       </fieldset>
 
       {mode === 'category' ? (
-        <Field label="Category">
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass} aria-label={`Category to give ${group.name} to`}>
+        <FormField label="Category">
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={controlClass} aria-label={`Category to give ${group.name} to`}>
             <option value="">Choose a category</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
@@ -391,16 +394,16 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
               </option>
             ))}
           </select>
-        </Field>
+        </FormField>
       ) : (
         <div className="flex flex-col gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items" aria-label="Search items" className={inputClass} />
-          <ul className="flex max-h-56 flex-col divide-y divide-gray-200 overflow-y-auto rounded-md border border-gray-200 bg-white" aria-label={`Items to give ${group.name} to`}>
-            {shown.length === 0 && <li className="px-3 py-2 text-sm text-gray-500">No items found.</li>}
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items" aria-label="Search items" className={controlClass} />
+          <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-control border border-line" aria-label={`Items to give ${group.name} to`}>
+            {shown.length === 0 && <li className="px-3 py-2 text-base text-ink-soft">No items found.</li>}
             {shown.map((item) => (
               <li key={item.id}>
-                <label className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900">
-                  <input type="checkbox" checked={chosen.has(item.id)} onChange={() => toggle(item.id)} />
+                <label className="flex min-h-12 items-center gap-3 px-3 text-base">
+                  <input type="checkbox" checked={chosen.has(item.id)} onChange={() => toggle(item.id)} className="size-5 accent-brand" />
                   {item.name}
                 </label>
               </li>
@@ -409,123 +412,129 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
         </div>
       )}
 
-      <p className="text-xs text-gray-500">
+      <p className="text-sm text-ink-soft">
         {mode === 'category'
           ? categoryId === ''
             ? 'Every active item in the category gets this group. Items that already have it are skipped.'
             : `${categoryCount} active ${categoryCount === 1 ? 'item' : 'items'} in this category.`
           : `${chosen.size} selected.`}
       </p>
-      <button type="button" onClick={() => void onApply()} disabled={!ready || attach.isPending} className="self-start rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-        {attach.isPending ? 'Applying…' : 'Apply'}
-      </button>
-    </div>
+    </FormDialog>
   );
 }
 
-/** Links the group to a category (or unlinks it) and tunes each of that category's items for this group. */
-function CategoryPanel({ group, categories }: { group: ModifierGroup; categories: { id: string; name: string }[] }) {
-  const update = useUpdateModifierGroup(group.id);
+/** Links the group to a category (or unlinks it) and sets, for each of that category's items, its added price or whether it is hidden. */
+function CategoryDialog({ group, categories, onClose }: { group: ModifierGroup; categories: { id: string; name: string }[]; onClose: () => void }) {
+  const updateGroup = useUpdateModifierGroup(group.id);
+  const updateItem = useUpdateModifierCategoryItem(group.id);
   const [categoryId, setCategoryId] = useState(group.categoryId ?? '');
+  // Per item: the price typed (empty keeps the item's own price) and whether it is hidden.
+  const [edits, setEdits] = useState<Record<string, { price: string; hidden: boolean }>>({});
 
-  async function onSave() {
+  const categoryChanged = categoryId !== (group.categoryId ?? '');
+  const entries = group.categoryItems ?? [];
+  const current = (entry: ModifierCategoryItem) => edits[entry.itemId] ?? { price: entry.priceOverride === null ? '' : String(entry.priceOverride), hidden: entry.isExcluded };
+  const changedEntries = entries.filter((entry) => {
+    const edit = current(entry);
+    return edit.price !== (entry.priceOverride === null ? '' : String(entry.priceOverride)) || edit.hidden !== entry.isExcluded;
+  });
+
+  function change(entry: ModifierCategoryItem, patch: Partial<{ price: string; hidden: boolean }>) {
+    setEdits((all) => ({ ...all, [entry.itemId]: { ...current(entry), ...patch } }));
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
     try {
-      await update.mutateAsync({
-        name: group.name,
-        allowMultipleSelection: group.allowMultipleSelection,
-        isRequired: group.isRequired,
-        categoryId: categoryId === '' ? null : categoryId,
-      });
-      toast.success('Category saved');
+      if (categoryChanged) {
+        await updateGroup.mutateAsync({
+          name: group.name,
+          allowMultipleSelection: group.allowMultipleSelection,
+          isRequired: group.isRequired,
+          categoryId: categoryId === '' ? null : categoryId,
+        });
+      } else {
+        for (const entry of changedEntries) {
+          const edit = current(entry);
+          await updateItem.mutateAsync({ itemId: entry.itemId, body: { priceOverride: edit.price.trim() === '' ? null : Number(edit.price), isExcluded: edit.hidden } });
+        }
+      }
+      toast.success('Saved');
+      onClose();
     } catch (error) {
       toast.error(userMessage(error));
     }
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-3 rounded-md bg-gray-50 p-3">
-      <div className="flex max-w-md flex-wrap items-end gap-3">
-        <Field label="Linked category">
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-            <option value="">None</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <button
-          type="button"
-          onClick={() => void onSave()}
-          disabled={update.isPending || categoryId === (group.categoryId ?? '')}
-          className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {update.isPending ? 'Saving…' : 'Save category'}
-        </button>
-      </div>
-      {group.categoryId && (
-        <>
-          <p className="text-xs text-gray-500">
-            Items in this category are added at their own price. Set an added price to charge something else in this group, or hide an item. Changing the category resets these.
-          </p>
-          {(group.categoryItems ?? []).length === 0 && <p className="text-sm text-gray-500">No active items in this category.</p>}
-          <ul className="flex flex-col divide-y divide-gray-200" aria-label={`${group.name} category items`}>
-            {(group.categoryItems ?? []).map((entry) => (
-              <CategoryItemRow key={`${entry.itemId}:${entry.priceOverride}:${entry.isExcluded}`} groupId={group.id} entry={entry} />
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-function CategoryItemRow({ groupId, entry }: { groupId: string; entry: ModifierCategoryItem }) {
-  const update = useUpdateModifierCategoryItem(groupId);
-  const [price, setPrice] = useState(entry.priceOverride === null ? '' : String(entry.priceOverride));
-  const [hidden, setHidden] = useState(entry.isExcluded);
-  const changed = price !== (entry.priceOverride === null ? '' : String(entry.priceOverride)) || hidden !== entry.isExcluded;
-
-  async function onSave() {
-    try {
-      await update.mutateAsync({ itemId: entry.itemId, body: { priceOverride: price.trim() === '' ? null : Number(price), isExcluded: hidden } });
-    } catch (error) {
-      toast.error(userMessage(error));
-    }
-  }
-
-  return (
-    <li className="flex flex-wrap items-center gap-3 py-2">
-      <span className="min-w-40 flex-1 text-sm font-medium text-gray-900">
-        {entry.name} <span className="font-normal text-gray-600">(₱{entry.basePrice.toFixed(2)})</span>
-      </span>
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        Added price
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={price}
-          aria-label={`Added price for ${entry.name}`}
-          placeholder={entry.basePrice.toFixed(2)}
-          onChange={(e) => setPrice(e.target.value)}
-          className={`${inputClass} w-28`}
-        />
-      </label>
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} aria-label={`Hide ${entry.name}`} />
-        Hide
-      </label>
-      <button
-        type="button"
-        onClick={() => void onSave()}
-        disabled={!changed || update.isPending}
-        aria-label={`Save ${entry.name}`}
-        className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+    <FormDialog
+      title={`Linked category of ${group.name}`}
+      submitLabel="Save"
+      wide
+      busy={updateGroup.isPending || updateItem.isPending}
+      onSubmit={(e) => void onSubmit(e)}
+      onClose={onClose}
+    >
+      <FormField
+        label="Linked category"
+        hint="Its items are offered as choices. Changing the category resets the added prices."
       >
-        Save
-      </button>
-    </li>
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={controlClass}>
+          <option value="">None</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      {categoryChanged ? (
+        categoryId !== '' && <p className="text-sm text-ink-soft">Save to set an added price for each item of this category.</p>
+      ) : (
+        group.categoryId && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-ink-soft">Items are added at their own price. Set an added price to charge something else in this group, or hide an item.</p>
+            {entries.length === 0 && <p className="text-base text-ink-soft">No active items in this category.</p>}
+            <ul className="flex flex-col divide-y divide-line" aria-label={`${group.name} category items`}>
+              {entries.map((entry) => {
+                const edit = current(entry);
+                return (
+                  <li key={entry.itemId} className="flex flex-wrap items-center gap-3 py-2">
+                    <span className="min-w-40 flex-1 text-base font-semibold">
+                      {entry.name} <span className="font-normal text-ink-soft">(₱{entry.basePrice.toFixed(2)})</span>
+                    </span>
+                    <label className="flex items-center gap-2 text-base">
+                      Added price
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        inputMode="decimal"
+                        value={edit.price}
+                        aria-label={`Added price for ${entry.name}`}
+                        placeholder={entry.basePrice.toFixed(2)}
+                        onChange={(e) => change(entry, { price: e.target.value })}
+                        className={`${controlClass} w-32`}
+                      />
+                    </label>
+                    <label className="flex min-h-12 items-center gap-2 text-base">
+                      <input
+                        type="checkbox"
+                        checked={edit.hidden}
+                        aria-label={`Hide ${entry.name}`}
+                        onChange={(e) => change(entry, { hidden: e.target.checked })}
+                        className="size-5 accent-brand"
+                      />
+                      Hide
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )
+      )}
+    </FormDialog>
   );
 }

@@ -68,7 +68,7 @@ describe('ModifierGroupsPage category link', () => {
     renderPage();
     await chooseFromMenu('Add fries & sides', 'Linked category');
     fireEvent.change(await screen.findByLabelText('Added price for Large Fries'), { target: { value: '60' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Large Fries' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(catalogApi.updateModifierCategoryItem).toHaveBeenCalledWith('g1', 'fries', { priceOverride: 60, isExcluded: false }));
   });
 
@@ -77,7 +77,7 @@ describe('ModifierGroupsPage category link', () => {
     renderPage();
     await chooseFromMenu('Add fries & sides', 'Linked category');
     fireEvent.click(await screen.findByLabelText('Hide Large Fries'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Large Fries' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(catalogApi.updateModifierCategoryItem).toHaveBeenCalledWith('g1', 'fries', { priceOverride: null, isExcluded: true }));
   });
 
@@ -86,7 +86,7 @@ describe('ModifierGroupsPage category link', () => {
     renderPage();
     await chooseFromMenu('Add fries & sides', 'Linked category');
     fireEvent.change(await screen.findByLabelText('Linked category'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save category' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(catalogApi.updateModifierGroup).toHaveBeenCalledWith('g1', { name: 'Add fries & sides', allowMultipleSelection: true, isRequired: false, categoryId: null }));
   });
 });
