@@ -118,7 +118,7 @@ class ModifierGroupListScreen extends ConsumerWidget {
                               ? 'Multiple choices allowed'
                               : 'Single choice only',
                           if (group.isRequired) 'Required',
-                          if (group.categoryId != null) 'Offers a category',
+                          if (group.categoryId != null) 'Includes a category',
                         ].join(' · '),
                         style: TextStyle(
                           fontSize: 13,
@@ -192,9 +192,9 @@ class ModifierGroupListScreen extends ConsumerWidget {
                           ),
                           subtitle: Text(
                             item.isExcluded
-                                ? 'Hidden from this group'
+                                ? 'Hidden'
                                 : 'From the category'
-                                    '${item.priceOverride != null ? ' · set price' : ''}',
+                                    '${item.priceOverride != null ? ' · custom price' : ''}',
                           ),
                           trailing: Text(
                             '+${formatCurrency(item.price)}',

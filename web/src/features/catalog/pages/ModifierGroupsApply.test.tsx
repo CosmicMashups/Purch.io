@@ -42,7 +42,7 @@ describe('ModifierGroupsPage apply to items', () => {
 
   it('gives the group to every item of a category', async () => {
     renderPage();
-    await chooseFromMenu('Sweetness', 'Apply to items');
+    await chooseFromMenu('Sweetness', 'Add to items');
     fireEvent.change(await screen.findByLabelText('Category to give Sweetness to'), { target: { value: 'drinks' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(catalogApi.attachModifierGroupToItems).toHaveBeenCalledWith('g1', { categoryId: 'drinks' }));
@@ -50,7 +50,7 @@ describe('ModifierGroupsPage apply to items', () => {
 
   it('gives the group to the items ticked', async () => {
     renderPage();
-    await chooseFromMenu('Sweetness', 'Apply to items');
+    await chooseFromMenu('Sweetness', 'Add to items');
     fireEvent.click(screen.getByLabelText('Selected items'));
     fireEvent.click(await screen.findByLabelText('Cake'));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));

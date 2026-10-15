@@ -91,8 +91,8 @@ export function ModifierGroupsPage() {
                         actions={[
                           { label: 'Edit group', onSelect: () => setGroupDialog(g) },
                           { label: 'Add modifier', onSelect: () => setModifierDialog({ groupId: g.id, modifier: null }) },
-                          { label: 'Offer a category', onSelect: () => setCategoryGroupId(categoryGroupId === g.id ? null : g.id) },
-                          { label: 'Apply to items', onSelect: () => setApplyGroupId(applyGroupId === g.id ? null : g.id) },
+                          { label: 'Linked category', onSelect: () => setCategoryGroupId(categoryGroupId === g.id ? null : g.id) },
+                          { label: 'Add to items', onSelect: () => setApplyGroupId(applyGroupId === g.id ? null : g.id) },
                           g.isActive === false
                             ? { label: 'Make active', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'reactivate'), separated: true }
                             : { label: 'Make inactive', onSelect: () => run({ kind: 'ModifierGroup', id: g.id, name: g.name }, 'deactivate'), separated: true },
@@ -104,7 +104,7 @@ export function ModifierGroupsPage() {
 
                   {g.categoryId && (
                     <p className="mt-1 text-sm text-ink-soft">
-                      Also offers every item in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
+                      Includes all items in {categories.data?.find((c) => c.id === g.categoryId)?.name ?? 'its category'}
                     </p>
                   )}
                   {categoryGroupId === g.id && <CategoryPanel group={g} categories={categories.data ?? []} />}
@@ -316,9 +316,9 @@ function GroupDialog({ group, categories, onClose }: { group: ModifierGroup | nu
         <input type="checkbox" {...register('isRequired')} className="size-6 accent-brand" />
         Required
       </label>
-      <FormField label="Offer items from a category (optional)" error={errors.categoryId?.message}>
+      <FormField label="Linked category (optional)" error={errors.categoryId?.message}>
         <select {...register('categoryId')} className={controlClass}>
-          <option value="">None, only the modifiers below</option>
+          <option value="">None</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -370,7 +370,7 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
   return (
     <div className="mt-2 flex max-w-lg flex-col gap-3 rounded-md bg-gray-50 p-3">
       <fieldset className="flex flex-col gap-1 text-sm text-gray-700">
-        <legend className="mb-1 font-medium">Give {group.name} to</legend>
+        <legend className="mb-1 font-medium">Add {group.name} to</legend>
         <label className="flex items-center gap-2">
           <input type="radio" name={`apply-${group.id}`} checked={mode === 'category'} onChange={() => setMode('category')} />
           All items of a category
@@ -412,7 +412,7 @@ function ApplyToItemsPanel({ group, categories }: { group: ModifierGroup; catego
       <p className="text-xs text-gray-500">
         {mode === 'category'
           ? categoryId === ''
-            ? 'Every active item in the category gets the group. Items that already have it are left alone.'
+            ? 'Every active item in the category gets this group. Items that already have it are skipped.'
             : `${categoryCount} active ${categoryCount === 1 ? 'item' : 'items'} in this category.`
           : `${chosen.size} selected.`}
       </p>
@@ -445,7 +445,7 @@ function CategoryPanel({ group, categories }: { group: ModifierGroup; categories
   return (
     <div className="mt-2 flex flex-col gap-3 rounded-md bg-gray-50 p-3">
       <div className="flex max-w-md flex-wrap items-end gap-3">
-        <Field label={`Category offered in ${group.name}`}>
+        <Field label="Linked category">
           <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
             <option value="">None</option>
             {categories.map((category) => (
@@ -467,9 +467,9 @@ function CategoryPanel({ group, categories }: { group: ModifierGroup; categories
       {group.categoryId && (
         <>
           <p className="text-xs text-gray-500">
-            Every active item in the category is offered at its own price. Set a price here to charge something else in this group, or hide an item from it. Changing the category clears these.
+            Items in this category are added at their own price. Set an added price to charge something else in this group, or hide an item. Changing the category resets these.
           </p>
-          {(group.categoryItems ?? []).length === 0 && <p className="text-sm text-gray-500">This category has no active items yet.</p>}
+          {(group.categoryItems ?? []).length === 0 && <p className="text-sm text-gray-500">No active items in this category.</p>}
           <ul className="flex flex-col divide-y divide-gray-200" aria-label={`${group.name} category items`}>
             {(group.categoryItems ?? []).map((entry) => (
               <CategoryItemRow key={`${entry.itemId}:${entry.priceOverride}:${entry.isExcluded}`} groupId={group.id} entry={entry} />
@@ -501,20 +501,20 @@ function CategoryItemRow({ groupId, entry }: { groupId: string; entry: ModifierC
         {entry.name} <span className="font-normal text-gray-600">(₱{entry.basePrice.toFixed(2)})</span>
       </span>
       <label className="flex items-center gap-2 text-sm text-gray-700">
-        Price in group
+        Added price
         <input
           type="number"
           step="0.01"
           min="0"
           value={price}
-          aria-label={`Price of ${entry.name} in this group`}
+          aria-label={`Added price for ${entry.name}`}
           placeholder={entry.basePrice.toFixed(2)}
           onChange={(e) => setPrice(e.target.value)}
           className={`${inputClass} w-28`}
         />
       </label>
       <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} aria-label={`Hide ${entry.name} from this group`} />
+        <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} aria-label={`Hide ${entry.name}`} />
         Hide
       </label>
       <button

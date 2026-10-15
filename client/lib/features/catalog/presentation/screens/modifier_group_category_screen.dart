@@ -68,9 +68,9 @@ class _ModifierGroupCategoryScreenState
             value: _categoryId,
             isExpanded: true,
             decoration: const InputDecoration(
-              labelText: 'Category offered in this group',
+              labelText: 'Linked category',
               helperText:
-                  'Every active item in it is offered. Changing it clears the prices below.',
+                  'Changing it resets the prices below.',
             ),
             items: [
               const DropdownMenuItem<String?>(value: null, child: Text('None')),
@@ -109,7 +109,7 @@ class _ModifierGroupCategoryScreenState
           ],
           const SizedBox(height: AppSpacing.md),
           if (group.categoryId != null && group.categoryItems.isEmpty)
-            const Text('This category has no active items yet.'),
+            const Text('No active items in this category.'),
           for (final item in group.categoryItems)
             _CategoryItemTile(
               key: ValueKey(
@@ -197,7 +197,7 @@ class _CategoryItemTileState extends State<_CategoryItemTile> {
                 enabled: !widget.busy,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Price here',
+                  labelText: 'Added price',
                   isDense: true,
                 ),
                 onChanged: (_) => setState(() {}),

@@ -156,14 +156,14 @@ class _AddModifierGroupScreenState
                         value: _categoryId,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Offer items from a category (optional)',
+                          labelText: 'Linked category (optional)',
                           helperText:
-                              'Every item in it becomes a choice, next to the options you add.',
+                              'Its items are offered as choices.',
                         ),
                         items: [
                           const DropdownMenuItem<String?>(
                             value: null,
-                            child: Text('None, only my own options'),
+                            child: Text('None'),
                           ),
                           for (final category in categories)
                             DropdownMenuItem<String?>(
