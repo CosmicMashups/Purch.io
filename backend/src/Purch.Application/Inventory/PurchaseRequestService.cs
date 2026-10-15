@@ -172,6 +172,11 @@ public sealed class PurchaseRequestService(
                     throw new ValidationException(nameof(order.LineIds), "A line does not belong to this purchase request.");
                 }
 
+                if (order.UnitPrices?.GetValueOrDefault(lineId) is < 0)
+                {
+                    throw new ValidationException(nameof(order.UnitPrices), "Unit price cannot be negative.");
+                }
+
                 if (!used.Add(lineId))
                 {
                     throw new ValidationException(nameof(order.LineIds), "A line can only go on one purchase order.");
@@ -186,7 +191,7 @@ public sealed class PurchaseRequestService(
             var orderLines = order.LineIds.Select(lineId => lines[lineId]).Select(line => new CreatePurchaseOrderLineRequest(
                 line.ItemId,
                 line.Quantity,
-                costs.GetValueOrDefault(line.Id),
+                order.UnitPrices is not null && order.UnitPrices.TryGetValue(line.Id, out var price) ? price : costs.GetValueOrDefault(line.Id),
                 line.InventoryItemId,
                 line.Unit)).ToList();
 

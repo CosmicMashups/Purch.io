@@ -231,7 +231,7 @@ export interface CreatePurchaseRequestRequest {
 }
 
 export interface ConvertPurchaseRequestRequest {
-  orders: { supplierId: string; lineIds: string[]; vatInclusive: boolean; discountAmount: number }[];
+  orders: { supplierId: string; lineIds: string[]; vatInclusive: boolean; discountAmount: number; unitPrices: Record<string, number> }[];
 }
 
 export interface SupplierLink {

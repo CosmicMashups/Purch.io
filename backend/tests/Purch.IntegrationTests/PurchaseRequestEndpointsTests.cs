@@ -75,7 +75,7 @@ public sealed class PurchaseRequestEndpointsTests(PostgresContainerFixture postg
         var oilLine = request.Lines.Single(line => line.ItemId == oil.Id);
         var body = new ConvertPurchaseRequestRequest(
         [
-            new ConvertPurchaseRequestOrder(supplierA.Id, [riceLine.Id], VatInclusive: false, DiscountAmount: 10m),
+            new ConvertPurchaseRequestOrder(supplierA.Id, [riceLine.Id], VatInclusive: false, DiscountAmount: 10m, UnitPrices: new Dictionary<Guid, decimal> { [riceLine.Id] = 55m }),
             new ConvertPurchaseRequestOrder(supplierB.Id, [oilLine.Id], VatInclusive: true),
         ]);
 
@@ -96,7 +96,11 @@ public sealed class PurchaseRequestEndpointsTests(PostgresContainerFixture postg
         var orderA = orders.Single(order => order.SupplierId == supplierA.Id);
         Assert.Equal("Alpha Foods Inc", orderA.PaymentAccountName);
         Assert.Equal("001-234", orderA.PaymentAccountNumber);
-        Assert.Equal(10m, Assert.Single(orderA.Lines).QuantityOrdered);
+        var orderALine = Assert.Single(orderA.Lines);
+        Assert.Equal(10m, orderALine.QuantityOrdered);
+        Assert.Equal(55m, orderALine.ExpectedUnitCost);
+        Assert.Equal(550m, orderALine.Amount);
+        Assert.Equal(540m, orderA.Subtotal - orderA.DiscountAmount);
 
         var refreshed = (await client.GetFromJsonAsync<List<PurchaseRequestDto>>("/purchase-requests", JsonOptions))!.Single(r => r.Id == request.Id);
         Assert.Equal(PurchaseRequestStatus.Converted, refreshed.Status);

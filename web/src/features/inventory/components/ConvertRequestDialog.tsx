@@ -22,6 +22,8 @@ export function ConvertRequestDialog({
   const [error, setError] = useState<string | null>(null);
   const [vat, setVat] = useState<Record<string, boolean>>({});
   const [discount, setDiscount] = useState<Record<string, string>>({});
+  // Unit price typed per request line; until then the supplier link cost (or the item cost) is shown.
+  const [typed, setTyped] = useState<Record<string, string>>({});
 
   // The preferred supplier is pre-selected; a lone link counts as preferred. No link means "choose one or skip".
   const [choice, setChoice] = useState<Record<string, string>>(() =>
@@ -43,6 +45,17 @@ export function ConvertRequestDialog({
     return map;
   }, [choice, request.lines]);
 
+  const suggestionFor = (line: PurchaseRequest['lines'][number]) =>
+    suggestions.find((s) => (line.inventoryItemId ? s.inventoryItemId === line.inventoryItemId : s.itemId === line.itemId));
+
+  function priceFor(line: PurchaseRequest['lines'][number]): string {
+    if (typed[line.id] !== undefined) return typed[line.id];
+    const suggestion = suggestionFor(line);
+    const link = suggestion?.suppliers.find((s) => s.supplierId === choice[line.id]);
+    const cost = link?.unitCost ?? suggestion?.unitCost ?? null;
+    return cost === null ? '' : String(cost);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (groups.size === 0) return setError('Choose a supplier for at least one line.');
@@ -50,6 +63,7 @@ export function ConvertRequestDialog({
     const orders = [...groups].map(([supplierId, lineIds]) => ({
       supplierId,
       lineIds,
+      unitPrices: Object.fromEntries(lineIds.map((id) => [id, Number(priceFor(request.lines.find((l) => l.id === id)!)) || 0])),
       vatInclusive: vat[supplierId] ?? false,
       discountAmount: Number(discount[supplierId]) || 0,
     }));
@@ -82,6 +96,17 @@ export function ConvertRequestDialog({
                 {line.quantity} {line.unit}
               </p>
             </div>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              placeholder="Unit price"
+              aria-label={`Unit price for ${line.name}`}
+              value={priceFor(line)}
+              onChange={(e) => setTyped({ ...typed, [line.id]: e.target.value })}
+              className={`${controlClass} w-28`}
+            />
             <select
               aria-label={`Supplier for ${line.name}`}
               value={choice[line.id] ?? ''}
@@ -123,7 +148,7 @@ export function ConvertRequestDialog({
           </FormField>
         </div>
       ))}
-      <p className="text-sm text-ink-soft">Unit prices come from the supplier link or the item cost. Lines left unassigned are dropped from the orders.</p>
+      <p className="text-sm text-ink-soft">Enter what each line costs. It starts from the supplier link or the item cost, and is blank when neither is set. Lines left unassigned are dropped from the orders.</p>
       {error && (
         <p role="alert" className="text-sm font-medium text-danger">
           {error}

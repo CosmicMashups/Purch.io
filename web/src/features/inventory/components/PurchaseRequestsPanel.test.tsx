@@ -98,13 +98,15 @@ describe('PurchaseRequestsPanel', () => {
     const oil = within(dialog).getByLabelText('Supplier for Oil') as HTMLSelectElement;
     expect(oil.value).toBe('');
     fireEvent.change(oil, { target: { value: 's2' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit price for Rice'), { target: { value: '55.5' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit price for Oil'), { target: { value: '120' } });
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create orders' }));
     await waitFor(() =>
       expect(inventoryApi.convertPurchaseRequest).toHaveBeenCalledWith('pr1', {
         orders: [
-          { supplierId: 's1', lineIds: ['l1'], vatInclusive: false, discountAmount: 0 },
-          { supplierId: 's2', lineIds: ['l2'], vatInclusive: false, discountAmount: 0 },
+          { supplierId: 's1', lineIds: ['l1'], vatInclusive: false, discountAmount: 0, unitPrices: { l1: 55.5 } },
+          { supplierId: 's2', lineIds: ['l2'], vatInclusive: false, discountAmount: 0, unitPrices: { l2: 120 } },
         ],
       }),
     );

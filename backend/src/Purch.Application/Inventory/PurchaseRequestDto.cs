@@ -43,7 +43,9 @@ public sealed record ConvertPurchaseRequestOrder(
     Guid SupplierId,
     IReadOnlyList<Guid> LineIds,
     bool VatInclusive = false,
-    decimal DiscountAmount = 0m);
+    decimal DiscountAmount = 0m,
+    /// <summary>Unit price per request line id. A line left out takes the supplier link cost, else the item cost.</summary>
+    IReadOnlyDictionary<Guid, decimal>? UnitPrices = null);
 
 public sealed record SupplierLinkDto(Guid SupplierId, string SupplierName, bool IsPreferred, decimal? UnitCost);
 
