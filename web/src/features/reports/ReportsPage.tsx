@@ -46,7 +46,7 @@ export function ReportsPage() {
   const departmentsOn = useDepartmentTracking();
   const tabs = TABS.filter((t) => t.id !== 'departments' || departmentsOn);
   const requested = search.get('tab');
-  const active: TabId = isTabId(requested) && tabs.some((t) => t.id === requested) ? requested : 'staff';
+  const active: TabId = isTabId(requested) && tabs.some((t) => t.id === requested) ? requested : 'sales';
   const tab = TABS.find((t) => t.id === active)!;
   const { role } = useSession();
   const { branches } = useSelectableBranches();

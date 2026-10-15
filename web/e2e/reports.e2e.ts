@@ -26,7 +26,7 @@ test.describe('the new reports', () => {
     await page.goto('/');
     await page.getByRole('heading', { name: 'Profit and leakage' }).scrollIntoViewIfNeeded();
     await expect(page.getByRole('heading', { name: 'Gross margin' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Revenue leakage' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sales leakage' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'What earns the money' })).toBeVisible();
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(/is unavailable|something went wrong/i)).toHaveCount(0);

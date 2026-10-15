@@ -14,6 +14,7 @@ import { BirReadingType, type BirReading } from './types';
 vi.mock('./api', () => ({
   reportsApi: {
     staffPerformance: vi.fn(),
+    salesMix: vi.fn(),
     departmentSales: vi.fn(),
     movementSummary: vi.fn(),
     xReading: vi.fn(),
@@ -84,14 +85,14 @@ beforeEach(() => {
 describe('range reports', () => {
   it('has no Departments tab when the shop does not monitor departments', async () => {
     vi.mocked(tenantApi.get).mockResolvedValue({ useDepartmentTracking: false } as TenantSettings);
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     expect(screen.getByRole('tab', { name: 'Staff' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Departments' })).not.toBeInTheDocument();
   });
 
   it('shows staff sales ranked, with the server figures and pluralised sale counts', async () => {
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     expect(await screen.findByText('₱9,000.00')).toBeInTheDocument();
     expect(screen.getByText('30 sales')).toBeInTheDocument();
     expect(screen.getByText('₱4,500.00')).toBeInTheDocument();
@@ -104,7 +105,7 @@ describe('range reports', () => {
   });
 
   it('asks the API for the last 30 days in Manila time by default', async () => {
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     const params = vi.mocked(reportsApi.staffPerformance).mock.calls[0][0];
     expect(params).not.toHaveProperty('branchId');
@@ -113,7 +114,7 @@ describe('range reports', () => {
   });
 
   it('groups the reports and shows only the chosen group underneath as tabs', async () => {
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     expect(screen.getByRole('button', { name: 'People and stock' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('tab', { name: 'Tax' })).not.toBeInTheDocument();
@@ -126,8 +127,14 @@ describe('range reports', () => {
     expect(screen.queryByRole('tab', { name: 'Staff' })).not.toBeInTheDocument();
   });
 
+  it('opens on the sales mix report when no report is asked for', async () => {
+    renderPage(<ReportsPage />);
+    expect(await screen.findByRole('tab', { name: 'Sales mix', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sales' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows the period as one chip with its dates and keeps the choice for the next visit', async () => {
-    const first = renderPage(<ReportsPage />);
+    const first = renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     const chip = screen.getByRole('button', { name: /^Period/ });
     expect(chip).toHaveTextContent('Last 30 days');
@@ -136,13 +143,13 @@ describe('range reports', () => {
     expect(chip).toHaveTextContent('Last 7 days');
     first.unmount();
 
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     expect(screen.getByRole('button', { name: /^Period/ })).toHaveTextContent('Last 7 days');
   });
 
   it('re-queries when a preset or a branch is chosen', async () => {
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     fireEvent.click(screen.getByRole('button', { name: /^Period/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Today' }));
@@ -155,7 +162,7 @@ describe('range reports', () => {
   });
 
   it('does not fetch while a custom range is reversed, and says why', async () => {
-    renderPage(<ReportsPage />);
+    renderPage(<ReportsPage />, { route: '/?tab=staff' });
     await screen.findByText('30 sales');
     fireEvent.click(screen.getByRole('button', { name: /^Period/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Custom' }));

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { toast } from '../../../components/feedback/toastStore';
+import { SegmentedToggle } from '../../../components/SegmentedToggle';
 import { csvRowCount, datedFilename, downloadTextFile } from '../../../lib/download';
 import { businessToday } from '../range';
 import type { RangeParams } from '../types';
@@ -55,19 +56,7 @@ export function ReportTable<T>({ caption, columns, rows, rowKey }: { caption: st
 /** Segmented picker for sub-views that all come from the one response, so switching never refetches. */
 export function SubViewTabs<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex w-fit max-w-full flex-wrap overflow-hidden rounded-control border border-line print:hidden">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          aria-pressed={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={`h-12 px-4 text-base font-semibold ${value === o.id ? 'bg-ink text-canvas' : 'bg-surface hover:bg-canvas'}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedToggle label={label} value={value} options={options} onChange={onChange} />
   );
 }
 

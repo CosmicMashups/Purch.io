@@ -68,7 +68,7 @@ export function ExecutiveInsights({ range, periodLabel }: { range: RangeParams |
         </AsyncPanel>
 
         <AsyncPanel
-          title="Revenue leakage"
+          title="Sales leakage"
           subtitle={`Discounts, voids and refunds as a share of sales${insights.data ? ` · ${insights.data.leakagePercent.toFixed(1)}% overall` : ''}`}
           query={insights}
           isEmpty={(d) => d.leakage.length === 0}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { DashboardRangeFilter } from './components/DashboardRangeFilter';
 import { DASHBOARD_PRESET_LABELS, dashboardParams, defaultDashboardRange } from './dashboardRange';
 import { CalendarHeatmap } from '../../components/charts/CalendarHeatmap';
+import { SegmentedToggle } from '../../components/SegmentedToggle';
 import { assignColors } from '../../components/charts/colors';
 import { BarList } from '../../components/charts/RankedCharts';
 import { StackedStrip } from '../../components/charts/Proportions';
@@ -125,19 +126,12 @@ export function HomePage() {
             isEmpty={(d) => d.topSellingItems.length === 0}
             emptyMessage="No item sales in this period."
             tabs={
-              <div role="group" aria-label="Rank top sellers" className="flex gap-2">
-                {TOP_SORTS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={topSort === key}
-                    onClick={() => setTopSort(key)}
-                    className={`h-9 rounded-control px-4 text-sm font-semibold ${topSort === key ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedToggle
+                label="Rank top sellers"
+                value={topSort}
+                options={TOP_SORTS.map(({ key, label }) => ({ id: key, label }))}
+                onChange={setTopSort}
+              />
             }
           >
             {(d) =>

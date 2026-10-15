@@ -1,22 +1,21 @@
+import { PeriodChip } from '../../../components/PeriodChip';
+import { SegmentedToggle } from '../../../components/SegmentedToggle';
 import { FormField, controlClass } from '../../../components/forms/FormField';
 import { rangeProblem } from '../../reports/range';
-import { DASHBOARD_PRESET_LABELS, type DashboardPreset, type DashboardRangeChoice } from '../dashboardRange';
+import { DASHBOARD_PRESET_LABELS, dashboardDays, type DashboardPreset, type DashboardRangeChoice } from '../dashboardRange';
+import { formatDay } from '../format';
 
-const chip = (active: boolean) =>
-  `h-10 rounded-control px-4 text-sm font-semibold ${active ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`;
+const OPTIONS = (Object.keys(DASHBOARD_PRESET_LABELS) as DashboardPreset[]).map((id) => ({ id, label: DASHBOARD_PRESET_LABELS[id] }));
 
 /** Picks the period the Revenue, Busiest days and Top sellers panels report on. */
 export function DashboardRangeFilter({ value, onChange }: { value: DashboardRangeChoice; onChange: (next: DashboardRangeChoice) => void }) {
   const problem = value.preset === 'custom' ? rangeProblem(value.custom) : null;
+  const days = dashboardDays(value);
+  const dates = days.fromDay === days.toDay ? formatDay(days.fromDay) : `${formatDay(days.fromDay)} to ${formatDay(days.toDay)}`;
+
   return (
-    <div className="flex flex-col gap-3">
-      <div role="group" aria-label="Reporting period" className="flex flex-wrap gap-2">
-        {(Object.keys(DASHBOARD_PRESET_LABELS) as DashboardPreset[]).map((preset) => (
-          <button key={preset} type="button" aria-pressed={value.preset === preset} onClick={() => onChange({ ...value, preset })} className={chip(value.preset === preset)}>
-            {DASHBOARD_PRESET_LABELS[preset]}
-          </button>
-        ))}
-      </div>
+    <PeriodChip label={DASHBOARD_PRESET_LABELS[value.preset]} dates={dates}>
+      <SegmentedToggle label="Reporting period" value={value.preset} options={OPTIONS} onChange={(preset) => onChange({ ...value, preset })} />
       {value.preset === 'custom' && (
         <div className="grid max-w-xl gap-4 sm:grid-cols-2">
           <FormField label="From">
@@ -27,6 +26,6 @@ export function DashboardRangeFilter({ value, onChange }: { value: DashboardRang
           </FormField>
         </div>
       )}
-    </div>
+    </PeriodChip>
   );
 }
