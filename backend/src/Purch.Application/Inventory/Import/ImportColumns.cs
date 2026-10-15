@@ -1,7 +1,10 @@
 namespace Purch.Application.Inventory.Import;
 
 /// <summary>CSV column names shared by the inventory export and import. Exported files append <see cref="ReadOnly"/>
-/// context columns after these; import ignores them.</summary>
+/// context columns after these; import ignores them.
+/// Contract for import: text columns sku/barcode/name/category/unit may be exported with ONE leading <c>'</c> guard
+/// when the value starts with = + - @ tab or CR; the importer must strip exactly one leading <c>'</c> iff the next
+/// char is one of those, before matching. Barcodes are compared as text, and spreadsheet apps may strip leading zeros.</summary>
 public static class ImportColumns
 {
     public static readonly string[] Catalog =

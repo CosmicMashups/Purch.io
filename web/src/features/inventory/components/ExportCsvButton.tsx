@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from '../../../components/feedback/toastStore';
 import { userMessage } from '../../../lib/apiError';
 import { datedFilename, downloadTextFile } from '../../../lib/download';
+import { useSession } from '../../auth/useSession';
 import { inventoryApi } from '../api';
 
 /** `2026-10-08` for the viewer's local today. */
@@ -12,6 +13,7 @@ function localDay(date = new Date()): string {
 
 /** Downloads one of the inventory CSV exports as `<kind>-<yyyy-mm-dd>.csv`. */
 export function ExportCsvButton({ kind, label }: { kind: 'items' | 'ingredients' | 'stock'; label: string }) {
+  const { role } = useSession();
   const [busy, setBusy] = useState(false);
 
   async function run() {
@@ -24,6 +26,9 @@ export function ExportCsvButton({ kind, label }: { kind: 'items' | 'ingredients'
       setBusy(false);
     }
   }
+
+  // Same roles as the export routes; the API enforces them regardless.
+  if (role !== 'Admin' && role !== 'Manager' && role !== 'Warehouse') return null;
 
   return (
     <button

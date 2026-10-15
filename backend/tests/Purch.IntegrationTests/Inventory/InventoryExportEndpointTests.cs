@@ -1,5 +1,6 @@
 using System.Net;
 using Purch.Common.TestUtilities;
+using Purch.Domain.Enums;
 using Purch.IntegrationTests.Fixtures;
 
 namespace Purch.IntegrationTests.Inventory;
@@ -17,8 +18,10 @@ public sealed class InventoryExportEndpointTests(PostgresContainerFixture postgr
         using var cashier = await TestSessions.CashierClientAsync(admin);
         using var manager = await TestSessions.ManagerClientAsync(admin);
 
+        using var warehouse = await TestSessions.StaffClientAsync(admin, "Wes Warehouse", MembershipRole.Staff, StaffDuty.Warehouse, "456712");
         foreach (var route in Routes)
         {
+            Assert.Equal(HttpStatusCode.OK, (await warehouse.GetAsync($"/inventory/export/{route}")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync($"/inventory/export/{route}")).StatusCode);
             var response = await manager.GetAsync($"/inventory/export/{route}");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);

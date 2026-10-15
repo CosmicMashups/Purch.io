@@ -15,7 +15,7 @@ public static class ReportCsv
             value = "'" + value;
         }
 
-        return value.Contains(',') || value.Contains('"') || value.Contains('\n')
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
             ? $"\"{value.Replace("\"", "\"\"")}\""
             : value;
     }

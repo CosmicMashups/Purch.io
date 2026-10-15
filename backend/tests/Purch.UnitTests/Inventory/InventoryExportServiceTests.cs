@@ -2,6 +2,7 @@ using Purch.Application.Catalog;
 using Purch.Application.Common;
 using Purch.Application.Inventory;
 using Purch.Application.Inventory.Import;
+using Purch.Application.Reporting;
 using Purch.Domain.Entities;
 using Purch.Domain.Enums;
 
@@ -62,8 +63,7 @@ public sealed class InventoryExportServiceTests
         var csv = await Service().ExportItemsAsync();
 
         Assert.Contains("Dormant", csv);
-        Assert.Contains(",false,", csv);
-        Assert.DoesNotContain("Gone", csv);
+                Assert.DoesNotContain("Gone", csv);
     }
 
     [Fact]
@@ -87,6 +87,94 @@ public sealed class InventoryExportServiceTests
         Assert.Contains("00123", csv);
     }
 
+
+    private static string[] Row(string csv, int index) => csv.TrimStart('\uFEFF').Split('\n', StringSplitOptions.RemoveEmptyEntries)[index].TrimEnd('\r').Split(',');
+
+    [Fact]
+    public async Task Negative_numbers_stay_numeric_while_text_formulas_are_guarded()
+    {
+        items.Add(new Item { TenantId = TenantGuid, Name = "=X", Sku = "-SKU", BasePrice = -3m, CostPrice = -3m, LowStockThreshold = -3m, StockOnHand = -3m });
+        var csv = await Service().ExportItemsAsync();
+        var header = HeaderOf(csv);
+        var row = Row(csv, 1);
+
+        Assert.Equal("'=X", row[Array.IndexOf(header, "name")]);
+        Assert.Equal("'-SKU", row[Array.IndexOf(header, "sku")]);
+        foreach (var column in new[] { "price", "cost", "reorder_threshold", "current_stock" })
+        {
+            Assert.Equal("-3", row[Array.IndexOf(header, column)]);
+        }
+
+        var stock = await Service().ExportStockAsync();
+        Assert.Equal("-3", Row(stock, 1)[Array.IndexOf(HeaderOf(stock), "counted_qty")]);
+    }
+
+    [Fact]
+    public async Task Active_column_reflects_state()
+    {
+        _ = Add("On");
+        _ = Add("Off", active: false);
+        var csv = await Service().ExportItemsAsync();
+        var col = Array.IndexOf(HeaderOf(csv), "active");
+        var name = Array.IndexOf(HeaderOf(csv), "name");
+        var rows = new[] { Row(csv, 1), Row(csv, 2) }.ToDictionary(r => r[name], r => r[col]);
+
+        Assert.Equal("true", rows["On"]);
+        Assert.Equal("false", rows["Off"]);
+    }
+
+    [Fact]
+    public async Task Ingredients_export_excludes_auto_paired_and_deleted_and_carries_cost()
+    {
+        ingredients.Add(new InventoryItem { TenantId = TenantGuid, Name = "Flour", UnitCost = 2m, QuantityOnHand = 4m });
+        ingredients.Add(new InventoryItem { TenantId = TenantGuid, Name = "AutoOne", IsAutoCreatedForItem = true });
+        ingredients.Add(new InventoryItem { TenantId = TenantGuid, Name = "LinkedOne", LinkedItemId = Guid.NewGuid() });
+        ingredients.Add(new InventoryItem { TenantId = TenantGuid, Name = "Binned", IsDeleted = true });
+        var csv = await Service().ExportIngredientsAsync();
+
+        Assert.Contains("Flour", csv);
+        Assert.DoesNotContain("AutoOne", csv);
+        Assert.DoesNotContain("LinkedOne", csv);
+        Assert.DoesNotContain("Binned", csv);
+        Assert.Equal("ingredient", Row(csv, 1)[0]);
+    }
+
+    [Fact]
+    public async Task Stock_csv_leaves_out_items_that_hold_no_stock()
+    {
+        _ = Add("Rice", 5m);
+        _ = Add("Haircut");
+        var holder = new Stock(onlyNamed: "Rice");
+        var service = new InventoryExportService(new Items(items), new Ingredients(ingredients), new Categories(), new InvCategories(), holder, new Tenant(), actor);
+        var csv = await service.ExportStockAsync();
+
+        Assert.Contains("Rice", csv);
+        Assert.DoesNotContain("Haircut", csv);
+    }
+
+    [Fact]
+    public async Task Warehouse_sees_the_cost_column()
+    {
+        _ = Add("Rice");
+        actor.CurrentRole = Role.Warehouse;
+        Assert.Contains("cost", HeaderOf(await Service().ExportItemsAsync()));
+    }
+
+    [Fact]
+    public void Csv_field_quotes_cr_lf_comma_and_quote_and_round_trips()
+    {
+        foreach (var value in new[] { "a\rb", "a\nb", "a,b", "a\"b", "a\r\nb,\"x\"" })
+        {
+            var field = ReportCsv.Field(value);
+            Assert.StartsWith("\"", field);
+            Assert.Equal(value, Unquote(field));
+        }
+
+        Assert.Equal("'=1", ReportCsv.Field("=1"));
+    }
+
+    private static string Unquote(string field) => field[1..^1].Replace("\"\"", "\"");
+
     private sealed class Tenant : ICurrentTenantProvider
     {
         public Guid? TenantId => TenantGuid;
@@ -103,12 +191,12 @@ public sealed class InventoryExportServiceTests
         public Role? Role => CurrentRole;
     }
 
-    private sealed class Stock : IItemStockService
+    private sealed class Stock(string? onlyNamed = null) : IItemStockService
     {
         public Task<Guid?> AdjustAsync(Item item, decimal delta, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<IReadOnlyDictionary<Guid, decimal>> GetOnHandAsync(IReadOnlyCollection<Item> items, Guid tenantId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyDictionary<Guid, decimal>>(items.ToDictionary(i => i.Id, i => i.StockOnHand));
+            Task.FromResult<IReadOnlyDictionary<Guid, decimal>>(items.Where(i => onlyNamed is null || i.Name == onlyNamed).ToDictionary(i => i.Id, i => i.StockOnHand));
     }
 
     private sealed class Items(List<Item> list) : IItemRepository
