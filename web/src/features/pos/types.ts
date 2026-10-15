@@ -135,12 +135,16 @@ export interface ManualDiscountRequest {
   kind: ManualDiscountKind;
   value: number;
   reason: string;
+  /** A Manager/Admin PIN. Required on every set, remove and override, whoever is signed in. */
+  approverPin?: string;
 }
 
 /** Mirrors OverrideLinePriceRequest. */
 export interface OverridePriceRequest {
   newUnitPrice: number;
   reason: string;
+  /** A Manager/Admin PIN, always required. */
+  approverPin?: string;
 }
 
 /** Mirrors AddOpenItemRequest. approverPin only on a claimed kiosk order. */

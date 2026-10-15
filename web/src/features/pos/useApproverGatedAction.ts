@@ -43,7 +43,13 @@ export function useApproverGatedAction() {
     send: (approverPin?: string) => Promise<T>,
     onLanded?: (cart: T) => void,
     describeError: (error: unknown) => string = userMessage,
+    /** Ask for the PIN before the first send, for actions the server always gates (manual discounts, price overrides). */
+    askFirst?: string,
   ): Promise<void> {
+    if (askFirst) {
+      setPending({ title, message: askFirst, isError: false, retry: send, onLanded: onLanded as PendingApproval['onLanded'], describeError });
+      return;
+    }
     try {
       land(await send(), onLanded as PendingApproval['onLanded']);
     } catch (error) {

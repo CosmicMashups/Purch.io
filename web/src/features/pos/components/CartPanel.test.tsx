@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/apiError';
+import { useToastStore } from '../../../components/feedback/toastStore';
 import { makeCart, makeLine } from '../../../test/pos';
 import { renderPage, signInAs } from '../../../test/render';
 import { catalogApi } from '../../catalog/api';
@@ -65,8 +66,17 @@ async function openLineMenu(name = 'Iced Latte') {
 }
 
 describe('role rules', () => {
-  it('hides discount and override from a Cashier', async () => {
-    signInAs('Cashier', session);
+  it.each(['Cashier', 'Manager', 'Admin'])('shows discount and override to a %s', async (role) => {
+    signInAs(role, session);
+    renderPage(<SellPage />);
+    const menu = await openLineMenu();
+    expect(within(menu).getByRole('menuitem', { name: /Discount/ })).toBeEnabled();
+    expect(within(menu).getByRole('menuitem', { name: /Override price/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add discount' })).toBeInTheDocument();
+  });
+
+  it('hides discount and override from any other role', async () => {
+    signInAs('Warehouse', session);
     renderPage(<SellPage />);
     const menu = await openLineMenu();
     expect(within(menu).queryByRole('menuitem', { name: /Discount/ })).toBeNull();
@@ -75,13 +85,11 @@ describe('role rules', () => {
     expect(screen.queryByRole('button', { name: 'Add discount' })).toBeNull();
   });
 
-  it.each(['Manager', 'Admin'])('shows discount and override to a %s', async (role) => {
-    signInAs(role, session);
+  it('keeps Senior/PWD for Manager/Admin only', async () => {
+    signInAs('Cashier', session);
     renderPage(<SellPage />);
-    const menu = await openLineMenu();
-    expect(within(menu).getByRole('menuitem', { name: /Discount/ })).toBeEnabled();
-    expect(within(menu).getByRole('menuitem', { name: /Override price/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Add discount' })).toBeInTheDocument();
+    expect(await screen.findByRole('switch')).toBeDisabled();
+    expect(screen.getByText('A manager applies this')).toBeInTheDocument();
   });
 });
 
@@ -226,19 +234,99 @@ describe('line note', () => {
   });
 });
 
-describe('manager discount', () => {
-  it('sends a line discount without any PIN and shows a refusal as a toast, not a PIN prompt', async () => {
-    signInAs('Manager', session);
-    vi.mocked(posApi.setLineDiscount).mockRejectedValue(new ApiError('validation', 'Refused', { approverPin: ['x'] }));
+const wrongPin = () => new ApiError('validation', 'Wrong PIN', { approverPin: ['That PIN is not a manager or admin PIN.'] });
+
+async function fillLineDiscount() {
+  const menu = await openLineMenu();
+  fireEvent.click(within(menu).getByRole('menuitem', { name: /Discount/ }));
+  const dialog = await screen.findByRole('dialog', { name: /Discount Iced Latte/ });
+  fireEvent.change(within(dialog).getByLabelText('Percent off'), { target: { value: '10' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Loyal customer' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Apply discount' }));
+  return dialog;
+}
+
+async function approve(pin: string) {
+  const input = await screen.findByLabelText('Manager or admin PIN');
+  fireEvent.change(input, { target: { value: pin } });
+  fireEvent.submit(input.closest('form') as HTMLFormElement);
+}
+
+describe('discount and override approval', () => {
+  it('asks for a PIN before sending, then sends one request carrying it', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.setLineDiscount).mockResolvedValue({ ...cart, lines: [{ ...latte, manualDiscountKind: 'Percent', manualDiscountValue: 10, manualDiscountAmount: 15 }] });
+    renderPage(<SellPage />);
+    const dialog = await fillLineDiscount();
+    expect(await screen.findByText('A manager or admin PIN is needed to approve this.', { selector: 'p[id]' })).toBeInTheDocument();
+    expect(posApi.setLineDiscount).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: 'Apply discount' })).toBeDisabled();
+    await approve('2222');
+    await waitFor(() => expect(posApi.setLineDiscount).toHaveBeenCalledWith('l1', { kind: 'Percent', value: 10, reason: 'Loyal customer', approverPin: '2222' }));
+    expect(posApi.setLineDiscount).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Discount Iced Latte/ })).toBeNull());
+  });
+
+  it('keeps the typed discount on a wrong PIN and lets them retry', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.setLineDiscount).mockRejectedValueOnce(wrongPin()).mockResolvedValueOnce(cart);
+    renderPage(<SellPage />);
+    const dialog = await fillLineDiscount();
+    await approve('9999');
+    expect(await screen.findByText('That PIN is not a manager or admin PIN.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Percent off')).toHaveValue('10');
+    await approve('2222');
+    await waitFor(() => expect(posApi.setLineDiscount).toHaveBeenLastCalledWith('l1', { kind: 'Percent', value: 10, reason: 'Loyal customer', approverPin: '2222' }));
+  });
+
+  it('closes only the PIN dialog on Escape and keeps the discount', async () => {
+    signInAs('Cashier', session);
+    renderPage(<SellPage />);
+    await fillLineDiscount();
+    await screen.findByLabelText('Manager or admin PIN');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByLabelText('Manager or admin PIN')).toBeNull());
+    const dialog = screen.getByRole('dialog', { name: /Discount Iced Latte/ });
+    expect(within(dialog).getByLabelText('Percent off')).toHaveValue('10');
+    expect(within(dialog).getByRole('button', { name: 'Apply discount' })).toBeEnabled();
+    expect(posApi.setLineDiscount).not.toHaveBeenCalled();
+  });
+
+  it('shows the server message when the device is locked out', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.setLineDiscount).mockRejectedValue(new ApiError('forbidden', 'Too many wrong PINs. This device is locked for 15 minutes.'));
+    renderPage(<SellPage />);
+    await fillLineDiscount();
+    await approve('9999');
+    await waitFor(() => expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('Too many wrong PINs. This device is locked for 15 minutes.'));
+  });
+
+  it('asks for a PIN to remove a discount', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.getCart).mockResolvedValue({ ...cart, lines: [{ ...latte, manualDiscountKind: 'Percent', manualDiscountValue: 10, manualDiscountAmount: 15 }] });
+    vi.mocked(posApi.setLineDiscount).mockResolvedValue(cart);
     renderPage(<SellPage />);
     const menu = await openLineMenu();
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /Discount/ }));
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Change discount/ }));
     const dialog = await screen.findByRole('dialog', { name: /Discount Iced Latte/ });
-    fireEvent.change(within(dialog).getByLabelText('Percent off'), { target: { value: '10' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Loyal customer' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply discount' }));
-    await waitFor(() => expect(posApi.setLineDiscount).toHaveBeenCalledWith('l1', { kind: 'Percent', value: 10, reason: 'Loyal customer' }));
-    expect(posApi.setLineDiscount).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('x')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove discount' }));
+    expect(posApi.setLineDiscount).not.toHaveBeenCalled();
+    await approve('2222');
+    await waitFor(() => expect(posApi.setLineDiscount).toHaveBeenCalledWith('l1', expect.objectContaining({ value: 0, approverPin: '2222' })));
+  });
+
+  it('asks for a PIN to override a price and sends it in the body', async () => {
+    signInAs('Cashier', session);
+    vi.mocked(posApi.overrideLinePrice).mockResolvedValue(cart);
+    renderPage(<SellPage />);
+    const menu = await openLineMenu();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Override price/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Override price of Iced Latte/ });
+    fireEvent.change(within(dialog).getByLabelText('New unit price'), { target: { value: '120' } });
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Dented can' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Override price' }));
+    expect(posApi.overrideLinePrice).not.toHaveBeenCalled();
+    await approve('2222');
+    await waitFor(() => expect(posApi.overrideLinePrice).toHaveBeenCalledWith('l1', { newUnitPrice: 120, reason: 'Dented can', approverPin: '2222' }));
   });
 });

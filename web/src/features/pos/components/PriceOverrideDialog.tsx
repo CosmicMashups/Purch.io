@@ -42,11 +42,12 @@ export function PriceOverrideDialog({ itemName, currentUnitPrice, originalUnitPr
           <input inputMode="decimal" autoComplete="off" value={price} onChange={(e) => setPrice(e.target.value)} className={`${controlClass} text-lg tabular-nums`} />
         </FormField>
         <ReasonField value={reason} onChange={setReason} error={errors.reason} />
+        <p className="text-sm text-ink-soft">A manager or admin PIN is needed to approve this.</p>
         <div className="flex justify-end gap-3">
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <PrimaryButton type="submit" busy={busy}>
+          <PrimaryButton type="submit" busy={busy} disabled={suspended}>
             {busy ? 'Saving...' : 'Override price'}
           </PrimaryButton>
         </div>

@@ -8,8 +8,8 @@ import type { TransactionLine } from '../types';
 
 interface LineActionsMenuProps {
   line: TransactionLine;
-  /** Manager/Admin. A Cashier never sees Discount or Override price at all. */
-  isSupervisor: boolean;
+  /** Cashier, Manager or Admin (each request then needs a Manager/Admin PIN). Other roles never see these. */
+  canDiscount: boolean;
   seniorApplied: boolean;
   disabled: boolean;
   onDiscount: () => void;
@@ -18,15 +18,15 @@ interface LineActionsMenuProps {
 }
 
 /** The per-line ⋯ menu. Remove stays a visible button on the line, as it is the most common edit. */
-export function LineActionsMenu({ line, isSupervisor, seniorApplied, disabled, onDiscount, onOverride, onNote }: LineActionsMenuProps) {
+export function LineActionsMenu({ line, canDiscount, seniorApplied, disabled, onDiscount, onOverride, onNote }: LineActionsMenuProps) {
   const actions: RowAction[] = [];
-  if (isSupervisor) {
+  if (canDiscount) {
     actions.push(
       { label: (line.manualDiscountAmount ?? 0) > 0 ? 'Change discount' : 'Discount', onSelect: onDiscount, disabled: disabled || seniorApplied, hint: seniorApplied ? SENIOR_EXCLUSIVE : undefined },
       { label: 'Override price', onSelect: onOverride, disabled: disabled || seniorApplied, hint: seniorApplied ? SENIOR_EXCLUSIVE : undefined },
     );
   }
-  actions.push({ label: line.note ? 'Edit note' : 'Add note', onSelect: onNote, disabled, separated: isSupervisor });
+  actions.push({ label: line.note ? 'Edit note' : 'Add note', onSelect: onNote, disabled, separated: canDiscount });
   return <RowActionsMenu subject={line.itemName} actions={actions} />;
 }
 
@@ -62,7 +62,7 @@ export function LineNoteDialog({ itemName, initial, busy, onSave, onClose, suspe
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <PrimaryButton type="submit" busy={busy}>
+          <PrimaryButton type="submit" busy={busy} disabled={suspended}>
             Save note
           </PrimaryButton>
         </div>

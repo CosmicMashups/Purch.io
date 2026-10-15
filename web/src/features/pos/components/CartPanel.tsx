@@ -1,14 +1,13 @@
 import { Pause, PlusCircle } from '@phosphor-icons/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApproverPinDialog } from '../../../components/ApproverPinDialog';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
 import { formatPeso } from '../../dashboard/format';
 import { vatOf } from '../../../hardware/display/channel';
-import { userMessage } from '../../../lib/apiError';
+import { ApiError, userMessage } from '../../../lib/apiError';
 import { posApi } from '../api';
-import { posKeys, useApplyPromoCode, useApplySeniorPwd, useParkCart, useSetOrderType } from '../queries';
+import { useApplyPromoCode, useApplySeniorPwd, useParkCart, useSetOrderType } from '../queries';
 import { useTenantSettings } from '../../tenant/queries';
 import { discountBase, discountMarker, hasManualDiscount, SENIOR_EXCLUSIVE } from '../rules';
 import { DiscountDialog } from './DiscountDialog';
@@ -30,6 +29,8 @@ const ORDER_TYPES = ['Dine In', 'Take Out'] as const;
 
 interface CartPanelProps {
   cart: Transaction;
+  /** Cashier, Manager or Admin: may ask for a manual discount or price override (each needs a Manager/Admin PIN). */
+  canDiscount?: boolean;
   /** Admin or Manager. The API restricts Senior/PWD and voiding to them; this only hides what would be refused. */
   isSupervisor: boolean;
   onCheckout: () => void;
@@ -49,7 +50,7 @@ function lineDetails(line: TransactionLine): string[] {
   ];
 }
 
-export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onParked }: CartPanelProps) {
+export function CartPanel({ cart, isSupervisor, canDiscount = isSupervisor, onCheckout, pending = [], onParked }: CartPanelProps) {
   const promo = useApplyPromoCode();
   const senior = useApplySeniorPwd();
   const orderType = useSetOrderType();
@@ -63,7 +64,6 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
   const [dialog, setDialog] = useState<LineDialog | null>(null);
   const [confirmSenior, setConfirmSenior] = useState(false);
   const seniorApplied = cart.seniorPwdDiscountApplied;
-  const qc = useQueryClient();
   const pinOpen = gated.dialogProps !== null;
 
   const updating = pending.length > 0;
@@ -107,25 +107,31 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
   }
 
   /**
-   * Discounts and price overrides are gated by role and permission on the server (DiscountApply, PriceOverride),
-   * never by an approver PIN, so they skip the PIN runner: no PIN dialog, no retry loop.
+   * Manual discounts and price overrides always need a Manager/Admin PIN, whoever is signed in: the PIN dialog
+   * opens first, over the form (which keeps its values), and one request goes up carrying it. A lockout shows the
+   * server's own words.
    */
-  async function submitSupervisor(send: () => Promise<Transaction>, done: string) {
-    setGatedActionBusy(true);
-    try {
-      qc.setQueryData(posKeys.cart, await send());
-      setDialog(null);
-      toast.success(done);
-    } catch (error) {
-      toast.error(userMessage(error));
-    } finally {
-      setGatedActionBusy(false);
-    }
+  function submitApproved(title: string, send: (approverPin?: string) => Promise<Transaction>, done: string) {
+    void gated.run(
+      title,
+      send,
+      () => {
+        setDialog(null);
+        toast.success(done);
+      },
+      approvalErrorMessage,
+      APPROVAL_PROMPT,
+    );
   }
 
   function applyDiscount(line: TransactionLine | null, body: ManualDiscountRequest) {
     const removing = body.value === 0;
-    void submitSupervisor(() => (line ? posApi.setLineDiscount(line.id, body) : posApi.setCartDiscount(body)), removing ? 'Discount removed' : 'Discount applied');
+    const what = line ? line.itemName : 'the cart';
+    submitApproved(
+      removing ? `Remove the discount on ${what}` : `Discount ${what}`,
+      (approverPin) => (line ? posApi.setLineDiscount(line.id, { ...body, approverPin }) : posApi.setCartDiscount({ ...body, approverPin })),
+      removing ? 'Discount removed' : 'Discount applied',
+    );
   }
 
   function addOpenItem(item: OpenItemInput) {
@@ -191,7 +197,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
                       <p className="pt-3 text-sm font-semibold tabular-nums">{formatPeso(line.lineTotal)}</p>
                       <LineActionsMenu
                         line={line}
-                        isSupervisor={isSupervisor}
+                        canDiscount={canDiscount}
                         seniorApplied={seniorApplied}
                         disabled={busy}
                         onDiscount={() => setDialog({ kind: 'discount', line })}
@@ -307,7 +313,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
           />
         </label>
 
-        {isSupervisor && !empty && (
+        {canDiscount && !empty && (
           seniorApplied ? (
             <p className="text-xs text-ink-soft">{SENIOR_EXCLUSIVE}</p>
           ) : (
@@ -390,6 +396,7 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
           total={discountBase(cart, dialog.line)}
           initial={initialDiscount(dialog.line ?? cart)}
           busy={gatedActionBusy}
+          suspended={pinOpen}
           onApply={(body) => applyDiscount(dialog.line, body)}
           onRemove={initialDiscount(dialog.line ?? cart) ? () => applyDiscount(dialog.line, { kind: 'Percent', value: 0, reason: 'Removed' }) : undefined}
           onClose={() => setDialog(null)}
@@ -401,7 +408,8 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
           currentUnitPrice={dialog.line.unitPrice}
           originalUnitPrice={dialog.line.priceOverrideFrom}
           busy={gatedActionBusy}
-          onApply={(body) => void submitSupervisor(() => posApi.overrideLinePrice(dialog.line.id, body), 'Price changed')}
+          suspended={pinOpen}
+          onApply={(body) => submitApproved(`Override price of ${dialog.line.itemName}`, (approverPin) => posApi.overrideLinePrice(dialog.line.id, { ...body, approverPin }), 'Price changed')}
           onClose={() => setDialog(null)}
         />
       )}
@@ -409,13 +417,13 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
         <LineNoteDialog
           itemName={dialog.line.itemName}
           initial={dialog.line.note}
-          busy={gatedActionBusy || pinOpen}
+          busy={gatedActionBusy}
           suspended={pinOpen}
           onSave={(note) => submitDialog(`Note for ${dialog.line.itemName}`, (approverPin) => posApi.setLineNote(dialog.line.id, note, approverPin), note ? 'Note saved' : 'Note removed')}
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog?.kind === 'openItem' && <OpenItemDialog busy={gatedActionBusy || pinOpen} suspended={pinOpen} onAdd={addOpenItem} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'openItem' && <OpenItemDialog busy={gatedActionBusy} suspended={pinOpen} onAdd={addOpenItem} onClose={() => setDialog(null)} />}
 
       {gated.dialogProps && <ApproverPinDialog open {...gated.dialogProps} />}
       {parkOpen && <ParkCartDialog open busy={park.isPending} onPark={onPark} onClose={() => setParkOpen(false)} />}
@@ -427,6 +435,14 @@ export function CartPanel({ cart, isSupervisor, onCheckout, pending = [], onPark
 function initialDiscount(target: { manualDiscountAmount?: number; manualDiscountKind?: Transaction['manualDiscountKind']; manualDiscountValue?: number | null; manualDiscountReason?: string | null }) {
   if (!target.manualDiscountKind || !target.manualDiscountValue || (target.manualDiscountAmount ?? 0) <= 0) return undefined;
   return { kind: target.manualDiscountKind, value: target.manualDiscountValue, reason: target.manualDiscountReason ?? '' };
+}
+
+const APPROVAL_PROMPT = 'A manager or admin PIN is needed to approve this.';
+
+/** A lockout (too many wrong PINs at this device) is a 403 whose message says so: show it, not generic copy. */
+function approvalErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.kind === 'forbidden' && error.message) return error.message;
+  return userMessage(error);
 }
 
 const lineDiscountTotal = (cart: Transaction) => cart.lines.reduce((sum, l) => sum + (l.manualDiscountAmount ?? 0), 0);

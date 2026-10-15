@@ -37,10 +37,10 @@ type Dialog = { kind: 'options'; item: Item } | { kind: 'weight'; item: Item } |
 export function SellPage() {
   const { claims, role } = useSession();
   if (!claims?.deviceId) return <DeviceRequired />;
-  return <Register isSupervisor={role === 'Admin' || role === 'Manager'} role={role} />;
+  return <Register isSupervisor={role === 'Admin' || role === 'Manager'} canDiscount={role === 'Admin' || role === 'Manager' || role === 'Cashier'} role={role} />;
 }
 
-function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string | null }) {
+function Register({ isSupervisor, canDiscount, role }: { isSupervisor: boolean; canDiscount: boolean; role: string | null }) {
   const navigate = useNavigate();
   const online = useOnlineStatus();
   const items = useItems();
@@ -179,7 +179,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
       </div>
 
       <aside className="hidden lg:sticky lg:top-4 lg:block lg:h-[calc(100dvh-6rem)]">
-        <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
+        <CartArea cart={cart} isSupervisor={isSupervisor} canDiscount={canDiscount} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} />
       </aside>
 
       <div className="fixed inset-x-4 bottom-4 z-30 md:left-60 lg:hidden">
@@ -199,7 +199,7 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
             Back to items
           </button>
           <div className="min-h-0 flex-1">
-            <CartArea cart={cart} isSupervisor={isSupervisor} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} onParked={() => setCartOpen(false)} />
+            <CartArea cart={cart} isSupervisor={isSupervisor} canDiscount={canDiscount} pending={adds.pending} onCheckout={() => navigate('/sell/payment')} onParked={() => setCartOpen(false)} />
           </div>
         </div>
       )}
@@ -226,17 +226,19 @@ function Register({ isSupervisor, role }: { isSupervisor: boolean; role: string 
 function CartArea({
   cart,
   isSupervisor,
+  canDiscount,
   pending,
   onCheckout,
   onParked,
 }: {
   cart: ReturnType<typeof useCart>;
   isSupervisor: boolean;
+  canDiscount: boolean;
   pending: PendingRow[];
   onCheckout: () => void;
   onParked?: () => void;
 }) {
   if (cart.isPending) return <Skeleton className="h-full min-h-96 w-full" />;
   if (cart.isError) return <ErrorState title="The cart could not be loaded" message={userMessage(cart.error)} onRetry={() => void cart.refetch()} />;
-  return <CartPanel cart={withPending(cart.data, pending)} isSupervisor={isSupervisor} pending={pending} onCheckout={onCheckout} onParked={onParked} />;
+  return <CartPanel cart={withPending(cart.data, pending)} isSupervisor={isSupervisor} canDiscount={canDiscount} pending={pending} onCheckout={onCheckout} onParked={onParked} />;
 }

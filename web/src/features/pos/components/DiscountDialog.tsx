@@ -82,6 +82,7 @@ export function DiscountDialog({ subject, total, initial, busy, onApply, onRemov
 
         <ReasonField value={reason} onChange={setReason} error={errors.reason} />
 
+        <p className="text-sm text-ink-soft">A manager or admin PIN is needed to approve this.</p>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {onRemove && (
             <button type="button" disabled={busy} onClick={onRemove} className="mr-auto h-12 px-2 text-base font-semibold text-ink-soft underline hover:text-ink disabled:opacity-40">
@@ -91,7 +92,7 @@ export function DiscountDialog({ subject, total, initial, busy, onApply, onRemov
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <PrimaryButton type="submit" busy={busy}>
+          <PrimaryButton type="submit" busy={busy} disabled={suspended}>
             {busy ? 'Applying...' : 'Apply discount'}
           </PrimaryButton>
         </div>

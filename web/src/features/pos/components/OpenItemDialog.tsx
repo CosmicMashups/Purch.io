@@ -62,7 +62,7 @@ export function OpenItemDialog({ busy, onAdd, onClose, suspended = false }: Open
           <SecondaryButton type="button" onClick={onClose}>
             Cancel
           </SecondaryButton>
-          <PrimaryButton type="submit" busy={busy}>
+          <PrimaryButton type="submit" busy={busy} disabled={suspended}>
             {busy ? 'Adding...' : 'Add to cart'}
           </PrimaryButton>
         </div>
