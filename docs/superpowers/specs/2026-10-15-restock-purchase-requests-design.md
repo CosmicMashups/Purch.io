@@ -27,8 +27,10 @@ E. Overlap with U3: adds `DefaultSupplierId` and cost use; no conflict with valu
 - Ingredients included in this unit (PO lines + receiving must support InventoryItemId).
 - No linked supplier: Unassigned group, choose any active supplier or Skip; offer to save the pick as preferred.
 - Branch: dropdown in dialog, default active branch.
-- Still open: per-supplier unit cost on the link, suggested qty rounding, Manager/Admin only (assumed).
+- Still open: per-supplier unit cost on the link, suggested qty rounding, Admin, Manager and Warehouse (the existing inventoryManager policy and Purchase Orders page roles).
 
 ## Tracking-on rule (owner, confirmed against ItemStockService)
 - "Track ingredients separately" off: items only (as before).
 - On: recipe items are never listed or ordered (availability comes from their ingredients; already excluded from stock counts). Ingredients are ordered. Non-recipe items (resale goods, stock held on the auto-paired record) remain orderable, as their paired record.
+
+- Role gating: Admin, Manager and Warehouse (existing inventoryManager policy); web hides actions for others.
