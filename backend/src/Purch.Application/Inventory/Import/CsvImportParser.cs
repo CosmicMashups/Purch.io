@@ -46,7 +46,9 @@ public static partial class CsvImportParser
 
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
-    [GeneratedRegex(@"^[0-9]+(\.[0-9]+)?[eE][+-]?[0-9]+$")]
+    /// <summary>What a spreadsheet writes for a long number: always with an exponent sign or a decimal point
+    /// (1.2E+5, 1E+10, 1.23457E11). Plain 12E5 / 1E10 are legitimate codes.</summary>
+    [GeneratedRegex(@"^([0-9]+(\.[0-9]+)?[eE][+-][0-9]+|[0-9]+\.[0-9]+[eE][0-9]+)$")]
     private static partial Regex ScientificNotation();
 
     public static ParsedImport Parse(Stream stream, ImportKind kind)
@@ -191,7 +193,13 @@ public static partial class CsvImportParser
         {
             var v = Cell(column);
             if (v is null) return null;
-            if (decimal.TryParse(v, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var d)) return d;
+            if (decimal.TryParse(v, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var d))
+            {
+                if (d >= 0) return d;
+                errors.Add($"Line {record.Line}: {column} cannot be negative.");
+                return null;
+            }
+
             errors.Add($"Line {record.Line}: {column} '{v}' is not a valid number.");
             return null;
         }
@@ -205,12 +213,16 @@ public static partial class CsvImportParser
             else errors.Add($"Line {record.Line}: type must be 'item' or 'ingredient'.");
         }
 
-        var barcode = Cell("barcode");
-        if (barcode is not null && ScientificNotation().IsMatch(barcode))
+        string? Code(string column)
         {
-            errors.Add($"Line {record.Line}: barcode '{barcode}' looks like a number mangled by a spreadsheet (scientific notation). Format the column as text and re-export.");
-            barcode = null;
+            var v = Cell(column);
+            if (v is null || !ScientificNotation().IsMatch(v)) return v;
+            errors.Add($"Line {record.Line}: {column} '{v}' looks like a number mangled by a spreadsheet (scientific notation). Format the column as text and re-export.");
+            return null;
         }
+
+        var sku = Code("sku");
+        var barcode = Code("barcode");
 
         var clearCost = Cell("cost") is { } c && c.Equals("CLEAR", StringComparison.OrdinalIgnoreCase);
         var cost = clearCost ? null : Number("cost");
@@ -228,7 +240,7 @@ public static partial class CsvImportParser
         {
             Line = record.Line,
             Type = type,
-            Sku = Cell("sku"),
+            Sku = sku,
             Barcode = barcode,
             Name = Cell("name"),
             Category = Cell("category"),

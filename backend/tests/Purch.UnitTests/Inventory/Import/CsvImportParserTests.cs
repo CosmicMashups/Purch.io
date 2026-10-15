@@ -120,4 +120,32 @@ public sealed class CsvImportParserTests
         Assert.Equal(12.5m, parsed.Rows[0].CountedQty);
         Assert.Equal("shelf", parsed.Rows[0].Note);
     }
+
+    [Theory]
+    [InlineData("1.2E+5", true)]
+    [InlineData("1E+10", true)]
+    [InlineData("1.23457E11", true)]
+    [InlineData("12E5", false)]
+    [InlineData("1E10", false)]
+    [InlineData("4E7", false)]
+    public void Scientific_notation_rule_for_barcode_and_sku(string code, bool flagged)
+    {
+        var parsed = Parse($"type,sku,barcode,name\nitem,{code},,A\nitem,X,{code},B\n");
+        Assert.Equal(flagged, parsed.Rows[0].Errors.Count > 0);
+        Assert.Equal(flagged, parsed.Rows[1].Errors.Count > 0);
+        if (!flagged)
+        {
+            Assert.Equal(code, parsed.Rows[0].Sku);
+            Assert.Equal(code, parsed.Rows[1].Barcode);
+        }
+    }
+
+    [Fact]
+    public void Negative_numbers_are_row_errors()
+    {
+        var parsed = Parse(CatalogHeader + "\nitem,S1,,A,,-1,,,,\nitem,S2,,B,,,-2,,,\nitem,S3,,C,,,,-3,,\n");
+        Assert.All(parsed.Rows, r => Assert.Single(r.Errors));
+        var stock = Parse("sku,counted_qty\nS1,-1\n", ImportKind.Stock);
+        Assert.Single(stock.Rows[0].Errors);
+    }
 }
