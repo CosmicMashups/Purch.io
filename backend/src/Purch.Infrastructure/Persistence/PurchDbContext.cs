@@ -143,6 +143,8 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
 
     public DbSet<StockTakeLine> StockTakeLines => Set<StockTakeLine>();
 
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampUpdatedAt();
