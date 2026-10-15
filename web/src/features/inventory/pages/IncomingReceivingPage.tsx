@@ -14,8 +14,8 @@ import { useItems } from '../../catalog/queries';
 import type { Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
 import { incomingReceivingSchema, type IncomingReceivingForm } from '../purchasing';
-import { useCreateIncomingReceiving, useIncomingReceiving, useLinkIncomingReceiving, usePurchaseOrders, useSuppliers } from '../queries';
-import { PurchaseOrderStatus, ReceivingCondition, ReceivingRemark, type IncomingReceiving, type PurchaseOrder } from '../types';
+import { useCreateIncomingReceiving, useIncomingReceiving, useInventoryItems, useLinkIncomingReceiving, usePurchaseOrders, useSuppliers } from '../queries';
+import { PurchaseOrderStatus, ReceivingCondition, ReceivingRemark, type IncomingReceiving, type InventoryItem, type PurchaseOrder } from '../types';
 import { conditionLabel, isPurchaseOrderOpen, remarkLabel } from '../workflow';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -36,6 +36,7 @@ export function IncomingReceivingPage() {
   const reports = useIncomingReceiving();
   const orders = usePurchaseOrders();
   const items = useItems();
+  const ingredients = useInventoryItems();
   const suppliers = useSuppliers();
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
   const { role } = useSession();
@@ -80,7 +81,7 @@ export function IncomingReceivingPage() {
           onClose={closeDialog}
         >
           {suppliers.data && items.data && orders.data && branches && (
-            <ReportDialog suppliers={suppliers.data} branches={branches} items={items.data} orders={orders.data} initialOrderId={dialog.orderId} onClose={closeDialog} />
+            <ReportDialog suppliers={suppliers.data} branches={branches} items={items.data} ingredients={(ingredients.data ?? []).filter((i) => !i.isAutoCreatedForItem && i.isActive !== false)} orders={orders.data} initialOrderId={dialog.orderId} onClose={closeDialog} />
           )}
         </FormDialogLoader>
       )}
@@ -155,6 +156,7 @@ function ReportDialog({
   suppliers,
   branches,
   items,
+  ingredients,
   orders,
   initialOrderId,
   onClose,
@@ -162,6 +164,7 @@ function ReportDialog({
   suppliers: { id: string; name: string }[];
   branches: Branch[];
   items: Item[];
+  ingredients: InventoryItem[];
   orders: PurchaseOrder[];
   initialOrderId: string;
   onClose: () => void;
@@ -189,9 +192,9 @@ function ReportDialog({
       remaining.map(
         (l) =>
           ({
-            itemId: l.itemId,
+            itemId: l.inventoryItemId ? `ing:${l.inventoryItemId}` : l.itemId,
             quantityReceived: l.quantityOrdered - l.quantityReceived,
-            uom: 'pc',
+            uom: l.unit ?? 'pc',
             unitPrice: l.expectedUnitCost,
             condition: '0',
             remark: '0',
@@ -214,7 +217,8 @@ function ReportDialog({
       deliveryDate: v.deliveryDate,
       remarks: v.remarks.trim() || null,
       lines: v.lines.map((l) => ({
-        itemId: l.itemId,
+        itemId: l.itemId.startsWith('ing:') ? '00000000-0000-0000-0000-000000000000' : l.itemId,
+        inventoryItemId: l.itemId.startsWith('ing:') ? l.itemId.slice(4) : null,
         quantityReceived: l.quantityReceived,
         uom: l.uom.trim(),
         unitPrice: l.unitPrice,
@@ -268,12 +272,21 @@ function ReportDialog({
           <div key={field.id} className="flex flex-col gap-3 rounded-control border border-line p-3">
             <FormField label="Item" error={errors.lines?.[index]?.itemId?.message}>
               <select {...register(`lines.${index}.itemId`)} className={controlClass}>
-                <option value="">Choose an item</option>
+                <option value="">Choose an item or ingredient</option>
                 {items.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
                 ))}
+                {ingredients.length > 0 && (
+                  <optgroup label="Ingredients">
+                    {ingredients.map((ingredient) => (
+                      <option key={ingredient.id} value={`ing:${ingredient.id}`}>
+                        {ingredient.name} ({ingredient.baseUnit})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </FormField>
             <div className="grid grid-cols-3 gap-3">

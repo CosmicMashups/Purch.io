@@ -305,7 +305,7 @@ export interface CreateIncomingReceivingRequest {
   branchId: string;
   deliveryDate: string;
   remarks: string | null;
-  lines: { itemId: string; quantityReceived: number; uom: string; unitPrice: number; condition: ReceivingCondition; remark: ReceivingRemark }[];
+  lines: { itemId: string; inventoryItemId?: string | null; quantityReceived: number; uom: string; unitPrice: number; condition: ReceivingCondition; remark: ReceivingRemark }[];
 }
 
 /** Mirrors Purch.Domain.Enums.BranchTransferStatus. */

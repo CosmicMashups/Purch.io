@@ -140,6 +140,46 @@ public sealed class PurchaseRequestEndpointsTests(PostgresContainerFixture postg
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
     }
 
+    [Fact]
+    public async Task An_ingredient_ordered_on_a_purchase_order_is_received_into_its_stock()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var client = await TestSessions.AdminClientAsync(factory);
+        var branchId = await MainBranchIdAsync(client);
+        var supplier = await CreateSupplierAsync(client, "Delta Mills");
+        var ingredientResponse = await client.PostAsJsonAsync("/inventory-items", new CreateInventoryItemRequest("Flour", null, "kg", "kg", 1m, 10m));
+        var ingredient = (await ingredientResponse.Content.ReadFromJsonAsync<InventoryItemDto>(JsonOptions))!;
+
+        var created = await client.PostAsJsonAsync(
+            "/purchase-orders",
+            new CreatePurchaseOrderRequest(
+                supplier.Id,
+                branchId,
+                [new CreatePurchaseOrderLineRequest(Guid.Empty, 5m, 40m, ingredient.Id, "kg")]));
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var order = (await created.Content.ReadFromJsonAsync<PurchaseOrderDto>(JsonOptions))!;
+        var line = Assert.Single(order.Lines);
+        Assert.Equal("Flour", line.ItemName);
+        Assert.Equal(ingredient.Id, line.InventoryItemId);
+        _ = await client.PostAsync($"/purchase-orders/{order.Id}/mark-sent", null);
+
+        var received = await client.PostAsJsonAsync(
+            "/incoming-receiving",
+            new CreateIncomingReceivingRequest(
+                order.Id,
+                supplier.Id,
+                branchId,
+                DateOnly.FromDateTime(DateTime.UtcNow),
+                null,
+                [new CreateIncomingReceivingLineRequest(Guid.Empty, 5m, "kg", 40m, ReceivingCondition.Good, ReceivingRemark.Accepted, ingredient.Id)]));
+        Assert.Equal(HttpStatusCode.OK, received.StatusCode);
+
+        var orders = (await client.GetFromJsonAsync<List<PurchaseOrderDto>>("/purchase-orders", JsonOptions))!;
+        Assert.Equal(PurchaseOrderStatus.Received, orders.Single(o => o.Id == order.Id).Status);
+        var stock = (await client.GetFromJsonAsync<List<InventoryItemDto>>("/inventory-items", JsonOptions))!.Single(i => i.Id == ingredient.Id);
+        Assert.Equal(5m, stock.QuantityOnHand);
+    }
+
     private static async Task<PurchaseOrderDto> PostOrderAsync(HttpClient client, Guid supplierId, Guid branchId, Guid itemId, bool vatInclusive)
     {
         var response = await client.PostAsJsonAsync(
