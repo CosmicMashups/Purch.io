@@ -53,7 +53,8 @@ describe('TransfersPage', () => {
   it('sends a pending transfer only after confirming', async () => {
     vi.mocked(inventoryApi.markTransferInTransit).mockResolvedValue({} as never);
     renderPage(<TransfersPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Actions for / }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Send' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Send this transfer?' });
     expect(inventoryApi.markTransferInTransit).not.toHaveBeenCalled();
@@ -65,7 +66,8 @@ describe('TransfersPage', () => {
     vi.mocked(inventoryApi.listTransfers).mockResolvedValue([transfer(BranchTransferStatus.InTransit)]);
     vi.mocked(inventoryApi.markTransferReceived).mockResolvedValue({} as never);
     renderPage(<TransfersPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Mark received' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Actions for / }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mark received' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Mark received' }));
     await waitFor(() => expect(inventoryApi.markTransferReceived).toHaveBeenCalledWith('t1'));
   });
@@ -74,8 +76,9 @@ describe('TransfersPage', () => {
     vi.mocked(inventoryApi.listTransfers).mockResolvedValue([transfer(BranchTransferStatus.Pending), { ...transfer(BranchTransferStatus.Received), id: 't2' }]);
     renderPage(<TransfersPage />);
     await screen.findAllByText('Katipunan to Kamuning');
-    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getAllByRole('button', { name: /^Actions for / })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /^Actions for / }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Cancel transfer' }));
     expect(screen.getByRole('dialog', { name: 'Cancel this transfer?' })).toBeInTheDocument();
   });
 

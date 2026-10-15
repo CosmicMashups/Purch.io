@@ -26,14 +26,17 @@ describe('InventoryHomePage', () => {
     expect(await screen.findByText('64')).toBeInTheDocument();
     const names = (await screen.findAllByRole('listitem')).map((li) => li.textContent).filter((t) => /Beans|Oat/.test(t ?? ''));
     expect(names[0]).toContain('Oat Milk');
-    expect(screen.getByText(/Out of stock, alert at 12/)).toBeInTheDocument();
+    expect(screen.getByText('Alert at 12')).toBeInTheDocument();
+    expect(screen.getAllByText('Out of stock').length).toBeGreaterThan(0);
   });
 
-  it('links each alert to a prefilled stock-in', async () => {
+  it('keeps the actions of each row in its menu, not as buttons beside it', async () => {
     signInAs('Warehouse');
     renderPage(<InventoryHomePage />);
-    const links = await screen.findAllByRole('link', { name: 'Add stock' });
-    expect(links[0]).toHaveAttribute('href', '/inventory/movements?record=1&stockRef=item:b&recordType=0');
+    const menus = await screen.findAllByRole('button', { name: /^Actions for / });
+    expect(screen.queryByRole('link', { name: 'Add stock' })).not.toBeInTheDocument();
+    fireEvent.click(menus[0]);
+    expect(await screen.findByRole('menuitem', { name: 'Add stock' })).toBeInTheDocument();
   });
 
   it('hides the catalog tiles from Warehouse but shows them to a Manager', async () => {
@@ -97,7 +100,8 @@ describe('InventoryHomePage', () => {
       fireEvent.click(screen.getAllByRole('tab', { name: 'Ingredients' })[0]);
       expect(await screen.findByText('Oat Milk')).toBeInTheDocument();
       expect(screen.queryByText('Latte')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Receive delivery' })).toHaveAttribute('href', '/inventory/ingredients?receive=ing1');
+      fireEvent.click(screen.getByRole('button', { name: /^Actions for Oat Milk/ }));
+      expect(await screen.findByRole('menuitem', { name: 'Receive delivery' })).toBeInTheDocument();
     });
   });
 });

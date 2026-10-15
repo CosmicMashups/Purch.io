@@ -2,7 +2,8 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorState } from '../../../components/ErrorState';
 import { SkeletonList } from '../../../components/Skeleton';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
-import { ListCard, Pill } from '../../../components/lists/QueryList';
+import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { Pill } from '../../../components/lists/QueryList';
 import { PageHeader } from '../../../components/PageHeader';
 import { GroupedCombobox } from '../../../components/forms/GroupedCombobox';
 import { formatDateTime } from '../../../lib/dates';
@@ -117,32 +118,37 @@ export function MovementLogPage() {
         <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No movements match these filters.</p>
       )}
       {log.isSuccess && rows.length > 0 && (
-        <ul className="flex flex-col gap-3">
+        <CompactList label="Stock movements">
           {rows.map((row) => (
-            <ListCard key={row.id}>
-              <div className="min-w-0">
-                <p className="text-base font-semibold">{row.inventoryItemName ?? row.itemName}</p>
-                {row.inventoryItemName && row.inventoryItemName !== row.itemName && row.itemId && (
-                  <p className="text-sm text-ink-soft">For {row.itemName}</p>
-                )}
-                <p className="text-base tabular-nums">
-                  {movementLabel(row.type)}: {row.quantity}
-                </p>
-                <p className="text-sm text-ink-soft">
-                  {row.branchName}, {row.staffUserName}, {formatDateTime(row.createdAt)}
-                </p>
-                {(row.reasonCategory || row.supplierReference || row.note) && (
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {[row.reasonCategory && `Reason: ${row.reasonCategory}`, row.supplierReference && `Supplier ref: ${row.supplierReference}`, row.note]
-                      .filter(Boolean)
-                      .join(' | ')}
+            <CompactRow
+              key={row.id}
+              title={row.inventoryItemName ?? row.itemName}
+              detail={
+                <>
+                  <p className="truncate">
+                    {row.inventoryItemName && row.inventoryItemName !== row.itemName && row.itemId ? `For ${row.itemName}. ` : ''}
+                    {row.branchName}, {row.staffUserName}, {formatDateTime(row.createdAt)}
                   </p>
-                )}
-              </div>
-              {row.type === MovementType.Sale && <Pill>Automatic</Pill>}
-            </ListCard>
+                  {(row.reasonCategory || row.supplierReference || row.note) && (
+                    <p className="truncate">
+                      {[row.reasonCategory && `Reason: ${row.reasonCategory}`, row.supplierReference && `Supplier ref: ${row.supplierReference}`, row.note]
+                        .filter(Boolean)
+                        .join(' | ')}
+                    </p>
+                  )}
+                </>
+              }
+              aside={
+                <div className="flex items-center gap-2">
+                  {row.type === MovementType.Sale && <Pill>Automatic</Pill>}
+                  <span className="text-base font-semibold tabular-nums">
+                    {movementLabel(row.type)}: {row.quantity}
+                  </span>
+                </div>
+              }
+            />
           ))}
-        </ul>
+        </CompactList>
       )}
       {recording && (
         <RecordMovementDialog

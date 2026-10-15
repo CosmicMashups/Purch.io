@@ -6,7 +6,12 @@ import { toast } from '../../../components/feedback/toastStore';
 import { FormDialog, FormDialogLoader } from '../../../components/forms/FormDialog';
 import { FormField, PrimaryButton, SecondaryButton, controlClass } from '../../../components/forms/FormField';
 import { FormCombobox, type ComboboxGroup } from '../../../components/forms/GroupedCombobox';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { ErrorState } from '../../../components/ErrorState';
+import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { Pill } from '../../../components/lists/QueryList';
+import { RowActionsMenu } from '../../../components/RowActionsMenu';
+import { SkeletonList } from '../../../components/Skeleton';
+import { userMessage } from '../../../lib/apiError';
 import { PageHeader } from '../../../components/PageHeader';
 import { useBranches, useSelectableBranches } from '../../branches/queries';
 import type { Branch } from '../../branches/types';
@@ -15,8 +20,6 @@ import { transferSchema, type TransferForm } from '../purchasing';
 import { useCancelTransfer, useCreateTransfer, useMarkTransferInTransit, useMarkTransferReceived, useTransfers } from '../queries';
 import type { BranchTransfer } from '../types';
 import { transferActions, transferStatusLabel, type TransferAction } from '../workflow';
-
-const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
 
 const CONFIRM_COPY: Record<TransferAction, { title: string; verb: string; describe: (t: BranchTransfer) => string; destructive: boolean }> = {
   ship: {
@@ -76,47 +79,34 @@ export function TransfersPage() {
         }
       />
       <div>
-        <QueryList
-          query={transfers}
-          errorTitle="Transfers could not be loaded"
-          emptyMessage="No transfers yet."
-          renderRow={(transfer) => {
-            const status = transferStatusLabel[transfer.status];
-            const actions = transferActions(transfer.status);
-            const label: Record<TransferAction, string> = { ship: 'Send', receive: 'Mark received', cancel: 'Cancel' };
-            return (
-              <ListCard key={transfer.id}>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold">
-                    {transfer.sourceBranchName} to {transfer.destinationBranchName}
-                  </p>
-                  <ul className="mt-1 flex flex-col gap-1">
-                    {transfer.lines.map((line) => (
-                      <li key={line.id} className="text-base tabular-nums">
-                        {line.itemName}: {line.quantity}
-                      </li>
-                    ))}
-                  </ul>
-                  {actions.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {actions.map((action) => (
-                        <button
-                          key={action}
-                          type="button"
-                          className={`${actionButton} ${action === 'cancel' ? 'text-danger' : ''}`}
-                          onClick={() => setPending({ action, transfer })}
-                        >
-                          {label[action]}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Pill tone={status.tone}>{status.label}</Pill>
-              </ListCard>
-            );
-          }}
-        />
+        {transfers.isPending && <SkeletonList />}
+        {transfers.isError && <ErrorState title="Transfers could not be loaded" message={userMessage(transfers.error)} onRetry={() => void transfers.refetch()} />}
+        {transfers.isSuccess && transfers.data.length === 0 && (
+          <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No transfers yet.</p>
+        )}
+        {transfers.isSuccess && transfers.data.length > 0 && (
+          <CompactList label="Stock transfers">
+            {transfers.data.map((transfer) => {
+              const status = transferStatusLabel[transfer.status];
+              const label: Record<TransferAction, string> = { ship: 'Send', receive: 'Mark received', cancel: 'Cancel transfer' };
+              const actions = transferActions(transfer.status).map((action) => ({
+                label: label[action],
+                danger: action === 'cancel',
+                separated: action === 'cancel',
+                onSelect: () => setPending({ action, transfer }),
+              }));
+              return (
+                <CompactRow
+                  key={transfer.id}
+                  title={`${transfer.sourceBranchName} to ${transfer.destinationBranchName}`}
+                  detail={<p className="truncate">{transfer.lines.map((line) => `${line.itemName} ${line.quantity}`).join(', ')}</p>}
+                  aside={<Pill tone={status.tone}>{status.label}</Pill>}
+                  menu={<RowActionsMenu subject={`${transfer.sourceBranchName} to ${transfer.destinationBranchName}`} actions={actions} />}
+                />
+              );
+            })}
+          </CompactList>
+        )}
       </div>
 
       {creating && (

@@ -13,18 +13,25 @@ const OPTIONS: { value: StatusView; label: string }[] = [
   { value: 'deleted', label: 'Deleted' },
 ];
 
+/** A filter is outlined; its selection takes the meaning of the state it shows. */
+const SELECTED: Record<StatusView, string> = {
+  active: 'border-brand bg-brand-tint text-brand-strong',
+  inactive: 'border-amber-600 bg-amber-50 text-amber-900',
+  deleted: 'border-danger bg-red-50 text-red-900',
+};
+
 /** Active / Inactive / Deleted, as one control a thumb can hit. Deleted is left out for people who can't restore. */
 export function StatusFilter({ value, onChange, canSeeDeleted = true }: { value: StatusView; onChange: (next: StatusView) => void; canSeeDeleted?: boolean }) {
   const options = canSeeDeleted ? OPTIONS : OPTIONS.filter((o) => o.value !== 'deleted');
   return (
-    <div role="group" aria-label="Show" className="inline-flex rounded-control border border-line bg-surface p-1">
+    <div role="group" aria-label="Show" className="inline-flex gap-2">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`h-10 min-w-24 rounded-control px-4 text-base font-semibold ${value === option.value ? 'bg-brand text-on-brand' : 'text-ink-soft hover:text-ink'}`}
+          className={`h-10 min-w-24 rounded-control border px-4 text-base font-semibold ${value === option.value ? SELECTED[option.value] : 'border-line bg-surface text-ink-soft hover:border-ink hover:text-ink'}`}
         >
           {option.label}
         </button>

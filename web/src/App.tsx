@@ -14,6 +14,7 @@ import { IngredientsPage } from './features/inventory/pages/IngredientsPage';
 import { EquipmentPage } from './features/equipment/pages/EquipmentPage';
 import { MovementLogPage } from './features/inventory/pages/MovementLogPage';
 import { PurchaseOrdersPage } from './features/inventory/pages/PurchaseOrdersPage';
+import { PurchaseRequestsPage } from './features/inventory/pages/PurchaseRequestsPage';
 import { LegacyRecordMovementRedirect } from './features/inventory/pages/LegacyRecordMovementRedirect';
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
@@ -125,6 +126,7 @@ export function App() {
             <Route path="/inventory/ingredients" element={<IngredientsPage />} />
             <Route path="/inventory/equipment" element={<EquipmentPage />} />
             <Route path="/inventory/suppliers" element={<SuppliersPage />} />
+            <Route path="/inventory/purchase-requests" element={<PurchaseRequestsPage />} />
             <Route path="/inventory/purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="/inventory/incoming-receiving" element={<IncomingReceivingPage />} />
             <Route path="/inventory/transfers" element={<TransfersPage />} />

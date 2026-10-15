@@ -22,7 +22,7 @@ export function Tabs<T extends string>({ label, tabs, active, onChange, idPrefix
             aria-selected={selected}
             aria-controls={`${idPrefix}-panel`}
             onClick={() => onChange(tab.id)}
-            className={`h-11 rounded-control px-5 text-base font-semibold ${selected ? 'bg-brand text-on-brand' : 'border border-line bg-surface hover:border-brand'}`}
+            className={`h-11 rounded-control px-5 text-base font-semibold border ${selected ? 'border-brand bg-brand-tint text-brand-strong' : 'border-line bg-surface text-ink-soft hover:border-brand hover:text-ink'}`}
           >
             {tab.label}
           </button>

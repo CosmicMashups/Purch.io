@@ -14,7 +14,6 @@ import { useItems } from '../../catalog/queries';
 import type { Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
 import { printPurchaseOrder } from '../printPurchaseOrder';
-import { PurchaseRequestsPanel } from '../components/PurchaseRequestsPanel';
 import { purchaseOrderSchema, type PurchaseOrderForm } from '../purchasing';
 import {
   useCancelPurchaseOrder,
@@ -27,7 +26,8 @@ import {
 import type { InventoryItem, PurchaseOrder } from '../types';
 import { purchaseOrderActions, purchaseOrderStatusLabel } from '../workflow';
 
-const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
+const actionButton = 'h-12 rounded-control bg-brand px-5 text-base font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60';
+const dangerButton = 'h-12 rounded-control bg-danger px-5 text-base font-semibold text-white hover:opacity-90 disabled:opacity-60';
 
 export function PurchaseOrdersPage() {
   const orders = usePurchaseOrders();
@@ -67,8 +67,6 @@ export function PurchaseOrdersPage() {
           </PrimaryButton>
         }
       />
-      <PurchaseRequestsPanel />
-      <h2 className="text-lg font-semibold">Purchase orders</h2>
       <div>
         <QueryList
           query={orders}
@@ -122,7 +120,7 @@ export function PurchaseOrdersPage() {
                       {order.receipts.length} delivery {order.receipts.length === 1 ? 'report' : 'reports'}, last on {order.receipts[order.receipts.length - 1].deliveryDate}
                     </p>
                   )}
-                  <button type="button" className={`${actionButton} mt-3`} onClick={() => printPurchaseOrder(order)}>
+                  <button type="button" className="mt-3 h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand" onClick={() => printPurchaseOrder(order)}>
                     Print
                   </button>
                   {actions.length > 0 && (
@@ -138,7 +136,7 @@ export function PurchaseOrdersPage() {
                         </Link>
                       )}
                       {actions.includes('cancel') && (
-                        <button type="button" className={`${actionButton} text-danger`} onClick={() => setCancelling(order)}>
+                        <button type="button" className={dangerButton} onClick={() => setCancelling(order)}>
                           Cancel order
                         </button>
                       )}

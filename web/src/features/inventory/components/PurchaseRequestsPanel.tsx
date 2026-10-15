@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { ConfirmModal } from '../../../components/ConfirmModal';
 import { toast } from '../../../components/feedback/toastStore';
-import { ListCard, Pill, QueryList } from '../../../components/lists/QueryList';
+import { CompactList, CompactRow } from '../../../components/lists/CompactList';
+import { Pill } from '../../../components/lists/QueryList';
+import { ErrorState } from '../../../components/ErrorState';
+import { RowActionsMenu, type RowAction } from '../../../components/RowActionsMenu';
+import { SkeletonList } from '../../../components/Skeleton';
+import { userMessage } from '../../../lib/apiError';
 import { useSession } from '../../auth/useSession';
 import { useApprovePurchaseRequest, useCancelPurchaseRequest, usePurchaseRequests, useRestockSuggestions, useSuppliers } from '../queries';
 import { PurchaseRequestStatus, type PurchaseRequest } from '../types';
 import { ConvertRequestDialog } from './ConvertRequestDialog';
-
-const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
 
 const statusLabel: Record<PurchaseRequestStatus, { label: string; tone: 'neutral' | 'brand' | 'warn' | 'danger' }> = {
   [PurchaseRequestStatus.Open]: { label: 'Awaiting approval', tone: 'warn' },
@@ -16,7 +19,7 @@ const statusLabel: Record<PurchaseRequestStatus, { label: string; tone: 'neutral
   [PurchaseRequestStatus.Cancelled]: { label: 'Cancelled', tone: 'neutral' },
 };
 
-/** Restock needs that have not become orders yet: approve, then turn them into purchase orders per supplier. */
+/** Purchase requests as a compact list; approve, convert and cancel live in each row's menu. */
 export function PurchaseRequestsPanel() {
   const requests = usePurchaseRequests();
   const suppliers = useSuppliers();
@@ -44,62 +47,52 @@ export function PurchaseRequestsPanel() {
     }
   }
 
+  function actionsFor(request: PurchaseRequest): RowAction[] {
+    const list: RowAction[] = [];
+    if (request.status === PurchaseRequestStatus.Open && canApprove) list.push({ label: 'Approve', onSelect: () => void onApprove(request) });
+    if (request.status === PurchaseRequestStatus.Approved) list.push({ label: 'Create purchase orders', onSelect: () => setConverting(request) });
+    if (request.status === PurchaseRequestStatus.Open || request.status === PurchaseRequestStatus.Approved) {
+      list.push({ label: 'Cancel request', danger: true, separated: list.length > 0, onSelect: () => setCancelling(request) });
+    }
+    return list;
+  }
+
   return (
     <section aria-labelledby="purchase-requests-heading" className="flex flex-col gap-3">
-      <h2 id="purchase-requests-heading" className="text-lg font-semibold">
+      <h2 id="purchase-requests-heading" className="sr-only">
         Purchase requests
       </h2>
-      <QueryList
-        query={requests}
-        errorTitle="Purchase requests could not be loaded"
-        emptyMessage="No purchase requests yet. Start one from Restock first."
-        renderRow={(request) => {
-          const status = statusLabel[request.status];
-          const open = request.status === PurchaseRequestStatus.Open;
-          const approved = request.status === PurchaseRequestStatus.Approved;
-          return (
-            <ListCard key={request.id}>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold">{request.controlNumber}</p>
-                <p className="text-sm text-ink-soft">
-                  Requested {request.requestDate} by {request.requestedByName || 'unknown'}
-                  {request.dateNeeded ? `, needed by ${request.dateNeeded}` : ''}
-                </p>
-                <p className="text-sm text-ink-soft">
-                  Deliver to {request.branchName}
-                  {request.deliveryAddress ? `, ${request.deliveryAddress}` : ''}
-                </p>
-                <ul className="mt-2 flex flex-col gap-1">
-                  {request.lines.map((line) => (
-                    <li key={line.id} className="text-base tabular-nums">
-                      {line.name}: {line.quantity} {line.unit}
-                    </li>
-                  ))}
-                </ul>
-                {request.remarks && <p className="mt-2 text-sm text-ink-soft">{request.remarks}</p>}
-                {(open || approved) && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {open && canApprove && (
-                      <button type="button" className={actionButton} disabled={approve.isPending} onClick={() => void onApprove(request)}>
-                        Approve
-                      </button>
-                    )}
-                    {approved && (
-                      <button type="button" className={actionButton} onClick={() => setConverting(request)}>
-                        Create purchase orders
-                      </button>
-                    )}
-                    <button type="button" className={`${actionButton} text-danger`} onClick={() => setCancelling(request)}>
-                      Cancel request
-                    </button>
-                  </div>
-                )}
-              </div>
-              <Pill tone={status.tone}>{status.label}</Pill>
-            </ListCard>
-          );
-        }}
-      />
+      {requests.isPending && <SkeletonList />}
+      {requests.isError && <ErrorState title="Purchase requests could not be loaded" message={userMessage(requests.error)} onRetry={() => void requests.refetch()} />}
+      {requests.isSuccess && requests.data.length === 0 && (
+        <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">No purchase requests yet. Start one from Restock first.</p>
+      )}
+      {requests.isSuccess && requests.data.length > 0 && (
+        <CompactList label="Purchase requests">
+          {requests.data.map((request) => {
+            const status = statusLabel[request.status];
+            return (
+              <CompactRow
+                key={request.id}
+                title={request.controlNumber}
+                detail={
+                  <>
+                    <p className="truncate">
+                      {request.lines.map((l) => `${l.name} ${l.quantity} ${l.unit}`).join(', ')}
+                    </p>
+                    <p className="truncate">
+                      {request.requestDate} by {request.requestedByName || 'unknown'}
+                      {request.dateNeeded ? `, needed by ${request.dateNeeded}` : ''}, to {request.branchName}
+                    </p>
+                  </>
+                }
+                aside={<Pill tone={status.tone}>{status.label}</Pill>}
+                menu={<RowActionsMenu subject={request.controlNumber} actions={actionsFor(request)} />}
+              />
+            );
+          })}
+        </CompactList>
+      )}
       {converting && suppliers.data && (
         <ConvertRequestDialog request={converting} suppliers={suppliers.data} suggestions={suggestions.data ?? []} onClose={() => setConverting(null)} />
       )}

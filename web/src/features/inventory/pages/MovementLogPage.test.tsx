@@ -82,7 +82,7 @@ describe('MovementLogPage', () => {
     ]);
     renderPage(<MovementLogPage />);
     expect(await screen.findByText('Coffee Beans')).toBeInTheDocument();
-    expect(screen.getByText('For Flat White')).toBeInTheDocument();
+    expect(screen.getByText(/For Flat White/)).toBeInTheDocument();
   });
 
   it('opens the record dialog from the button and from a ?record link', async () => {

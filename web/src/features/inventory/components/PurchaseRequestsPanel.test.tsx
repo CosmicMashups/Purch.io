@@ -63,7 +63,7 @@ describe('PurchaseRequestsPanel', () => {
     renderPage(<PurchaseRequestsPanel />);
     await screen.findByText('MAIN-PR-00001');
     expect(screen.getByText(/Wanda Warehouse/)).toBeInTheDocument();
-    expect(screen.getByText(/1 Rizal St/)).toBeInTheDocument();
+    expect(screen.getByText(/Rice 10 kg/)).toBeInTheDocument();
   });
 
   it('lets only an Admin or Manager approve', async () => {
@@ -71,13 +71,16 @@ describe('PurchaseRequestsPanel', () => {
     vi.mocked(inventoryApi.listPurchaseRequests).mockResolvedValue([request(PurchaseRequestStatus.Open)]);
     const warehouse = renderPage(<PurchaseRequestsPanel />);
     await screen.findByText('MAIN-PR-00001');
-    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Actions for MAIN-PR-00001/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Cancel request' })).toBeInTheDocument();
     warehouse.unmount();
 
     signInAs('Manager');
     vi.mocked(inventoryApi.approvePurchaseRequest).mockResolvedValue({} as never);
     renderPage(<PurchaseRequestsPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Actions for MAIN-PR-00001/ }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Approve' }));
     await waitFor(() => expect(inventoryApi.approvePurchaseRequest).toHaveBeenCalledWith('pr1'));
   });
 
@@ -86,7 +89,8 @@ describe('PurchaseRequestsPanel', () => {
     vi.mocked(inventoryApi.listPurchaseRequests).mockResolvedValue([request(PurchaseRequestStatus.Approved)]);
     vi.mocked(inventoryApi.convertPurchaseRequest).mockResolvedValue([] as never);
     renderPage(<PurchaseRequestsPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Create purchase orders' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Actions for MAIN-PR-00001/ }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create purchase orders' }));
 
     const dialog = await screen.findByRole('dialog');
     const rice = within(dialog).getByLabelText('Supplier for Rice') as HTMLSelectElement;

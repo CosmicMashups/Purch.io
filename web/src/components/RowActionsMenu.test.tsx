@@ -15,6 +15,18 @@ describe('RowActionsMenu', () => {
     expect(screen.getByRole('menu', { name: 'Actions for Add fries & sides' })).toBeInTheDocument();
   });
 
+  it('opens outside a clipping container so a table never cuts it off', () => {
+    const { container } = render(
+      <div style={{ overflow: 'hidden' }}>
+        <RowActionsMenu subject="Coffee" actions={[{ label: 'Edit', onSelect: vi.fn() }]} />
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Coffee' }));
+    const menu = screen.getByRole('menu');
+    expect(container.contains(menu)).toBe(false);
+    expect(document.body.contains(menu)).toBe(true);
+  });
+
   it('runs the chosen action and closes', () => {
     const onEdit = vi.fn();
     render(<RowActionsMenu subject="Coffee" actions={[{ label: 'Edit', onSelect: onEdit }, { label: 'Delete', danger: true, onSelect: vi.fn() }]} />);

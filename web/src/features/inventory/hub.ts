@@ -17,6 +17,7 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
     title: 'Procurement',
     tiles: [
       { id: 'suppliers', label: 'Suppliers', hint: 'Who you buy from', to: '/inventory/suppliers' },
+      { id: 'purchase-requests', label: 'Purchase requests', hint: 'What to buy, before a supplier is chosen', to: '/inventory/purchase-requests' },
       { id: 'purchase-orders', label: 'Purchase orders', hint: 'Order stock from suppliers', to: '/inventory/purchase-orders' },
       { id: 'incoming-receiving', label: 'Incoming receiving', hint: 'Record and check deliveries', to: '/inventory/incoming-receiving' },
     ],

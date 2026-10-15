@@ -13,11 +13,13 @@ interface AsyncPanelProps<T> {
   minHeight?: string;
   /** Shown under the heading whatever state the data is in, e.g. tabs that pick which data to show. */
   tabs?: ReactNode;
+  /** A primary action for the whole panel, set in the heading row. */
+  action?: ReactNode;
   children: (data: T) => ReactNode;
 }
 
 /** A titled panel that owns the loading, error and empty states so every dashboard block behaves alike. */
-export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, minHeight = 'min-h-48', tabs, children }: AsyncPanelProps<T>) {
+export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, minHeight = 'min-h-48', tabs, action, children }: AsyncPanelProps<T>) {
   let body: ReactNode;
 
   if (query.isPending) {
@@ -41,11 +43,12 @@ export function AsyncPanel<T>({ title, subtitle, query, isEmpty, emptyMessage, m
 
   return (
     <section aria-labelledby={`panel-${title}`} className="rounded-panel border border-line bg-surface p-5">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h2 id={`panel-${title}`} className="text-lg font-semibold">
           {title}
         </h2>
-        {asOf && (
+        {action}
+        {!action && asOf && (
           <p className="text-xs text-ink-soft">
             {query.isFetching ? 'Updating…' : `As of ${asOf.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
           </p>
