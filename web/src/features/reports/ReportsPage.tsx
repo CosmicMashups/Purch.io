@@ -6,6 +6,8 @@ import { useSelectableBranches } from '../branches/queries';
 import { ApprovalsPanel } from './components/ApprovalsPanel';
 import { BirPanel } from './components/BirPanel';
 import { ExportsPanel } from './components/ExportsPanel';
+import { DiscountsPanel, VoidsRefundsPanel } from './components/LeakagePanels';
+import { ProfitPanel, SalesMixPanel, TaxPanel } from './components/SalesPanels';
 import { DepartmentPanel, MovementPanel, StaffPanels } from './components/RangePanels';
 import { RangeControl } from './components/RangeControl';
 import { choiceToParams, defaultChoice, type RangeChoice } from './params';
@@ -15,6 +17,11 @@ const TABS = [
   { id: 'staff', label: 'Staff', usesRange: true },
   { id: 'departments', label: 'Departments', usesRange: true },
   { id: 'stock', label: 'Stock movement', usesRange: true },
+  { id: 'sales', label: 'Sales mix', usesRange: true },
+  { id: 'tax', label: 'Tax', usesRange: true },
+  { id: 'profit', label: 'Profit', usesRange: true },
+  { id: 'discounts', label: 'Discounts', usesRange: true },
+  { id: 'voids', label: 'Voids and refunds', usesRange: true },
   { id: 'bir', label: 'X and Z readings', usesRange: false },
   { id: 'approvals', label: 'Approvals', usesRange: false },
   { id: 'exports', label: 'Exports', usesRange: true },
@@ -72,12 +79,17 @@ export function ReportsPage() {
         {active === 'bir' && <BirPanel />}
         {active === 'approvals' && <ApprovalsPanel />}
         {active === 'exports' && <ExportsPanel params={params} isAdmin={role === 'Admin'} />}
-        {(active === 'staff' || active === 'departments' || active === 'stock') &&
+        {(active === 'staff' || active === 'departments' || active === 'stock' || active === 'sales' || active === 'tax' || active === 'profit' || active === 'discounts' || active === 'voids') &&
           (params ? (
             <>
               {active === 'staff' && <StaffPanels params={params} />}
               {active === 'departments' && <DepartmentPanel params={params} />}
               {active === 'stock' && <MovementPanel params={params} />}
+              {active === 'sales' && <SalesMixPanel params={params} />}
+              {active === 'tax' && <TaxPanel params={params} />}
+              {active === 'profit' && <ProfitPanel params={params} />}
+              {active === 'discounts' && <DiscountsPanel params={params} isAdmin={role === 'Admin'} />}
+              {active === 'voids' && <VoidsRefundsPanel params={params} isAdmin={role === 'Admin'} />}
             </>
           ) : (
             <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">Choose a valid date range to see this report.</p>
