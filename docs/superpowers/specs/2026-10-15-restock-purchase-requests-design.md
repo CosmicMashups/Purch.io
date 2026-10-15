@@ -19,3 +19,12 @@ B. Items already on an open order: skip by default (recommended) or include? Sug
 C. Unassigned items: must choose a supplier in the dialog, or just left out with a note (recommended: choose or skip)?
 D. Include ingredients in this unit (needs line support) or items only first?
 E. Overlap with U3: adds `DefaultSupplierId` and cost use; no conflict with valuation/stock-take/import, but import/export columns should later include supplier.
+
+## Owner decisions (grill, 2026-10-15) - supersede the proposal above
+- Supplier link: many suppliers per item and per ingredient (link table, RLS). One is marked preferred; auto-set when it is the only one. Support both modes: use the pre-selected preferred supplier automatically, or pick at order time.
+- Bulk with several suppliers: always shown in the dialog, preferred pre-selected, user may change.
+- Items already on an open order (Draft/Sent/PartiallyReceived): skipped entirely, shown as "On order".
+- Ingredients included in this unit (PO lines + receiving must support InventoryItemId).
+- No linked supplier: Unassigned group, choose any active supplier or Skip; offer to save the pick as preferred.
+- Branch: dropdown in dialog, default active branch.
+- Still open: per-supplier unit cost on the link, suggested qty rounding, Manager/Admin only (assumed).
