@@ -111,6 +111,92 @@ public sealed class ImportPlannerTests
     }
 
     [Fact]
+    public void Long_names_5000_by_5000_are_fast_and_memory_bounded()
+    {
+        var rnd = new Random(3);
+        string Word() => new(Enumerable.Range(0, 60).Select(_ => (char)('a' + rnd.Next(26))).ToArray());
+        for (var i = 0; i < 5000; i++) _ = Rec(Word(), sku: "E" + i);
+        var sb = new StringBuilder(Header).Append('\n');
+        for (var i = 0; i < 5000; i++) sb.Append("item,N").Append(i).Append(",,").Append(Word()).Append(",,1,,,,\n");
+        var parsed = CsvImportParser.Parse(new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString())), ImportKind.Catalog);
+
+        var before = GC.GetTotalAllocatedBytes(precise: true);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var plan = ImportPlanner.Plan(parsed, new ExistingCatalog(records, categories));
+        sw.Stop();
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"took {sw.Elapsed}");
+        Assert.True(allocated < 300L * 1024 * 1024, $"allocated {allocated / (1024 * 1024)} MB");
+        Assert.Equal(5000, plan.WillCreate.Count);
+    }
+
+    [Fact]
+    public void Same_name_different_skus_both_create()
+    {
+        var plan = Plan("item,S1,,Cola,,1,,,,\nitem,S2,,Cola,,1,,,,\n");
+        Assert.Equal(2, plan.WillCreate.Count(c => c.Kind == PlannedCreateKind.Item));
+        Assert.False(plan.Blocked);
+    }
+
+    [Fact]
+    public void Name_only_rename_then_link_diffs_with_new_name()
+    {
+        var target = Rec("Cola Zero");
+        var plan = Plan("item,,,Kola Zro,,10,,,,\n", resolutions: new()
+        {
+            ["name:item:kola zro"] = new ImportResolution(ResolutionChoice.Rename, NewName: "Coke Zero Sugar"),
+            ["name:item:coke zero sugar"] = new ImportResolution(ResolutionChoice.Link, target.Id),
+        });
+        var u = Assert.Single(plan.WillUpdate);
+        Assert.Equal(target.Id, u.ExistingId);
+        Assert.Contains(u.Changes, c => c.Field == "name" && c.After == "Coke Zero Sugar");
+        Assert.Empty(plan.StaleResolutions);
+    }
+
+    [Fact]
+    public void Row_rename_is_used_for_create()
+    {
+        _ = Rec("Coca Cola", sku: "S1");
+        var plan = Plan("item,S2,,Coca Colla,,1,,,,\n", resolutions: new() { ["row:2"] = new ImportResolution(ResolutionChoice.Rename, NewName: "Pepsi") });
+        Assert.Equal("Pepsi", Assert.Single(plan.WillCreate).Name);
+    }
+
+    [Fact]
+    public void Category_rename_shows_resolved_category_in_diff()
+    {
+        var bev = Cat("Beverages");
+        _ = Rec("Cola", sku: "S1");
+        var plan = Plan("item,S1,,Cola,Bevrages,,,,,\n",
+            resolutions: new() { ["cat:item:bevrages"] = new ImportResolution(ResolutionChoice.Rename, NewName: "Beverages") });
+        var u = Assert.Single(plan.WillUpdate);
+        var change = Assert.Single(u.Changes);
+        Assert.Equal("category", change.Field);
+        Assert.Equal("Beverages", change.After);
+        Assert.Equal(bev.Id, u.ResolvedCategoryId);
+    }
+
+    [Fact]
+    public void New_category_key_is_exposed_on_rows()
+    {
+        var plan = Plan("item,S1,,Cola,Snacks & Co,1,,,,\n");
+        var cat = Assert.Single(plan.WillCreate, c => c.Kind == PlannedCreateKind.Category);
+        var item = Assert.Single(plan.WillCreate, c => c.Kind == PlannedCreateKind.Item);
+        Assert.Equal("cat:item:snacks and co", cat.Key);
+        Assert.Equal(cat.Key, item.NewCategoryKey);
+        Assert.Null(item.ResolvedCategoryId);
+    }
+
+    [Fact]
+    public void Category_resolution_is_not_stale_when_row_stops_at_item_decision()
+    {
+        _ = Cat("Beverages");
+        var plan = Plan("item,,,Brand New,Bevrages,1,,,,\n",
+            resolutions: new() { ["cat:item:bevrages"] = new ImportResolution(ResolutionChoice.Create) });
+        Assert.Single(plan.NeedsDecision);
+        Assert.Empty(plan.StaleResolutions);
+    }
+
+    [Fact]
     public void Five_thousand_rows_against_five_thousand_records_is_fast()
     {
         var rnd = new Random(1);

@@ -21,7 +21,9 @@ public enum PlannedCreateKind
 }
 
 /// <summary>A creation listed for explicit confirmation. Category creations list every line that uses them.</summary>
-public sealed record PlannedCreate(PlannedCreateKind Kind, string Name, IReadOnlyList<int> Lines, ImportRowType Type);
+public sealed record PlannedCreate(
+    PlannedCreateKind Kind, string Name, IReadOnlyList<int> Lines, ImportRowType Type,
+    string? Key = null, Guid? ResolvedCategoryId = null, string? NewCategoryKey = null);
 
 /// <summary>A category linked to an existing one (identical key, or a Link resolution); shown so it can be undone.</summary>
 public sealed record CategoryAutoLink(int Line, string CsvName, Guid ExistingId, string ExistingName);
@@ -60,7 +62,9 @@ public sealed record ImportResolution(ResolutionChoice Choice, Guid? TargetId = 
 
 public sealed record FieldChange(string Field, string? Before, string? After);
 
-public sealed record PlannedUpdate(int Line, Guid ExistingId, ImportRowType Type, IReadOnlyList<FieldChange> Changes);
+public sealed record PlannedUpdate(
+    int Line, Guid ExistingId, ImportRowType Type, IReadOnlyList<FieldChange> Changes,
+    Guid? ResolvedCategoryId = null, string? NewCategoryKey = null);
 
 public sealed record RowError(int Line, string Message);
 
@@ -98,10 +102,10 @@ public static class ImportPlanner
         private readonly Dictionary<string, ExistingRecord> bySku;
         private readonly Dictionary<string, ExistingRecord> byBarcode;
         private readonly Dictionary<(ImportRowType, string), List<ExistingRecord>> recordsByKey;
-        private readonly Dictionary<ImportRowType, NearMatchIndex> recordIndex;
+        private readonly Dictionary<ImportRowType, Lazy<NearMatchIndex>> recordIndex;
         private readonly Dictionary<(ImportRowType, string), ExistingCategory> categoriesByKey;
         private readonly Dictionary<Guid, ExistingCategory> categoriesById;
-        private readonly Dictionary<ImportRowType, NearMatchIndex> categoryIndex;
+        private readonly Dictionary<ImportRowType, Lazy<NearMatchIndex>> categoryIndex;
 
         private readonly List<PlannedCreate> creates = [];
         private readonly List<CategoryAutoLink> links = [];
@@ -122,11 +126,11 @@ public static class ImportPlanner
                 .GroupBy(r => r.Barcode!.Trim(), StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
             recordsByKey = existing.Records.GroupBy(r => (r.Type, NameKey.Of(r.Name))).ToDictionary(g => g.Key, g => g.ToList());
             recordIndex = Enum.GetValues<ImportRowType>().ToDictionary(
-                t => t, t => new NearMatchIndex(existing.Records.Where(r => r.Type == t).Select(r => (r.Id, r.Name))));
+                t => t, t => new Lazy<NearMatchIndex>(() => new NearMatchIndex(existing.Records.Where(r => r.Type == t).Select(r => (r.Id, r.Name)))));
             categoriesByKey = existing.Categories.GroupBy(c => (c.Type, NameKey.Of(c.Name))).ToDictionary(g => g.Key, g => g.First());
             categoriesById = existing.Categories.ToDictionary(c => c.Id);
             categoryIndex = Enum.GetValues<ImportRowType>().ToDictionary(
-                t => t, t => new NearMatchIndex(existing.Categories.Where(c => c.Type == t).Select(c => (c.Id, c.Name))));
+                t => t, t => new Lazy<NearMatchIndex>(() => new NearMatchIndex(existing.Categories.Where(c => c.Type == t).Select(c => (c.Id, c.Name)))));
         }
 
         public ImportPlan Run(ParsedImport parsed)
@@ -160,9 +164,34 @@ public static class ImportPlanner
                 else PlanCatalogRow(row, match);
             }
 
-            creates.InsertRange(0, newCategories.Select(kv => new PlannedCreate(PlannedCreateKind.Category, kv.Value.Name, kv.Value.Lines, kv.Key.Item1)));
-            var stale = resolutions.Keys.Where(k => !usedKeys.Contains(k)).Order(StringComparer.Ordinal).ToList();
+            creates.InsertRange(0, newCategories.Select(kv => new PlannedCreate(
+                PlannedCreateKind.Category, kv.Value.Name, kv.Value.Lines, kv.Key.Item1, CategoryKey(kv.Key.Item1, kv.Key.Item2))));
+            var candidates = CandidateKeys(parsed);
+            var stale = resolutions.Keys.Where(k => !usedKeys.Contains(k) && !candidates.Contains(k)).Order(StringComparer.Ordinal).ToList();
             return new ImportPlan(creates, links, decisions, updates, errors, unchanged, stale);
+        }
+
+        private static string CategoryKey(ImportRowType type, string nameKey) => $"cat:{T(type)}:{nameKey}";
+
+        /// <summary>Every decision key some row of the file could produce, so a resolution is only stale when no row
+        /// could ask that question any more (not merely because the row stopped earlier this time).</summary>
+        private static HashSet<string> CandidateKeys(ParsedImport parsed)
+        {
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var row in parsed.Rows)
+            {
+                _ = keys.Add($"row:{row.Line}");
+                ImportRowType[] types = row.Type is { } t ? [t] : Enum.GetValues<ImportRowType>();
+                var nameKey = NameKey.Of(row.Name);
+                var catKey = NameKey.Of(row.Category);
+                foreach (var type in types)
+                {
+                    if (nameKey.Length > 0) _ = keys.Add($"name:{T(type)}:{nameKey}");
+                    if (catKey.Length > 0) _ = keys.Add(CategoryKey(type, catKey));
+                }
+            }
+
+            return keys;
         }
 
         private ImportResolution? Resolve(string key)
@@ -236,18 +265,19 @@ public static class ImportPlanner
             }
 
             if (outcome is Outcome.Error or Outcome.Decision) return;
-            if (!PlanCategory(row, type!.Value, match)) return;
+            if (!PlanCategory(row, type!.Value, match, out var category)) return;
 
             if (outcome == Outcome.Update)
             {
-                var changes = Diff(row, match!, name);
+                var changes = Diff(row, match!, name, category.Name);
                 if (changes.Count == 0) unchanged++;
-                else updates.Add(new PlannedUpdate(row.Line, match!.Id, match.Type, changes));
+                else updates.Add(new PlannedUpdate(row.Line, match!.Id, match.Type, changes, category.Id, category.NewKey));
                 return;
             }
 
             creates.Add(new PlannedCreate(
-                type == ImportRowType.Item ? PlannedCreateKind.Item : PlannedCreateKind.Ingredient, name!, [row.Line], type!.Value));
+                type == ImportRowType.Item ? PlannedCreateKind.Item : PlannedCreateKind.Ingredient, name!, [row.Line], type!.Value,
+                null, category.Id, category.NewKey));
         }
 
         private ExistingRecord? LinkTarget(ParsedRow row, ImportResolution res, ImportRowType type)
@@ -270,7 +300,7 @@ public static class ImportPlanner
                     return (Outcome.Error, null, null);
                 }
 
-                var near = recordIndex[type].Find(nameKey);
+                var near = recordIndex[type].Value.Find(nameKey);
                 if (near.Count == 0) return (Outcome.Create, null, name);
 
                 var res = Resolve(key);
@@ -286,7 +316,7 @@ public static class ImportPlanner
                         return (Outcome.Create, null, name);
                     case ResolutionChoice.Link:
                         var target = LinkTarget(row, res, type);
-                        return target is null ? (Outcome.Error, null, null) : (Outcome.Update, target, row.Name);
+                        return target is null ? (Outcome.Error, null, null) : (Outcome.Update, target, name);
                     default:
                         name = res.NewName!.Trim();
                         break;
@@ -313,7 +343,7 @@ public static class ImportPlanner
                 var res = Resolve(key);
                 if (res is null || (res.Choice == ResolutionChoice.Rename && (renames >= MaxRenames || string.IsNullOrWhiteSpace(res.NewName))))
                 {
-                    var nearest = same.Count > 0 ? same.Select(r => new NearMatch(r.Id, r.Name, 0)).ToList() : recordIndex[type].Find(nameKey);
+                    var nearest = same.Count > 0 ? same.Select(r => new NearMatch(r.Id, r.Name, 0)).ToList() : recordIndex[type].Value.Find(nameKey);
                     AddDecision(key, row.Line, DecisionReason.NoIdentity, name, nearest);
                     return (Outcome.Decision, null, null);
                 }
@@ -324,7 +354,7 @@ public static class ImportPlanner
                         return (Outcome.Create, null, name);
                     case ResolutionChoice.Link:
                         var target = LinkTarget(row, res, type);
-                        return target is null ? (Outcome.Error, null, null) : (Outcome.Update, target, row.Name);
+                        return target is null ? (Outcome.Error, null, null) : (Outcome.Update, target, name);
                     default:
                         name = res.NewName!.Trim();
                         break;
@@ -332,12 +362,21 @@ public static class ImportPlanner
             }
         }
 
-        /// <summary>Plans the row's category. Returns false when the row must stop (error or open decision).</summary>
-        private bool PlanCategory(ParsedRow row, ImportRowType type, ExistingRecord? match)
+        /// <summary>The row's category after matching/resolutions: an existing category id, or the key of a category
+        /// this import creates (<c>cat:{type}:{nameKey}</c>), plus the name to show in diffs. All null = unchanged.</summary>
+        private readonly record struct CategoryResult(Guid? Id, string? NewKey, string? Name);
+
+        /// <summary>Plans the row's category. Returns false when the row must stop (error).</summary>
+        private bool PlanCategory(ParsedRow row, ImportRowType type, ExistingRecord? match, out CategoryResult result)
         {
+            result = default;
             if (row.Category is null) return true;
             var name = row.Category;
-            if (match is not null && NameKey.Of(match.Category) == NameKey.Of(name)) return true;
+            if (match is not null && NameKey.Of(match.Category) == NameKey.Of(name))
+            {
+                result = new CategoryResult(categoriesByKey.GetValueOrDefault((type, NameKey.Of(name)))?.Id, null, null);
+                return true;
+            }
 
             for (var renames = 0; ; renames++)
             {
@@ -352,27 +391,31 @@ public static class ImportPlanner
                 {
                     if (!string.Equals(exact.Name, row.Category, StringComparison.Ordinal))
                         links.Add(new CategoryAutoLink(row.Line, row.Category, exact.Id, exact.Name));
+                    result = new CategoryResult(exact.Id, null, exact.Name);
                     return true;
                 }
 
                 if (newCategories.TryGetValue((type, key), out var pending))
                 {
                     pending.Lines.Add(row.Line);
+                    result = new CategoryResult(null, CategoryKey(type, key), pending.Name);
                     return true;
                 }
 
-                var near = categoryIndex[type].Find(key);
+                var near = categoryIndex[type].Value.Find(key);
+                var dkey = CategoryKey(type, key);
                 if (near.Count == 0)
                 {
                     newCategories[(type, key)] = (name, [row.Line]);
+                    result = new CategoryResult(null, dkey, name);
                     return true;
                 }
 
-                var dkey = $"cat:{T(type)}:{key}";
                 var res = Resolve(dkey);
                 if (res is null || (res.Choice == ResolutionChoice.Rename && (renames >= MaxRenames || string.IsNullOrWhiteSpace(res.NewName))))
                 {
                     AddDecision(dkey, row.Line, DecisionReason.SimilarCategory, name, near);
+                    result = new CategoryResult(null, null, name);
                     return true; // the item itself still plans; Blocked holds the commit
                 }
 
@@ -380,11 +423,13 @@ public static class ImportPlanner
                 {
                     case ResolutionChoice.Create:
                         newCategories[(type, key)] = (name, [row.Line]);
+                        result = new CategoryResult(null, dkey, name);
                         return true;
                     case ResolutionChoice.Link:
                         if (res.TargetId is { } id && categoriesById.TryGetValue(id, out var target) && target.Type == type)
                         {
                             links.Add(new CategoryAutoLink(row.Line, row.Category, target.Id, target.Name));
+                            result = new CategoryResult(target.Id, null, target.Name);
                             return true;
                         }
 
@@ -397,7 +442,7 @@ public static class ImportPlanner
             }
         }
 
-        private static List<FieldChange> Diff(ParsedRow row, ExistingRecord e, string? name)
+        private static List<FieldChange> Diff(ParsedRow row, ExistingRecord e, string? name, string? category)
         {
             var changes = new List<FieldChange>();
             void Text(string field, string? after, string? before, StringComparison cmp = StringComparison.Ordinal)
@@ -413,8 +458,8 @@ public static class ImportPlanner
             Text("sku", row.Sku, e.Sku, StringComparison.OrdinalIgnoreCase);
             Text("barcode", row.Barcode, e.Barcode);
             Text("name", name, e.Name);
-            if (row.Category is not null && NameKey.Of(row.Category) != NameKey.Of(e.Category))
-                changes.Add(new FieldChange("category", e.Category, row.Category));
+            if (category is not null && NameKey.Of(category) != NameKey.Of(e.Category))
+                changes.Add(new FieldChange("category", e.Category, category));
             Num("price", row.Price, e.Price);
             if (row.ClearCost)
             {

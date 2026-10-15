@@ -53,6 +53,32 @@ public sealed class NameKeyTests
         Assert.Equal(near, NameKey.IsNear(NameKey.Of(a), NameKey.Of(b), out _));
 
     [Fact]
+    public void Index_matches_naive_scan_for_long_mixed_keys()
+    {
+        var rnd = new Random(11);
+        const string alphabet = "ab 1é字";
+        string Word(int len) => new(Enumerable.Range(0, len).Select(_ => alphabet[rnd.Next(alphabet.Length)]).ToArray());
+        string Mutate(string s)
+        {
+            var chars = s.ToList();
+            for (var i = rnd.Next(0, 3); i > 0 && chars.Count > 1; i--) chars[rnd.Next(chars.Count)] = alphabet[rnd.Next(alphabet.Length)];
+            if (rnd.Next(2) == 0) chars.RemoveAt(rnd.Next(chars.Count));
+            return new string(chars.ToArray());
+        }
+
+        int[] lengths = [5, 22, 23, 24, 25, 26, 27, 40, 100];
+        var names = Enumerable.Range(0, 400).Select(i => (Id: Guid.NewGuid(), Name: Word(lengths[i % lengths.Length]))).ToList();
+        var index = new NearMatchIndex(names);
+        foreach (var (_, n) in names.Take(150))
+        {
+            var key = NameKey.Of(Mutate(n));
+            var naive = names.Where(x => NameKey.IsNear(key, NameKey.Of(x.Name), out _)).Select(x => x.Id).ToHashSet();
+            var fast = index.Find(key, int.MaxValue).Select(m => m.Id).ToHashSet();
+            Assert.True(naive.SetEquals(fast), $"mismatch for '{key}' ({key.Length})");
+        }
+    }
+
+    [Fact]
     public void Index_matches_naive_scan()
     {
         var rnd = new Random(7);
