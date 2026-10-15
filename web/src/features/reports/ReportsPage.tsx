@@ -21,10 +21,15 @@ const ProfitPanel = lazy(() => import('./components/SalesPanels').then((m) => ({
 const DiscountsPanel = lazy(() => import('./components/LeakagePanels').then((m) => ({ default: m.DiscountsPanel })));
 const VoidsRefundsPanel = lazy(() => import('./components/LeakagePanels').then((m) => ({ default: m.VoidsRefundsPanel })));
 
+const ValuationPanel = lazy(() => import('./components/ValuationPanel').then((m) => ({ default: m.ValuationPanel })));
+const CogsPanel = lazy(() => import('./components/CogsPanel').then((m) => ({ default: m.CogsPanel })));
+
 const TABS = [
   { id: 'staff', label: 'Staff', usesRange: true },
   { id: 'departments', label: 'Departments', usesRange: true },
   { id: 'stock', label: 'Stock movement', usesRange: true },
+  { id: 'valuation', label: 'Stock valuation', usesRange: false },
+  { id: 'cogs', label: 'COGS', usesRange: true },
   { id: 'sales', label: 'Sales mix', usesRange: true },
   { id: 'tax', label: 'Tax', usesRange: true },
   { id: 'profit', label: 'Profit', usesRange: true },
@@ -71,16 +76,18 @@ export function ReportsPage() {
 
       <div role="tabpanel" id={`report-panel-${active}`} aria-labelledby={`report-tab-${active}`}>
        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+        {active === 'valuation' && <ValuationPanel />}
         {active === 'bir' && <BirPanel />}
         {active === 'approvals' && <ApprovalsPanel />}
         {active === 'exports' && <ExportsPanel params={params} isAdmin={role === 'Admin'} />}
-        {(active === 'staff' || active === 'departments' || active === 'stock' || active === 'sales' || active === 'tax' || active === 'profit' || active === 'discounts' || active === 'voids') &&
+        {(active === 'staff' || active === 'departments' || active === 'stock' || active === 'sales' || active === 'tax' || active === 'profit' || active === 'discounts' || active === 'voids' || active === 'cogs') &&
           (params ? (
             <>
               {active === 'staff' && <StaffPanels params={params} />}
               {active === 'departments' && <DepartmentPanel params={params} />}
               {active === 'stock' && <MovementPanel params={params} />}
               {active === 'sales' && <SalesMixPanel params={params} />}
+              {active === 'cogs' && <CogsPanel params={params} />}
               {active === 'tax' && <TaxPanel params={params} />}
               {active === 'profit' && <ProfitPanel params={params} />}
               {active === 'discounts' && <DiscountsPanel params={params} isAdmin={role === 'Admin'} />}

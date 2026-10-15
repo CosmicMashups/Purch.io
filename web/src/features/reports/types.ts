@@ -119,3 +119,45 @@ export interface ApprovalsReview {
   totalApprovals: number;
   approvers: ApproverSummary[];
 }
+
+export interface ValuationRow {
+  id: string;
+  kind: string;
+  name: string;
+  sku: string | null;
+  category: string | null;
+  onHand: number;
+  unitCost: number | null;
+  value: number | null;
+  flagged: boolean;
+}
+export interface ValuationGroup {
+  categoryId: string | null;
+  name: string;
+  subtotal: number;
+  rows: ValuationRow[];
+}
+export interface InventoryValuation {
+  groups: ValuationGroup[];
+  totalValue: number;
+  valuedCount: number;
+  unknownCostCount: number;
+  negativeStockCount: number;
+}
+export interface CogsGroup {
+  id: string | null;
+  name: string;
+  quantity: number;
+  cogs: number;
+  knownCostRevenue: number;
+  coveragePercent: number;
+  excludedLineCount: number;
+}
+export interface InventoryCogs {
+  groups: CogsGroup[];
+  cogs: number;
+  knownCostRevenue: number;
+  coveragePercent: number;
+  excludedLineCount: number;
+}
+export type CogsGroupBy = 'item' | 'category' | 'day';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inventoryHubStats } from './hub';
+import { INVENTORY_GROUPS, inventoryHubStats } from './hub';
 import { BranchTransferStatus, PurchaseOrderStatus, type BranchTransfer, type IncomingReceiving, type InventoryItem, type PurchaseOrder, type Supplier } from './types';
 
 const ingredient = (quantityOnHand: number, lowStockThreshold: number | null) => ({ quantityOnHand, lowStockThreshold }) as InventoryItem;
@@ -34,5 +34,12 @@ describe('inventoryHubStats', () => {
   it('summarises transfers on the move', () => {
     expect(inventoryHubStats({ transfers: [transfer(BranchTransferStatus.InTransit), transfer(BranchTransferStatus.Received)] }).transfers?.text).toBe('1 in transit');
     expect(inventoryHubStats({ transfers: [] }).transfers?.text).toBe('None moving');
+  });
+});
+
+describe('INVENTORY_GROUPS valuation tile', () => {
+  it('links the Stock group to the valuation report for managers only', () => {
+    const tile = INVENTORY_GROUPS.find((g) => g.title === 'Stock')!.tiles.find((t) => t.id === 'valuation');
+    expect(tile).toMatchObject({ to: '/reports?tab=valuation', managersOnly: true });
   });
 });

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { reportsApi } from './api';
-import type { RangeParams } from './types';
+import type { CogsGroupBy, RangeParams } from './types';
 
 export const reportKeys = {
   staff: (p: RangeParams) => ['reports', 'staff', p] as const,
@@ -64,3 +64,9 @@ export const useZReading = () => useMutation({ mutationFn: () => reportsApi.zRea
 /** date is an ISO yyyy-MM-dd string, or undefined for today. */
 export const useApprovalsReview = (date: string | undefined, enabled = true) =>
   useQuery({ queryKey: reportKeys.approvalsReview(date), queryFn: () => reportsApi.approvalsReview(date), enabled });
+
+export const useInventoryValuation = (type: string) =>
+  useQuery({ queryKey: ['reports', 'valuation', type], queryFn: () => reportsApi.inventoryValuation({ type }), ...AGGREGATE });
+
+export const useInventoryCogs = (params: RangeParams, groupBy: CogsGroupBy) =>
+  useQuery({ queryKey: ['reports', 'cogs', params, groupBy], queryFn: () => reportsApi.inventoryCogs({ ...params, groupBy }), ...AGGREGATE });

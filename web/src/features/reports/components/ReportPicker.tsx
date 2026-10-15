@@ -42,6 +42,8 @@ export const REPORT_GROUPS: ReportGroup[] = [
       { id: 'staff', label: 'Staff' },
       { id: 'departments', label: 'Departments' },
       { id: 'stock', label: 'Stock movement' },
+      { id: 'valuation', label: 'Stock valuation' },
+      { id: 'cogs', label: 'COGS' },
     ],
   },
   {

@@ -11,6 +11,7 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
       { id: 'transfers', label: 'Stock transfers', hint: 'Move stock between branches', to: '/inventory/transfers' },
       { id: 'ingredients', label: 'Ingredients', hint: 'Counts and deliveries', to: '/inventory/ingredients' },
       { id: 'equipment', label: 'Equipment', hint: 'Machines, furniture and utensils', to: '/inventory/equipment' },
+      { id: 'valuation', label: 'Stock valuation', hint: 'What your stock is worth at cost', to: '/reports?tab=valuation', managersOnly: true },
     ],
   },
   {
