@@ -9,7 +9,7 @@ export function ItemSuppliersDialog({ row, suppliers, onClose }: { row: RestockS
   const save = useSetItemSuppliers();
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(row.suppliers.map((s) => s.supplierId)));
   const [preferred, setPreferred] = useState<string | null>(row.suppliers.find((s) => s.isPreferred)?.supplierId ?? null);
-  const costs = new Map(row.suppliers.map((s) => [s.supplierId, s.unitCost]));
+  const [costs, setCosts] = useState<Record<string, string>>(() => Object.fromEntries(row.suppliers.map((s) => [s.supplierId, s.unitCost === null ? '' : String(s.unitCost)])));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,7 +17,7 @@ export function ItemSuppliersDialog({ row, suppliers, onClose }: { row: RestockS
     const list = [...chosen].map((supplierId) => ({
       supplierId,
       isPreferred: supplierId === preferred,
-      unitCost: costs.get(supplierId) ?? null,
+      unitCost: costs[supplierId]?.trim() ? Number(costs[supplierId]) : null,
     }));
     await save.mutateAsync({ owner, suppliers: list });
     toast.success(`Suppliers saved for ${row.name}`);
@@ -47,6 +47,19 @@ export function ItemSuppliersDialog({ row, suppliers, onClose }: { row: RestockS
               />
               {s.name}
             </label>
+            {on && (
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                aria-label={`Unit cost from ${s.name}`}
+                placeholder="Unit cost"
+                value={costs[s.id] ?? ''}
+                onChange={(e) => setCosts({ ...costs, [s.id]: e.target.value })}
+                className="h-12 w-28 rounded-control border border-line px-2 text-base"
+              />
+            )}
             {on && (
               <label className="flex items-center gap-2 text-sm font-semibold">
                 <input type="radio" name="preferred" className="size-5" checked={preferred === s.id} onChange={() => setPreferred(s.id)} />

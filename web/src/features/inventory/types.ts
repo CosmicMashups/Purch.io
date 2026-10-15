@@ -259,6 +259,10 @@ export interface CreatePurchaseOrderRequest {
   supplierId: string;
   branchId: string;
   lines: { itemId: string; quantityOrdered: number; expectedUnitCost: number }[];
+  vatInclusive?: boolean;
+  discountAmount?: number;
+  remarks?: string | null;
+  dateNeeded?: string | null;
 }
 
 /** Mirrors Purch.Domain.Enums.ReceivingCondition. */

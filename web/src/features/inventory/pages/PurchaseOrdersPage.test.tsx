@@ -108,6 +108,8 @@ describe('PurchaseOrdersPage', () => {
       supplierId: 's1',
       branchId: 'kat',
       lines: [{ itemId: 'milk', quantityOrdered: 24, expectedUnitCost: 80.5 }],
+      vatInclusive: false,
+      discountAmount: 0,
     });
   });
 

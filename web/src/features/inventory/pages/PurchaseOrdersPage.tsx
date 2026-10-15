@@ -13,6 +13,7 @@ import type { Branch } from '../../branches/types';
 import { useItems } from '../../catalog/queries';
 import type { Item } from '../../catalog/types';
 import { formatPeso } from '../../dashboard/format';
+import { printPurchaseOrder } from '../printPurchaseOrder';
 import { PurchaseRequestsPanel } from '../components/PurchaseRequestsPanel';
 import { purchaseOrderSchema, type PurchaseOrderForm } from '../purchasing';
 import {
@@ -119,6 +120,9 @@ export function PurchaseOrdersPage() {
                       {order.receipts.length} delivery {order.receipts.length === 1 ? 'report' : 'reports'}, last on {order.receipts[order.receipts.length - 1].deliveryDate}
                     </p>
                   )}
+                  <button type="button" className={`${actionButton} mt-3`} onClick={() => printPurchaseOrder(order)}>
+                    Print
+                  </button>
                   {actions.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {actions.includes('send') && (
@@ -186,6 +190,8 @@ function PurchaseOrderDialog({
   onClose: () => void;
 }) {
   const create = useCreatePurchaseOrder();
+  const [vatInclusive, setVatInclusive] = useState(false);
+  const [discount, setDiscount] = useState('');
   const {
     register,
     control,
@@ -198,7 +204,7 @@ function PurchaseOrderDialog({
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
   const submit = handleSubmit(async (v) => {
-    await create.mutateAsync(v);
+    await create.mutateAsync({ ...v, vatInclusive, discountAmount: Number(discount) || 0 });
     toast.success('Purchase order created as a draft');
     onClose();
   });
@@ -225,6 +231,16 @@ function PurchaseOrderDialog({
           ))}
         </select>
       </FormField>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex h-12 items-center gap-2 text-base">
+          <input type="checkbox" className="size-6" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
+          Unit costs include VAT
+        </label>
+        <FormField label="Discount (whole order)">
+          <input type="number" inputMode="decimal" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} className={controlClass} />
+        </FormField>
+      </div>
 
       <fieldset className="flex flex-col gap-4">
         <legend className="text-base font-semibold">Items</legend>
