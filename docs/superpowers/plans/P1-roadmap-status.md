@@ -3,7 +3,8 @@
 Read this first in a new session. It supersedes the unit order in the original plan header.
 
 ## Where things stand
-- **U4 (Reports) is implemented on `feat/reporting-sales-tax-margin-discounts`** (not merged, not pushed). Spec: `docs/superpowers/specs/2026-10-15-u4-reports-design.md`. Deploy: `docs/DEPLOY-NOTE-u4-reports.md`. Next up is U3.
+- **U4 (Reports) has shipped** (on `origin/main`). Spec: `docs/superpowers/specs/2026-10-15-u4-reports-design.md`. Deploy: `docs/DEPLOY-NOTE-u4-reports.md`.
+- **U3 (Inventory depth) is in progress** on `feat/u3-inventory-depth`. Spec: `docs/superpowers/specs/2026-10-15-u3-inventory-depth-design.md` (variance is `counted - expected_at_count`, applied as a delta; import creates items/categories after user review).
 - **U1 (POS foundations) is done and merged to `main`** at `d70be7c` (local, not pushed). Spec: `docs/superpowers/specs/2026-10-14-u1-pos-foundations-design.md`. Plan: `docs/superpowers/plans/2026-10-14-u1-pos-foundations.md`. Deploy steps: `docs/DEPLOY-NOTE-u1-pos-foundations.md`. Golden pricing cases for Flutter: `docs/superpowers/specs/u1-golden-cases.json`. Feature rows: `docs/system-analysis/10-feature-inventory.md`.
 - Last verified: backend unit 136 + integration 538 (clean, no cleanup failures); web 1053 tests, build and lint clean; Playwright has 8 failures that also fail on the pre-U1 baseline `12f3b3f` (admin x2, business-dialogs, dashboards, offline x2, pos device-gate, roles kiosk). They are not caused by U1 and still need their own look.
 - Flutter client is **unchanged**. No pricing/tier gating exists anywhere; a later session handles tiers.
