@@ -64,7 +64,7 @@ public sealed class StockTakeService(
         }
 
         // Overlapping open takes are allowed (delta-based apply keeps them safe); creation only warns.
-        var open = await stockTakeRepository.ListOpenLineTargetsAsync(CurrentTenantId, cancellationToken);
+        var open = (await stockTakeRepository.ListOpenLineTargetsAsync(CurrentTenantId, cancellationToken)).ToHashSet();
         var overlapping = take.Lines.Count(line => open.Contains((line.ItemId, line.InventoryItemId)));
         var warnings = overlapping > 0
             ? new[] { $"{overlapping} of these lines are also in another open stock take." }
@@ -72,23 +72,17 @@ public sealed class StockTakeService(
 
         stockTakeRepository.Add(take);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return ToDto(take, warnings);
+        return await ToDtoAsync(take, cancellationToken, warnings);
     }
 
     public async Task<StockTakeDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return ToDto(await RequireAsync(id, cancellationToken));
+        return await ToDtoAsync(await RequireAsync(id, cancellationToken), cancellationToken);
     }
 
-    public async Task<IReadOnlyList<StockTakeSummaryDto>> ListAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<StockTakeSummaryDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var takes = await stockTakeRepository.ListAsync(CurrentTenantId, cancellationToken);
-        return takes
-            .OrderByDescending(take => take.CreatedAt)
-            .Select(take => new StockTakeSummaryDto(
-                take.Id, take.Name, take.Status, take.Blind, take.ScopeKind, take.CreatedAt, take.AppliedAt,
-                take.Lines.Count, take.Lines.Count(line => line.State == StockTakeLineState.Counted)))
-            .ToList();
+        return stockTakeRepository.ListSummariesAsync(CurrentTenantId, cancellationToken);
     }
 
     public async Task<StockTakeDto> CountLineAsync(Guid takeId, Guid lineId, decimal? counted, bool skip, CancellationToken cancellationToken = default)
@@ -97,6 +91,13 @@ public sealed class StockTakeService(
         if (take.Status is not (StockTakeStatus.Counting or StockTakeStatus.Review))
         {
             throw new ConflictException("Counts can only be entered while the stock take is being counted or reviewed.");
+        }
+
+        // Once a blind take is in review its expected quantities are visible, so only an Admin/Manager may change
+        // counts then; otherwise a counter could read the expected figure and re-count to match it.
+        if (take.Blind && take.Status == StockTakeStatus.Review && currentActorProvider.Role is not (Role.Admin or Role.Manager))
+        {
+            throw new ForbiddenException("Only a manager or admin can change counts on a blind stock take in review.");
         }
 
         var line = take.Lines.FirstOrDefault(l => l.Id == lineId) ?? throw new NotFoundException("Stock take line", lineId);
@@ -129,8 +130,13 @@ public sealed class StockTakeService(
         }
 
         line.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // Touch the take as well: its row version (xmin) then guards every line edit, so a count saved after a
+        // concurrent apply (or apply racing a count) fails with a 409 instead of leaving a line and its posted
+        // movement disagreeing.
+        take.UpdatedAt = line.UpdatedAt;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return ToDto(take);
+        return await ToDtoAsync(take, cancellationToken);
     }
 
     public Task<StockTakeDto> StartAsync(Guid id, CancellationToken cancellationToken = default)
@@ -152,10 +158,17 @@ public sealed class StockTakeService(
     {
         // A read-only look first, so an already-applied take returns its first result and a request that would be
         // refused anyway does not burn a PIN attempt.
-        var preview = await RequireAsync(id, cancellationToken);
+        // Loaded untracked, so the load inside the transaction below reads the row fresh (with its current xmin)
+        // instead of handing back this same tracked instance.
+        var preview = await stockTakeRepository.GetUntrackedAsync(id, cancellationToken);
+        if (preview is null || preview.TenantId != CurrentTenantId)
+        {
+            throw new NotFoundException("Stock take", id);
+        }
+
         if (preview.Status == StockTakeStatus.Applied)
         {
-            return ToDto(preview);
+            return await ToDtoAsync(preview, cancellationToken);
         }
 
         EnsureApplicable(preview);
@@ -168,15 +181,16 @@ public sealed class StockTakeService(
             var take = await RequireAsync(id, ct);
             if (take.Status == StockTakeStatus.Applied)
             {
-                return ToDto(take);
+                return await ToDtoAsync(take, ct);
             }
 
             EnsureApplicable(take);
             var posted = new List<object>();
             var missing = new List<object>();
+            var negative = new List<object>();
             foreach (var line in take.Lines.Where(l => l.State == StockTakeLineState.Counted && l.VarianceQty is not null and not 0m))
             {
-                var movementId = await PostAdjustmentAsync(take, line, ct);
+                var (movementId, resultingOnHand) = await PostAdjustmentAsync(take, line, ct);
                 if (movementId is null)
                 {
                     missing.Add(new { lineId = line.Id, name = line.Name });
@@ -186,6 +200,13 @@ public sealed class StockTakeService(
                 line.MovementId = movementId;
                 line.UpdatedAt = DateTimeOffset.UtcNow;
                 posted.Add(new { lineId = line.Id, name = line.Name, variance = line.VarianceQty });
+
+                // Apply intentionally does not refuse a negative result (owner rule: the variance is a delta on top
+                // of whatever happened since the count); such lines are listed so they can be followed up.
+                if (resultingOnHand < 0)
+                {
+                    negative.Add(new { lineId = line.Id, name = line.Name, onHand = resultingOnHand });
+                }
             }
 
             var now = DateTimeOffset.UtcNow;
@@ -213,19 +234,21 @@ public sealed class StockTakeService(
                     uncountedLines = take.Lines.Where(l => l.State == StockTakeLineState.Uncounted).Select(l => new { lineId = l.Id, name = l.Name }),
                     skippedLines = take.Lines.Where(l => l.State == StockTakeLineState.Skipped).Select(l => new { lineId = l.Id, name = l.Name }),
                     missingLines = missing,
+                    negativeStockLines = negative,
                 }),
             });
 
             _ = await unitOfWork.SaveChangesAsync(ct);
-            return ToDto(take);
+            return await ToDtoAsync(take, ct);
         }, cancellationToken);
     }
 
     /// <summary>Posts the line's variance as a signed Adjustment through the same stock routing as a hand-recorded
     /// movement. Returns null when the item or ingredient no longer exists.</summary>
-    private async Task<Guid?> PostAdjustmentAsync(StockTake take, StockTakeLine line, CancellationToken cancellationToken)
+    private async Task<(Guid? MovementId, decimal ResultingOnHand)> PostAdjustmentAsync(StockTake take, StockTakeLine line, CancellationToken cancellationToken)
     {
         var variance = line.VarianceQty!.Value;
+        decimal resulting;
         Guid? itemId = null;
         Guid? inventoryItemId;
         if (line.InventoryItemId is { } ingredientId)
@@ -233,10 +256,11 @@ public sealed class StockTakeService(
             var ingredient = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken);
             if (ingredient is null || ingredient.IsDeleted)
             {
-                return null;
+                return (null, 0m);
             }
 
             ingredient.QuantityOnHand += variance;
+            resulting = ingredient.QuantityOnHand;
             inventoryItemId = ingredient.Id;
         }
         else
@@ -244,9 +268,11 @@ public sealed class StockTakeService(
             var item = await itemRepository.GetByIdAsync(line.ItemId!.Value, cancellationToken);
             if (item is null || item.IsDeleted)
             {
-                return null;
+                return (null, 0m);
             }
 
+            // Read before adjusting: the on-hand lookup may read the stored (pre-adjustment) figure.
+            resulting = (await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken)).GetValueOrDefault(item.Id) + variance;
             itemId = item.Id;
             inventoryItemId = await itemStockService.AdjustAsync(item, variance, cancellationToken);
         }
@@ -263,7 +289,7 @@ public sealed class StockTakeService(
             Note = $"Stock take: {take.Name}",
         };
         movementRepository.Add(movement);
-        return movement.Id;
+        return (movement.Id, resulting);
     }
 
     private static void EnsureApplicable(StockTake take)
@@ -291,7 +317,7 @@ public sealed class StockTakeService(
         take.UpdatedAt = DateTimeOffset.UtcNow;
         also?.Invoke(take);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return ToDto(take);
+        return await ToDtoAsync(take, cancellationToken);
     }
 
     private async Task<decimal> OnHandAsync(StockTakeLine line, CancellationToken cancellationToken)
@@ -300,11 +326,18 @@ public sealed class StockTakeService(
         {
             var ingredient = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken)
                 ?? throw new NotFoundException("Ingredient", ingredientId);
-            return ingredient.QuantityOnHand;
+            return ingredient.IsDeleted
+                ? throw new ValidationException("lineId", $"{ingredient.Name} has been deleted, so it cannot be counted.")
+                : ingredient.QuantityOnHand;
         }
 
         var item = await itemRepository.GetByIdAsync(line.ItemId!.Value, cancellationToken)
             ?? throw new NotFoundException("Item", line.ItemId.Value);
+        if (item.IsDeleted)
+        {
+            throw new ValidationException("lineId", $"{item.Name} has been deleted, so it cannot be counted.");
+        }
+
         var onHand = await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken);
         return onHand.TryGetValue(item.Id, out var quantity)
             ? quantity
@@ -386,10 +419,52 @@ public sealed class StockTakeService(
             : take;
     }
 
-    private StockTakeDto ToDto(StockTake take, IReadOnlyList<string>? warnings = null)
+    /// <summary>A line needs a recount when stock moved since it was counted by more than the larger of 5% of the
+    /// expected quantity and one unit: small drift is normal trading, larger drift means the count may no longer
+    /// describe the shelf (for example a delivery was put away mid-count).</summary>
+    internal static bool NeedsRecount(decimal movementsSinceCount, decimal expectedQty)
+    {
+        const decimal RecountThresholdFraction = 0.05m;
+        const decimal MinimumRecountThreshold = 1m;
+        var threshold = Math.Max(Math.Abs(expectedQty) * RecountThresholdFraction, MinimumRecountThreshold);
+        return Math.Abs(movementsSinceCount) > threshold;
+    }
+
+    /// <summary>Signed net stock movement per counted line since it was counted, excluding this take's own
+    /// adjustments. Only computed while the take is Counting or Review, and not for a blind take while Counting.</summary>
+    private async Task<Dictionary<Guid, decimal>> MovementsSinceCountAsync(StockTake take, bool hideExpected, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<Guid, decimal>();
+        var counted = take.Lines.Where(l => l.State == StockTakeLineState.Counted && l.CountedAt is not null).ToList();
+        if (hideExpected || take.Status is not (StockTakeStatus.Counting or StockTakeStatus.Review) || counted.Count == 0)
+        {
+            return result;
+        }
+
+        var ownMovements = take.Lines.Where(l => l.MovementId is not null).Select(l => l.MovementId!.Value).ToHashSet();
+        var movements = await stockTakeRepository.ListMovementsSinceAsync(
+            take.TenantId,
+            counted.Where(l => l.ItemId is not null).Select(l => l.ItemId!.Value).ToList(),
+            counted.Where(l => l.InventoryItemId is not null).Select(l => l.InventoryItemId!.Value).ToList(),
+            counted.Min(l => l.CountedAt!.Value),
+            cancellationToken);
+
+        foreach (var line in counted)
+        {
+            result[line.Id] = movements
+                .Where(m => !ownMovements.Contains(m.Id) && m.CreatedAt > line.CountedAt!.Value
+                    && (line.ItemId is { } itemId ? m.ItemId == itemId : m.InventoryItemId == line.InventoryItemId))
+                .Sum(m => InventoryMovementService.StockDelta(m.Type, m.Quantity));
+        }
+
+        return result;
+    }
+
+    private async Task<StockTakeDto> ToDtoAsync(StockTake take, CancellationToken cancellationToken, IReadOnlyList<string>? warnings = null)
     {
         var hideExpected = take.Blind && take.Status == StockTakeStatus.Counting;
         var canSeeCosts = currentActorProvider.CanSeeCosts;
+        var sinceCount = await MovementsSinceCountAsync(take, hideExpected, cancellationToken);
         var lines = take.Lines
             .OrderBy(line => line.Name, StringComparer.OrdinalIgnoreCase)
             .Select(line => new StockTakeLineDto(
@@ -406,7 +481,9 @@ public sealed class StockTakeService(
                 canSeeCosts && !hideExpected && line.VarianceQty is { } v && line.UnitCostSnapshot is { } cost ? v * cost : null,
                 line.CountedBy,
                 line.CountedAt,
-                line.MovementId))
+                line.MovementId,
+                sinceCount.TryGetValue(line.Id, out var moved) ? moved : null,
+                sinceCount.TryGetValue(line.Id, out var drift) && NeedsRecount(drift, line.ExpectedQty ?? 0m)))
             .ToList();
 
         return new StockTakeDto(

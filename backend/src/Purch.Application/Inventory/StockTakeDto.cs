@@ -36,7 +36,9 @@ public sealed record StockTakeLineDto(
     decimal? VarianceValue,
     Guid? CountedBy,
     DateTimeOffset? CountedAt,
-    Guid? MovementId);
+    Guid? MovementId,
+    decimal? MovementsSinceCount = null,
+    bool NeedsRecount = false);
 
 public sealed record StockTakeDto(
     Guid Id,

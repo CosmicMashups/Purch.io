@@ -171,7 +171,7 @@ public sealed class InventoryMovementService(
     /// adds; every other named type always subtracts the (always-positive)
     /// quantity; Adjustment applies the signed quantity as-is, since it's the
     /// one type meant to correct a miscount in either direction.</summary>
-    private static decimal StockDelta(MovementType type, decimal quantity)
+    internal static decimal StockDelta(MovementType type, decimal quantity)
     {
         return type is MovementType.StockIn or MovementType.Adjustment
             ? quantity

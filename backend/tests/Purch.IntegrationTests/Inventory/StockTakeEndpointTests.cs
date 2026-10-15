@@ -147,4 +147,89 @@ public sealed class StockTakeEndpointTests(PostgresContainerFixture postgres)
         _ = await ReadAsync<StockTakeDto>(await admin.PostAsJsonAsync($"/stock-takes/{firstTake.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)));
         Assert.Equal(9m, await StockOfAsync(item.Id));
     }
+
+    private static Task<HttpClient> WarehouseClientAsync(HttpClient admin) =>
+        TestSessions.StaffClientAsync(admin, "Wes Warehouse", MembershipRole.Staff, StaffDuty.Warehouse, "456712");
+
+    private async Task<decimal?> MovementQuantityAsync(Guid movementId)
+    {
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT \"Quantity\" FROM \"InventoryMovements\" WHERE \"Id\" = @id", connection);
+        _ = command.Parameters.AddWithValue("id", movementId);
+        return (decimal?)await command.ExecuteScalarAsync();
+    }
+
+    [Fact]
+    public async Task Warehouse_counts_but_only_a_manager_moves_a_take_to_review_and_warehouse_cannot_apply()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        using var manager = await TestSessions.ManagerClientAsync(admin);
+        using var warehouse = await WarehouseClientAsync(admin);
+        var item = await StockedItemAsync(admin, "Rice", 10m);
+
+        var take = await ReadAsync<StockTakeDto>(await warehouse.PostAsJsonAsync("/stock-takes",
+            new CreateStockTakeRequest("Blind shelf", StockTakeScopeKind.Picked, Blind: true, ItemIds: [item.Id])));
+        _ = await ReadAsync<StockTakeDto>(await warehouse.PostAsync($"/stock-takes/{take.Id}/start", null));
+        var counted = await ReadAsync<StockTakeDto>(await warehouse.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{take.Lines.Single().Id}", new CountStockTakeLineRequest(7m)));
+        Assert.Null(counted.Lines.Single().ExpectedQty);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.PostAsync($"/stock-takes/{take.Id}/review", null)).StatusCode);
+        var review = await ReadAsync<StockTakeDto>(await manager.PostAsync($"/stock-takes/{take.Id}/review", null));
+        Assert.Equal(10m, review.Lines.Single().ExpectedQty);
+
+        // A blind take in review: the counter may no longer change counts.
+        Assert.Equal(HttpStatusCode.Forbidden, (await warehouse.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{take.Lines.Single().Id}", new CountStockTakeLineRequest(10m))).StatusCode);
+
+        // Warehouse is not an approver: its own PIN is rejected and nothing is posted.
+        var refused = await warehouse.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest("456712"));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal(10m, await StockOfAsync(item.Id));
+    }
+
+    [Fact]
+    public async Task Concurrent_applies_post_the_variance_exactly_once()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var item = await StockedItemAsync(admin, "Rice", 10m);
+        var take = await ReviewTakeWithCountAsync(admin, item, 7m);
+
+        var responses = await Task.WhenAll(
+            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)),
+            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)));
+
+        Assert.All(responses, r => Assert.True(r.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict, r.StatusCode.ToString()));
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Equal(7m, await StockOfAsync(item.Id));
+        Assert.Equal(1, await AuditCountAsync(take.Id));
+    }
+
+    [Fact]
+    public async Task A_count_racing_apply_never_leaves_the_line_and_its_movement_disagreeing()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var item = await StockedItemAsync(admin, "Rice", 10m);
+        var take = await ReviewTakeWithCountAsync(admin, item, 7m);
+        var lineId = take.Lines.Single().Id;
+
+        _ = await Task.WhenAll(
+            admin.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{lineId}", new CountStockTakeLineRequest(4m)),
+            admin.PostAsJsonAsync($"/stock-takes/{take.Id}/apply", new ApplyStockTakeRequest(TestSessions.AdminPin)));
+
+        var final = await ReadAsync<StockTakeDto>(await admin.GetAsync($"/stock-takes/{take.Id}"));
+        var line = final.Lines.Single();
+        if (final.Status == StockTakeStatus.Applied)
+        {
+            Assert.Equal(line.VarianceQty, await MovementQuantityAsync(line.MovementId!.Value));
+            Assert.Equal(10m + line.VarianceQty, await StockOfAsync(item.Id));
+        }
+        else
+        {
+            Assert.Null(line.MovementId);
+            Assert.Equal(10m, await StockOfAsync(item.Id));
+        }
+    }
 }

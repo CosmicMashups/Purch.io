@@ -201,6 +201,107 @@ public sealed class StockTakeServiceTests
         Assert.Null(line.VarianceValue);
     }
 
+    private void Sell(Item item, decimal quantity)
+    {
+        item.StockOnHand -= quantity;
+        takes.History.Add(new InventoryMovement { TenantId = Tenant, ItemId = item.Id, BranchId = Branch, Type = MovementType.Sale, Quantity = quantity, CreatedAt = DateTimeOffset.UtcNow.AddSeconds(1) });
+    }
+
+    [Fact]
+    public async Task A_sale_after_the_count_shows_as_movements_since_count_and_flags_a_recount_but_apply_posts_only_the_variance()
+    {
+        var rice = AddItem("Rice", 10m);
+        var service = Service();
+        var take = await CountingTakeAsync(service);
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 8m, false);
+
+        Sell(rice, 3m);
+        var review = await service.ToReviewAsync(take.Id);
+
+        var line = review.Lines.Single();
+        Assert.Equal(-3m, line.MovementsSinceCount);
+        Assert.True(line.NeedsRecount);
+        _ = await service.ApplyAsync(take.Id, "1234");
+        Assert.Equal(-2m, Assert.Single(movements.Added).Quantity);
+        Assert.Equal(5m, rice.StockOnHand);
+    }
+
+    [Fact]
+    public async Task Movement_within_the_threshold_is_shown_but_not_flagged()
+    {
+        var rice = AddItem("Rice", 10m);
+        var service = Service();
+        var take = await CountingTakeAsync(service);
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 8m, false);
+
+        Sell(rice, 1m); // max(5% of 10, 1) = 1, and only movement beyond it flags
+        var line = (await service.ToReviewAsync(take.Id)).Lines.Single();
+
+        Assert.Equal(-1m, line.MovementsSinceCount);
+        Assert.False(line.NeedsRecount);
+    }
+
+    [Fact]
+    public async Task Movements_since_count_stay_hidden_while_a_blind_take_is_counting()
+    {
+        var rice = AddItem("Rice", 10m);
+        var service = Service();
+        var take = await CountingTakeAsync(service, blind: true);
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 8m, false);
+        Sell(rice, 3m);
+
+        var line = (await service.GetAsync(take.Id)).Lines.Single();
+        Assert.Null(line.MovementsSinceCount);
+        Assert.False(line.NeedsRecount);
+    }
+
+    [Fact]
+    public async Task Only_a_manager_or_admin_may_change_counts_on_a_blind_take_in_review()
+    {
+        var rice = AddItem("Rice", 10m);
+        var service = Service();
+        var take = await CountingTakeAsync(service, blind: true);
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 8m, false);
+        _ = await service.ToReviewAsync(take.Id);
+
+        actor.CurrentRole = Role.Warehouse;
+        _ = await Assert.ThrowsAsync<ForbiddenException>(() => service.CountLineAsync(take.Id, LineOf(take, rice), 10m, false));
+        actor.CurrentRole = Role.Manager;
+        Assert.Equal(10m, (await service.CountLineAsync(take.Id, LineOf(take, rice), 10m, false)).Lines.Single().CountedQty);
+    }
+
+    [Fact]
+    public async Task Counts_are_refused_once_the_take_is_applied_or_the_item_is_deleted()
+    {
+        var rice = AddItem("Rice", 10m);
+        var gone = AddItem("Gone", 4m);
+        var service = Service();
+        var take = await CountingTakeAsync(service);
+        gone.IsDeleted = true;
+        _ = await Assert.ThrowsAsync<ValidationException>(() => service.CountLineAsync(take.Id, LineOf(take, gone), 1m, false));
+
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 8m, false);
+        _ = await service.ToReviewAsync(take.Id);
+        _ = await service.ApplyAsync(take.Id, "1234");
+        _ = await Assert.ThrowsAsync<ConflictException>(() => service.CountLineAsync(take.Id, LineOf(take, rice), 3m, false));
+    }
+
+    [Fact]
+    public async Task Apply_lists_lines_whose_stock_ends_negative_without_refusing()
+    {
+        var rice = AddItem("Rice", 5m);
+        var service = Service();
+        var take = await CountingTakeAsync(service);
+        _ = await service.CountLineAsync(take.Id, LineOf(take, rice), 1m, false); // variance -4
+        Sell(rice, 3m); // 2 left, apply takes it to -2
+        _ = await service.ToReviewAsync(take.Id);
+
+        _ = await service.ApplyAsync(take.Id, "1234");
+
+        Assert.Equal(-2m, rice.StockOnHand);
+        Assert.Contains("\"negativeStockLines\":[{", Assert.Single(audit.Added).AfterStateJson);
+    }
+
     private sealed class FakeTenant : ICurrentTenantProvider
     {
         public Guid? TenantId => Tenant;
@@ -245,9 +346,17 @@ public sealed class StockTakeServiceTests
     {
         private readonly List<StockTake> stored = [];
 
+        public List<InventoryMovement> History { get; } = [];
+
         public Task<StockTake?> GetAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(stored.FirstOrDefault(t => t.Id == id));
 
-        public Task<IReadOnlyList<StockTake>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<StockTake>>(stored);
+        public Task<StockTake?> GetUntrackedAsync(Guid id, CancellationToken cancellationToken = default) => GetAsync(id, cancellationToken);
+
+        public Task<IReadOnlyList<StockTakeSummaryDto>> ListSummariesAsync(Guid tenantId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<InventoryMovement>> ListMovementsSinceAsync(Guid tenantId, IReadOnlyCollection<Guid> itemIds, IReadOnlyCollection<Guid> inventoryItemIds, DateTimeOffset since, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<InventoryMovement>>(History.Where(m => m.CreatedAt > since
+                && ((m.ItemId is { } i && itemIds.Contains(i)) || (m.InventoryItemId is { } g && inventoryItemIds.Contains(g)))).ToList());
 
         public Task<IReadOnlyList<(Guid? ItemId, Guid? InventoryItemId)>> ListOpenLineTargetsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<(Guid?, Guid?)>>(stored

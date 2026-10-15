@@ -37,6 +37,9 @@ public static class InventoryEndpoints
             Results.Ok(await movementService.RecordAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // Review reveals expected quantities (even on a blind take), so only Admin/Manager may move a take to it.
+        var stockTakeReviewers = new[] { nameof(Role.Admin), nameof(Role.Manager) };
+
         // --- U3 — stock-take sessions. Apply additionally needs an Admin/Manager approver PIN (checked in the service). ---
         _ = app.MapPost("/stock-takes", async (
             CreateStockTakeRequest request,
@@ -79,7 +82,7 @@ public static class InventoryEndpoints
             IStockTakeService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.ToReviewAsync(id, cancellationToken)))
-            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+            .RequireAuthorization(policy => policy.RequireRole(stockTakeReviewers));
 
         _ = app.MapPost("/stock-takes/{id:guid}/apply", async (
             Guid id,

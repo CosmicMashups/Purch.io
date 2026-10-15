@@ -15,13 +15,30 @@ public sealed class EfStockTakeRepository(PurchDbContext dbContext) : IStockTake
             .FirstOrDefaultAsync(take => take.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<StockTake>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    public Task<StockTake?> GetUntrackedAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.StockTakes
+            .AsNoTracking()
+            .Include(take => take.Lines)
+            .FirstOrDefaultAsync(take => take.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<StockTakeSummaryDto>> ListSummariesAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await dbContext.StockTakes
             .AsNoTracking()
-            .Include(take => take.Lines)
             .Where(take => take.TenantId == tenantId)
             .OrderByDescending(take => take.CreatedAt)
+            .Select(take => new StockTakeSummaryDto(
+                take.Id,
+                take.Name,
+                take.Status,
+                take.Blind,
+                take.ScopeKind,
+                take.CreatedAt,
+                take.AppliedAt,
+                take.Lines.Count,
+                take.Lines.Count(line => line.State == StockTakeLineState.Counted)))
             .ToListAsync(cancellationToken);
     }
 
@@ -35,6 +52,27 @@ public sealed class EfStockTakeRepository(PurchDbContext dbContext) : IStockTake
                 select new { line.ItemId, line.InventoryItemId })
             .ToListAsync(cancellationToken);
         return rows.Select(row => (row.ItemId, row.InventoryItemId)).ToList();
+    }
+
+    public async Task<IReadOnlyList<InventoryMovement>> ListMovementsSinceAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> itemIds,
+        IReadOnlyCollection<Guid> inventoryItemIds,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        if (itemIds.Count + inventoryItemIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.InventoryMovements
+            .AsNoTracking()
+            .Where(movement => movement.TenantId == tenantId
+                && movement.CreatedAt > since
+                && ((movement.ItemId != null && itemIds.Contains(movement.ItemId.Value))
+                    || (movement.InventoryItemId != null && inventoryItemIds.Contains(movement.InventoryItemId.Value))))
+            .ToListAsync(cancellationToken);
     }
 
     public void Add(StockTake stockTake)
