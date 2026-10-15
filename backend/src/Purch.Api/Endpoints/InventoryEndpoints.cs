@@ -122,6 +122,80 @@ public static class InventoryEndpoints
             Results.Ok(await purchaseOrderService.CancelAsync(purchaseOrderId, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
+        // --- Restock: purchase requests, converted into purchase orders ---
+        var approvers = new[] { nameof(Role.Admin), nameof(Role.Manager) };
+
+        _ = app.MapGet("/inventory/restock-suggestions", async (
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetRestockSuggestionsAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/purchase-requests", async (
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListAsync(cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-requests", async (
+            CreatePurchaseRequestRequest request,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CreateAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-requests/{id:guid}/approve", async (
+            Guid id,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ApproveAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(approvers));
+
+        _ = app.MapPost("/purchase-requests/{id:guid}/cancel", async (
+            Guid id,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CancelAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPost("/purchase-requests/{id:guid}/convert", async (
+            Guid id,
+            ConvertPurchaseRequestRequest request,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ConvertAsync(id, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/items/{itemId:guid}/suppliers", async (
+            Guid itemId,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetSuppliersAsync(itemId, null, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPut("/items/{itemId:guid}/suppliers", async (
+            Guid itemId,
+            SetItemSuppliersRequest request,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.SetSuppliersAsync(itemId, null, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/inventory-items/{inventoryItemId:guid}/suppliers", async (
+            Guid inventoryItemId,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetSuppliersAsync(null, inventoryItemId, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPut("/inventory-items/{inventoryItemId:guid}/suppliers", async (
+            Guid inventoryItemId,
+            SetItemSuppliersRequest request,
+            IPurchaseRequestService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.SetSuppliersAsync(null, inventoryItemId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
         // --- Incoming Receiving Reports (IRR) ---
         _ = app.MapGet("/incoming-receiving", async (
             IIncomingReceivingService incomingReceivingService,

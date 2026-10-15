@@ -16,6 +16,7 @@ public sealed class IncomingReceivingService(
     IInventoryMovementRepository movementRepository,
     ISupplierRepository supplierRepository,
     IItemRepository itemRepository,
+    IInventoryItemRepository inventoryItemRepository,
     IItemStockService itemStockService,
     ITenantRepository tenantRepository,
     IBranchRepository branchRepository,
@@ -57,6 +58,7 @@ public sealed class IncomingReceivingService(
             ?? throw new NotFoundException("Branch", request.BranchId);
 
         var items = new Dictionary<Guid, Item>();
+        var ingredients = new Dictionary<Guid, InventoryItem>();
         foreach (var line in request.Lines)
         {
             if (line.QuantityReceived <= 0)
@@ -69,7 +71,15 @@ public sealed class IncomingReceivingService(
                 throw new ValidationException(nameof(line.UnitPrice), "Unit price cannot be negative.");
             }
 
-            if (!items.ContainsKey(line.ItemId))
+            if (line.InventoryItemId is { } ingredientId)
+            {
+                if (!ingredients.ContainsKey(ingredientId))
+                {
+                    ingredients[ingredientId] = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken)
+                        ?? throw new NotFoundException("Ingredient", ingredientId);
+                }
+            }
+            else if (!items.ContainsKey(line.ItemId))
             {
                 items[line.ItemId] = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken)
                     ?? throw new NotFoundException("Item", line.ItemId);
@@ -102,7 +112,8 @@ public sealed class IncomingReceivingService(
             {
                 TenantId = CurrentTenantId,
                 ReportId = report.Id,
-                ItemId = lineRequest.ItemId,
+                ItemId = lineRequest.InventoryItemId is null ? lineRequest.ItemId : Guid.Empty,
+                InventoryItemId = lineRequest.InventoryItemId,
                 QuantityReceived = lineRequest.QuantityReceived,
                 Uom = string.IsNullOrWhiteSpace(lineRequest.Uom) ? "pc" : lineRequest.Uom.Trim(),
                 UnitPrice = lineRequest.UnitPrice,
@@ -114,6 +125,28 @@ public sealed class IncomingReceivingService(
 
             if (line.Remark != ReceivingRemark.Accepted)
             {
+                continue;
+            }
+
+            if (line.InventoryItemId is { } receivedIngredientId)
+            {
+                var ingredient = ingredients[receivedIngredientId];
+                if (updateCostOnReceiving && line.UnitPrice > 0)
+                {
+                    ingredient.UnitCost = line.UnitPrice;
+                }
+
+                ingredient.QuantityOnHand += line.QuantityReceived;
+                movementRepository.Add(new InventoryMovement
+                {
+                    TenantId = CurrentTenantId,
+                    InventoryItemId = receivedIngredientId,
+                    BranchId = request.BranchId,
+                    Type = MovementType.StockIn,
+                    Quantity = line.QuantityReceived,
+                    StaffUserId = CurrentUserId,
+                    Note = $"Received on incoming receiving report {report.Id}",
+                });
                 continue;
             }
 
@@ -199,11 +232,13 @@ public sealed class IncomingReceivingService(
     {
         var orderLines = await purchaseOrderRepository.ListLinesAsync(purchaseOrder.Id, cancellationToken);
 
-        foreach (var group in reportLines.Where(line => line.Remark == ReceivingRemark.Accepted).GroupBy(line => line.ItemId))
+        foreach (var group in reportLines.Where(line => line.Remark == ReceivingRemark.Accepted).GroupBy(line => (line.ItemId, line.InventoryItemId)))
         {
             var total = group.Sum(line => line.QuantityReceived);
             var remainingToAllocate = total;
-            var matching = orderLines.Where(line => line.ItemId == group.Key).ToList();
+            var matching = orderLines.Where(line => group.Key.InventoryItemId is { } ingredientKey
+                ? line.InventoryItemId == ingredientKey
+                : line.ItemId == group.Key.ItemId && line.InventoryItemId is null).ToList();
             if (matching.Count == 0)
             {
                 throw new ValidationException("Lines", "A received item is not on the purchase order.");
@@ -246,16 +281,19 @@ public sealed class IncomingReceivingService(
         var lineDtos = new List<IncomingReceivingLineDto>();
         foreach (var line in lines)
         {
-            var item = await itemRepository.GetByIdAsync(line.ItemId, cancellationToken);
+            var itemName = line.InventoryItemId is { } ingredientId
+                ? (await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken))?.Name
+                : (await itemRepository.GetByIdAsync(line.ItemId, cancellationToken))?.Name;
             lineDtos.Add(new IncomingReceivingLineDto(
                 line.Id,
                 line.ItemId,
-                item?.Name ?? "(deleted item)",
+                itemName ?? "(deleted item)",
                 line.QuantityReceived,
                 line.Uom,
                 line.UnitPrice,
                 line.Condition,
-                line.Remark));
+                line.Remark,
+                line.InventoryItemId));
         }
 
         return new IncomingReceivingDto(

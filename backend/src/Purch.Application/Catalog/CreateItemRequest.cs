@@ -17,4 +17,5 @@ public sealed record CreateItemRequest(
     PricingType PricingType,
     Guid? DepartmentId = null,
     int SortOrder = 0,
-    decimal? CostPrice = null);
+    decimal? CostPrice = null,
+    string? Unit = null);

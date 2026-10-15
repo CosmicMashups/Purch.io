@@ -24,6 +24,10 @@ public class Supplier : TenantScopedEntity, ISoftDeletable
 
     public string? Remarks { get; set; }
 
+    public string? PaymentAccountName { get; set; }
+
+    public string? PaymentAccountNumber { get; set; }
+
     /// <summary>The people to reach at this supplier. Stored as one JSON column.</summary>
     public List<SupplierContact> Contacts { get; set; } = [];
 

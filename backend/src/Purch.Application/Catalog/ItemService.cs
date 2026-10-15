@@ -122,6 +122,7 @@ public sealed class ItemService(
             DepartmentId = request.DepartmentId,
             SortOrder = request.SortOrder,
             CostPrice = request.CostPrice,
+            Unit = string.IsNullOrWhiteSpace(request.Unit) ? null : request.Unit.Trim(),
             IsActive = true,
         };
 
@@ -210,6 +211,11 @@ public sealed class ItemService(
         item.IsActive = request.IsActive;
         item.DepartmentId = request.DepartmentId;
         item.SortOrder = request.SortOrder ?? item.SortOrder;
+        if (request.Unit is not null)
+        {
+            item.Unit = string.IsNullOrWhiteSpace(request.Unit) ? null : request.Unit.Trim();
+        }
+
         if (request.ClearCostPrice)
         {
             item.CostPrice = null;
@@ -596,6 +602,7 @@ public sealed class ItemService(
         item.SortOrder,
         hasOwnStock,
         linked?.QuantityOnHand ?? item.StockOnHand,
-        includeCost ? item.CostPrice : null);
+        includeCost ? item.CostPrice : null,
+        item.Unit);
     }
 }

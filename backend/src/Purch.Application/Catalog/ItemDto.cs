@@ -24,4 +24,5 @@ public sealed record ItemDto(
     int SortOrder = 0,
     bool HasOwnStock = true,
     decimal CountOnHand = 0,
-    decimal? CostPrice = null);
+    decimal? CostPrice = null,
+    string? Unit = null);

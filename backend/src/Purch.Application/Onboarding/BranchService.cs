@@ -23,17 +23,71 @@ public sealed class BranchService(
             throw new ValidationException(nameof(request.Name), "Branch name is required.");
         }
 
+        var existing = await branchRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+        var code = string.IsNullOrWhiteSpace(request.Code)
+            ? DefaultCode(request.Name, existing)
+            : NormalizeCode(request.Code, existing, null);
+
         var branch = new Branch
         {
             TenantId = CurrentTenantId,
             Name = request.Name.Trim(),
             Address = request.Address?.Trim(),
+            Code = code,
         };
 
         branchRepository.Add(branch);
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return ToDto(branch);
+    }
+
+    public async Task<BranchDto> UpdateDetailsAsync(Guid branchId, UpdateBranchDetailsRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new ValidationException(nameof(request.Name), "Branch name is required.");
+        }
+
+        var branch = await branchRepository.GetByIdAsync(branchId, cancellationToken)
+            ?? throw new NotFoundException("Branch", branchId);
+        var all = await branchRepository.ListByTenantAsync(CurrentTenantId, cancellationToken);
+
+        branch.Name = request.Name.Trim();
+        branch.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+        branch.Code = NormalizeCode(request.Code, all, branch.Id);
+
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return ToDto(branch);
+    }
+
+    /// <summary>First letters of the name, numbered when another branch already uses it.</summary>
+    internal static string DefaultCode(string name, IReadOnlyList<Branch> existing)
+    {
+        var letters = new string(name.Where(char.IsLetterOrDigit).Take(4).ToArray()).ToUpperInvariant();
+        var baseCode = letters.Length == 0 ? "BR" : letters;
+        var code = baseCode;
+        for (var n = 2; existing.Any(b => string.Equals(b.Code, code, StringComparison.OrdinalIgnoreCase)); n++)
+        {
+            code = baseCode + n;
+        }
+        return code;
+    }
+
+    private static string NormalizeCode(string value, IReadOnlyList<Branch> existing, Guid? selfId)
+    {
+        var code = value.Trim().ToUpperInvariant();
+        if (code.Length is < 2 or > 12 || !code.All(char.IsAsciiLetterOrDigit))
+        {
+            throw new ValidationException("Code", "Branch code must be 2 to 12 letters or numbers.");
+        }
+
+        if (existing.Any(b => b.Id != selfId && string.Equals(b.Code, code, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ValidationException("Code", "Another branch already uses this code.");
+        }
+
+        return code;
     }
 
     public async Task<BranchDto> UpdateHardwareSettingsAsync(
@@ -107,6 +161,7 @@ public sealed class BranchService(
         branch.ManualGcashQrImageUrl,
         branch.ManualGcashAccountName,
         branch.ManualGcashAccountNumber,
-        branch.IsActive);
+        branch.IsActive,
+        branch.Code);
     }
 }

@@ -9,6 +9,9 @@ public class IncomingReceivingReportLine : TenantScopedEntity
 
     public Guid ItemId { get; set; }
 
+    /// <summary>Set when the line is a separately tracked ingredient (ItemId is then empty).</summary>
+    public Guid? InventoryItemId { get; set; }
+
     public decimal QuantityReceived { get; set; }
 
     public string Uom { get; set; } = "pc";

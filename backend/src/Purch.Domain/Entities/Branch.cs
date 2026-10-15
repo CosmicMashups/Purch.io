@@ -17,6 +17,9 @@ public class Branch : TenantScopedEntity, ISoftDeletable
 
     public string? Address { get; set; }
 
+    /// <summary>Short code used in document control numbers, e.g. MAIN. Unique per business.</summary>
+    public string Code { get; set; } = string.Empty;
+
     public ReceiptPrinterProfile ReceiptPrinterProfile { get; set; } = ReceiptPrinterProfile.None;
 
     public bool CashDrawerEnabled { get; set; }

@@ -77,6 +77,13 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
 
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+
+    public DbSet<PurchaseRequestLine> PurchaseRequestLines => Set<PurchaseRequestLine>();
+
+    public DbSet<ItemSupplier> ItemSuppliers => Set<ItemSupplier>();
+
+    public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
 
     public DbSet<IncomingReceivingReport> IncomingReceivingReports => Set<IncomingReceivingReport>();
 
@@ -222,6 +229,17 @@ public class PurchDbContext(DbContextOptions<PurchDbContext> options, ICurrentTe
         _ = modelBuilder.Entity<Shift>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<PurchaseOrder>().Property<uint>("Version").IsRowVersion();
         _ = modelBuilder.Entity<PurchaseOrderLine>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<PurchaseRequest>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<DocumentSequence>().Property<uint>("Version").IsRowVersion();
+        _ = modelBuilder.Entity<DocumentSequence>().HasIndex(s => new { s.TenantId, s.BranchId, s.Kind }).IsUnique();
+        _ = modelBuilder.Entity<PurchaseRequest>().HasIndex(r => new { r.TenantId, r.ControlNumber }).IsUnique();
+        _ = modelBuilder.Entity<PurchaseRequest>().Property(r => r.ControlNumber).HasMaxLength(40);
+        _ = modelBuilder.Entity<PurchaseOrder>().Property(o => o.ControlNumber).HasMaxLength(40);
+        _ = modelBuilder.Entity<PurchaseRequestLine>().HasIndex(l => l.PurchaseRequestId);
+        _ = modelBuilder.Entity<ItemSupplier>().HasIndex(l => new { l.TenantId, l.ItemId });
+        _ = modelBuilder.Entity<ItemSupplier>().HasIndex(l => new { l.TenantId, l.InventoryItemId });
+        _ = modelBuilder.Entity<Branch>().Property(b => b.Code).HasMaxLength(12);
+        _ = modelBuilder.Entity<Tenant>().Property(t => t.Country).HasMaxLength(2);
 
         // Single enforcement point for shared-database multi-tenant isolation (NFR14):
         // every ITenantScoped entity gets this filter applied, so no repository/query

@@ -31,7 +31,7 @@ public sealed class BootstrapTenantService(
         };
         tenantRepository.Add(tenant);
 
-        var branch = new Branch { TenantId = tenant.Id, Name = request.BranchName.Trim() };
+        var branch = new Branch { TenantId = tenant.Id, Name = request.BranchName.Trim(), Code = BranchService.DefaultCode(request.BranchName, []) };
         branchRepository.Add(branch);
 
         // The owner is an account (email and password, checked by the identity provider) with an Admin membership here. If

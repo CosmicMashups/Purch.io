@@ -12,4 +12,5 @@ public sealed record BranchDto(
     string? ManualGcashQrImageUrl,
     string? ManualGcashAccountName,
     string? ManualGcashAccountNumber,
-    bool IsActive = true);
+    bool IsActive = true,
+    string Code = "");

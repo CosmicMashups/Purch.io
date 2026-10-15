@@ -10,7 +10,8 @@ public sealed record IncomingReceivingLineDto(
     string Uom,
     decimal UnitPrice,
     ReceivingCondition Condition,
-    ReceivingRemark Remark);
+    ReceivingRemark Remark,
+    Guid? InventoryItemId = null);
 
 public sealed record IncomingReceivingDto(
     Guid Id,
@@ -40,6 +41,7 @@ public sealed record CreateIncomingReceivingLineRequest(
     string? Uom,
     decimal UnitPrice,
     ReceivingCondition Condition,
-    ReceivingRemark Remark);
+    ReceivingRemark Remark,
+    Guid? InventoryItemId = null);
 
 public sealed record LinkIncomingReceivingRequest(Guid PurchaseOrderId);

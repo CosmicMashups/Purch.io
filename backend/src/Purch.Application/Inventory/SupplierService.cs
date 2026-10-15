@@ -33,6 +33,8 @@ public sealed class SupplierService(
             Address = Clean(request.Address),
             Tin = Clean(request.Tin),
             Remarks = Clean(request.Remarks),
+            PaymentAccountName = Clean(request.PaymentAccountName),
+            PaymentAccountNumber = Clean(request.PaymentAccountNumber),
             Contacts = CleanContacts(request.Contacts),
             IsActive = true,
         };
@@ -58,6 +60,8 @@ public sealed class SupplierService(
         supplier.Address = Clean(request.Address);
         supplier.Tin = Clean(request.Tin);
         supplier.Remarks = Clean(request.Remarks);
+        supplier.PaymentAccountName = Clean(request.PaymentAccountName);
+        supplier.PaymentAccountNumber = Clean(request.PaymentAccountNumber);
         supplier.Contacts = CleanContacts(request.Contacts);
         supplier.IsActive = request.IsActive;
         // The old free-text line is replaced by the structured contacts.
@@ -121,6 +125,6 @@ public sealed class SupplierService(
             : string.Join(" · ", supplier.Contacts.Select(contact =>
                 string.Join(" ", new[] { contact.ContactPerson }.Concat(contact.Numbers.Take(1)).Concat(contact.Emails.Take(1)).Where(part => part.Length > 0))));
 
-        return new(supplier.Id, supplier.Name, summary, supplier.IsActive, supplier.Specialization, supplier.Address, supplier.Tin, supplier.Remarks, contacts);
+        return new(supplier.Id, supplier.Name, summary, supplier.IsActive, supplier.Specialization, supplier.Address, supplier.Tin, supplier.Remarks, contacts, supplier.PaymentAccountName, supplier.PaymentAccountNumber);
     }
 }

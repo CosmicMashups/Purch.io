@@ -34,6 +34,14 @@ public static class OnboardingEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await branchService.CreateAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
+        _ = app.MapPut("/branches/{branchId:guid}/details", async (
+            Guid branchId,
+            UpdateBranchDetailsRequest request,
+            IBranchService branchService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await branchService.UpdateDetailsAsync(branchId, request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(admin));
+
         _ = app.MapPut("/branches/{branchId:guid}/hardware-settings", async (
             Guid branchId,
             UpdateBranchHardwareSettingsRequest request,
@@ -289,6 +297,12 @@ public static class OnboardingEndpoints
             ITenantSettingsService settingsService,
             CancellationToken cancellationToken) =>
             Results.Ok(await settingsService.UpdateInventoryTrackingSettingAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
+
+        _ = app.MapPut("/tenant/settings/country", async (
+            UpdateCountryRequest request,
+            ITenantSettingsService settingsService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await settingsService.UpdateCountryAsync(request, cancellationToken))).RequireAuthorization(policy => policy.RequireRole(admin));
 
         // --- Department tracking toggle: off hides every department screen, field and report ---
         _ = app.MapPut("/tenant/settings/department-tracking", async (

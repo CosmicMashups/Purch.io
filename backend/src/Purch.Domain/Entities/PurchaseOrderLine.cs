@@ -16,4 +16,6 @@ public class PurchaseOrderLine : TenantScopedEntity
     public decimal QuantityReceived { get; set; }
 
     public decimal ExpectedUnitCost { get; set; }
+
+    public string Unit { get; set; } = "pc";
 }

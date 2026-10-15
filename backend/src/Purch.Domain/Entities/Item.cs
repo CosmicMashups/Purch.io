@@ -24,6 +24,9 @@ public class Item : TenantScopedEntity, ISoftDeletable
     /// <summary>What one unit costs the shop; null when unknown.</summary>
     public decimal? CostPrice { get; set; }
 
+    /// <summary>Unit of measure shown on purchase documents, e.g. pc, kg, box. Null means pc.</summary>
+    public string? Unit { get; set; }
+
     public string? ImageUrl { get; set; }
 
     public PricingType PricingType { get; set; }

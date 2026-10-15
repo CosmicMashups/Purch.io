@@ -41,6 +41,9 @@ public class Tenant : Entity
 
     public string? RegisteredAddress { get; set; }
 
+    /// <summary>ISO 3166 alpha-2 code. Maps to a currency and VAT rate (see CountryProfiles).</summary>
+    public string Country { get; set; } = "PH";
+
     // --- Utang ledger retention (NFR10) ---
     public int? CreditLedgerRetentionDays { get; set; }
 

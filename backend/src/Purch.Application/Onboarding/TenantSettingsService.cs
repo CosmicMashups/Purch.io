@@ -54,6 +54,20 @@ public sealed partial class TenantSettingsService(
         return ToDto(tenant);
     }
 
+    public async Task<TenantSettingsDto> UpdateCountryAsync(UpdateCountryRequest request, CancellationToken cancellationToken = default)
+    {
+        var country = request.Country?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (!Domain.CountryProfiles.All.ContainsKey(country))
+        {
+            throw new ValidationException(nameof(request.Country), "That country is not supported yet.");
+        }
+
+        var tenant = await GetCurrentTenantAsync(cancellationToken);
+        tenant.Country = country;
+        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return ToDto(tenant);
+    }
+
     public async Task<TenantSettingsDto> UpdateBarcodeSettingAsync(UpdateBarcodeSettingRequest request, CancellationToken cancellationToken = default)
     {
         if (request.ParkedCartTtlHours is < 1 or > 168)
@@ -142,7 +156,8 @@ public sealed partial class TenantSettingsService(
         tenant.UseDepartmentTracking,
         tenant.UpdateCostOnReceiving,
         tenant.OpenItemEnabled,
-        tenant.ParkedCartTtlHours);
+        tenant.ParkedCartTtlHours,
+        tenant.Country);
     }
 
     private static void ValidateHex(string? value, string field, string label)

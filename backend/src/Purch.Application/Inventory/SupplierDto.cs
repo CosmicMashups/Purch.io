@@ -16,7 +16,9 @@ public sealed record SupplierDto(
     string? Address,
     string? Tin,
     string? Remarks,
-    IReadOnlyList<SupplierContactDto> Contacts);
+    IReadOnlyList<SupplierContactDto> Contacts,
+    string? PaymentAccountName = null,
+    string? PaymentAccountNumber = null);
 
 public sealed record CreateSupplierRequest(
     string Name,
@@ -25,7 +27,9 @@ public sealed record CreateSupplierRequest(
     string? Address = null,
     string? Tin = null,
     string? Remarks = null,
-    IReadOnlyList<SupplierContactDto>? Contacts = null);
+    IReadOnlyList<SupplierContactDto>? Contacts = null,
+    string? PaymentAccountName = null,
+    string? PaymentAccountNumber = null);
 
 public sealed record UpdateSupplierRequest(
     string Name,
@@ -34,4 +38,6 @@ public sealed record UpdateSupplierRequest(
     string? Tin,
     string? Remarks,
     IReadOnlyList<SupplierContactDto> Contacts,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? PaymentAccountName = null,
+    string? PaymentAccountNumber = null);

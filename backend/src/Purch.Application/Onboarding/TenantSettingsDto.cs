@@ -23,4 +23,5 @@ public sealed record TenantSettingsDto(
     bool UseDepartmentTracking = false,
     bool UpdateCostOnReceiving = false,
     bool OpenItemEnabled = true,
-    int ParkedCartTtlHours = 24);
+    int ParkedCartTtlHours = 24,
+    string Country = "PH");

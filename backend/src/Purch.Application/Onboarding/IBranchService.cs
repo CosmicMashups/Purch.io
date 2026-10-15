@@ -6,6 +6,8 @@ public interface IBranchService
 
     Task<BranchDto> CreateAsync(CreateBranchRequest request, CancellationToken cancellationToken = default);
 
+    Task<BranchDto> UpdateDetailsAsync(Guid branchId, UpdateBranchDetailsRequest request, CancellationToken cancellationToken = default);
+
     Task<BranchDto> UpdateHardwareSettingsAsync(
         Guid branchId,
         UpdateBranchHardwareSettingsRequest request,
