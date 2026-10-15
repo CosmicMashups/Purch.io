@@ -298,6 +298,31 @@ public sealed class StockTakeEndpointTests(PostgresContainerFixture postgres)
     }
 
     [Fact]
+    public async Task A_first_count_on_an_uncounted_line_loaded_before_apply_cannot_be_saved_after_it()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var shop = TestSessions.ShopOf(admin);
+        var (tenantId, userId) = (shop.Tenant.TenantId, shop.Tenant.AdminMembershipId);
+        var (take, rice, salt) = await TwoLineTakeAsync(admin, toReview: false);
+        var saltLine = take.Lines.Single(l => l.ItemId == salt.Id).Id;
+        _ = await ReadAsync<StockTakeDto>(await admin.PutAsJsonAsync($"/stock-takes/{take.Id}/lines/{take.Lines.Single(l => l.ItemId == rice.Id).Id}", new CountStockTakeLineRequest(7m)));
+        _ = await ReadAsync<StockTakeDto>(await admin.PostAsync($"/stock-takes/{take.Id}/review", null));
+
+        await using var stale = NewContext(tenantId);
+        await using var applier = NewContext(tenantId);
+        _ = await new EfStockTakeRepository(stale).GetAsync(take.Id); // salt still Uncounted, take still in Review
+
+        _ = await ServiceOver(applier, tenantId, userId).ApplyAsync(take.Id, "pin");
+        _ = await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => ServiceOver(stale, tenantId, userId).CountLineAsync(take.Id, saltLine, 4m, false));
+
+        var final = await ReadAsync<StockTakeDto>(await admin.GetAsync($"/stock-takes/{take.Id}"));
+        Assert.Equal(StockTakeStatus.Applied, final.Status);
+        Assert.Equal(StockTakeLineState.Uncounted, final.Lines.Single(l => l.Id == saltLine).State);
+        Assert.Equal(10m, await StockOfAsync(salt.Id));
+    }
+
+    [Fact]
     public async Task Two_counters_on_different_lines_of_one_take_never_conflict()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

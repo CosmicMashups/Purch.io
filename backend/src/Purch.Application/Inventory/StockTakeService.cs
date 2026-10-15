@@ -134,6 +134,8 @@ public sealed class StockTakeService(
         // apply writes every counted line.
         line.UpdatedAt = DateTimeOffset.UtcNow;
         _ = await unitOfWork.SaveChangesAsync(cancellationToken);
+        // Only the edited line carries MovementsSinceCount/NeedsRecount in this response (the others are left null/false
+        // to avoid re-scanning the whole take): clients must merge the returned line, not replace the whole take.
         return await ToDtoAsync(take, cancellationToken, onlyLineId: line.Id);
     }
 
@@ -188,9 +190,10 @@ public sealed class StockTakeService(
             var negative = new List<object>();
             var now = DateTimeOffset.UtcNow;
 
-            // Every counted line is written (even a zero-variance one), so its row version moves and a count that was
-            // loaded before this apply cannot be saved over the applied figures.
-            foreach (var line in take.Lines.Where(l => l.State == StockTakeLineState.Counted))
+            // Every line is written (Counted, Skipped and Uncounted alike), so each line's row version moves and any
+            // count, skip or unskip that was loaded before this apply fails with a 409 instead of changing a line of an
+            // Applied take.
+            foreach (var line in take.Lines)
             {
                 line.UpdatedAt = now;
             }
