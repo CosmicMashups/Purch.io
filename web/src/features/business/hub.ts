@@ -19,8 +19,6 @@ export const TILE_GROUPS: readonly TileGroup[] = [
   {
     title: 'Sell and stock',
     tiles: [
-      { id: 'catalog-items', label: 'Items', hint: 'Prices, variants, combos', to: '/catalog/items' },
-      { id: 'catalog-categories', label: 'Categories', hint: 'Group items for the till', to: '/catalog/categories' },
       { id: 'catalog-modifiers', label: 'Modifier groups', hint: 'Add-ons and options', to: '/catalog/modifier-groups' },
       { id: 'promotions', label: 'Promotions', hint: 'Buy 1 Take 1, combos, discounts, codes', to: '/business/promotions' },
     ],
@@ -58,8 +56,6 @@ export interface HubStat {
 }
 
 export interface HubData {
-  itemCount?: number;
-  categoryCount?: number;
   modifierGroupCount?: number;
   staff?: StaffMember[];
   branchCount?: number;
@@ -73,8 +69,6 @@ const n = (count: number, one: string, many: string) => `${count} ${count === 1 
 /** The live figure shown beside each link. A figure that has not loaded (or that a role cannot see) is simply left out. */
 export function hubStats(data: HubData): Record<string, HubStat | undefined> {
   const stats: Record<string, HubStat | undefined> = {};
-  if (data.itemCount !== undefined) stats['catalog-items'] = { text: n(data.itemCount, 'item', 'items') };
-  if (data.categoryCount !== undefined) stats['catalog-categories'] = { text: n(data.categoryCount, 'category', 'categories') };
   if (data.modifierGroupCount !== undefined) stats['catalog-modifiers'] = { text: n(data.modifierGroupCount, 'group', 'groups') };
   if (data.staff) {
     const active = data.staff.filter((s) => s.isActive).length;

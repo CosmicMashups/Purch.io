@@ -1,7 +1,7 @@
 import { HubGroups } from '../../components/HubGroups';
 import { isBusinessTileVisible } from '../../permissions/navPolicy';
 import { useSession } from '../auth/useSession';
-import { useCategories, useItems, useModifierGroups } from '../catalog/queries';
+import { useModifierGroups } from '../catalog/queries';
 import { useBranches } from '../branches/queries';
 import { useCreditLedgers } from '../credit/queries';
 import { useFlaggedSync } from '../dashboard/queries';
@@ -18,8 +18,6 @@ export function BusinessPage() {
   const isAdmin = role === 'Admin';
   const canManage = role === 'Admin' || role === 'Manager';
 
-  const items = useItems();
-  const categories = useCategories();
   const modifierGroups = useModifierGroups();
   const staff = useStaff();
   const branches = useBranches();
@@ -29,8 +27,6 @@ export function BusinessPage() {
   const flagged = useFlaggedSync(canManage);
 
   const stats = hubStats({
-    itemCount: items.data?.length,
-    categoryCount: categories.data?.length,
     modifierGroupCount: modifierGroups.data?.length,
     staff: staff.data,
     branchCount: branches.data?.length,

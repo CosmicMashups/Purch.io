@@ -16,7 +16,7 @@ describe('BusinessPage tiles', () => {
     renderPage(<BusinessPage />);
     await screen.findByRole('link', { name: /Customers/ });
     const text = tileNames().join(' | ');
-    for (const label of ['Items', 'Reports', 'Customers', 'Staff', 'Branches', 'Devices', 'Business settings', 'Audit log', 'Promotions']) {
+    for (const label of ['Modifier groups', 'Reports', 'Customers', 'Staff', 'Branches', 'Devices', 'Business settings', 'Audit log', 'Promotions']) {
       expect(text).toContain(label);
     }
   });

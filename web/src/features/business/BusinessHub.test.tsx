@@ -60,8 +60,6 @@ describe('Business page for an admin', () => {
   it('shows a live figure beside each link, in words', async () => {
     signInAs('Admin');
     renderPage(<BusinessPage />);
-    expect(await link(/^Items.*2 items/)).toHaveAttribute('href', '/catalog/items');
-    expect(await link(/^Categories.*1 category/)).toBeInTheDocument();
     expect(await link(/^Modifier groups.*0 groups/)).toBeInTheDocument();
     expect(await link(/^Staff.*2 active, 1 off/)).toBeInTheDocument();
     expect(await link(/^Branches.*2 branches/)).toBeInTheDocument();

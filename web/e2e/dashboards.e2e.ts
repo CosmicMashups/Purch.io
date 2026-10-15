@@ -64,7 +64,9 @@ test.describe('the Business page', () => {
   test('shows live figures beside the links', async ({ page, signInAs }) => {
     await signInAs('admin');
     await page.goto('/business');
-    await expect(page.getByRole('link', { name: /^Items\D*\d+ items/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Modifier groups\D*\d+ groups?/ })).toBeVisible();
+    // Items and Categories live under Inventory, not here.
+    await expect(page.getByRole('link', { name: /^Items/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /^Staff\D*\d+ active/ })).toBeVisible();
   });
 

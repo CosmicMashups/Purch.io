@@ -8,7 +8,7 @@ describe('TILE_GROUPS', () => {
   it('lists every tile once, so no link is lost or doubled', () => {
     const ids = TILE_GROUPS.flatMap((g) => g.tiles.map((t) => t.id));
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toHaveLength(13);
+    expect(ids).toHaveLength(11);
   });
 });
 
@@ -18,9 +18,7 @@ describe('hubStats', () => {
   });
 
   it('counts with the right words', () => {
-    const s = hubStats({ itemCount: 1, categoryCount: 6, modifierGroupCount: 0, branchCount: 1, deviceCount: 5 });
-    expect(s['catalog-items']?.text).toBe('1 item');
-    expect(s['catalog-categories']?.text).toBe('6 categories');
+    const s = hubStats({ modifierGroupCount: 0, branchCount: 1, deviceCount: 5 });
     expect(s['catalog-modifiers']?.text).toBe('0 groups');
     expect(s.branches?.text).toBe('1 branch');
     expect(s.devices?.text).toBe('5 paired');
