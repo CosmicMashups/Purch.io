@@ -63,6 +63,15 @@ public sealed class InventoryCogsServiceTests
     }
 
     [Fact]
+    public async Task Open_item_with_a_cost_is_still_excluded()
+    {
+        var result = await RunAsync([Line(null, 1, 50m, 9m, open: true), Line(Guid.NewGuid(), 1, 50m, 10m)]);
+
+        Assert.Equal(10m, result.Cogs);
+        Assert.Equal(1, result.ExcludedLineCount);
+    }
+
+    [Fact]
     public async Task Groups_by_category_and_day()
     {
         var cat = new Category { Id = Guid.NewGuid(), TenantId = Tenant, Name = "Drinks" };

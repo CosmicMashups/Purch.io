@@ -2,7 +2,7 @@ namespace Purch.Application.Reporting;
 
 /// <summary>Cost of goods sold from the sale-time cost snapshot on each line. Lines whose cost is unknown
 /// (null, never zero) and open items are left out of Cogs and counted in ExcludedLineCount. Quantities are net of
-/// refunds and exchange returns. Recipe/ingredient consumption is not added: only the finished item's own snapshot.</summary>
+/// refunds and exchange returns; a refund or return nets against the original sale date, not the refund date. Recipe/ingredient consumption is not added: only the finished item's own snapshot.</summary>
 public sealed record CogsGroupDto(
     Guid? Id,
     string Name,
