@@ -1,3 +1,4 @@
+import { Warning } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { AsyncPanel } from '../../dashboard/components/AsyncPanel';
 import { formatPeso } from '../../dashboard/format';
@@ -42,20 +43,25 @@ export function CogsPanel({ params }: { params: RangeParams }) {
               <Stat label="Revenue with a known cost" value={formatPeso(x.knownCostRevenue)} />
               <Stat label="Cost coverage" value={`${x.coveragePercent.toFixed(1)}%`} />
             </div>
-            <p className="rounded-panel border border-line bg-surface p-4 text-base text-ink-soft">
+            <p role="status" className="flex items-start gap-2 rounded-panel border border-warn bg-warn/5 p-4 text-base text-ink">
+              <Warning size={24} weight="fill" className="shrink-0 text-warn" aria-hidden="true" />
+              <span>
               {x.excludedLineCount} {x.excludedLineCount === 1 ? 'line has' : 'lines have'} no recorded cost and{' '}
               {x.excludedLineCount === 1 ? 'is' : 'are'} left out. Recipe use is not included in COGS, only each finished item's own cost. Quantities are net
-              of refunds, and refunds net against the original sale date.
+              of refunds, and refunds net against the original sale date. Stock and COGS cover the whole business, not one branch.
+              </span>
             </p>
             <ReportTable<CogsGroup>
               caption="COGS"
               rows={x.groups}
-              rowKey={(g) => g.id ?? g.name}
+              rowKey={(g) => `${g.id ?? 'none'}-${g.name}`}
               columns={[
                 { header: 'Name', cell: (g) => g.name },
                 { header: 'Qty', numeric: true, cell: (g) => g.quantity },
                 { header: 'COGS', numeric: true, cell: (g) => formatPeso(g.cogs) },
+                { header: 'Known-cost revenue', numeric: true, cell: (g) => formatPeso(g.knownCostRevenue) },
                 { header: 'Coverage', numeric: true, cell: (g) => `${g.coveragePercent.toFixed(1)}%` },
+                { header: 'Excluded lines', numeric: true, cell: (g) => g.excludedLineCount },
               ]}
             />
           </div>

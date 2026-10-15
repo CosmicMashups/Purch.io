@@ -1,3 +1,4 @@
+import { Warning } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { AsyncPanel } from '../../dashboard/components/AsyncPanel';
 import { formatPeso } from '../../dashboard/format';
@@ -40,17 +41,24 @@ export function ValuationPanel() {
       >
         {(x) => (
           <div className="flex flex-col gap-4">
+            {x.unknownCostCount > 0 && (
+              <p role="status" className="flex items-start gap-2 rounded-panel border border-warn bg-warn/5 p-4 text-base text-ink">
+                <Warning size={24} weight="fill" className="shrink-0 text-warn" aria-hidden="true" />
+                <span>Unknown cost excluded from the total: {plural(x.unknownCostCount, 'item has', 'items have')} no cost recorded.</span>
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <Stat label="Total stock value" value={formatPeso(x.totalValue)} note={`${plural(x.valuedCount, 'item', 'items')} valued`} />
               <Stat
-                label="Unknown cost excluded from the total"
+                label="Items without a cost"
                 value={String(x.unknownCostCount)}
-                note={`${plural(x.unknownCostCount, 'item has no cost', 'items have no cost')} recorded`}
+                note="left out of the value"
               />
             </div>
             {x.negativeStockCount > 0 && (
-              <p className="rounded-panel border border-line bg-surface p-4 text-base text-ink-soft">
-                {plural(x.negativeStockCount, 'item has negative stock', 'items have negative stock')}, valued at 0 and flagged below.
+              <p role="status" className="flex items-start gap-2 rounded-panel border border-warn bg-warn/5 p-4 text-base text-ink">
+                <Warning size={24} weight="fill" className="shrink-0 text-warn" aria-hidden="true" />
+                <span>{plural(x.negativeStockCount, 'item has negative stock', 'items have negative stock')}, valued at 0 and flagged below.</span>
               </p>
             )}
             {unknown.length > 0 && (
@@ -71,7 +79,7 @@ export function ValuationPanel() {
                 <ReportTable<ValuationRow>
                   caption={`${g.name} stock valuation`}
                   rows={g.rows}
-                  rowKey={(r) => r.id}
+                  rowKey={(r) => `${r.kind}-${r.id}`}
                   columns={[
                     { header: 'Name', cell: (r) => r.name },
                     { header: 'On hand', numeric: true, cell: (r) => r.onHand },

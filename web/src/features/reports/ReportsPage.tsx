@@ -49,11 +49,12 @@ function isTabId(value: string | null): value is TabId {
 export function ReportsPage() {
   const [search, setSearch] = useSearchParams();
   const departmentsOn = useDepartmentTracking();
-  const tabs = TABS.filter((t) => t.id !== 'departments' || departmentsOn);
+  const { role } = useSession();
+  const stockRole = role === 'Admin' || role === 'Manager' || role === 'Warehouse';
+  const tabs = TABS.filter((t) => (t.id !== 'departments' || departmentsOn) && ((t.id !== 'valuation' && t.id !== 'cogs') || stockRole));
   const requested = search.get('tab');
   const active: TabId = isTabId(requested) && tabs.some((t) => t.id === requested) ? requested : 'sales';
   const tab = TABS.find((t) => t.id === active)!;
-  const { role } = useSession();
   const { branches } = useSelectableBranches();
   const [choice, setChoice] = useRememberedChoice();
   const params = choiceToParams(choice);

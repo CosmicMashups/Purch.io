@@ -20,8 +20,12 @@ export const reportsApi = {
   movementSummary: (params: RangeParams) => apiClient.get<MovementSummary>('/reports/inventory/movement-summary', { params }).then((r) => r.data),
   inventoryValuation: (params: { type?: string; categoryId?: string }) =>
     apiClient.get<InventoryValuation>('/reports/inventory/valuation', { params }).then((r) => r.data),
-  inventoryCogs: (params: RangeParams & { groupBy: CogsGroupBy }) =>
-    apiClient.get<InventoryCogs>('/reports/inventory/cogs', { params }).then((r) => r.data),
+  /** The endpoint takes business days (yyyy-MM-dd, end inclusive) and is tenant-wide, so branchId is not sent. */
+  inventoryCogs: (params: RangeParams & { groupBy: CogsGroupBy }) => {
+    const day = (ms: number) => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
+    const query = { from: day(new Date(params.from).getTime()), to: day(new Date(params.to).getTime() - 1), groupBy: params.groupBy };
+    return apiClient.get<InventoryCogs>('/reports/inventory/cogs', { params: query }).then((r) => r.data);
+  },
   xReading: () => apiClient.post<BirReading>('/reports/x-reading').then((r) => r.data),
   zReading: () => apiClient.post<BirReading>('/reports/z-reading').then((r) => r.data),
   lowStockCsv: () => apiClient.get<string>('/reports/inventory/low-stock-export.csv', { responseType: 'text' }).then((r) => r.data),
