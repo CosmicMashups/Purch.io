@@ -13,6 +13,7 @@ export const inventoryKeys = {
   restock: ['inventory', 'restock-suggestions'] as const,
   incomingReceiving: ['inventory', 'incoming-receiving'] as const,
   transfers: ['inventory', 'transfers'] as const,
+  stockTakes: ['inventory', 'stock-takes'] as const,
 };
 
 export const useInventoryItems = () => useQuery({ queryKey: inventoryKeys.items, queryFn: inventoryApi.listInventoryItems });
@@ -158,3 +159,65 @@ export const useCreateTransfer = () => useStockMutation(inventoryApi.createTrans
 export const useMarkTransferInTransit = () => useStockMutation(inventoryApi.markTransferInTransit);
 export const useMarkTransferReceived = () => useStockMutation(inventoryApi.markTransferReceived);
 export const useCancelTransfer = () => useStockMutation(inventoryApi.cancelTransfer);
+
+export const useStockTakes = () => useQuery({ queryKey: inventoryKeys.stockTakes, queryFn: inventoryApi.stockTakes.list });
+export const useStockTake = (id: string | undefined) =>
+  useQuery({ queryKey: [...inventoryKeys.stockTakes, id], queryFn: () => inventoryApi.stockTakes.get(id!), enabled: !!id });
+
+/** Folds a count response into the cached take: only the edited line is authoritative, the rest stay as cached. */
+export function mergeCountedLine(cached: StockTake, returned: StockTake, lineId: string): StockTake {
+  const line = returned.lines.find((l) => l.id === lineId);
+  return {
+    ...returned,
+    lines: cached.lines.map((l) => (l.id === lineId && line ? line : l)),
+  };
+}
+
+export function useCreateStockTake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateStockTakeRequest) => inventoryApi.stockTakes.create(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.stockTakes }),
+  });
+}
+
+export function useCountStockTakeLine(takeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (v: { lineId: string; counted: number | null; skip: boolean }) =>
+      inventoryApi.stockTakes.countLine(takeId, v.lineId, { counted: v.counted, skip: v.skip }),
+    onSuccess: (returned, v) => {
+      const key = [...inventoryKeys.stockTakes, takeId];
+      const cached = qc.getQueryData<StockTake>(key);
+      qc.setQueryData(key, cached ? mergeCountedLine(cached, returned, v.lineId) : returned);
+    },
+  });
+}
+
+/** Start, review, apply and cancel replace the take wholesale and ripple into stock when applied. */
+export function useStockTakeTransition(takeId: string, kind: 'start' | 'review' | 'cancel') {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: () => inventoryApi.stockTakes[kind](takeId),
+    onSuccess: (take) => {
+      qc.setQueryData([...inventoryKeys.stockTakes, takeId], take);
+      void qc.invalidateQueries({ queryKey: [...inventoryKeys.stockTakes], exact: true });
+    },
+  });
+}
+
+export function useApplyStockTake(takeId: string) {
+  const invalidate = useStockInvalidation();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (pin?: string) => inventoryApi.stockTakes.apply(takeId, pin),
+    onSuccess: async (take) => {
+      qc.setQueryData([...inventoryKeys.stockTakes, takeId], take);
+      await invalidate();
+      await qc.invalidateQueries({ queryKey: inventoryKeys.stockTakes, exact: true });
+    },
+  });
+}

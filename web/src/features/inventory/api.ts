@@ -23,11 +23,27 @@ import type {
   RecordMovementRequest,
   Supplier,
   UpdateInventoryItemRequest,
+  CreateStockTakeRequest,
+  StockTake,
+  StockTakeSummary,
 } from './types';
 
 export const MOVEMENT_PAGE_SIZE = 30;
 
 export const inventoryApi = {
+  stockTakes: {
+    list: () => apiClient.get<StockTakeSummary[]>('/stock-takes').then((r) => r.data),
+    get: (id: string) => apiClient.get<StockTake>(`/stock-takes/${id}`).then((r) => r.data),
+    create: (body: CreateStockTakeRequest) => apiClient.post<StockTake>('/stock-takes', body).then((r) => r.data),
+    countLine: (id: string, lineId: string, body: { counted: number | null; skip: boolean }) =>
+      apiClient.put<StockTake>(`/stock-takes/${id}/lines/${lineId}`, body).then((r) => r.data),
+    start: (id: string) => apiClient.post<StockTake>(`/stock-takes/${id}/start`).then((r) => r.data),
+    review: (id: string) => apiClient.post<StockTake>(`/stock-takes/${id}/review`).then((r) => r.data),
+    apply: (id: string, approverPin?: string) =>
+      apiClient.post<StockTake>(`/stock-takes/${id}/apply`, { approverPin: approverPin ?? null }).then((r) => r.data),
+    cancel: (id: string) => apiClient.post<StockTake>(`/stock-takes/${id}/cancel`).then((r) => r.data),
+  },
+
   listInventoryItems: () => apiClient.get<InventoryItem[]>('/inventory-items').then((r) => r.data),
   createInventoryItem: (body: CreateInventoryItemRequest) => apiClient.post<InventoryItem>('/inventory-items', body).then((r) => r.data),
   reorderInventoryItems: (inventoryItemIds: string[]) => apiClient.put('/inventory-items/order', { inventoryItemIds }).then(() => undefined),

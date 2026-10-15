@@ -20,6 +20,8 @@ import { PurchaseOrderDetailPage } from './features/inventory/pages/PurchaseOrde
 import { IncomingReceivingDetailPage } from './features/inventory/pages/IncomingReceivingDetailPage';
 import { LegacyRecordMovementRedirect } from './features/inventory/pages/LegacyRecordMovementRedirect';
 import { SuppliersPage } from './features/inventory/pages/SuppliersPage';
+import { StockTakesPage } from './features/inventory/pages/StockTakesPage';
+import { StockTakeDetailPage } from './features/inventory/pages/StockTakeDetailPage';
 import { TransfersPage } from './features/inventory/pages/TransfersPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { ReportsRedirect } from './features/reports/ReportsRedirect';
@@ -137,6 +139,8 @@ export function App() {
             <Route path="/inventory/incoming-receiving" element={<IncomingReceivingPage />} />
             <Route path="/inventory/incoming-receiving/:id" element={<IncomingReceivingDetailPage />} />
             <Route path="/inventory/transfers" element={<TransfersPage />} />
+            <Route path="/inventory/stock-takes" element={<StockTakesPage />} />
+            <Route path="/inventory/stock-takes/:id" element={<StockTakeDetailPage />} />
             <Route path="/inventory/*" element={<Navigate to="/inventory" replace />} />
           </Route>
 

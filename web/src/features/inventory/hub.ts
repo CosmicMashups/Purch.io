@@ -9,6 +9,7 @@ export const INVENTORY_GROUPS: readonly HubGroup[] = [
     tiles: [
       { id: 'movements', label: 'Stock movements', hint: 'Every stock-in, spoilage and sale', to: '/inventory/movements' },
       { id: 'transfers', label: 'Stock transfers', hint: 'Move stock between branches', to: '/inventory/transfers' },
+      { id: 'stock-takes', label: 'Stock takes', hint: 'Count shelves and correct the books', to: '/inventory/stock-takes' },
       { id: 'ingredients', label: 'Ingredients', hint: 'Counts and deliveries', to: '/inventory/ingredients' },
       { id: 'equipment', label: 'Equipment', hint: 'Machines, furniture and utensils', to: '/inventory/equipment' },
       { id: 'valuation', label: 'Stock valuation', hint: 'What your stock is worth at cost', to: '/reports?tab=valuation', managersOnly: true },

@@ -343,3 +343,71 @@ export interface CreateBranchTransferRequest {
   destinationBranchId: string;
   lines: { itemId: string | null; inventoryItemId: string | null; quantity: number }[];
 }
+
+/** Mirrors Purch.Domain.Enums.StockTakeStatus. */
+export const StockTakeStatus = { Draft: 0, Counting: 1, Review: 2, Applied: 3, Cancelled: 4 } as const;
+export type StockTakeStatus = (typeof StockTakeStatus)[keyof typeof StockTakeStatus];
+
+/** Mirrors Purch.Domain.Enums.StockTakeScopeKind. */
+export const StockTakeScopeKind = { All: 0, Categories: 1, Picked: 2 } as const;
+export type StockTakeScopeKind = (typeof StockTakeScopeKind)[keyof typeof StockTakeScopeKind];
+
+/** Mirrors Purch.Domain.Enums.StockTakeLineState. */
+export const StockTakeLineState = { Uncounted: 0, Counted: 1, Skipped: 2 } as const;
+export type StockTakeLineState = (typeof StockTakeLineState)[keyof typeof StockTakeLineState];
+
+export interface StockTakeLine {
+  id: string;
+  itemId: string | null;
+  inventoryItemId: string | null;
+  name: string;
+  categoryId: string | null;
+  state: StockTakeLineState;
+  /** Null while a blind take is Counting. */
+  expectedQty: number | null;
+  countedQty: number | null;
+  varianceQty: number | null;
+  /** Null for roles that may not see costs. */
+  unitCostSnapshot: number | null;
+  varianceValue: number | null;
+  movementsSinceCount?: number | null;
+  needsRecount?: boolean;
+}
+
+export interface StockTake {
+  id: string;
+  name: string;
+  status: StockTakeStatus;
+  blind: boolean;
+  scopeKind: StockTakeScopeKind;
+  branchId: string;
+  createdAt: string;
+  startedAt: string | null;
+  appliedAt: string | null;
+  note: string | null;
+  countedCount: number;
+  uncountedCount: number;
+  skippedCount: number;
+  lines: StockTakeLine[];
+  warnings: string[];
+}
+
+export interface StockTakeSummary {
+  id: string;
+  name: string;
+  status: StockTakeStatus;
+  blind: boolean;
+  scopeKind: StockTakeScopeKind;
+  createdAt: string;
+  appliedAt: string | null;
+  lineCount: number;
+  countedCount: number;
+}
+
+export interface CreateStockTakeRequest {
+  name: string;
+  scopeKind: StockTakeScopeKind;
+  blind: boolean;
+  categoryIds?: string[];
+  inventoryItemIds?: string[];
+}
