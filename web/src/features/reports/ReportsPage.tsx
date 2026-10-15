@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Skeleton } from '../../components/Skeleton';
 import { PageHeader } from '../../components/PageHeader';
 import { useSession } from '../auth/useSession';
 import { useSelectableBranches } from '../branches/queries';
 import { ApprovalsPanel } from './components/ApprovalsPanel';
 import { BirPanel } from './components/BirPanel';
 import { ExportsPanel } from './components/ExportsPanel';
-import { DiscountsPanel, VoidsRefundsPanel } from './components/LeakagePanels';
-import { ProfitPanel, SalesMixPanel, TaxPanel } from './components/SalesPanels';
 import { DepartmentPanel, MovementPanel, StaffPanels } from './components/RangePanels';
 import { RangeControl } from './components/RangeControl';
 import { choiceToParams, defaultChoice, type RangeChoice } from './params';
 import { useDepartmentTracking } from '../tenant/queries';
+
+// The newer report tabs load on demand: most visits open one tab, and the page shell should not carry the rest.
+const SalesMixPanel = lazy(() => import('./components/SalesPanels').then((m) => ({ default: m.SalesMixPanel })));
+const TaxPanel = lazy(() => import('./components/SalesPanels').then((m) => ({ default: m.TaxPanel })));
+const ProfitPanel = lazy(() => import('./components/SalesPanels').then((m) => ({ default: m.ProfitPanel })));
+const DiscountsPanel = lazy(() => import('./components/LeakagePanels').then((m) => ({ default: m.DiscountsPanel })));
+const VoidsRefundsPanel = lazy(() => import('./components/LeakagePanels').then((m) => ({ default: m.VoidsRefundsPanel })));
 
 const TABS = [
   { id: 'staff', label: 'Staff', usesRange: true },
@@ -76,6 +82,7 @@ export function ReportsPage() {
       )}
 
       <div role="tabpanel" id={`report-panel-${active}`} aria-labelledby={`report-tab-${active}`}>
+       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
         {active === 'bir' && <BirPanel />}
         {active === 'approvals' && <ApprovalsPanel />}
         {active === 'exports' && <ExportsPanel params={params} isAdmin={role === 'Admin'} />}
@@ -94,6 +101,7 @@ export function ReportsPage() {
           ) : (
             <p className="rounded-panel border border-dashed border-ink-soft/40 p-6 text-base text-ink-soft">Choose a valid date range to see this report.</p>
           ))}
+       </Suspense>
       </div>
     </div>
   );
