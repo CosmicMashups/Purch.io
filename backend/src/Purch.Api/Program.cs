@@ -249,6 +249,8 @@ builder.Services.AddScoped<IBranchScopeGuard, BranchScopeGuard>();
 builder.Services.AddScoped<ISalesDashboardService, SalesDashboardService>();
 builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
 builder.Services.AddScoped<IInventoryValuationService, InventoryValuationService>();
+builder.Services.AddScoped<IInventoryCogsService, InventoryCogsService>();
+builder.Services.AddScoped<IInventoryCogsRepository, EfInventoryCogsRepository>();
 builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
 builder.Services.AddScoped<IStaffPerformanceService, StaffPerformanceService>();
 builder.Services.AddScoped<IDepartmentSalesReportService, DepartmentSalesReportService>();

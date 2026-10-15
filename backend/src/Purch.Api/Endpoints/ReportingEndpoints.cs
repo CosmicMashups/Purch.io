@@ -99,6 +99,15 @@ public static class ReportingEndpoints
         })
             .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse)));
 
+        _ = app.MapGet("/reports/inventory/cogs", async (
+            [FromQuery(Name = "from")] DateOnly from,
+            [FromQuery(Name = "to")] DateOnly to,
+            string? groupBy,
+            IInventoryCogsService cogsService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await cogsService.GetAsync(from, to, groupBy ?? "item", cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse)));
+
         // --- Data export: the tenant's own sales record, independent of this app (accounting, a
         // system switch, or a Data Privacy Act/GDPR access request). Admin-only — broader than the
         // reporting roles above, since it hands over raw rows rather than an aggregate. ---
