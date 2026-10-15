@@ -384,16 +384,16 @@ public sealed class RevenueReportService(
         facts.GroupBy(f =>
         {
             var (utcDate, utcHour) = key(f);
-            return DateOnly.FromDateTime(new DateTime(utcDate.Year, utcDate.Month, utcDate.Day, utcHour, 0, 0).Add(ReportTimeZone.Offset));
+            return ReportMath.ToBusinessTime(utcDate, utcHour).Date;
         }).OrderBy(g => g.Key);
 
     private static decimal RevenueExVat(HourlySaleFacts f) => f.VatableSales + f.VatExemptSales + f.ZeroRatedSales;
 
     /// <summary>Revenue attributable to the lines with a known cost: the sale-level net revenue spread by line total.</summary>
     private static decimal Allocate(decimal revenueExVat, decimal knownGross, decimal lineGross) =>
-        lineGross > 0m ? Math.Round(revenueExVat * knownGross / lineGross, 2) : 0m;
+        ReportMath.AllocateKnownRevenue(revenueExVat, knownGross, lineGross);
 
-    private static decimal? Pct(decimal part, decimal whole) => whole > 0m ? Math.Round(part / whole * 100m, 1) : null;
+    private static decimal? Pct(decimal part, decimal whole) => ReportMath.Percent(part, whole);
 
     private static ProfitGroupDto Group(Guid? id, string name, decimal quantity, decimal lineGross, decimal knownGross, decimal cost, decimal factor)
     {

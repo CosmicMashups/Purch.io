@@ -39,9 +39,8 @@ public sealed class SalesMixReportService(
         var local = utcHours
             .Select(row =>
             {
-                var shifted = new DateTime(row.UtcDate.Year, row.UtcDate.Month, row.UtcDate.Day, row.UtcHour, 0, 0)
-                    .Add(ReportTimeZone.Offset);
-                return (Date: DateOnly.FromDateTime(shifted), shifted.Hour, Sales: row.Total, TransactionCount: row.SaleCount);
+                var (date, hour) = ReportMath.ToBusinessTime(row.UtcDate, row.UtcHour);
+                return (Date: date, Hour: hour, Sales: row.Total, TransactionCount: row.SaleCount);
             })
             .ToList();
 
