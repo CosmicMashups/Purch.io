@@ -34,3 +34,15 @@ E. Overlap with U3: adds `DefaultSupplierId` and cost use; no conflict with valu
 - On: recipe items are never listed or ordered (availability comes from their ingredients; already excluded from stock counts). Ingredients are ordered. Non-recipe items (resale goods, stock held on the auto-paired record) remain orderable, as their paired record.
 
 - Role gating: Admin, Manager and Warehouse (existing inventoryManager policy); web hides actions for others.
+
+## Revision: PR and PO are separate documents (owner, 2026-10-15) - supersedes "PR = draft PO" and the one-PO-per-supplier restock action
+- **Purchase request (new entity + lines):** control number, request date, date needed, requested by, delivery address (branch `Address`; single-branch tenant falls back to `Tenant.RegisteredAddress`; both fields already exist), lines (item or ingredient, quantity, UOM), remarks. No supplier, no prices. Status: Open, Approved, Converted, Cancelled.
+- **Restock action** (per row, or bulk) creates one PR. Items on an open PR or open PO are skipped ("On order"/"Requested"), per earlier decision.
+- **Approval:** Admin/Manager approve; Warehouse can create/edit/cancel. Only an Approved PR converts. Admin/Manager may approve their own.
+- **Convert:** the PR's lines are grouped by supplier (preferred supplier pre-selected, user may change, Unassigned group = pick supplier or skip); one Draft PO per supplier; PR becomes Converted and links to its POs. Existing PO create/send/cancel/receive flow is reused.
+- **Purchase order additions:** control number, PR link, request date/date needed/requester/delivery address/remarks carried over, supplier payment details (snapshot of supplier account name + number), per-line unit price and amount, VAT inclusive/exclusive flag, subtotal, discount (peso amount, whole order), VAT amount (tenant VAT rate), order total, delivery status = existing Draft/Sent/PartiallyReceived/Received/Cancelled driven by Incoming Receiving.
+- **UOM:** new nullable `Item.Unit` (default "pc"); ingredient lines default to `BaseUnit` with `PackagingUnit` as the alternative; the line stores the chosen unit text.
+- **Control numbers:** per branch prefix, locked counter, never reused: `<BRANCHCODE>-PR-00001`, `<BRANCHCODE>-PO-00001`. Needs a short branch code (new field if absent).
+- **Supplier:** one payment account (account name, account number), two new nullable fields.
+- **VAT:** flag + tenant VAT rate. Exclusive: VAT = (subtotal - discount) x rate, total = that + VAT. Inclusive: VAT extracted from (subtotal - discount). All stored as snapshots.
+- **New tables** (PR, PR lines, counters) need ENABLE ROW LEVEL SECURITY in the migration.
