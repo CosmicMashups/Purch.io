@@ -258,7 +258,7 @@ export interface RestockSuggestion {
 export interface CreatePurchaseOrderRequest {
   supplierId: string;
   branchId: string;
-  lines: { itemId: string; quantityOrdered: number; expectedUnitCost: number }[];
+  lines: { itemId: string; inventoryItemId?: string | null; quantityOrdered: number; expectedUnitCost: number; unit?: string | null }[];
   vatInclusive?: boolean;
   discountAmount?: number;
   remarks?: string | null;

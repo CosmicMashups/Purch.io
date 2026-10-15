@@ -15,6 +15,7 @@ vi.mock('../api', () => ({
   inventoryApi: {
     listPurchaseOrders: vi.fn(),
     listSuppliers: vi.fn(),
+    listInventoryItems: vi.fn(),
     createPurchaseOrder: vi.fn(),
     markPurchaseOrderSent: vi.fn(),
     cancelPurchaseOrder: vi.fn(),
@@ -41,6 +42,10 @@ describe('PurchaseOrdersPage', () => {
     vi.mocked(branchesApi.list).mockResolvedValue([{ id: 'kat', name: 'Katipunan', address: null }]);
     vi.mocked(inventoryApi.listSuppliers).mockResolvedValue([{ id: 's1', name: 'Metro Foods', contactInfo: null, isActive: true, specialization: null, address: null, tin: null, remarks: null, contacts: [] }]);
     vi.mocked(inventoryApi.listPurchaseOrders).mockResolvedValue([order(PurchaseOrderStatus.Draft)]);
+    vi.mocked(inventoryApi.listInventoryItems).mockResolvedValue([
+      { id: 'flour', name: 'Flour', baseUnit: 'kg', isAutoCreatedForItem: false, isActive: true },
+      { id: 'auto', name: 'Milk (auto)', baseUnit: 'pc', isAutoCreatedForItem: true, isActive: true },
+    ] as never);
   });
 
   it('offers only the actions the status allows', async () => {
@@ -111,6 +116,27 @@ describe('PurchaseOrdersPage', () => {
       vatInclusive: false,
       discountAmount: 0,
     });
+  });
+
+  it('orders an ingredient and hides the item-paired records', async () => {
+    vi.mocked(inventoryApi.createPurchaseOrder).mockResolvedValue({} as never);
+    renderPage(<PurchaseOrdersPage />);
+    await screen.findByText('Deliver to Katipunan');
+    fireEvent.click(screen.getByRole('button', { name: 'New purchase order' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New purchase order' });
+    await within(dialog).findByRole('option', { name: 'Flour (kg)' });
+    expect(within(dialog).queryByRole('option', { name: /Milk \(auto\)/ })).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText('Supplier'), { target: { value: 's1' } });
+    fireEvent.change(within(dialog).getByLabelText('Item'), { target: { value: 'ing:flour' } });
+    fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '5' } });
+    fireEvent.change(within(dialog).getByLabelText('Unit cost (PHP)'), { target: { value: '40' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create draft' }));
+
+    await waitFor(() => expect(inventoryApi.createPurchaseOrder).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(inventoryApi.createPurchaseOrder).mock.calls[0][0].lines).toEqual([
+      { itemId: '00000000-0000-0000-0000-000000000000', inventoryItemId: 'flour', quantityOrdered: 5, expectedUnitCost: 40, unit: 'kg' },
+    ]);
   });
 
   it('will not create an order without a supplier', async () => {

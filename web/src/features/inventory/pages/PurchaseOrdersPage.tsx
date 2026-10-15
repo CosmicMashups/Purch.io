@@ -19,11 +19,12 @@ import { purchaseOrderSchema, type PurchaseOrderForm } from '../purchasing';
 import {
   useCancelPurchaseOrder,
   useCreatePurchaseOrder,
+  useInventoryItems,
   useMarkPurchaseOrderSent,
   usePurchaseOrders,
   useSuppliers,
 } from '../queries';
-import type { PurchaseOrder } from '../types';
+import type { InventoryItem, PurchaseOrder } from '../types';
 import { purchaseOrderActions, purchaseOrderStatusLabel } from '../workflow';
 
 const actionButton = 'h-12 rounded-control border border-line px-5 text-base font-semibold hover:border-brand disabled:opacity-60';
@@ -31,6 +32,7 @@ const actionButton = 'h-12 rounded-control border border-line px-5 text-base fon
 export function PurchaseOrdersPage() {
   const orders = usePurchaseOrders();
   const items = useItems();
+  const ingredients = useInventoryItems();
   const suppliers = useSuppliers();
   const { branches, isError: branchesFailed, error: branchesError, refetch: refetchBranches } = useSelectableBranches();
   const send = useMarkPurchaseOrderSent();
@@ -159,7 +161,12 @@ export function PurchaseOrdersPage() {
           onClose={() => setCreating(false)}
         >
           {suppliers.data && items.data && branches && (
-            <PurchaseOrderDialog suppliers={suppliers.data} branches={branches} items={items.data} onClose={() => setCreating(false)} />
+            <PurchaseOrderDialog
+              suppliers={suppliers.data}
+              branches={branches}
+              items={items.data}
+              ingredients={(ingredients.data ?? []).filter((i) => !i.isAutoCreatedForItem && i.isActive !== false)}
+              onClose={() => setCreating(false)} />
           )}
         </FormDialogLoader>
       )}
@@ -182,11 +189,13 @@ function PurchaseOrderDialog({
   suppliers,
   branches,
   items,
+  ingredients,
   onClose,
 }: {
   suppliers: { id: string; name: string }[];
   branches: Branch[];
   items: Item[];
+  ingredients: InventoryItem[];
   onClose: () => void;
 }) {
   const create = useCreatePurchaseOrder();
@@ -204,7 +213,13 @@ function PurchaseOrderDialog({
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
   const submit = handleSubmit(async (v) => {
-    await create.mutateAsync({ ...v, vatInclusive, discountAmount: Number(discount) || 0 });
+    const lines = v.lines.map((line) => {
+      const ingredient = line.itemId.startsWith('ing:') ? ingredients.find((i) => i.id === line.itemId.slice(4)) : undefined;
+      return ingredient
+        ? { itemId: '00000000-0000-0000-0000-000000000000', inventoryItemId: ingredient.id, quantityOrdered: line.quantityOrdered, expectedUnitCost: line.expectedUnitCost, unit: ingredient.baseUnit }
+        : line;
+    });
+    await create.mutateAsync({ ...v, lines, vatInclusive, discountAmount: Number(discount) || 0 });
     toast.success('Purchase order created as a draft');
     onClose();
   });
@@ -248,12 +263,21 @@ function PurchaseOrderDialog({
           <div key={field.id} className="flex flex-col gap-3 rounded-control border border-line p-3">
             <FormField label="Item" error={errors.lines?.[index]?.itemId?.message}>
               <select {...register(`lines.${index}.itemId`)} className={controlClass}>
-                <option value="">Choose an item</option>
+                <option value="">Choose an item or ingredient</option>
                 {items.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
                 ))}
+                {ingredients.length > 0 && (
+                  <optgroup label="Ingredients">
+                    {ingredients.map((ingredient) => (
+                      <option key={ingredient.id} value={`ing:${ingredient.id}`}>
+                        {ingredient.name} ({ingredient.baseUnit})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </FormField>
             <div className="grid grid-cols-2 gap-3">
