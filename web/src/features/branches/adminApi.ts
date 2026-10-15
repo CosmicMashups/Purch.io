@@ -16,6 +16,8 @@ export interface GcashBody {
 export const branchAdminApi = {
   create: (body: { name: string; address: string | null }) => apiClient.post<Branch>('/branches', body).then((r) => r.data),
   updateHardware: (id: string, body: HardwareBody) => apiClient.put<Branch>(`/branches/${id}/hardware-settings`, body).then((r) => r.data),
+  updateDetails: (id: string, body: { name: string; address: string | null; code: string }) =>
+    apiClient.put<Branch>(`/branches/${id}/details`, body).then((r) => r.data),
   updateGcash: (id: string, body: GcashBody) => apiClient.put<Branch>(`/branches/${id}/manual-gcash-qr`, body).then((r) => r.data),
   listDepartments: (id: string) => apiClient.get<BranchDepartment[]>(`/branches/${id}/departments`).then((r) => r.data),
   createDepartment: (id: string, body: { name: string; concessionaireContactInfo: string | null }) =>

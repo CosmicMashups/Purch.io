@@ -13,7 +13,7 @@ import { ErrorState } from '../../components/ErrorState';
 import { userMessage } from '../../lib/apiError';
 import { useSession } from '../auth/useSession';
 import { useDepartmentTracking } from '../tenant/queries';
-import { useBranchDepartments, useCreateBranch, useCreateDepartment, useUpdateGcash, useUpdateHardware } from '../branches/adminQueries';
+import { useBranchDepartments, useCreateBranch, useCreateDepartment, useUpdateBranchDetails, useUpdateGcash, useUpdateHardware } from '../branches/adminQueries';
 import { useBranches } from '../branches/queries';
 import type { Branch } from '../branches/types';
 import { RowActionsMenu } from '../../components/RowActionsMenu';
@@ -61,6 +61,7 @@ export function BranchesPage() {
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
                   {branch.name}
+                  {branch.code && <span className="rounded-control bg-canvas px-2 py-0.5 text-sm font-semibold text-ink-soft">{branch.code}</span>}
                   {branch.isActive === false && <StatusBadge label="Inactive" tone="warning" />}
                 </p>
                 {branch.address && <p className="text-base text-ink-soft">{branch.address}</p>}
@@ -119,11 +120,43 @@ function BranchDetail({ branch, onClose }: { branch: Branch; onClose: () => void
   return (
     <Modal open wide title={branch.name} onClose={onClose} footer={<div className="flex justify-end"><SecondaryButton type="button" onClick={onClose}>Done</SecondaryButton></div>}>
       <div className="flex flex-col gap-6">
+        <DetailsForm branch={branch} />
         <HardwareForm branch={branch} />
         <GcashForm branch={branch} />
         {useDepartmentTracking() && <Departments branchId={branch.id} />}
       </div>
     </Modal>
+  );
+}
+
+/** Name, address and the short code that prefixes this branch's purchase request and order numbers. */
+function DetailsForm({ branch }: { branch: Branch }) {
+  const save = useUpdateBranchDetails();
+  const { register, handleSubmit } = useForm({ defaultValues: { name: branch.name, address: branch.address ?? '', code: branch.code ?? '' } });
+  const submit = handleSubmit((v) =>
+    save.mutate(
+      { id: branch.id, body: { name: v.name.trim(), address: v.address.trim() || null, code: v.code.trim() } },
+      { onSuccess: () => toast.success('Branch details saved') },
+    ),
+  );
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4 rounded-panel border border-line bg-surface p-5" aria-label="Branch details">
+      <h3 className="text-base font-semibold">Details</h3>
+      <FormField label="Name">
+        <input {...register('name')} className={controlClass} />
+      </FormField>
+      <FormField label="Address" hint="Printed as the delivery address on purchase requests and orders">
+        <input {...register('address')} className={controlClass} />
+      </FormField>
+      <FormField label="Branch code" hint="2 to 12 letters or numbers, for example MAIN">
+        <input {...register('code')} maxLength={12} className={`${controlClass} uppercase`} />
+      </FormField>
+      <div>
+        <PrimaryButton type="submit" busy={save.isPending}>
+          Save details
+        </PrimaryButton>
+      </div>
+    </form>
   );
 }
 

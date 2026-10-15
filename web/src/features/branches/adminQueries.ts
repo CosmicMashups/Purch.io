@@ -26,6 +26,14 @@ export function useUpdateHardware() {
   });
 }
 
+export function useUpdateBranchDetails() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof branchAdminApi.updateDetails>[1] }) => branchAdminApi.updateDetails(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: branchKeys.all }),
+  });
+}
+
 export function useUpdateGcash() {
   const qc = useQueryClient();
   return useMutation({

@@ -28,7 +28,7 @@ describe('SuppliersPage', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Puregold Wholesale' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(inventoryApi.createSupplier).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(inventoryApi.createSupplier).mock.calls[0][0]).toEqual({ name: 'Puregold Wholesale', specialization: null, address: null, tin: null, remarks: null, contacts: [] });
+    expect(vi.mocked(inventoryApi.createSupplier).mock.calls[0][0]).toEqual({ name: 'Puregold Wholesale', specialization: null, address: null, tin: null, remarks: null, paymentAccountName: null, paymentAccountNumber: null, contacts: [] });
   });
 
   it('adds a supplier with a contact that has several numbers and a mode', async () => {

@@ -5,6 +5,7 @@ import { userMessage } from '../../lib/apiError';
 import { useTenantSettings } from '../tenant/queries';
 import { BirSection } from './components/BirSection';
 import { BrandingSection } from './components/BrandingSection';
+import { CountrySection } from './components/CountrySection';
 import { OptionsSection, PosSection } from './components/OptionsSection';
 
 export function SettingsPage() {
@@ -24,6 +25,7 @@ export function SettingsPage() {
         <>
           <BrandingSection settings={settings.data} />
           <BirSection settings={settings.data} />
+          <CountrySection settings={settings.data} />
           <OptionsSection settings={settings.data} />
           <PosSection settings={settings.data} />
         </>

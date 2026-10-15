@@ -46,6 +46,7 @@ export interface Item {
   sortOrder: number;
   /** Null means unknown, or hidden from the Cashier role. */
   costPrice?: number | null;
+  unit?: string | null;
   /** False for a service, a combo, or an item made from ingredients: it has no count of its own to edit. Absent reads as true. */
   hasOwnStock?: boolean;
   /** The count to show and edit: the paired ingredient record's with separate tracking, else stockOnHand. Absent reads as stockOnHand. */
@@ -197,6 +198,7 @@ export interface CreateItemRequest {
   sortOrder?: number;
   /** Omit or null for unknown. */
   costPrice?: number | null;
+  unit?: string | null;
 }
 
 export interface UpdateItemRequest {
@@ -211,6 +213,7 @@ export interface UpdateItemRequest {
   sortOrder?: number;
   /** Omitted keeps the saved cost. */
   costPrice?: number | null;
+  unit?: string | null;
   /** Deliberately clears the saved cost. */
   clearCostPrice?: boolean;
 }

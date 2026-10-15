@@ -33,6 +33,7 @@ export const tenantApi = {
     apiClient.put<TenantSettings>('/tenant/settings/inventory-tracking', { useSeparateInventoryTracking }).then((r) => r.data),
   updateCostOnReceiving: (useSeparateInventoryTracking: boolean, updateCostOnReceiving: boolean) =>
     apiClient.put<TenantSettings>('/tenant/settings/inventory-tracking', { useSeparateInventoryTracking, updateCostOnReceiving }).then((r) => r.data),
+  updateCountry: (country: string) => apiClient.put<TenantSettings>('/tenant/settings/country', { country }).then((r) => r.data),
   updateDepartmentTracking: (useDepartmentTracking: boolean) =>
     apiClient.put<TenantSettings>('/tenant/settings/department-tracking', { useDepartmentTracking }).then((r) => r.data),
 };

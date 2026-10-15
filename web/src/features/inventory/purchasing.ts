@@ -8,6 +8,8 @@ export const supplierSchema = z.object({
   address: z.string(),
   tin: z.string(),
   remarks: z.string(),
+  paymentAccountName: z.string(),
+  paymentAccountNumber: z.string(),
   contacts: z.array(
     z.object({
       contactPerson: z.string(),
@@ -27,7 +29,7 @@ export const emptyContact = (): SupplierForm['contacts'][number] => ({
   emails: [{ value: '' }],
 });
 
-export const emptySupplierForm = (): SupplierForm => ({ name: '', specialization: '', address: '', tin: '', remarks: '', contacts: [emptyContact()] });
+export const emptySupplierForm = (): SupplierForm => ({ name: '', specialization: '', address: '', tin: '', remarks: '', paymentAccountName: '', paymentAccountNumber: '', contacts: [emptyContact()] });
 
 export const purchaseOrderSchema = z.object({
   supplierId: z.string().min(1, 'Choose a supplier'),

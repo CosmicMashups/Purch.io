@@ -22,6 +22,8 @@ function toRequest(v: SupplierForm): SupplierRequest {
     address: blankToNull(v.address),
     tin: blankToNull(v.tin),
     remarks: blankToNull(v.remarks),
+    paymentAccountName: blankToNull(v.paymentAccountName),
+    paymentAccountNumber: blankToNull(v.paymentAccountNumber),
     contacts: v.contacts
       .map((c) => ({
         contactPerson: c.contactPerson.trim(),
@@ -47,6 +49,8 @@ function toForm(s: Supplier): SupplierForm {
     tin: s.tin ?? '',
     // Suppliers saved before contacts were structured carry their old text as a remark, so it is not lost on the first edit.
     remarks: s.remarks ?? (s.contacts.length === 0 && s.contactInfo ? s.contactInfo : ''),
+    paymentAccountName: s.paymentAccountName ?? '',
+    paymentAccountNumber: s.paymentAccountNumber ?? '',
     contacts: contacts.length > 0 ? contacts : [emptyContact()],
   };
 }
@@ -152,6 +156,14 @@ function SupplierDialog({ supplier, onClose }: { supplier: Supplier | null; onCl
       <FormField label="TIN (optional)">
         <input {...register('tin')} className={controlClass} />
       </FormField>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Payment account name (optional)" hint="Shown on purchase orders">
+          <input {...register('paymentAccountName')} className={controlClass} />
+        </FormField>
+        <FormField label="Payment account number (optional)">
+          <input {...register('paymentAccountNumber')} inputMode="numeric" className={controlClass} />
+        </FormField>
+      </div>
 
       <fieldset className="flex flex-col gap-4">
         <legend className="text-base font-semibold">Contacts</legend>

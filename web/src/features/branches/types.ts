@@ -11,6 +11,8 @@ export interface Branch {
   manualGcashAccountNumber?: string | null;
   /** False once the branch is made inactive: kept, but not offered for new work. */
   isActive?: boolean;
+  /** Short code used in purchase request and order control numbers. */
+  code?: string;
 }
 
 /** Mirrors DepartmentDto. */

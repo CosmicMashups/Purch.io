@@ -126,6 +126,7 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
   const canSeeCost = useCanSeeCost();
   const [cost, setCost] = useState('');
   const [costError, setCostError] = useState<string | null>(null);
+  const [unit, setUnit] = useState('');
 
   useEffect(() => onBusy(createItem.isPending), [createItem.isPending, onBusy]);
 
@@ -245,6 +246,7 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
         pricingType: values.pricingType,
         sortOrder: values.sortOrder,
         ...(parsedCost.value !== null ? { costPrice: parsedCost.value } : {}),
+        ...(unit.trim() ? { unit: unit.trim() } : {}),
       });
 
       await createSubResourceIfValid(item.id, values);
@@ -312,6 +314,10 @@ function AddForm({ onClose, onBusy }: { onClose: () => void; onBusy: (busy: bool
       </Field>
 
       {canSeeCost && <CostField value={cost} onChange={setCost} error={costError} price={priceNow} savedCost={false} />}
+
+      <Field label="Unit of measure (optional)">
+        <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pc, kg, box" maxLength={20} className={inputClass} />
+      </Field>
 
       <Field label="Sort order" error={errors.sortOrder?.message}>
         <input type="number" {...register('sortOrder')} className={inputClass} />
@@ -411,6 +417,7 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
   const hadCost = item.costPrice !== null && item.costPrice !== undefined;
   const [cost, setCost] = useState(hadCost ? String(item.costPrice) : '');
   const [costError, setCostError] = useState<string | null>(null);
+  const [unit, setUnit] = useState(item.unit ?? '');
 
   const tracksIngredients = useTenantSettings().data?.useSeparateInventoryTracking === true;
   const inventoryItems = useInventoryItems();
@@ -518,6 +525,7 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
           isActive: values.isActive,
           departmentId: values.departmentId ?? null,
           ...costFields,
+          unit: unit.trim(),
         },
       });
       if (parsedThreshold.value !== item.lowStockThreshold) {
@@ -568,6 +576,10 @@ function EditForm({ item, onClose, onBusy }: { item: Item; onClose: () => void; 
       </Field>
 
       {canSeeCost && <CostField value={cost} onChange={setCost} error={costError} price={priceNow} savedCost={hadCost} />}
+
+      <Field label="Unit of measure (optional)">
+        <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pc, kg, box" maxLength={20} className={inputClass} />
+      </Field>
 
       <Field label="Sort order" error={errors.sortOrder?.message}>
         <input type="number" {...register('sortOrder')} className={inputClass} />

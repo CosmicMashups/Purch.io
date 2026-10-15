@@ -25,4 +25,6 @@ export interface TenantSettings {
   openItemEnabled?: boolean;
   /** Hours a parked cart is kept before it is released, 1 to 168. */
   parkedCartTtlHours?: number;
+  /** ISO country code; sets the currency and VAT rate on purchase orders. */
+  country?: string;
 }
