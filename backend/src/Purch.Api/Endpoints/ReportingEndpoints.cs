@@ -86,6 +86,19 @@ public static class ReportingEndpoints
                 "text/csv"))
             .RequireAuthorization(policy => policy.RequireRole(reportGenerator));
 
+        _ = app.MapGet("/reports/inventory/valuation", async (
+            Guid? categoryId,
+            string? type,
+            IInventoryValuationService valuationService,
+            CancellationToken cancellationToken) =>
+        {
+            var kind = (type ?? "all").ToLowerInvariant();
+            return kind is "all" or "item" or "ingredient"
+                ? Results.Ok(await valuationService.GetAsync(new InventoryValuationQuery(categoryId, kind), cancellationToken))
+                : Results.BadRequest(new { error = "type must be item, ingredient or all." });
+        })
+            .RequireAuthorization(policy => policy.RequireRole(nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse)));
+
         // --- Data export: the tenant's own sales record, independent of this app (accounting, a
         // system switch, or a Data Privacy Act/GDPR access request). Admin-only — broader than the
         // reporting roles above, since it hands over raw rows rather than an aggregate. ---
