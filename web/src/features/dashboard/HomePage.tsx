@@ -52,7 +52,7 @@ export function HomePage() {
           <button
             type="button"
             onClick={() => void refreshDashboards()}
-            className="inline-flex h-10 items-center rounded-control border border-line bg-surface px-4 text-sm font-semibold hover:border-brand"
+            className="inline-flex h-10 items-center rounded-control bg-brand text-on-brand hover:bg-brand-strong px-4 text-sm font-semibold"
           >
             Refresh
           </button>

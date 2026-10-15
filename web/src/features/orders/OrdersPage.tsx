@@ -148,7 +148,7 @@ export function OrdersPage() {
             type="button"
             onClick={() => void exportCsv()}
             disabled={exporting || !orders.data || orders.data.total === 0}
-            className="h-12 rounded-control border border-line bg-surface px-6 text-base font-semibold hover:border-brand disabled:opacity-50"
+            className="h-12 rounded-control bg-brand text-on-brand hover:bg-brand-strong px-6 text-base font-semibold disabled:opacity-50"
           >
             {exporting ? 'Exporting…' : 'Export CSV'}
           </button>

@@ -82,7 +82,7 @@ export function ModifierGroupsPage() {
                         type="button"
                         aria-label={`Add modifier to ${g.name}`}
                         onClick={() => setModifierDialog({ groupId: g.id, modifier: null })}
-                        className="hidden h-12 items-center rounded-control border border-line px-4 text-base font-semibold hover:border-brand sm:inline-flex"
+                        className="hidden h-12 items-center rounded-control bg-brand text-on-brand hover:bg-brand-strong px-4 text-base font-semibold sm:inline-flex"
                       >
                         Add modifier
                       </button>

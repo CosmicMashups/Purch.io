@@ -5,7 +5,7 @@ import { useSlipPrinter } from './useSlipPrinter';
 import { testSlip } from './slipData';
 import { useBusinessName } from './useBusinessName';
 
-const button = 'h-12 rounded-control border border-line bg-surface px-4 text-base font-semibold hover:border-brand disabled:opacity-50';
+const button = 'h-12 rounded-control bg-brand text-on-brand hover:bg-brand-strong px-4 text-base font-semibold disabled:opacity-50';
 
 /**
  * Turning on the kiosk's order slip, step by step: pick the paper, print a test slip, say it came out right, then switch it
