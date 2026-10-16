@@ -1,0 +1,21 @@
+# Documentation conflicts found in the 2026-10-16 restructure
+
+Status: Historical · Last substantive change: 2026-10-16 · Audience: owner, contributors
+
+Where two documents disagreed, or a document disagreed with the code, the code-backed statement went into the living
+doc and the disagreement is recorded here. Items marked **owner decision** were left as they are.
+
+| # | Conflict | Evidence in code / repo | What the living docs now say |
+|---|---|---|---|
+| C1 | Old `ARCHITECTURE.md` §10 listed kiosk, transfers, department mode, utang enforcement, weight/bundle pricing as deferred; Essentials and the case study say they shipped (also React migration D3). | Kiosk, transfer, credit-ledger and pricing code exist in `backend/src` and `client/lib`. | [architecture/overview.md](../architecture/overview.md) §9: built. |
+| C2 | Executive overview and business rule 6 describe a "dual login" with device pairing code + PIN; diagram 5 shows `POST /auth/login`. | [auth.md](../architecture/auth.md) step 8 removed `/auth/login`; the "pairing code or PIN was not recognized" message no longer exists in `backend/src`. | Overview §5 links auth.md; diagrams README marks diagram 5 stale; a note was added above rule 6 in [business-rules.md](../architecture/business-rules.md). The diagram itself was not redrawn. |
+| C3 | ADR 0002 says Supabase Auth is not used. | auth.md: Supabase Auth checks passwords in Cloud mode; the API still issues its own JWTs. | Overview §2 table. ADR 0002 text unchanged. **Owner decision:** amend or supersede 0002. |
+| C4 | Hosting: Essentials says Render; the executive overview says Render/Vercel; the roadmap says the backend is Vercel-only; `vercel-deployment.md` says Vercel is an alternative to Render, not a replacement. | Both `render.yaml` and `backend/vercel.json` are tracked. | Overview §3 lists both configurations without claiming which is live. **Owner decision:** whether Render is retired (then ADR 0002 is superseded and `render.yaml` can go). |
+| C5 | Original design: local storage encrypted at rest (SQLCipher or platform encryption). | No SQLCipher in `client/pubspec.yaml`; the security assessment lists it as deferred/open (item 17). | Overview §5 states it is not implemented and links the assessment. |
+| C6 | ADR 0003 says no feature write path uses the offline queue; offline sales exist. | Flutter queued sales go to one-call checkout with `ClientSaleId` (checkout deploy note), not through `pending_sync_queue`. | Overview §6 describes both. ADR text unchanged. **Owner decision:** add a follow-up ADR or amend 0003. |
+| C7 | Original design said "REST/GraphQL" and "Riverpod or Bloc"; "ASP.NET Core or Node". | REST only, Riverpod, ASP.NET Core on .NET 9. | Overview states what is used. |
+| C8 | The two backup runbooks: `docs/BACKUPS.md` cited `scripts/backup_db.sh` and a tiered WAL/S3/Glacier strategy. | No `backup_db.sh` exists; nothing in the repo provisions WAL archiving or object storage. Local mode ships `backend/scripts/backup-local.ps1` / `restore-local.ps1`. | [operations/backups.md](../operations/backups.md) keeps both; the script is labelled a reference template and the tier table "intended strategy". |
+| C9 | `backend/docs/BACKUPS.md` linked `README.md#deployment-configuration` and mentioned "the transaction export below", which did not exist. | Root README has `## Deployment Modes`. | Link points at `#deployment-modes`; the dangling phrase was dropped. |
+| C10 | Deploy notes name `scripts/migrate-production.ps1`. | Only `scripts/migrate-production.sh` is tracked. | Deploy-notes README says so. Notes unchanged. |
+| C11 | U1 and U3 spec headers say "draft"; roadmap says U1 done, U3 implemented "not merged". | U1, U3, U4 and restock migrations are all on `origin/main` (2026-10-16). | [engineering/README.md](../engineering/README.md) table. Spec and roadmap text unchanged (roadmap is live handoff state; **owner** to refresh). |
+| C12 | `backend/Dockerfile.vercel` pointed at `docs/VERCEL-DEPLOYMENT.md`. | The file was at `backend/docs/VERCEL-DEPLOYMENT.md` (path relative to `backend/`, not broken but ambiguous). | Moved to [operations/vercel-deployment.md](../operations/vercel-deployment.md); the comment uses the repo-root path. |

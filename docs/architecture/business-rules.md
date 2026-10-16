@@ -1,5 +1,7 @@
 # Purch.io — Implemented Business Rules Specification
 
+Status: Living · Last substantive change: 2026-10-01 · Audience: contributors
+
 ---
 
 ## 1. Multi-Tenancy & Data Security Rules
@@ -14,6 +16,9 @@
 
 4. **PIN Complexity Rule**: Numeric PINs must be between 4 and 6 digits. Obvious sequential combinations (`1234`, `12345`, `123456`) and uniform repeated digits (`0000`, `1111`, `9999`) are strictly rejected (`PinPolicy.Validate`).
 5. **Password Complexity Rule**: Passwords must be at least 8 characters long, contain at least one uppercase letter, and contain at least one numeric digit (`PasswordPolicy.Validate`).
+> Note (2026-10-16): rule 6 describes the device-code + PIN sign-in that was removed in the login redesign
+> ([auth.md](auth.md), step 8). Kept for history; see [../history/doc-conflicts.md](../history/doc-conflicts.md) C2.
+
 6. **Credential Enumeration Defense**: Device code and PIN validation failures return identical HTTP status codes and error messages (`401 Unauthorized: The device pairing code or PIN was not recognized`) regardless of whether the device code or the PIN was incorrect.
 7. **Single-Use Refresh Tokens**: Redeeming a refresh token immediately records its `RevokedAt` timestamp. Re-presenting an already revoked refresh token invalidates the entire session chain.
 
