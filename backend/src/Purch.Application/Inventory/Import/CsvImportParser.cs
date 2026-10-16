@@ -32,6 +32,7 @@ public sealed record ParsedRow
     public string? Unit { get; init; }
     public bool? Active { get; init; }
     public decimal? CountedQty { get; init; }
+    public decimal? OpeningStock { get; init; }
     public string? Note { get; init; }
     public List<string> Errors { get; init; } = [];
 }
@@ -160,7 +161,7 @@ public static partial class CsvImportParser
 
     private static void ValidateHeader(List<string> header, ImportKind kind)
     {
-        var allowed = (kind == ImportKind.Catalog ? ImportColumns.Catalog : ImportColumns.Stock).Concat(ImportColumns.ReadOnly).ToHashSet();
+        var allowed = (kind == ImportKind.Catalog ? ImportColumns.Catalog.Concat(ImportColumns.CatalogImportOnly) : ImportColumns.Stock).Concat(ImportColumns.ReadOnly).ToHashSet();
         var seen = new HashSet<string>();
         foreach (var h in header)
         {
@@ -251,6 +252,7 @@ public static partial class CsvImportParser
             Unit = Cell("unit"),
             Active = active,
             CountedQty = Number("counted_qty"),
+            OpeningStock = Number("opening_stock"),
             Note = Cell("note"),
             Errors = errors,
         };

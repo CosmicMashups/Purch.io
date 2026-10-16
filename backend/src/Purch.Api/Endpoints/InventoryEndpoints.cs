@@ -1,10 +1,16 @@
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 using Purch.Application.Inventory;
+using Purch.Application.Inventory.Import;
 using Purch.Domain.Enums;
 
 namespace Purch.Api.Endpoints;
 
 public static class InventoryEndpoints
 {
+    /// <summary>The 5 MB file cap plus room for the multipart boundaries and the kind field.</summary>
+    private const long ImportRequestLimit = CsvImportParser.MaxBytes + (64 * 1024);
+
     public static IEndpointRouteBuilder MapInventoryEndpoints(this IEndpointRouteBuilder app)
     {
         var inventoryManager = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Warehouse) };
@@ -48,6 +54,76 @@ public static class InventoryEndpoints
             IInventoryMovementService movementService,
             CancellationToken cancellationToken) =>
             Results.Ok(await movementService.RecordAsync(request, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        // --- U3 — CSV import: upload, review (re-planned on the server), resolutions, commit (Admin/Manager approver PIN
+        // checked in the service). Cost columns are honoured only because only these roles reach the routes. ---
+        _ = app.MapPost("/inventory/imports", async (HttpRequest request, IImportService importService, CancellationToken cancellationToken) =>
+        {
+            // Refuse an oversized body before anything is buffered; the parser enforces the 5 MB file cap again.
+            if (request.ContentLength > ImportRequestLimit)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Payload too large.", detail: "The file is larger than 5 MB.");
+            }
+
+            var sizeFeature = request.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (sizeFeature is { IsReadOnly: false })
+            {
+                sizeFeature.MaxRequestBodySize = ImportRequestLimit;
+            }
+
+            if (!request.HasFormContentType)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Bad request.", detail: "Send the file as multipart/form-data.");
+            }
+
+            var form = await request.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("file");
+            if (file is null || file.Length == 0)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Bad request.", detail: "No file was uploaded or the file is empty.");
+            }
+
+            ImportKind? kind = form["kind"].ToString().Trim().ToLowerInvariant() switch
+            {
+                "catalog" => ImportKind.Catalog,
+                "stock" => ImportKind.Stock,
+                _ => null,
+            };
+            if (kind is null)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Bad request.", detail: "Kind must be catalog or stock.");
+            }
+
+            await using var stream = file.OpenReadStream();
+            return Results.Ok(await importService.UploadAsync(stream, kind.Value, request.Headers["Idempotency-Key"].ToString(), cancellationToken));
+        })
+            .WithMetadata(new RequestSizeLimitAttribute(ImportRequestLimit))
+            .DisableAntiforgery()
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapGet("/inventory/imports/{id:guid}", async (Guid id, IImportService importService, CancellationToken cancellationToken) =>
+            Results.Ok(await importService.GetAsync(id, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        _ = app.MapPut("/inventory/imports/{id:guid}/resolutions", async (
+            Guid id,
+            Dictionary<string, ImportResolutionDto> resolutions,
+            IImportService importService,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await importService.SaveResolutionsAsync(id, resolutions, cancellationToken)))
+            .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
+
+        // A stale preview is a 409 carrying the fresh plan and the changed rows; nothing was applied.
+        _ = app.MapPost("/inventory/imports/{id:guid}/commit", async (
+            Guid id,
+            CommitImportRequest request,
+            IImportService importService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await importService.CommitAsync(id, request, cancellationToken);
+            return result.Committed ? Results.Ok(result) : Results.Conflict(result);
+        })
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));
 
         // Review reveals expected quantities (even on a blind take), so only Admin/Manager may move a take to it.

@@ -255,49 +255,21 @@ public sealed class StockTakeService(
     /// movement. Returns null when the item or ingredient no longer exists.</summary>
     private async Task<(Guid? MovementId, decimal ResultingOnHand)> PostAdjustmentAsync(StockTake take, StockTakeLine line, CancellationToken cancellationToken)
     {
-        var variance = line.VarianceQty!.Value;
-        decimal resulting;
-        Guid? itemId = null;
-        Guid? inventoryItemId;
-        if (line.InventoryItemId is { } ingredientId)
-        {
-            var ingredient = await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken);
-            if (ingredient is null || ingredient.IsDeleted)
-            {
-                return (null, 0m);
-            }
-
-            ingredient.QuantityOnHand += variance;
-            resulting = ingredient.QuantityOnHand;
-            inventoryItemId = ingredient.Id;
-        }
-        else
-        {
-            var item = await itemRepository.GetByIdAsync(line.ItemId!.Value, cancellationToken);
-            if (item is null || item.IsDeleted)
-            {
-                return (null, 0m);
-            }
-
-            // Read before adjusting: the on-hand lookup may read the stored (pre-adjustment) figure.
-            resulting = (await itemStockService.GetOnHandAsync([item], CurrentTenantId, cancellationToken)).GetValueOrDefault(item.Id) + variance;
-            itemId = item.Id;
-            inventoryItemId = await itemStockService.AdjustAsync(item, variance, cancellationToken);
-        }
-
-        var movement = new InventoryMovement
-        {
-            TenantId = CurrentTenantId,
-            ItemId = itemId,
-            InventoryItemId = inventoryItemId,
-            BranchId = take.BranchId,
-            Type = MovementType.Adjustment,
-            Quantity = variance,
-            StaffUserId = CurrentUserId,
-            Note = $"Stock take: {take.Name}",
-        };
-        movementRepository.Add(movement);
-        return (movement.Id, resulting);
+        var posted = await StockPosting.PostAsync(
+            line.InventoryItemId is null ? line.ItemId : null,
+            line.InventoryItemId,
+            MovementType.Adjustment,
+            line.VarianceQty!.Value,
+            take.BranchId,
+            $"Stock take: {take.Name}",
+            CurrentTenantId,
+            CurrentUserId,
+            itemRepository,
+            inventoryItemRepository,
+            itemStockService,
+            movementRepository,
+            cancellationToken);
+        return posted is { } p ? (p.Movement.Id, p.ResultingOnHand) : (null, 0m);
     }
 
     private static void EnsureApplicable(StockTake take)

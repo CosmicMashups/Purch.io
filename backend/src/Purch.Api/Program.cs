@@ -260,6 +260,8 @@ builder.Services.AddScoped<IInventoryMovementRepository, EfInventoryMovementRepo
 builder.Services.AddScoped<IInventoryMovementService, InventoryMovementService>();
 builder.Services.AddScoped<IStockTakeRepository, EfStockTakeRepository>();
 builder.Services.AddScoped<IStockTakeService, StockTakeService>();
+builder.Services.AddScoped<Purch.Application.Inventory.Import.IImportBatchRepository, EfImportBatchRepository>();
+builder.Services.AddScoped<Purch.Application.Inventory.Import.IImportService, Purch.Application.Inventory.Import.ImportService>();
 builder.Services.AddScoped<IInventoryExportService, InventoryExportService>();
 builder.Services.AddScoped<IInventoryDashboardService, InventoryDashboardService>();
 builder.Services.AddScoped<IBranchTransferRepository, EfBranchTransferRepository>();

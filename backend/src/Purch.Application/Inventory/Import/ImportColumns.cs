@@ -10,6 +10,10 @@ public static class ImportColumns
     public static readonly string[] Catalog =
         ["type", "sku", "barcode", "name", "category", "price", "cost", "reorder_threshold", "unit", "active"];
 
+    /// <summary>Accepted by a catalog import but never exported: the opening stock of a NEW row, posted as a StockIn.
+    /// Ignored for rows that match an existing record (stock is only ever changed by a stock import's delta).</summary>
+    public static readonly string[] CatalogImportOnly = ["opening_stock"];
+
     public static readonly string[] Stock = ["type", "sku", "barcode", "name", "counted_qty", "note"];
 
     public static readonly string[] ReadOnly = ["id", "current_stock", "updated_at"];

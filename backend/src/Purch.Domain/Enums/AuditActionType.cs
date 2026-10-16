@@ -62,4 +62,8 @@ public enum AuditActionType
 
     /// <summary>A stock take was applied with an approver PIN; the entry lists counted, uncounted and skipped lines.</summary>
     StockTakeApplied,
+
+    /// <summary>An inventory CSV import was committed with an approver PIN; lists created categories and records,
+    /// the update count, stock movements, the batch id and the file hash.</summary>
+    InventoryImportCommitted,
 }
