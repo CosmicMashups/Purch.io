@@ -4,7 +4,7 @@ Read this first in a new session. It supersedes the unit order in the original p
 
 ## Where things stand
 - **U4 (Reports) has shipped** (on `origin/main`). Spec: `docs/superpowers/specs/2026-10-15-u4-reports-design.md`. Deploy: `docs/DEPLOY-NOTE-u4-reports.md`.
-- **U3 (Inventory depth) is in progress** on `feat/u3-inventory-depth`. Spec: `docs/superpowers/specs/2026-10-15-u3-inventory-depth-design.md` (variance is `counted - expected_at_count`, applied as a delta; import creates items/categories after user review).
+- **U3 (Inventory depth) is implemented** on `feat/u3-inventory-depth` (not merged, not pushed). Spec: `docs/superpowers/specs/2026-10-15-u3-inventory-depth-design.md`. Plan: `docs/superpowers/plans/2026-10-15-u3-inventory-depth.md`. Deploy: `docs/DEPLOY-NOTE-u3-inventory-depth.md`. Owner decisions: variance is `counted - expected_at_count` applied as a delta; import creates items/categories after user review; stock is tenant-wide (no per-branch); web only, Flutter unchanged. Verification: `.superpowers/sdd/2026-10-15-u3-inventory-depth/task-11-report.md`.
 - **U1 (POS foundations) is done and merged to `main`** at `d70be7c` (local, not pushed). Spec: `docs/superpowers/specs/2026-10-14-u1-pos-foundations-design.md`. Plan: `docs/superpowers/plans/2026-10-14-u1-pos-foundations.md`. Deploy steps: `docs/DEPLOY-NOTE-u1-pos-foundations.md`. Golden pricing cases for Flutter: `docs/superpowers/specs/u1-golden-cases.json`. Feature rows: `docs/system-analysis/10-feature-inventory.md`.
 - Last verified: backend unit 136 + integration 538 (clean, no cleanup failures); web 1053 tests, build and lint clean; Playwright has 8 failures that also fail on the pre-U1 baseline `12f3b3f` (admin x2, business-dialogs, dashboards, offline x2, pos device-gate, roles kiosk). They are not caused by U1 and still need their own look.
 - Flutter client is **unchanged**. No pricing/tier gating exists anywhere; a later session handles tiers.
@@ -52,3 +52,19 @@ Scope: valuation (on-hand x cost, by category/branch), COGS from line snapshots,
 - Approver is not branch-scoped (existing service behaviour).
 - Flutter (U6): must never receive a Parked transaction (status index 5 exceeds its enum); open items arrive with an all-zero `itemId`; local `PricingEngine` must mirror manual discounts, split tender, VAT stamping and the cart cap (use the golden-case file); offline checkout cannot carry open items or split tender yet.
 - Web polish: raw gray/red colours in `EmptyState`/`ErrorState` and `ItemDialog` CostField; switches at 32px; margin hint not linked by `aria-describedby`.
+
+## U3 Inventory depth: follow-ups and rulings to confirm (2026-10-16)
+Open follow-ups:
+- Per-branch stock (valuation, count and import are tenant-wide today).
+- Flutter parity (U6).
+- Branch/idempotency minors: a stock import needs a branch for actors with none (`RequiresBranch`); stock-take apply rewrites `UpdatedAt` on every line; the in-transaction stale check for import commit is unit-covered only; COGS reads line rows up to 366 days (not SQL-aggregated).
+- Web minors: Review shows lines twice for Admin/Manager; item picker includes service/combo/recipe items; `day()` hardcodes +8h.
+
+Rulings to confirm (product calls made during the build):
+- `/review` is Manager/Admin only (blind-count integrity): Warehouse counters need a manager to move a take to Review.
+- Apply may drive stock negative (delta semantic); negative lines are listed in the audit.
+- No Draft scope edit (cancel and recreate); no back-to-Counting transition (recount in Review instead).
+- Import near-match thresholds: distance 1 needs both keys >= 4 chars, distance 2 both >= 6, keys differing only in digits are not near. Cost if wrong: a typo on a short name creates a near-duplicate instead of asking.
+- Import: negative price/cost/reorder/counted_qty are row errors; `opening_stock` on matched rows is a row error; rows with no SKU/barcode match by name key; an expired batch returns 400 (not 410).
+- Import commit takes an optional BranchId (required for stock imports); web admins must pick a branch.
+- Line-level `xmin` concurrency token on `StockTakeLine` (own migration) instead of bumping the take row per count.
