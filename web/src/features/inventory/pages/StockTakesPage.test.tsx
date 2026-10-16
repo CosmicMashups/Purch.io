@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { catalogApi } from '../../catalog/api';
 import { renderPage, signInAs } from '../../../test/render';
 import { inventoryApi } from '../api';
 import { StockTakeScopeKind, StockTakeStatus } from '../types';

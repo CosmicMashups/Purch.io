@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardKeys } from '../dashboard/queries';
 import { MOVEMENT_PAGE_SIZE, inventoryApi } from './api';
-import type { InventoryItem, MovementCursor, MovementFilter } from './types';
+import type { CreateStockTakeRequest, InventoryItem, MovementCursor, MovementFilter, StockTake } from './types';
 
 export const inventoryKeys = {
   items: ['inventory-items'] as const,
