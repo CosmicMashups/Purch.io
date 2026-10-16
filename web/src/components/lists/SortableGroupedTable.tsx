@@ -71,7 +71,7 @@ export function SortableGroupedTable<T>({
             onReorder(arrayMove(ids, from, to));
           };
           return (
-            <DndContext key={group.id} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <DndContext key={group.id} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} accessibility={{ container: document.body }}>
               <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                 <tbody className="divide-y divide-gray-100 border-t border-gray-200">
                   <tr className="bg-gray-50">
