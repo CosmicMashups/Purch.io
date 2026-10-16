@@ -100,6 +100,8 @@ Every installation runs in one of two deployment modes, set by the `PURCH_DEPLOY
 
 ## Documentation
 
+Contributors: start with [BRAIN.md](BRAIN.md) (where to change what) and [SECOND-BRAIN.md](SECOND-BRAIN.md) (full map). Tenants: the [user manual](docs/manual/README.md). Feature gaps vs competitors: [docs/product/competitor-gap-status.md](docs/product/competitor-gap-status.md).
+
 All project documentation is indexed in [docs/README.md](docs/README.md): product docs, the [architecture overview](docs/architecture/overview.md), [decision records](docs/adr/README.md), [operations runbooks and deploy notes](docs/operations/deploy-notes/README.md), [engineering specs and the roadmap](docs/engineering/README.md), and historical material.
 
 ---

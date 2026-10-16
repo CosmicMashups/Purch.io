@@ -7,6 +7,7 @@ Every document under `docs/` is listed here. Start with the path for your role.
 ## Start here
 
 **New contributor**
+0. [BRAIN.md](../BRAIN.md) then [SECOND-BRAIN.md](../SECOND-BRAIN.md): task router and deep map of the codebase.
 1. [Root README](../README.md): what the repo contains, quick start, tests.
 2. [architecture/overview.md](architecture/overview.md): the one architecture overview.
 3. [engineering/roadmap.md](engineering/roadmap.md): current state, standing decisions, open follow-ups (read before starting work).
@@ -22,6 +23,7 @@ Every document under `docs/` is listed here. Start with the path for your role.
 5. [installer/README.md](../installer/README.md): Local (on-prem) mode packaging.
 
 **Product**
+0. [manual/README.md](manual/README.md): tenant user manual (web app), and [product/competitor-gap-status.md](product/competitor-gap-status.md): which competitor gaps are closed.
 1. [product/proposal.md](product/proposal.md), then [product/requirements.md](product/requirements.md).
 2. [product/workflow.md](product/workflow.md): non-technical day-to-day walkthrough.
 3. [product/pages.md](product/pages.md): page and component specification.

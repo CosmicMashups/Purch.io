@@ -3,6 +3,7 @@
 Read this first in a new session. It supersedes the unit order in the original plan header.
 
 ## Where things stand
+- **Gap audit (2026-10-16):** see `docs/product/competitor-gap-status.md`. Open P1: customer attach, loyalty, CRM (U2); time clock, custom roles (U5).
 - **U4 (Reports) has shipped** (on `origin/main`). Spec: `docs/engineering/specs/2026-10-15-u4-reports-design.md`. Deploy: `docs/operations/deploy-notes/u4-reports.md`.
 - **U3 (Inventory depth) has shipped** (merged to `main` at `bc323cb`). Spec: `docs/engineering/specs/2026-10-15-u3-inventory-depth-design.md`. Plan: `docs/engineering/plans/2026-10-15-u3-inventory-depth.md`. Deploy: `docs/operations/deploy-notes/u3-inventory-depth.md`. Owner decisions: variance is `counted - expected_at_count` applied as a delta; import creates items/categories after user review; stock is tenant-wide (no per-branch); web only, Flutter unchanged.
 - **U1 (POS foundations) is done and merged to `main`** at `d70be7c` (local, not pushed). Spec: `docs/engineering/specs/2026-10-14-u1-pos-foundations-design.md`. Plan: `docs/engineering/plans/2026-10-14-u1-pos-foundations.md`. Deploy steps: `docs/operations/deploy-notes/u1-pos-foundations.md`. Golden pricing cases for Flutter: `docs/engineering/specs/u1-golden-cases.json`. Feature rows: `docs/product/feature-inventory.md`.
