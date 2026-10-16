@@ -2,7 +2,7 @@
 
 Vercel doesn't have a native .NET runtime, but it does run arbitrary Docker
 images as Vercel Functions ("container" services). `Dockerfile.vercel` and
-`vercel.json` in this directory set that up. This is an alternative to the
+`vercel.json` in `backend/` set that up. This is an alternative to the
 existing Render deployment (`render.yaml`), not a replacement for it — both
 can point at the same image with minor differences.
 
@@ -70,10 +70,10 @@ can point at the same image with minor differences.
 - **4.5 MB request/response body limit.** Enforced by the Vercel Functions
   layer in front of the container, not configurable from the Dockerfile.
 - **No persistent disk.** `POST /uploads/image` now writes to Supabase
-  Storage in Cloud mode ([SupabaseFileStorage.cs](../src/Purch.Infrastructure/Storage/SupabaseFileStorage.cs)),
+  Storage in Cloud mode ([SupabaseFileStorage.cs](../../backend/src/Purch.Infrastructure/Storage/SupabaseFileStorage.cs)),
   selected via `IFileStorage` based on `PURCH_DEPLOYMENT_MODE`
-  ([Program.cs](../src/Purch.Api/Program.cs)) — local disk
-  ([LocalFileStorage.cs](../src/Purch.Infrastructure/Storage/LocalFileStorage.cs))
+  ([Program.cs](../../backend/src/Purch.Api/Program.cs)) — local disk
+  ([LocalFileStorage.cs](../../backend/src/Purch.Infrastructure/Storage/LocalFileStorage.cs))
   is only used in Local mode, where a single long-lived instance owns its
   own disk. Make sure the `SUPABASE_STORAGE_BUCKET` bucket exists and is
   public in the Supabase dashboard before deploying.

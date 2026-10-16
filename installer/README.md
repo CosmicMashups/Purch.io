@@ -1,6 +1,6 @@
 # Local/On-Prem Installer
 
-Packaging for the **Local** deployment mode (see `docs/ARCHITECTURE.md` and
+Packaging for the **Local** deployment mode (see [docs/architecture/overview.md](../docs/architecture/overview.md) and
 the implementation plan): a dedicated, single-tenant Purch.io backend +
 Postgres running on a machine inside the store's own network, reachable by
 every POS/kiosk device on that LAN. This is about **data isolation**, not

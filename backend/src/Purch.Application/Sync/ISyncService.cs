@@ -2,7 +2,7 @@ namespace Purch.Application.Sync;
 
 public interface ISyncService
 {
-    /// <summary>Processes a batch in one round trip — see docs/ARCHITECTURE.md §3
+    /// <summary>Processes a batch in one round trip — see docs/architecture/overview.md §2
     /// ("don't make the client sync item-by-item").</summary>
     Task<SyncBatchResultDto> SyncBatchAsync(SyncBatchRequest request, CancellationToken cancellationToken = default);
 

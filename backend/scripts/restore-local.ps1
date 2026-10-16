@@ -8,7 +8,7 @@
     Destructive: pg_restore --clean drops existing objects before recreating them, so this overwrites the
     target database. Requires typing the database name to confirm, unless -Force is passed (for a scripted
     restore drill). Always restore into a throwaway database first to verify a backup is actually usable —
-    see docs/BACKUPS.md's restore-drill section — before ever pointing this at production data.
+    see docs/operations/backups.md's restore-drill section — before ever pointing this at production data.
 
 .PARAMETER BackupFolder
     A folder created by backup-local.ps1 (containing database.dump, and optionally an uploads\ subfolder).

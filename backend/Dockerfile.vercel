@@ -1,4 +1,4 @@
-# Vercel container deployment — see docs/VERCEL-DEPLOYMENT.md for the full
+# Vercel container deployment — see docs/operations/vercel-deployment.md for the full
 # setup (env vars, migrations, and the local-disk-uploads caveat). This is a
 # separate file from Dockerfile (Render) because Vercel's container runtime
 # has different constraints: it runs the image as a Vercel Function, so it

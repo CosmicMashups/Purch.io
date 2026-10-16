@@ -22,7 +22,7 @@ part 'app_database.g.dart';
 /// The one local SQLite database backing the app's offline cache and write
 /// queue. Deliberately a small, hand-picked subset of the backend's schema —
 /// only what a device needs cached/queued locally, not a full mirror — see
-/// docs/ARCHITECTURE.md §2 ("Local persistence").
+/// docs/architecture/overview.md §2 ("Local persistence").
 @DriftDatabase(
   tables: [
     PendingSyncQueue,

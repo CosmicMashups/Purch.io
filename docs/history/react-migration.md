@@ -146,7 +146,7 @@ This is a **parity gap versus Flutter**, chosen deliberately to avoid duplicatin
 | D1 | DOCUMENTATION CONFLICT | WORKFLOW.md/PAGES.md describe five tabs including Reports; Flutter removed the Reports tab. Web follows Flutter. |
 | D2 | DOCUMENTATION CONFLICT | Docs say Home/Sell; Flutter labels the tabs Dashboard/Cashier. Web uses Home/Sell. |
 | D3 | DOCUMENTATION CONFLICT | ARCHITECTURE.md section 10 ("deferred") is stale; the case study says those items shipped. |
-| D4 | DOCUMENTATION | `docs/WEB-ARCHITECTURE.md` was empty; now points here. |
+| D4 | DOCUMENTATION | The web-architecture stub was empty and pointed here; it is now merged into `docs/architecture/overview.md` (2026-10-16). |
 | D5 | IMPLEMENTATION | `web-ci.yml` runs lint and build but not `npm test`. |
 | G1 | BACKEND GAP | No OpenAPI/Swagger; types are hand-written. |
 | G2 | BACKEND GAP | CORS is blocked unless `CORS_ALLOWED_ORIGINS` includes the web origin (deployment config). **Confirmed 2026-09-24:** an OPTIONS preflight from `http://localhost:5173` to `purch-io-backend.vercel.app/auth/login` returns 405 with no CORS headers. The Vercel env var must be set to the web origin(s); in dev, use the Vite proxy. |

@@ -1,4 +1,4 @@
-# Render Blueprint for the Cloud deployment mode — see docs/ARCHITECTURE.md
+# Render Blueprint for the Cloud deployment mode — see docs/architecture/overview.md
 # and the implementation plan's "Deployment Modes" section. Render deploys
 # automatically from this file once the repo is connected as a Blueprint in
 # the Render dashboard (https://dashboard.render.com/blueprints); nothing in

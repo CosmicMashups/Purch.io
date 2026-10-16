@@ -5,7 +5,7 @@ using Purch.Domain.Entities;
 namespace Purch.Application.Sync;
 
 /// <summary>Phase 6 — the server side of the offline sync engine (see
-/// docs/adr/0003, docs/ARCHITECTURE.md §5). Two guarantees, both built on
+/// docs/adr/0003, docs/architecture/overview.md §6). Two guarantees, both built on
 /// the SyncedRecord ledger:
 /// 1. Idempotency: replaying an already-recorded IdempotencyKey (e.g. after
 ///    a client retry following a dropped response) is a safe no-op.

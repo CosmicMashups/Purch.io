@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 9 Minimal API, EF Core + Postgres (Testcontainers integration tests), React + Vite + Tailwind v4, react-query, react-hook-form + zod, vitest, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-14-u1-pos-foundations-design.md`
+**Spec:** `docs/engineering/specs/2026-10-14-u1-pos-foundations-design.md`
 
 ## Global Constraints
 
@@ -244,8 +244,8 @@
 
 - [ ] **Step 1:** Run full backend suite `dotnet test` (D:\dotnet-sdk) and `dotnet ef migrations has-pending-model-changes`. Expect all green, no pending changes.
 - [ ] **Step 2:** `npm test`, `npm run build`, lint, `npm run e2e` in `web/`. Expect green.
-- [ ] **Step 3:** Update `docs/system-analysis/10-feature-inventory.md` with rows POS-15..POS-21 (park, resume, discard, manual discount, price override, open item, split tender) and `PRODUCT.md` "Evidence on Hand" if counts changed.
-- [ ] **Step 4:** Record golden pricing cases (manual discount, split tender totals, VAT stamp) in `docs/superpowers/specs/u1-golden-cases.json` for U6 Flutter mirroring. Commit; open PR.
+- [ ] **Step 3:** Update `docs/product/feature-inventory.md` with rows POS-15..POS-21 (park, resume, discard, manual discount, price override, open item, split tender) and `PRODUCT.md` "Evidence on Hand" if counts changed.
+- [ ] **Step 4:** Record golden pricing cases (manual discount, split tender totals, VAT stamp) in `docs/engineering/specs/u1-golden-cases.json` for U6 Flutter mirroring. Commit; open PR.
 
 ## Notes
 - U1.5 (attach customer) is intentionally shipped as the `Transaction.CustomerId` column only (Task 1); its endpoint lands in U2 with the `Customer` entity, resolving the coupling flagged in the spec.

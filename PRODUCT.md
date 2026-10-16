@@ -37,11 +37,11 @@ Config-driven, offline-first POS and store management system for Philippine SMEs
 ## Brand Commitments
 - Name: Purch.io
 - Assets: Logo square icon (client/assets/logo.jpg), horizontal wordmark (client/assets/wordmark.png).
-- Token system target: docs/design/ (scaffolded for design tokens).
+- Token system target: [docs/design/](docs/design/README.md) ([tokens.json](docs/design/tokens.json)).
 - Dynamic branding capability: Merchants can configure logo, primary color, and fonts per tenant.
 
 ## Evidence on Hand
-- Full documentation suite (docs/PROPOSAL.md, ARCHITECTURE.md, ARCHITECTURE-ESSENTIALS.md, PAGES.md, PROJECT-CASE-STUDY.md).
+- Full documentation suite, indexed in [docs/README.md](docs/README.md) (proposal, architecture overview, page spec, case study).
 - Brand assets: client/assets/logo.jpg, client/assets/wordmark.png.
 - 145 passing unit & widget tests in client/test/.
 

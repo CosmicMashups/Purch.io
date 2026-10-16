@@ -42,4 +42,4 @@ Commands:
 - `npm run preview:cf`: Test the Cloudflare edge build locally with Wrangler.
 - `npm run deploy:cf`: Build and deploy to Cloudflare.
 
-For detailed setup instructions, CI/CD, and backend CORS configuration, see [docs/CLOUDFLARE-DEPLOYMENT.md](../docs/CLOUDFLARE-DEPLOYMENT.md).
+For detailed setup instructions, CI/CD, and backend CORS configuration, see [docs/operations/cloudflare-deployment.md](../docs/operations/cloudflare-deployment.md).

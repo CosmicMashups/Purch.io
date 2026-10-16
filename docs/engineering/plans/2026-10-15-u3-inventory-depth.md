@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET minimal APIs + EF Core/Postgres (backend/src), xUnit + Docker integration tests, React + vitest + Playwright (web/src).
 
-**Spec:** `docs/superpowers/specs/2026-10-15-u3-inventory-depth-design.md`
+**Spec:** `docs/engineering/specs/2026-10-15-u3-inventory-depth-design.md`
 
 ## Global Constraints
 - Branch `feat/u3-inventory-depth`; no push, no PR, no Co-Authored-By or Claude/Anthropic text in commits (tell every subagent).
@@ -156,7 +156,7 @@
 - [ ] **Step 2-4:** Implement; `npx vitest run src/features/inventory`; commit `feat(web): inventory import wizard`.
 
 ### Task 11: E2E, docs, full verification
-**Files:** Create `web/e2e/inventory-depth.e2e.ts`; modify `docs/system-analysis/10-feature-inventory.md` (INV-17..), create `docs/DEPLOY-NOTE-u3-inventory-depth.md` (two migrations, RLS, no Flutter change), update `P1-roadmap-status.md`.
+**Files:** Create `web/e2e/inventory-depth.e2e.ts`; modify `docs/product/feature-inventory.md` (INV-17..), create `docs/operations/deploy-notes/u3-inventory-depth.md` (two migrations, RLS, no Flutter change), update `docs/engineering/roadmap.md`.
 
 - [ ] **Step 1:** E2E: stock-take count -> review -> apply with PIN; import upload -> resolve -> commit.
 - [ ] **Step 2:** Run web build, lint, vitest, Playwright (expect only the 8 known failures), then full backend suite once, no edits afterwards.

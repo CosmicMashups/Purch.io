@@ -32,7 +32,7 @@ function toBranding(s: TenantSettings): TenantBranding {
 /**
  * Applies tenant branding as CSS variables. GET /tenant/settings is Admin-only, so other roles
  * render with the last branding an Admin loaded on this device, or the Purch.io defaults.
- * See docs/REACT-MIGRATION.md gap G10.
+ * See docs/history/react-migration.md gap G10.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { claims } = useSession();

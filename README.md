@@ -87,21 +87,20 @@ Built for mission-critical operations, Purch.io features offline-resilient local
   - `lib/core/`: Theming tokens, network clients, Drift database, and shared UI components (`PurchImage`, `EmptyStateView`, `ErrorStateView`).
   - `lib/features/`: Feature modules for Auth, Catalog, POS, Kiosk, Inventory, Credit Ledger, and Reports.
   - `test/`: 230+ automated unit and widget regression tests.
-- **`docs/`**: Architecture decision records (`docs/adr/`), specifications, database schemas, and design token documentation (`docs/design/`).
+- **`docs/`**: All documentation, indexed in [docs/README.md](docs/README.md): product, architecture, ADRs (`docs/adr/`), operations, design tokens (`docs/design/`), engineering specs, history.
 - **`installer/`**: Deployment configurations for dedicated on-premise deployments (Docker Compose / Windows Service).
 
 ---
 
 ## Deployment Modes
 
-Every installation operates in one of two deployment modes, controlled by the `PURCH_DEPLOYMENT_MODE` environment variable:
+Every installation runs in one of two deployment modes, set by the `PURCH_DEPLOYMENT_MODE` environment variable: **Cloud** (shared multi-tenant backend on Supabase) or **Local** (one dedicated backend + Postgres on the merchant's LAN, migrating itself on first boot). Details: [architecture overview, deployment modes](docs/architecture/overview.md#3-deployment-modes).
 
-1. **Cloud Mode (`Cloud`)**:
-   - Multi-tenant shared backend hosted on cloud container infrastructure (e.g. Render).
-   - Backed by managed PostgreSQL (e.g. Supabase) with tenant isolation enforced at the data layer via JWT claim inspection and EF Core global query filters.
-2. **Local Mode (`Local`)**:
-   - Single-tenant, dedicated installation running on a merchant's on-premises LAN server (Docker or Windows Service).
-   - Automatically executes database migrations against an isolated PostgreSQL instance upon first boot, ensuring full offline functionality on local network segments.
+---
+
+## Documentation
+
+All project documentation is indexed in [docs/README.md](docs/README.md): product docs, the [architecture overview](docs/architecture/overview.md), [decision records](docs/adr/README.md), [operations runbooks and deploy notes](docs/operations/deploy-notes/README.md), [engineering specs and the roadmap](docs/engineering/README.md), and historical material.
 
 ---
 
@@ -181,7 +180,7 @@ Open <http://localhost:5173>. In development the web app calls `/api`, which Vit
 - **Business → Devices**: add a device (Register, Kiosk, Order Board, Kitchen Display, Warehouse, or Customer Display). You get a one-time pairing code. Open `/pair` in that device's browser and enter it. The device then keeps its own revocable credential.
 - Registers and Warehouse devices lock themselves; staff unlock them at `/unlock` with their own PIN.
 
-How sign-in works, in short: **people** sign in with email and password, or unlock a paired till with their PIN; **devices** are paired once with a short-lived code and never hold a person's password. The full design is in [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md).
+How sign-in works, in short: **people** sign in with email and password, or unlock a paired till with their PIN; **devices** are paired once with a short-lived code and never hold a person's password. The full design is in [docs/architecture/auth.md](docs/architecture/auth.md).
 
 ---
 
@@ -212,7 +211,7 @@ Never commit real keys. `.env`, `.env.local`, and `.local-storage/` are git-igno
 
 - **Local mode** migrates automatically at startup.
 - **Cloud mode** does not. Run `scripts/migrate-production.sh` (or the `.ps1` / `.bat` version) against the target database before deploying, or call the CLI directly: `dotnet run --project backend/src/Purch.Api -- migrate`.
-- **Upgrading an installation that used the old PIN-at-a-pairing-code sign-in:** after `migrate`, run `dotnet run --project backend/src/Purch.Api -- migrate-legacy` once. It carries owners over, ends old sessions, sets old devices back to waiting for a one-time code, and prints a **single-use claim link** for any owner who never had an email and password. Those links appear only in that command's output. See [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md). A brand-new database does not need this.
+- **Upgrading an installation that used the old PIN-at-a-pairing-code sign-in:** after `migrate`, run `dotnet run --project backend/src/Purch.Api -- migrate-legacy` once. It carries owners over, ends old sessions, sets old devices back to waiting for a one-time code, and prints a **single-use claim link** for any owner who never had an email and password. Those links appear only in that command's output. See [docs/architecture/auth.md](docs/architecture/auth.md). A brand-new database does not need this.
 
 ---
 
@@ -279,10 +278,10 @@ Chrome/web is not a supported Flutter target (the offline Drift database is not 
 
 ### Deployment
 
-- **Cloud:** backend on Vercel (`backend/vercel.json`, `backend/Dockerfile.vercel`) or Render (`render.yaml`), with Supabase for Postgres, Auth, and storage; web app on Cloudflare ([docs/CLOUDFLARE-DEPLOYMENT.md](docs/CLOUDFLARE-DEPLOYMENT.md)) or Vercel (`web/vercel.json`). CI workflows are in `.github/workflows/`.
+- **Cloud:** backend on Vercel (`backend/vercel.json`, `backend/Dockerfile.vercel`) or Render (`render.yaml`), with Supabase for Postgres, Auth, and storage; web app on Cloudflare ([docs/operations/cloudflare-deployment.md](docs/operations/cloudflare-deployment.md)) or Vercel (`web/vercel.json`). CI workflows are in `.github/workflows/`.
 - **On-premises:** see [installer/README.md](installer/README.md) (Docker Compose or a Windows service).
 
-Further reading: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/WEB-ARCHITECTURE.md](docs/WEB-ARCHITECTURE.md), [docs/AUTH-REDESIGN.md](docs/AUTH-REDESIGN.md), [docs/BACKUPS.md](docs/BACKUPS.md).
+Further reading: [docs/architecture/overview.md](docs/architecture/overview.md), [docs/architecture/auth.md](docs/architecture/auth.md), [docs/operations/backups.md](docs/operations/backups.md), [docs/operations/vercel-deployment.md](docs/operations/vercel-deployment.md), [deploy notes](docs/operations/deploy-notes/README.md).
 
 ---
 

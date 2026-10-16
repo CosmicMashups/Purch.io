@@ -9,7 +9,7 @@ public class ReceiptSequenceConfiguration : IEntityTypeConfiguration<ReceiptSequ
     public void Configure(EntityTypeBuilder<ReceiptSequence> builder)
     {
         // One independently-sequential series per (tenant, branch, device) — per Machine
-        // Identification Number, not one company-wide counter. See docs/ARCHITECTURE.md §8.
+        // Identification Number, not one company-wide counter. See docs/architecture/overview.md §4.
         _ = builder.HasIndex(r => new { r.TenantId, r.BranchId, r.DeviceId }).IsUnique();
     }
 }

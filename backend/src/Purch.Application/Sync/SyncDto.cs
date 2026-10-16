@@ -1,7 +1,7 @@
 namespace Purch.Application.Sync;
 
 /// <summary>One queued offline write, as the client's local
-/// pending_sync_queue table stores it — see docs/ARCHITECTURE.md §5.</summary>
+/// pending_sync_queue table stores it — see docs/architecture/overview.md §6.</summary>
 public sealed record SyncItemRequest(
     string IdempotencyKey,
     string EntityType,

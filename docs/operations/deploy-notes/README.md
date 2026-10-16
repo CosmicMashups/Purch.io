@@ -6,7 +6,7 @@ One note per shipped change set that needs deploy steps, oldest first. Read the 
 
 | Date (git) | Note | Covers |
 |---|---|---|
-| 2026-09-20 | [checkout-and-offline-sales.md](checkout-and-offline-sales.md) | One-call checkout, Flutter offline sales, Z-reading fix (formerly in `backend/docs/`) |
+| 2026-09-20 | [checkout-and-offline-sales.md](checkout-and-offline-sales.md) | One-call checkout, Flutter offline sales, Z-reading fix (moved from the backend folder; see the history index) |
 | 2026-10-15 | [u1-pos-foundations.md](u1-pos-foundations.md) | U1: parked carts, split tender, manual discount / price override, open items, cost and VAT stamping |
 | 2026-10-15 | [u4-reports.md](u4-reports.md) | U4: reporting endpoints and two indexes |
 | 2026-10-16 | [u3-inventory-depth.md](u3-inventory-depth.md) | U3: valuation, COGS, stock-take, CSV import/export |

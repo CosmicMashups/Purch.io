@@ -10,12 +10,12 @@ The following files prepare the web client for Cloudflare Pages:
 
 | File | Purpose |
 |---|---|
-| [`web/public/_redirects`](file:///d:/Projects/Research%20Projects/Purch.io/web/public/_redirects) | SPA fallback rewrite rule (`/*  /index.html  200`) so direct navigation and refreshes on client routes (e.g. `/sell`, `/kiosk`, `/inventory`, `/business`) do not return 404s. |
-| [`web/public/_headers`](file:///d:/Projects/Research%20Projects/Purch.io/web/public/_headers) | Sets security headers (`nosniff`, `SAMEORIGIN`, permissions policy), enforces revalidation for `index.html` on new releases, and sets 1-year immutable caching for hashed files in `/assets/*`. |
-| [`web/wrangler.jsonc`](file:///d:/Projects/Research%20Projects/Purch.io/web/wrangler.jsonc) | Cloudflare Pages configuration declaring project name (`purch-io-web`), build output directory (`./dist`), and compatibility date. |
-| [`web/.nvmrc`](file:///d:/Projects/Research%20Projects/Purch.io/web/.nvmrc) | Enforces Node.js version `22` in Cloudflare's build runners. |
-| [`.github/workflows/web-deploy.yml`](file:///d:/Projects/Research%20Projects/Purch.io/.github/workflows/web-deploy.yml) | Automated deployment workflow via GitHub Actions and Wrangler. |
-| [`web/package.json`](file:///d:/Projects/Research%20Projects/Purch.io/web/package.json) | Includes `wrangler` dev dependency and scripts `preview:cf` and `deploy:cf`. |
+| ~~`web/public/_redirects`~~ | Removed in commit `9505ef7` (2026-09-25). SPA fallback for client routes (e.g. `/sell`, `/kiosk`, `/inventory`, `/business`) is now `"not_found_handling": "single-page-application"` in `web/wrangler.jsonc`. |
+| [`web/public/_headers`](../../web/public/_headers) | Sets security headers (`nosniff`, `SAMEORIGIN`, permissions policy), enforces revalidation for `index.html` on new releases, and sets 1-year immutable caching for hashed files in `/assets/*`. |
+| [`web/wrangler.jsonc`](../../web/wrangler.jsonc) | Cloudflare Pages configuration declaring project name (`purch-io-web`), build output directory (`./dist`), and compatibility date. |
+| [`web/.nvmrc`](../../web/.nvmrc) | Enforces Node.js version `22` in Cloudflare's build runners. |
+| [`.github/workflows/web-deploy.yml`](../../.github/workflows/web-deploy.yml) | Automated deployment workflow via GitHub Actions and Wrangler. |
+| [`web/package.json`](../../web/package.json) | Includes `wrangler` dev dependency and scripts `preview:cf` and `deploy:cf`. |
 
 ---
 
@@ -80,7 +80,7 @@ npx wrangler pages deploy dist --branch=preview
 
 The web client runs as a Single Page Application in the browser. In production, calls to the backend API (`https://purch-io-backend.vercel.app` or Render) are cross-origin requests.
 
-The backend requires the web origin to be listed in `CORS_ALLOWED_ORIGINS` (see [Program.cs](file:///d:/Projects/Research%20Projects/Purch.io/backend/src/Purch.Api/Program.cs#L240-L251)).
+The backend requires the web origin to be listed in `CORS_ALLOWED_ORIGINS` (see [Program.cs](../../backend/src/Purch.Api/Program.cs#L240-L251)).
 
 ### Steps to update backend CORS:
 

@@ -7,7 +7,7 @@
 
 .DESCRIPTION
     Local mode has no managed backup service behind it (unlike Cloud mode's Supabase, which takes its own
-    daily backups/PITR — see docs/BACKUPS.md) — this script exists to give an on-prem install the same
+    daily backups/PITR — see docs/operations/backups.md) — this script exists to give an on-prem install the same
     safety net. Reads LOCAL_DB_CONNECTION_STRING and LOCAL_STORAGE_PATH the same way the app itself does
     (environment variables, or a -EnvFile of KEY=VALUE lines), so it stays correct if either changes.
 

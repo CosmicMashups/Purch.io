@@ -80,4 +80,4 @@ Unit: variance maths (post-count sale does not create phantom variance), normali
 Blind mode hides expected only while Counting; import caps 5,000/5 MB; `asOf` valuation is "now" only (no historical valuation).
 
 ## Housekeeping
-Update `docs/superpowers/plans/P1-roadmap-status.md` (U4 merged, U3 in progress).
+Update `docs/engineering/roadmap.md` (U4 merged, U3 in progress).

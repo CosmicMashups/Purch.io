@@ -57,11 +57,11 @@ Purch.io is architected for zero-downtime store operations, even during complete
 
 ## Design System & Unified Media (`PurchImage`)
 
-The client UI is driven by a centralized design token system ([`lib/core/theming/app_tokens.dart`](file:///d:/Projects/Research%20Projects/Purch.io/client/lib/core/theming/app_tokens.dart)):
+The client UI is driven by a centralized design token system ([`lib/core/theming/app_tokens.dart`](lib/core/theming/app_tokens.dart)):
 - **Color Palette**: Brand Ultramarine (`#1E40AF`), Warm Amber alerts (`#D97706`), and Emerald positive indicators (`#059669`) set against high-contrast Slate neutrals.
 - **Tabular Figures**: All monetary amounts (`₱`) utilize `FontFeature.tabularFigures()` so financial columns align without visual jitter during high-speed scanning.
-- **Standardized State Handling**: Every screen incorporates dedicated [`EmptyStateView`](file:///d:/Projects/Research%20Projects/Purch.io/client/lib/core/widgets/empty_state_view.dart) and [`ErrorStateView`](file:///d:/Projects/Research%20Projects/Purch.io/client/lib/core/widgets/error_state_view.dart) components featuring clear action triggers rather than blank screens or raw exception traces.
-- **Unified Media Resolver ([`PurchImage`](file:///d:/Projects/Research%20Projects/Purch.io/client/lib/core/widgets/purch_image.dart))**:
+- **Standardized State Handling**: Every screen incorporates dedicated [`EmptyStateView`](lib/core/widgets/empty_state_view.dart) and [`ErrorStateView`](lib/core/widgets/error_state_view.dart) components featuring clear action triggers rather than blank screens or raw exception traces.
+- **Unified Media Resolver ([`PurchImage`](lib/core/widgets/purch_image.dart))**:
   - Automatically detects and resolves local bundled assets (`assets/...`), dynamic backend uploads (`/uploads/...` with base URL prepending), and remote CDN URLs.
   - Features shimmer placeholders during load states and automatic fallback to default brand assets on connection failures.
 

@@ -22,7 +22,7 @@ public static class PosEndpoints
     {
         var posOperator = new[] { nameof(Role.Admin), nameof(Role.Manager), nameof(Role.Cashier) };
         // Voiding a sale and applying an after-the-fact discount are sensitive,
-        // audit-trailed actions per docs/WORKFLOW.md §7 — owner/manager only.
+        // audit-trailed actions per docs/product/workflow.md §7 — owner/manager only.
         var posSupervisor = new[] { nameof(Role.Admin), nameof(Role.Manager) };
 
         // --- Cart engine — one in-progress Open transaction per device ---
