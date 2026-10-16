@@ -72,6 +72,41 @@ describe('ImportPage', () => {
     await waitFor(() => expect(inventoryApi.imports.get).toHaveBeenCalledWith('b1'));
   });
 
+  it('keeps creation ticks when a decision is saved and clears the stale note', async () => {
+    await upload('Manager', batch({ willCreate: [create], needsDecision: [decision] }));
+    fireEvent.click(screen.getByLabelText('Confirm all'));
+    vi.mocked(inventoryApi.imports.saveResolutions).mockResolvedValue(batch({ willCreate: [create] }, { resolutions: { 'row:3': { choice: 'create' } } }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Create new' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save choice' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save choice' })).toBeNull());
+    expect(screen.getByLabelText('Confirm all')).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Commit import' })).toBeEnabled();
+  });
+
+  it('clears the stale note after a resolution is saved', async () => {
+    await upload('Manager', batch({}));
+    vi.mocked(inventoryApi.imports.commit).mockRejectedValue(new ApiError('conflict', 'stale'));
+    vi.mocked(inventoryApi.imports.get).mockResolvedValue(batch({ needsDecision: [decision] }));
+    fireEvent.click(screen.getByRole('button', { name: 'Commit import' }));
+    fireEvent.change(await screen.findByLabelText(/PIN/i), { target: { value: '1234' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText(/changed. Review again/i)).toBeInTheDocument();
+    vi.mocked(inventoryApi.imports.saveResolutions).mockResolvedValue(batch({}));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save choice' }));
+    await waitFor(() => expect(screen.queryByText(/changed. Review again/i)).toBeNull());
+  });
+
+  it('changing the kind drops the batch and issues a new idempotency key', async () => {
+    await upload('Manager', batch({}));
+    const first = vi.mocked(inventoryApi.imports.upload).mock.calls[0][2];
+    fireEvent.change(screen.getByLabelText('What is in the file'), { target: { value: 'stock' } });
+    expect(screen.queryByRole('button', { name: 'Commit import' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Upload and review' }));
+    await waitFor(() => expect(inventoryApi.imports.upload).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(inventoryApi.imports.upload).mock.calls[1][2]).not.toBe(first);
+    expect(vi.mocked(inventoryApi.imports.upload).mock.calls[1][1]).toBe('stock');
+  });
+
   it('lists row errors with line numbers and blocks commit', async () => {
     await upload('Manager', batch({ rowErrors: [{ line: 7, message: 'Price is not a number' }] }));
     expect(screen.getByText('Line 7: Price is not a number')).toBeInTheDocument();

@@ -13,8 +13,12 @@ export function CsvFileField({ file, onPick, error }: { file: File | null; onPic
         <span className="font-semibold">{file ? file.name : 'Choose a CSV file'}</span>
         {file && <span className="text-sm text-ink-soft">{(file.size / 1024).toFixed(1)} KB</span>}
       </label>
-      <input id={id} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <input id={id} type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          // Clear so picking the same file again still fires a change.
+          e.target.value = '';
+        }} />
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

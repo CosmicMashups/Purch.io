@@ -45,9 +45,21 @@ export function ImportPage() {
     keyRef.current = next ? crypto.randomUUID() : '';
   }
 
-  function show(next: ImportBatch) {
+  const createId = (c: ImportBatch['plan']['willCreate'][number]) => `${c.kind}|${c.type}|${c.key ?? ''}|${c.name}`;
+
+  /** Shows a plan; `keepTicks` carries over confirmations for creations that are unchanged. */
+  function show(next: ImportBatch, keepTicks = false) {
+    const ticked = new Set(keepTicks && batch ? batch.plan.willCreate.filter((_, i) => confirmed[i]).map(createId) : []);
     setBatch(next);
-    setConfirmed(next.plan.willCreate.map(() => false));
+    setConfirmed(next.plan.willCreate.map((c) => ticked.has(createId(c))));
+  }
+
+  function changeKind(next: 'catalog' | 'stock') {
+    setKind(next);
+    setBatch(null);
+    setConfirmed([]);
+    setStaleNote(false);
+    keyRef.current = file ? crypto.randomUUID() : '';
   }
 
   async function guard(action: () => Promise<void>) {
@@ -68,7 +80,10 @@ export function ImportPage() {
     });
 
   const resolve = (key: string, r: ImportResolution) =>
-    guard(async () => show(await inventoryApi.imports.saveResolutions(batch!.id, { ...batch!.resolutions, [key]: r })));
+    guard(async () => {
+      show(await inventoryApi.imports.saveResolutions(batch!.id, { ...batch!.resolutions, [key]: r }), true);
+      setStaleNote(false);
+    });
 
   const pin = useApproverPinAction({
     send: (p) => {
@@ -120,7 +135,7 @@ export function ImportPage() {
 
       <div className="flex flex-col gap-4 rounded-panel border border-line bg-surface p-4">
         <FormField label="What is in the file">
-          <select value={kind} onChange={(e) => setKind(e.target.value as 'catalog' | 'stock')} className={controlClass} disabled={busy}>
+          <select value={kind} onChange={(e) => changeKind(e.target.value as 'catalog' | 'stock')} className={controlClass} disabled={busy}>
             <option value="catalog">Catalog (items and ingredients)</option>
             <option value="stock">Stock counts</option>
           </select>
@@ -134,7 +149,7 @@ export function ImportPage() {
       </div>
 
       {staleNote && (
-        <p role="alert" className="rounded-panel border border-amber-300 bg-amber-50 p-3 text-base text-amber-900">
+        <p role="alert" className="rounded-panel border border-warn bg-warn/5 p-3 text-base text-ink">
           {STALE}
         </p>
       )}

@@ -14,8 +14,8 @@ un-migrated database and then fail on the new routes. Migrations 2 and 4 change 
 
 ## Row level security
 
-`ENABLE ROW LEVEL SECURITY` and the tenant policy are in the migrations for `StockTakes`, `StockTakeLines` and
-`ImportBatches` (`RowLevelSecurityCoverageTests` covers them). Nothing to do by hand.
+The migrations for `StockTakes`, `StockTakeLines` and `ImportBatches` run `ENABLE ROW LEVEL SECURITY` only; no policy
+is created (repo convention), and `RowLevelSecurityCoverageTests` covers them. Nothing to do by hand.
 
 ## New routes
 
@@ -23,9 +23,9 @@ un-migrated database and then fail on the new routes. Migrations 2 and 4 change 
 - Export (Admin, Manager, Warehouse): `GET /inventory/export/items.csv`, `/ingredients.csv`, `/stock.csv`.
 - Stock-take (Admin, Manager, Warehouse): `POST/GET /stock-takes`, `GET /stock-takes/{id}`,
   `PUT /stock-takes/{id}/lines/{lineId}`, `POST /stock-takes/{id}/start`, `/cancel`.
-  `/review` is Manager/Admin; `/apply` is Manager/Admin with an approver PIN.
+  `/review` is Manager/Admin; `/apply` accepts Admin/Manager/Warehouse sessions, but the approver PIN must belong to a Manager/Admin.
 - Import (Admin, Manager, Warehouse): `POST /inventory/imports`, `GET /inventory/imports/{id}`,
-  `PUT /inventory/imports/{id}/resolutions`. `POST /inventory/imports/{id}/commit` is Manager/Admin with an approver PIN.
+  `PUT /inventory/imports/{id}/resolutions`. `POST /inventory/imports/{id}/commit` accepts Admin/Manager/Warehouse sessions, but the approver PIN must belong to a Manager/Admin.
 - Web: `/inventory/stock-takes`, `/inventory/stock-takes/:id`, `/inventory/import`, valuation and COGS tabs.
 - Cashier gets 403 on all of these and never receives cost fields.
 

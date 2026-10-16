@@ -85,12 +85,12 @@ export function ImportReview({ batch, confirmed, onConfirmedChange, busy, onReso
     <div className="flex flex-col gap-6">
       {plan.rowErrors.length > 0 && (
         <section aria-labelledby="imp-errors" className="flex flex-col gap-2">
-          <h2 id="imp-errors" className="text-lg font-semibold text-red-900">
+          <h2 id="imp-errors" className="text-lg font-semibold text-danger">
             Fix these rows in the file ({plan.rowErrors.length})
           </h2>
           <ul className="flex flex-col gap-2">
             {plan.rowErrors.map((e) => (
-              <li key={`${e.line}-${e.message}`} className="rounded-panel border border-red-300 bg-red-50 p-3 text-base text-red-900">
+              <li key={`${e.line}-${e.message}`} className="rounded-panel border border-danger bg-danger/5 p-3 text-base text-ink">
                 Line {e.line}: {e.message}
               </li>
             ))}
