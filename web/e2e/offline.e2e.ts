@@ -55,8 +55,8 @@ test.describe('offline browsing', () => {
     await expect.poll(() => savedRows(page), { timeout: 15_000 }).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Sign out' }).click();
-    // The browser is a paired till, so signing out locks it rather than going back to the email sign-in.
-    await expect(page).toHaveURL(/\/unlock$/);
+    // Sign out leaves the business, so the person lands on the email sign-in.
+    await expect(page).toHaveURL(/\/login$/);
     await expect.poll(() => savedRows(page), { timeout: 10_000 }).toBe(0);
   });
 

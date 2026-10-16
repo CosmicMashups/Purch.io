@@ -1,4 +1,4 @@
-import { resetRegister, unlockOnTill } from './support/api';
+import { call, resetRegister, unlockOnTill } from './support/api';
 import { expect, test } from './support/fixtures';
 
 test.describe('the Home dashboard', () => {
@@ -53,7 +53,9 @@ async function firstItemId(token: string, ip: string): Promise<string> {
 
 test.describe('the Business page', () => {
   test('puts what needs attention first, then money, the team and the devices', async ({ page, signInAs }) => {
-    await signInAs('admin');
+    const tokens = await signInAs('admin');
+    // Money owed only shows once the business turns Utang on.
+    await call('PUT', '/tenant/settings/credit-ledger', { token: tokens.accessToken, body: { creditLedgerEnabled: true } });
     await page.goto('/business');
     await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Money owed' })).toBeVisible();

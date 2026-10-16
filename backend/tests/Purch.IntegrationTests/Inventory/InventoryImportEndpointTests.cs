@@ -3,8 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Purch.Application.Catalog;
+using Purch.Application.Common;
 using Purch.Application.Inventory;
 using Purch.Application.Inventory.Import;
 using Purch.Common.TestUtilities;
@@ -142,6 +145,50 @@ public sealed class InventoryImportEndpointTests(PostgresContainerFixture postgr
         Assert.False(body.Committed);
         Assert.Equal(ImportBatchStatus.Previewed, body.Batch!.Status);
         Assert.Equal(0L, await ScalarAsync<long>("SELECT COUNT(*) FROM \"Items\" WHERE \"TenantId\" = @id", TestSessions.ShopOf(admin).Tenant.TenantId));
+    }
+
+    [Fact]
+    public async Task A_catalog_change_between_the_pre_check_and_the_transaction_is_a_conflict_that_applies_nothing()
+    {
+        Func<Task>? beforeTransaction = null;
+        await using var factory = new PurchApiFactory(postgres.ConnectionString)
+        {
+            ConfigureExtraServices = services =>
+            {
+                var real = services.Single(d => d.ServiceType == typeof(IUnitOfWork)).ImplementationType!;
+                _ = services.RemoveAll<IUnitOfWork>();
+                _ = services.AddScoped<IUnitOfWork>(sp => new HookedUnitOfWork((IUnitOfWork)ActivatorUtilities.CreateInstance(sp, real), () => beforeTransaction));
+            },
+        };
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(admin, CatalogHeader + "\nitem,N1,,Noodles,,5,,,,,", "catalog"));
+
+        // Someone creates the same SKU after the plan hash was checked but before the transaction opens.
+        beforeTransaction = async () =>
+        {
+            beforeTransaction = null;
+            _ = await ReadAsync<ItemDto>(await admin.PostAsJsonAsync("/items", new CreateItemRequest("Noodles", "N1", null, null, 5m, null, PricingType.Unit)));
+        };
+        var response = await admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest(TestSessions.AdminPin, uploaded.PlanHash, true));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.False((await response.Content.ReadFromJsonAsync<ImportCommitResultDto>(JsonOptions))!.Committed);
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT COUNT(*) FROM \"Items\" WHERE \"TenantId\" = @id", TestSessions.ShopOf(admin).Tenant.TenantId));
+    }
+
+    private sealed class HookedUnitOfWork(IUnitOfWork inner, Func<Func<Task>?> hook) : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => inner.SaveChangesAsync(cancellationToken);
+
+        public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            if (hook() is { } run)
+            {
+                await run();
+            }
+
+            return await inner.ExecuteInTransactionAsync(operation, cancellationToken);
+        }
     }
 
     [Fact]

@@ -21,6 +21,9 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
     /// <c>new PurchApiFactory(cs) { ExtraSettings = { ["PUBLIC_BASE_URL"] = "https://cdn.example" } }</c>.</summary>
     public Dictionary<string, string?> ExtraSettings { get; } = [];
 
+    /// <summary>Extra service overrides for one test (set before the first request creates the host).</summary>
+    public Action<IServiceCollection>? ConfigureExtraServices { get; set; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _ = builder.ConfigureAppConfiguration((webHostBuilderContext, configBuilder) =>
@@ -59,6 +62,8 @@ public sealed class PurchApiFactory(string connectionString) : WebApplicationFac
             // own deliberately-old rows — with no ordering guarantee. Retention logic is covered directly
             // against RetentionSweeper instead; nothing here needs it actually running.
             _ = services.RemoveAll<IHostedService>();
+
+            ConfigureExtraServices?.Invoke(services);
         });
     }
 }

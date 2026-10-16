@@ -400,7 +400,12 @@ public sealed class PurchaseRequestService(
     {
         var links = await requestRepository.ListSupplierLinksAsync(CurrentTenantId, cancellationToken);
         var result = new Dictionary<Guid, decimal>();
-        foreach (var line in lines)
+        var all = lines.ToList();
+        var ingredients = (await inventoryItemRepository.ListByIdsAsync([.. all.Where(l => l.InventoryItemId is not null).Select(l => l.InventoryItemId!.Value).Distinct()], cancellationToken))
+            .ToDictionary(i => i.Id);
+        var items = (await itemRepository.ListByIdsAsync([.. all.Where(l => l.InventoryItemId is null).Select(l => l.ItemId).Distinct()], cancellationToken))
+            .ToDictionary(i => i.Id);
+        foreach (var line in all)
         {
             var link = links
                 .Where(l => line.InventoryItemId is { } ingredientId ? l.InventoryItemId == ingredientId : l.ItemId == line.ItemId)
@@ -412,11 +417,11 @@ public sealed class PurchaseRequestService(
             }
             else if (line.InventoryItemId is { } ingredientId)
             {
-                result[line.Id] = (await inventoryItemRepository.GetByIdAsync(ingredientId, cancellationToken))?.UnitCost ?? 0m;
+                result[line.Id] = ingredients.GetValueOrDefault(ingredientId)?.UnitCost ?? 0m;
             }
             else
             {
-                result[line.Id] = (await itemRepository.GetByIdAsync(line.ItemId, cancellationToken))?.CostPrice ?? 0m;
+                result[line.Id] = items.GetValueOrDefault(line.ItemId)?.CostPrice ?? 0m;
             }
         }
         return result;

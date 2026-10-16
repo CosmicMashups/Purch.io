@@ -1,8 +1,11 @@
 import { expect, test } from './support/fixtures';
+import { call } from './support/api';
 
 test.describe('business forms', () => {
   test('customers, staff, devices, branches and promotions open their forms in a dialog, not on the page', async ({ page, signInAs }) => {
-    await signInAs('admin');
+    const tokens = await signInAs('admin');
+    // Customers is hidden until the business turns Utang on.
+    await call('PUT', '/tenant/settings/credit-ledger', { token: tokens.accessToken, body: { creditLedgerEnabled: true } });
     const pages: [string, string, string][] = [
       ['/business/customers', 'Add customer', 'Credit limit (PHP)'],
       ['/business/staff', 'Invite someone', 'Email'],

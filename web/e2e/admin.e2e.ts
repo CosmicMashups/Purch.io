@@ -20,11 +20,13 @@ test.describe('running the business', () => {
     const name = `Rina ${Date.now().toString(36)}`;
 
     await page.goto('/business/staff');
-    await page.getByLabel('Name').fill(name);
-    await page.getByLabel('Email').fill(`rina-${Date.now().toString(36)}@e2e.test`);
-    await page.getByLabel('Cashier').check();
-    await page.getByLabel('Main Branch').check();
-    await page.getByRole('button', { name: 'Invite', exact: true }).click();
+    await page.getByRole('button', { name: 'Invite someone' }).click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('Name').fill(name);
+    await form.getByLabel('Email').fill(`rina-${Date.now().toString(36)}@e2e.test`);
+    await form.getByLabel('Cashier').check();
+    await form.getByLabel('Main Branch').check();
+    await form.getByRole('button', { name: 'Invite', exact: true }).click();
 
     const link = await page.getByTestId('invite-url').innerText();
     expect(link).toMatch(/\/enrol\//);
@@ -35,7 +37,7 @@ test.describe('running the business', () => {
     await expect(phone.getByRole('heading', { name: /^Join / })).toBeVisible();
     await phone.getByLabel(/^Choose a password/).fill('Rina-password-1');
     await phone.getByLabel(/^Type it again/).fill('Rina-password-1');
-    await phone.getByLabel(/^Choose a PIN/).fill('8642');
+    await phone.getByLabel(/^Choose a PIN/).fill('864213');
     await phone.getByRole('button', { name: 'Join' }).click();
     await expect(phone).toHaveURL(/\/sell$/);
     await phone.context().close();
@@ -45,6 +47,7 @@ test.describe('running the business', () => {
     await signInAs('manager');
     await page.goto('/business/staff');
     await expect(page.getByText('Carlo Cashier')).toBeVisible();
-    await expect(page.getByLabel('Role').locator('option')).toHaveText(['Staff']);
+    await page.getByRole('button', { name: 'Invite someone' }).click();
+    await expect(page.getByRole('dialog').getByLabel('Role').locator('option')).toHaveText(['Staff']);
   });
 });

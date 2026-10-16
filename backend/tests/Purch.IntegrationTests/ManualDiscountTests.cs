@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Purch.Application.Catalog;
 using Purch.Application.Pos;
@@ -482,5 +484,51 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
 
         var cart = await AddAsync(admin, item);
         Assert.Equal(2, cart.Lines.Count);
+    }
+
+    [Fact]
+    public async Task A_transient_failure_inside_the_transaction_retries_without_a_second_pin_check_or_audit_row()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString)
+        {
+            ConfigureExtraServices = services =>
+            {
+                var real = services.Single(d => d.ServiceType == typeof(Purch.Application.Common.IUnitOfWork)).ImplementationType!;
+                _ = services.RemoveAll<Purch.Application.Common.IUnitOfWork>();
+                _ = services.AddScoped<Purch.Application.Common.IUnitOfWork>(sp =>
+                    new FailFirstAttemptUnitOfWork((Purch.Application.Common.IUnitOfWork)ActivatorUtilities.CreateInstance(sp, real)));
+            },
+        };
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var item = await CreateItemAsync(admin, "Rice", 200m);
+        var lineId = (await AddAsync(cashier, item)).Lines[0].Id;
+
+        var priced = await ReadAsync(await cashier.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m, "Dented can", "567812")));
+
+        Assert.Equal(180m, priced.TotalAmount);
+        _ = Assert.Single(await AuditActorsAsync(priced.Id, AuditActionType.DiscountOverride));
+    }
+
+    /// <summary>Runs the first attempt to completion, then fails it with a transient database error so the execution strategy rolls back and retries.</summary>
+    private sealed class FailFirstAttemptUnitOfWork(Purch.Application.Common.IUnitOfWork inner) : Purch.Application.Common.IUnitOfWork
+    {
+        private bool failed;
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => inner.SaveChangesAsync(cancellationToken);
+
+        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+            => inner.ExecuteInTransactionAsync(async ct =>
+            {
+                var result = await operation(ct);
+                if (!failed)
+                {
+                    failed = true;
+                    throw new NpgsqlException("simulated connection loss", new TimeoutException());
+                }
+
+                return result;
+            }, cancellationToken);
     }
 }

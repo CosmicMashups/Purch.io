@@ -53,7 +53,7 @@ test.describe('device sessions stay apart from staff', () => {
     await pairDevice('kiosk');
     await page.goto('/');
     await expect(page).toHaveURL(/\/kiosk$/);
-    await expect(page.getByRole('heading', { name: 'Welcome!' })).toBeVisible();
+    await expect(page.getByText('Tap anywhere to begin')).toBeVisible();
   });
 
   test('an unpaired browser is sent to pair the kiosk', async ({ page }) => {
