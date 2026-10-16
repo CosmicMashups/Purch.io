@@ -1,5 +1,8 @@
 import { apiClient } from '../../lib/apiClient';
 import type {
+  ImportBatch,
+  ImportResolution,
+  CommitImportRequest,
   BranchTransfer,
   CreateBranchTransferRequest,
   CreateInventoryItemRequest,
@@ -31,6 +34,18 @@ import type {
 export const MOVEMENT_PAGE_SIZE = 30;
 
 export const inventoryApi = {
+  imports: {
+    upload: (file: File, kind: 'catalog' | 'stock', idempotencyKey: string) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('kind', kind);
+      return apiClient.post<ImportBatch>('/inventory/imports', form, { headers: { 'Idempotency-Key': idempotencyKey } }).then((r) => r.data);
+    },
+    get: (id: string) => apiClient.get<ImportBatch>(`/inventory/imports/${id}`).then((r) => r.data),
+    saveResolutions: (id: string, body: Record<string, ImportResolution>) =>
+      apiClient.put<ImportBatch>(`/inventory/imports/${id}/resolutions`, body).then((r) => r.data),
+    commit: (id: string, body: CommitImportRequest) => apiClient.post<{ result: ImportBatch['result'] }>(`/inventory/imports/${id}/commit`, body).then((r) => r.data),
+  },
   stockTakes: {
     list: () => apiClient.get<StockTakeSummary[]>('/stock-takes').then((r) => r.data),
     get: (id: string) => apiClient.get<StockTake>(`/stock-takes/${id}`).then((r) => r.data),

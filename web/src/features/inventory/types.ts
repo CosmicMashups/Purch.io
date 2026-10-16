@@ -412,3 +412,51 @@ export interface CreateStockTakeRequest {
   itemIds?: string[];
   inventoryItemIds?: string[];
 }
+
+// --- U3 CSV import (mirrors Purch.Application.Inventory.Import) ---
+export const ImportKind = { Catalog: 0, Stock: 1 } as const;
+export type ImportKind = (typeof ImportKind)[keyof typeof ImportKind];
+export const ImportBatchStatus = { Previewed: 0, Committed: 1, Expired: 2, Failed: 3 } as const;
+/** Mirrors ImportRowType: which kind of record a row or decision belongs to. */
+export const ImportRowType = { Item: 0, Ingredient: 1 } as const;
+export const PlannedCreateKind = { Category: 0, Item: 1, Ingredient: 2 } as const;
+export const DecisionReason = { SimilarCategory: 0, SimilarName: 1, NoIdentity: 2 } as const;
+
+export interface ImportPlannedCreate { kind: number; name: string; lines: number[]; type: number; key: string | null; openingStock: number | null }
+export interface ImportAutoLink { line: number; csvName: string; existingId: string; existingName: string }
+export interface ImportNearMatch { id: string; name: string; distance: number }
+export interface ImportDecision { key: string; lines: number[]; reason: number; name: string; nearest: ImportNearMatch[] }
+export interface ImportFieldChange { field: string; before: string | null; after: string | null }
+export interface ImportPlannedUpdate { line: number; existingId: string; type: number; changes: ImportFieldChange[] }
+export interface ImportRowError { line: number; message: string }
+export interface ImportPlan {
+  willCreate: ImportPlannedCreate[];
+  autoLinks: ImportAutoLink[];
+  needsDecision: ImportDecision[];
+  willUpdate: ImportPlannedUpdate[];
+  rowErrors: ImportRowError[];
+  unchangedCount: number;
+  staleResolutions: string[];
+}
+export interface ImportResolution { choice: 'link' | 'create' | 'rename'; targetId?: string | null; newName?: string | null }
+export interface ImportCreated { kind: string; id: string; name: string; lines: number[] }
+export interface ImportResult {
+  batchId: string;
+  createdCategories: ImportCreated[];
+  createdRecords: ImportCreated[];
+  updatedCount: number;
+  movements: { line: number; movementId: string; quantity: number }[];
+  committedAt: string;
+}
+export interface ImportBatch {
+  id: string;
+  kind: ImportKind;
+  status: number;
+  plan: ImportPlan;
+  planHash: string;
+  blocked: boolean;
+  requiresBranch: boolean;
+  resolutions: Record<string, ImportResolution>;
+  result: ImportResult | null;
+}
+export interface CommitImportRequest { approverPin: string | null; planHash: string; confirmCreations: boolean; branchId?: string | null }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from '../../../components/feedback/toastStore';
 import { userMessage } from '../../../lib/apiError';
 import { datedFilename, downloadTextFile } from '../../../lib/download';
@@ -39,5 +40,16 @@ export function ExportCsvButton({ kind, label }: { kind: 'items' | 'ingredients'
     >
       {busy ? 'Exporting…' : label}
     </button>
+  );
+}
+
+/** Entry to the import wizard, beside the exports. Warehouse may upload; only Admin/Manager can commit. */
+export function ImportCsvLink() {
+  const { role } = useSession();
+  if (role !== 'Admin' && role !== 'Manager' && role !== 'Warehouse') return null;
+  return (
+    <Link to="/inventory/import" className="flex h-12 items-center whitespace-nowrap rounded-control border border-brand px-5 text-base font-semibold text-brand-strong hover:bg-brand-tint">
+      Import CSV
+    </Link>
   );
 }

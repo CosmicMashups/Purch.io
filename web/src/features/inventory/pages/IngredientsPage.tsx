@@ -14,7 +14,7 @@ import { SkeletonList } from '../../../components/Skeleton';
 import { userMessage } from '../../../lib/apiError';
 import { PageHeader } from '../../../components/PageHeader';
 import { Tabs } from '../../../components/Tabs';
-import { ExportCsvButton } from '../components/ExportCsvButton';
+import { ExportCsvButton, ImportCsvLink } from '../components/ExportCsvButton';
 import { useSession } from '../../auth/useSession';
 import { IngredientCategories } from '../components/IngredientCategories';
 import type { Branch } from '../../branches/types';
@@ -161,6 +161,7 @@ export function IngredientsPage() {
             <div className="flex flex-wrap gap-2">
               <ExportCsvButton kind="ingredients" label="Export ingredients" />
               <ExportCsvButton kind="stock" label="Export stock sheet" />
+              <ImportCsvLink />
               <button type="button" onClick={() => setDialog({ mode: 'create' })} className="h-12 rounded-control bg-brand px-5 text-base font-semibold text-on-brand hover:bg-brand-strong">
                 Add Ingredient
               </button>
