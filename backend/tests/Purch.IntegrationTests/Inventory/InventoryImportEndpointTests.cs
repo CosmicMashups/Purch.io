@@ -156,4 +156,121 @@ public sealed class InventoryImportEndpointTests(PostgresContainerFixture postgr
 
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
     }
+    private Task<long> CountAsync(string table, Guid tenantId) =>
+        ScalarAsync<long>($"SELECT COUNT(*) FROM \"{table}\" WHERE \"TenantId\" = @id", tenantId);
+
+    [Fact]
+    public async Task A_catalog_change_after_review_is_a_conflict_that_keeps_the_batch_and_its_decisions()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var tenantId = TestSessions.ShopOf(admin).Tenant.TenantId;
+        var cola = await ReadAsync<ItemDto>(await admin.PostAsJsonAsync("/items", new CreateItemRequest("Cola", "C1", null, null, 10m, null, PricingType.Unit)));
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(admin, CatalogHeader + "\nitem,C1,,Cola,,12,,,,,\nitem,C2,,Colla,,6,,,,,", "catalog"));
+        var key = Assert.Single(uploaded.Plan.NeedsDecision).Key;
+        var resolved = await ReadAsync<ImportBatchDto>(await admin.PutAsJsonAsync($"/inventory/imports/{uploaded.Id}/resolutions",
+            new Dictionary<string, ImportResolutionDto> { [key] = new("create") }));
+        _ = await ReadAsync<ImportBatchDto>(await admin.GetAsync($"/inventory/imports/{uploaded.Id}"));
+        _ = await ReadAsync<ItemDto>(await admin.PutAsJsonAsync($"/items/{cola.Id}", new UpdateItemRequest("Cola", "C1", null, null, 11m, null, true)));
+
+        var response = await admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest(TestSessions.AdminPin, resolved.PlanHash, true));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<ImportCommitResultDto>(JsonOptions))!;
+        Assert.Contains(2, body.ChangedLines);
+        Assert.Equal(11m, await ScalarAsync<decimal>("SELECT \"BasePrice\" FROM \"Items\" WHERE \"Id\" = @id", cola.Id));
+        Assert.Equal(1L, await CountAsync("Items", tenantId));
+        var reloaded = await ReadAsync<ImportBatchDto>(await admin.GetAsync($"/inventory/imports/{uploaded.Id}"));
+        Assert.Equal(ImportBatchStatus.Previewed, reloaded.Status);
+        Assert.Equal("create", reloaded.Resolutions[key].Choice);
+    }
+
+    [Fact]
+    public async Task A_wrong_pin_persists_the_failed_attempt_and_applies_nothing()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var shop = TestSessions.ShopOf(admin);
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(admin, CatalogHeader + "\nitem,N1,,Noodles,Pantry,5,,,,,4", "catalog"));
+        const string Attempts = "SELECT \"ApproverPinFailedAttempts\" FROM \"Devices\" WHERE \"Id\" = @id";
+        var before = await ScalarAsync<int>(Attempts, shop.RegisterId);
+
+        var response = await admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest("000000", uploaded.PlanHash, true));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(before + 1, await ScalarAsync<int>(Attempts, shop.RegisterId));
+        Assert.Equal(0L, await CountAsync("Items", shop.Tenant.TenantId));
+        Assert.Equal(0L, await CountAsync("Categories", shop.Tenant.TenantId));
+        Assert.Equal(0L, await CountAsync("InventoryMovements", shop.Tenant.TenantId));
+    }
+
+    [Fact]
+    public async Task Two_parallel_commits_apply_once()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var tenantId = TestSessions.ShopOf(admin).Tenant.TenantId;
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(admin, CatalogHeader + "\nitem,N1,,Noodles,Pantry,5,,,,,4", "catalog"));
+        var commit = new CommitImportRequest(TestSessions.AdminPin, uploaded.PlanHash, true);
+
+        var responses = await Task.WhenAll(
+            admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", commit),
+            admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", commit));
+
+        Assert.All(responses, r => Assert.True(r.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict, r.StatusCode.ToString()));
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Equal(1L, await CountAsync("Items", tenantId));
+        Assert.Equal(1L, await CountAsync("Categories", tenantId));
+        Assert.Equal(1L, await CountAsync("InventoryMovements", tenantId));
+    }
+
+    [Fact]
+    public async Task Warehouse_uploads_and_resolves_and_commits_with_a_manager_pin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        using var manager = await TestSessions.ManagerClientAsync(admin);
+        using var warehouse = await TestSessions.StaffClientAsync(admin, "Wes Warehouse", MembershipRole.Staff, StaffDuty.Warehouse, "456712");
+        _ = await ReadAsync<ItemDto>(await admin.PostAsJsonAsync("/items", new CreateItemRequest("Cola", "C1", null, null, 10m, null, PricingType.Unit)));
+
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(warehouse, CatalogHeader + "\nitem,C2,,Colla,,6,,,,,", "catalog"));
+        var resolved = await ReadAsync<ImportBatchDto>(await warehouse.PutAsJsonAsync($"/inventory/imports/{uploaded.Id}/resolutions",
+            new Dictionary<string, ImportResolutionDto> { [uploaded.Plan.NeedsDecision.Single().Key] = new("create") }));
+        Assert.Equal(HttpStatusCode.BadRequest, (await warehouse.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest("456712", resolved.PlanHash, true))).StatusCode);
+
+        var committed = await ReadAsync<ImportCommitResultDto>(await warehouse.PostAsJsonAsync(
+            $"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest("567812", resolved.PlanHash, true)));
+
+        Assert.True(committed.Committed);
+        Assert.Equal("Colla", committed.Result!.CreatedRecords.Single().Name);
+    }
+
+    [Fact]
+    public async Task A_failure_on_a_later_row_rolls_back_categories_and_items_created_earlier()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var tenantId = TestSessions.ShopOf(admin).Tenant.TenantId;
+        // A deleted item keeps its barcode: the planner (non-deleted records only) plans a create, ItemService refuses it.
+        var old = await ReadAsync<ItemDto>(await admin.PostAsJsonAsync("/items", new CreateItemRequest("Old Soda", "OLD", "4800001", null, 10m, null, PricingType.Unit)));
+        await using (var connection = new NpgsqlConnection(postgres.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand("UPDATE \"Items\" SET \"IsDeleted\" = TRUE WHERE \"Id\" = @id", connection);
+            _ = command.Parameters.AddWithValue("id", old.Id);
+            _ = await command.ExecuteNonQueryAsync();
+        }
+
+        var uploaded = await ReadAsync<ImportBatchDto>(await UploadAsync(admin,
+            CatalogHeader + "\nitem,N1,,Noodles,Pantry,5,,,,,4\nitem,S2,4800001,Fizz,Pantry,5,,,,,", "catalog"));
+        Assert.False(uploaded.Blocked);
+
+        var response = await admin.PostAsJsonAsync($"/inventory/imports/{uploaded.Id}/commit", new CommitImportRequest(TestSessions.AdminPin, uploaded.PlanHash, true));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(0L, await CountAsync("Categories", tenantId));
+        Assert.Equal(1L, await CountAsync("Items", tenantId));
+        Assert.Equal(0L, await CountAsync("InventoryMovements", tenantId));
+        Assert.Equal(ImportBatchStatus.Previewed, (await ReadAsync<ImportBatchDto>(await admin.GetAsync($"/inventory/imports/{uploaded.Id}"))).Status);
+    }
 }

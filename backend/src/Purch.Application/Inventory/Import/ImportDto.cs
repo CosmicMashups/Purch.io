@@ -7,10 +7,11 @@ public sealed record ImportResolutionDto(string Choice, Guid? TargetId = null, s
 
 /// <summary>Commit takes only the batch id plus these: the plan is always rebuilt on the server. <see cref="PlanHash"/>
 /// is the hash of the preview the user confirmed; <see cref="ConfirmCreations"/> confirms the Will-create group.</summary>
-public sealed record CommitImportRequest(string? ApproverPin, string? PlanHash, bool ConfirmCreations);
+public sealed record CommitImportRequest(string? ApproverPin, string? PlanHash, bool ConfirmCreations, Guid? BranchId = null);
 
 /// <summary>A batch with its plan rebuilt against the current catalog and the saved resolutions. Cost before/after
-/// values in the plan are blanked for actors who cannot see costs.</summary>
+/// values in the plan are blanked for actors who cannot see costs. <see cref="RequiresBranch"/>: the plan posts stock
+/// and the device has no branch, so the commit must send a BranchId.</summary>
 public sealed record ImportBatchDto(
     Guid Id,
     ImportKind Kind,
@@ -21,6 +22,7 @@ public sealed record ImportBatchDto(
     ImportPlan Plan,
     string PlanHash,
     bool Blocked,
+    bool RequiresBranch,
     IReadOnlyDictionary<string, ImportResolutionDto> Resolutions,
     ImportResultDto? Result);
 

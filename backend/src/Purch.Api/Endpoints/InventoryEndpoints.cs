@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Purch.Application.Common.Exceptions;
 using Purch.Application.Inventory;
 using Purch.Application.Inventory.Import;
 using Purch.Domain.Enums;
@@ -95,8 +98,22 @@ public static class InventoryEndpoints
                 return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Bad request.", detail: "Kind must be catalog or stock.");
             }
 
-            await using var stream = file.OpenReadStream();
-            return Results.Ok(await importService.UploadAsync(stream, kind.Value, request.Headers["Idempotency-Key"].ToString(), cancellationToken));
+            using var buffer = new MemoryStream();
+            await using (var stream = file.OpenReadStream())
+            {
+                await stream.CopyToAsync(buffer, cancellationToken);
+            }
+
+            var key = request.Headers["Idempotency-Key"].ToString();
+            try
+            {
+                return Results.Ok(await importService.UploadAsync(new MemoryStream(buffer.ToArray()), kind.Value, key, cancellationToken));
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // A parallel upload with the same Idempotency-Key won the insert: return that batch.
+                return Results.Ok(await importService.UploadAsync(new MemoryStream(buffer.ToArray()), kind.Value, key, cancellationToken));
+            }
         })
             .WithMetadata(new RequestSizeLimitAttribute(ImportRequestLimit))
             .DisableAntiforgery()
@@ -121,7 +138,17 @@ public static class InventoryEndpoints
             IImportService importService,
             CancellationToken cancellationToken) =>
         {
-            var result = await importService.CommitAsync(id, request, cancellationToken);
+            ImportCommitResultDto result;
+            try
+            {
+                result = await importService.CommitAsync(id, request, cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // A parallel commit of the same batch won: replay its result, otherwise the generic 409.
+                result = await importService.TryReplayAsync(id, cancellationToken) ?? throw new ConflictException("This import was changed by another request. Please try again.");
+            }
+
             return result.Committed ? Results.Ok(result) : Results.Conflict(result);
         })
             .RequireAuthorization(policy => policy.RequireRole(inventoryManager));

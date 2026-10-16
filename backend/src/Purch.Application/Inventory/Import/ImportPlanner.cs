@@ -23,7 +23,7 @@ public enum PlannedCreateKind
 /// <summary>A creation listed for explicit confirmation. Category creations list every line that uses them.</summary>
 public sealed record PlannedCreate(
     PlannedCreateKind Kind, string Name, IReadOnlyList<int> Lines, ImportRowType Type,
-    string? Key = null, Guid? ResolvedCategoryId = null, string? NewCategoryKey = null);
+    string? Key = null, Guid? ResolvedCategoryId = null, string? NewCategoryKey = null, decimal? OpeningStock = null);
 
 /// <summary>A category linked to an existing one (identical key, or a Link resolution); shown so it can be undone.</summary>
 public sealed record CategoryAutoLink(int Line, string CsvName, Guid ExistingId, string ExistingName);
@@ -265,6 +265,12 @@ public static class ImportPlanner
             }
 
             if (outcome is Outcome.Error or Outcome.Decision) return;
+            if (outcome == Outcome.Update && row.OpeningStock is not null)
+            {
+                Error(row.Line, "opening_stock applies to new rows only.");
+                return;
+            }
+
             if (!PlanCategory(row, type!.Value, match, out var category)) return;
 
             if (outcome == Outcome.Update)
@@ -277,7 +283,7 @@ public static class ImportPlanner
 
             creates.Add(new PlannedCreate(
                 type == ImportRowType.Item ? PlannedCreateKind.Item : PlannedCreateKind.Ingredient, name!, [row.Line], type!.Value,
-                null, category.Id, category.NewKey));
+                null, category.Id, category.NewKey, row.OpeningStock));
         }
 
         private ExistingRecord? LinkTarget(ParsedRow row, ImportResolution res, ImportRowType type)

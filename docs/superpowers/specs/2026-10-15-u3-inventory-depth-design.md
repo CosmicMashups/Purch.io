@@ -64,6 +64,7 @@ Out of scope (exists): purchase orders, purchase requests, supplier unit cost, V
 - Name/category comparison key: trim, collapse whitespace, case-fold, strip diacritics and punctuation, `&` = `and`. Identical keys auto-link, visibly and undoably. Near matches (edit distance <= 2) always ask. Names that collapse to one key within the file group as one new category.
 - Blank cell = leave unchanged; `CLEAR` clears an optional cost; literal `0` is a real zero.
 - New rows require `type` (item|ingredient), name, and SKU or barcode; a SKU/barcode colliding with another record or duplicated in the file is a row error. Opening stock for a new row posts `StockIn`.
+- Catalog import also accepts an import-only `opening_stock` column (never exported): new rows only, posted as `StockIn`; filled on a matched row it is a row error.
 - Stock import: SKU/barcode + counted qty (+ note). Posts `Adjustment` of `counted - current` computed at commit time, tagged with the batch id. Never overwrites.
 
 ## Data and migration

@@ -15,5 +15,8 @@ public interface IImportService
 
     /// <summary>Re-plans on the server (before the PIN and again inside the transaction) and applies the batch all or
     /// nothing. A stale preview returns <see cref="ImportCommitResultDto.Committed"/> false with the fresh plan.</summary>
+    /// <summary>The stored result when the batch is Committed, else null (used after a concurrent commit lost the race).</summary>
+    Task<ImportCommitResultDto?> TryReplayAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<ImportCommitResultDto> CommitAsync(Guid id, CommitImportRequest request, CancellationToken cancellationToken = default);
 }

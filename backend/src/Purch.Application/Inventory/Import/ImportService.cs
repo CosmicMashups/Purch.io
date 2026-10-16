@@ -112,10 +112,14 @@ public sealed class ImportService(
         }
 
         await EnsureNotExpiredAsync(batch, cancellationToken);
-        var view = await BuildAsync(Parsed(batch), Resolutions(batch), cancellationToken);
-        batch.PlanJson = JsonSerializer.Serialize(view.HashPlan, Json);
-        _ = await unitOfWork.SaveChangesAsync(cancellationToken);
-        return ToDto(batch, view);
+        // Read-only: the stale baseline stays the plan stored at upload / resolutions save.
+        return ToDto(batch, await BuildAsync(Parsed(batch), Resolutions(batch), cancellationToken));
+    }
+
+    public async Task<ImportCommitResultDto?> TryReplayAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var batch = await RequireAsync(id, tracked: false, cancellationToken);
+        return batch.Status == ImportBatchStatus.Committed ? Replay(batch) : null;
     }
 
     public async Task<ImportBatchDto> SaveResolutionsAsync(Guid id, IReadOnlyDictionary<string, ImportResolutionDto> resolutions, CancellationToken cancellationToken = default)
@@ -152,16 +156,25 @@ public sealed class ImportService(
         }
 
         await EnsureNotExpiredAsync(preview, cancellationToken);
-        var parsed = Parsed(preview);
-        var resolutions = Resolutions(preview);
-        var view = await BuildAsync(parsed, resolutions, cancellationToken);
+        var view = await BuildAsync(Parsed(preview), Resolutions(preview), cancellationToken);
         if (!string.Equals(view.Hash, request.PlanHash, StringComparison.Ordinal))
         {
-            var tracked = await RequireAsync(id, tracked: true, cancellationToken);
-            return await StaleAsync(tracked, view, cancellationToken);
+            return Stale(preview, view);
         }
 
         EnsureCommittable(view.HashPlan, request);
+
+        // Branch for the stock movements: the request's, else the device's. Checked before the PIN is consumed.
+        var branchId = request.BranchId ?? currentActorProvider.BranchId;
+        if (branchId is null && PostsStock(view.Display))
+        {
+            throw new ValidationException("branchId", "Choose the branch the stock movements are for.");
+        }
+
+        if (branchId is { } chosen)
+        {
+            await branchScopeGuard.EnsureAllowedAsync(chosen, cancellationToken);
+        }
 
         // The PIN is checked BEFORE the transaction opens: a wrong PIN records a failed attempt that must survive the
         // error. Everything is loaded and planned again inside the transaction, which may be retried from the start.
@@ -179,15 +192,17 @@ public sealed class ImportService(
                 throw new ConflictException($"This import is {batch.Status} and cannot be committed.");
             }
 
-            var fresh = await BuildAsync(parsed, resolutions, ct);
+            // Rows and resolutions come from the tracked batch, so what is applied is exactly what is stored.
+            var parsed = Parsed(batch);
+            var fresh = await BuildAsync(parsed, Resolutions(batch), ct);
             if (fresh.HashPlan.Blocked || !string.Equals(fresh.Hash, request.PlanHash, StringComparison.Ordinal))
             {
-                return await StaleAsync(batch, fresh, ct);
+                return Stale(batch, fresh);
             }
 
             var result = batch.Kind == ImportKind.Stock
-                ? await ApplyStockAsync(batch, parsed, fresh.HashPlan, approver, ct)
-                : await ApplyCatalogAsync(batch, parsed, fresh.HashPlan, approver, ct);
+                ? await ApplyStockAsync(batch, parsed, fresh.HashPlan, approver, branchId, ct)
+                : await ApplyCatalogAsync(batch, parsed, fresh.HashPlan, approver, branchId, ct);
 
             batch.Status = ImportBatchStatus.Committed;
             batch.CommittedAt = result.CommittedAt;
@@ -227,7 +242,7 @@ public sealed class ImportService(
 
     // ---------------- apply ----------------
 
-    private async Task<ImportResultDto> ApplyCatalogAsync(ImportBatch batch, ParsedImport parsed, ImportPlan plan, User approver, CancellationToken ct)
+    private async Task<ImportResultDto> ApplyCatalogAsync(ImportBatch batch, ParsedImport parsed, ImportPlan plan, User approver, Guid? branchId, CancellationToken ct)
     {
         var rows = parsed.Rows.ToDictionary(r => r.Line);
         var createdCategories = new List<ImportCreatedDto>();
@@ -278,9 +293,9 @@ public sealed class ImportService(
             }
 
             createdRecords.Add(new ImportCreatedDto(create.Kind == PlannedCreateKind.Item ? "item" : "ingredient", id, create.Name, create.Lines));
-            if (row.OpeningStock is { } opening && opening > 0m)
+            if (create.OpeningStock is { } opening && opening > 0m)
             {
-                movements.Add(await PostAsync(batch, row, create.Kind == PlannedCreateKind.Item ? id : null, create.Kind == PlannedCreateKind.Ingredient ? id : null, MovementType.StockIn, opening, ct));
+                movements.Add(await PostAsync(batch, branchId, row, create.Kind == PlannedCreateKind.Item ? id : null, create.Kind == PlannedCreateKind.Ingredient ? id : null, MovementType.StockIn, opening, ct));
             }
         }
 
@@ -303,7 +318,7 @@ public sealed class ImportService(
 
     /// <summary>Posts counted - current for every matched row, with current read now, inside the transaction. Never
     /// sets stock to the counted figure, so a sale that lands before the commit is absorbed into the delta.</summary>
-    private async Task<ImportResultDto> ApplyStockAsync(ImportBatch batch, ParsedImport parsed, ImportPlan plan, User approver, CancellationToken ct)
+    private async Task<ImportResultDto> ApplyStockAsync(ImportBatch batch, ParsedImport parsed, ImportPlan plan, User approver, Guid? branchId, CancellationToken ct)
     {
         var rows = parsed.Rows.ToDictionary(r => r.Line);
         var movements = new List<ImportMovementDto>();
@@ -339,24 +354,16 @@ public sealed class ImportService(
             }
 
             movements.Add(await PostAsync(
-                batch, row, update.Type == ImportRowType.Item ? update.ExistingId : null, update.Type == ImportRowType.Ingredient ? update.ExistingId : null,
+                batch, branchId, row, update.Type == ImportRowType.Item ? update.ExistingId : null, update.Type == ImportRowType.Ingredient ? update.ExistingId : null,
                 MovementType.Adjustment, delta, ct));
         }
 
         return new ImportResultDto(batch.Id, [], [], 0, movements, approver.Id, DateTimeOffset.UtcNow);
     }
 
-    private Guid? branchChecked;
-
-    private async Task<ImportMovementDto> PostAsync(ImportBatch batch, ParsedRow row, Guid? itemId, Guid? ingredientId, MovementType type, decimal quantity, CancellationToken ct)
+    private async Task<ImportMovementDto> PostAsync(ImportBatch batch, Guid? branch, ParsedRow row, Guid? itemId, Guid? ingredientId, MovementType type, decimal quantity, CancellationToken ct)
     {
-        var branchId = currentActorProvider.BranchId
-            ?? throw new ValidationException("branch", "Stock can only be posted from a device signed in at a branch.");
-        if (branchChecked != branchId)
-        {
-            await branchScopeGuard.EnsureAllowedAsync(branchId, ct);
-            branchChecked = branchId;
-        }
+        var branchId = branch ?? throw new ValidationException("branchId", "Choose the branch the stock movements are for.");
 
         var note = row.Note is { } extra ? $"import:{batch.Id} {extra}" : $"import:{batch.Id}";
         if (note.Length > MaxMovementNoteLength)
@@ -531,19 +538,20 @@ public sealed class ImportService(
     }
 
     /// <summary>The preview the user confirmed no longer matches: nothing is applied, the batch stays Previewed with its
-    /// resolutions, and the fresh plan is saved and returned with the rows whose outcome changed.</summary>
-    private async Task<ImportCommitResultDto> StaleAsync(ImportBatch batch, PlanView view, CancellationToken ct)
+    /// resolutions, and the fresh plan is returned with the rows whose outcome changed.</summary>
+    private ImportCommitResultDto Stale(ImportBatch batch, PlanView view)
     {
         var changed = ChangedLines(ReadPlan(batch.PlanJson), view.HashPlan);
-        batch.PlanJson = JsonSerializer.Serialize(view.HashPlan, Json);
-        batch.UpdatedAt = DateTimeOffset.UtcNow;
-        _ = await unitOfWork.SaveChangesAsync(ct);
         return new ImportCommitResultDto(
             false, null, ToDto(batch, view), changed,
             view.HashPlan.Blocked
                 ? "The import changed since it was reviewed and now needs attention. Nothing was applied."
                 : "The import changed since it was reviewed. Nothing was applied; review the highlighted rows and commit again.");
     }
+
+    private static bool PostsStock(ImportPlan plan) =>
+        plan.WillCreate.Any(c => c.OpeningStock is > 0m)
+        || plan.WillUpdate.Any(u => u.Changes.Any(c => c.Field == "counted_qty" && c.Before != c.After));
 
     private static List<int> ChangedLines(ImportPlan? before, ImportPlan after)
     {
@@ -710,7 +718,8 @@ public sealed class ImportService(
         var result = batch.ResultJson is { } json ? JsonSerializer.Deserialize<ImportResultDto>(json, Json) : null;
         return new ImportBatchDto(
             batch.Id, batch.Kind, batch.Status, batch.ContentHash, batch.CreatedAt, batch.ExpiresAt,
-            RedactCosts(view.Display, currentActorProvider.CanSeeCosts), view.Hash, view.Display.Blocked, resolutions, result);
+            RedactCosts(view.Display, currentActorProvider.CanSeeCosts), view.Hash, view.Display.Blocked,
+            currentActorProvider.BranchId is null && batch.Status == ImportBatchStatus.Previewed && PostsStock(view.Display), resolutions, result);
     }
 
     /// <summary>Blanks cost before/after values for an actor without CanSeeCosts (the hash is always taken unredacted).</summary>

@@ -282,7 +282,7 @@ public sealed class ImportServiceTests
     {
         var cola = AddItem("Cola", "C1", stock: 5m, price: 10m);
         var service = Service();
-        var batch = await UploadAsync(service, Catalog("item,C1,,Cola,,12,CLEAR,3,,false,99"));
+        var batch = await UploadAsync(service, Catalog("item,C1,,Cola,,12,CLEAR,3,,false,"));
 
         var result = await service.CommitAsync(batch.Id, new CommitImportRequest("1234", batch.PlanHash, false));
 
@@ -294,6 +294,54 @@ public sealed class ImportServiceTests
         Assert.False(cola.IsActive);
         Assert.Equal(5m, cola.StockOnHand);
         Assert.Empty(store.Movements.Added);
+    }
+
+    [Fact]
+    public async Task Resolutions_changed_after_the_preview_are_what_the_transaction_plans_with()
+    {
+        _ = AddItem("Cola", "C1");
+        var service = Service();
+        var batch = await UploadAsync(service, Catalog("item,C2,,Colla,,5,,,,,"));
+        var key = Assert.Single(batch.Plan.NeedsDecision).Key;
+        var resolved = await service.SaveResolutionsAsync(batch.Id, new Dictionary<string, ImportResolutionDto> { [key] = new("create") });
+        var stored = store.Batches.Stored.Single();
+        var renamed = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, ImportResolution> { [key] = new(ResolutionChoice.Rename, null, "Lemonade") });
+        approver.OnAuthorize = () => stored.ResolutionsJson = renamed; // another request saves new decisions mid-commit
+
+        var result = await service.CommitAsync(batch.Id, new CommitImportRequest("1234", resolved.PlanHash, true));
+
+        Assert.False(result.Committed);
+        Assert.Equal(renamed, stored.ResolutionsJson);
+        Assert.Single(store.Items);
+    }
+
+    [Fact]
+    public async Task Without_a_device_branch_a_commit_that_posts_stock_needs_a_branch_id_before_the_pin()
+    {
+        actor.BranchId = null;
+        var service = Service();
+        var batch = await UploadAsync(service, Catalog("item,N1,,Noodles,,5,,,,,3"));
+        Assert.True(batch.RequiresBranch);
+        Assert.Equal(3m, batch.Plan.WillCreate.Single().OpeningStock);
+
+        var refused = await Assert.ThrowsAsync<ValidationException>(() => service.CommitAsync(batch.Id, new CommitImportRequest("1234", batch.PlanHash, true)));
+        Assert.True(refused.Errors.ContainsKey("branchId"));
+        Assert.Equal(0, approver.Calls);
+
+        var other = Guid.NewGuid();
+        var result = await service.CommitAsync(batch.Id, new CommitImportRequest("1234", batch.PlanHash, true, other));
+        Assert.True(result.Committed);
+        Assert.Equal(other, store.Movements.Added.Single().BranchId);
+    }
+
+    [Fact]
+    public async Task Opening_stock_on_a_matched_row_is_a_row_error()
+    {
+        _ = AddItem("Cola", "C1");
+        var batch = await UploadAsync(Service(), Catalog("item,C1,,Cola,,10,,,,,5"));
+
+        Assert.Contains(batch.Plan.RowErrors, e => e.Message.Contains("opening_stock applies to new rows only"));
+        Assert.True(batch.Blocked);
     }
 
     // ---------------- fakes ----------------
@@ -319,7 +367,7 @@ public sealed class ImportServiceTests
         public Role CurrentRole { get; set; } = Domain.Enums.Role.Manager;
         public Guid? UserId { get; } = Guid.NewGuid();
         public Guid? DeviceId { get; } = Guid.NewGuid();
-        public Guid? BranchId => Branch;
+        public Guid? BranchId { get; set; } = Branch;
         public ScopeType? ScopeType => Domain.Enums.ScopeType.Tenant;
         public Guid? ScopeId => null;
         public Role? Role => CurrentRole;
