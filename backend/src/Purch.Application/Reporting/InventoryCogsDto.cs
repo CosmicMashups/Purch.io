@@ -19,13 +19,16 @@ public sealed record InventoryCogsDto(
     decimal CoveragePercent,
     int ExcludedLineCount);
 
-/// <summary>One sold line, with what has since been returned against it (a whole-sale refund returns every unit).</summary>
-public sealed record CogsLineRow(
-    DateTimeOffset SoldAt,
+/// <summary>The sold lines of one day/item/category/open-item bucket, already summed: Quantity is net of returns, Revenue is what the
+/// customer paid for those net units, Cogs and KnownRevenue cover only lines with a known cost (open items never count), and
+/// ExcludedLines counts the rest. Lines with nothing left after returns are left out.</summary>
+public sealed record CogsAggregateRow(
+    string Day,
     Guid? ItemId,
     Guid? CategoryId,
     bool IsOpenItem,
     decimal Quantity,
-    decimal ReturnedQuantity,
-    decimal LineTotal,
-    decimal? UnitCost);
+    decimal Revenue,
+    decimal Cogs,
+    decimal KnownRevenue,
+    int ExcludedLines);

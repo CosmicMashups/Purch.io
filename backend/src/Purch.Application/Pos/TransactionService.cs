@@ -452,10 +452,12 @@ public sealed class TransactionService(
             return item.CostPrice;
         }
 
+        var ingredients = (await inventoryItemRepository.ListByIdsAsync([.. recipeLines.Select(l => l.InventoryItemId)], cancellationToken))
+            .ToDictionary(i => i.Id);
         decimal total = 0m;
         foreach (var recipeLine in recipeLines)
         {
-            var ingredient = await inventoryItemRepository.GetByIdAsync(recipeLine.InventoryItemId, cancellationToken);
+            ingredients.TryGetValue(recipeLine.InventoryItemId, out var ingredient);
             if (ingredient?.UnitCost is not { } unitCost || recipeLine.QuantityPerOrder is not { } perOrder)
             {
                 return null;
@@ -1243,6 +1245,9 @@ public sealed class TransactionService(
             EnforceExpectedTotal(cart.TotalAmount, expectedTotal);
         }
 
+        // Approved before anything is added: a wrong PIN saves its failed-attempt count, which must not carry pending rows with it.
+        var overrideApprover = request.AllowCreditLimitOverride ? await ResolveCreditOverrideApproverAsync(request.ApproverPin, cancellationToken) : null;
+
         // The unique (TenantId, ClientSaleId) index makes a concurrent double-submit fail on save instead of paying twice.
         cart.ClientSaleId ??= request.PaymentKey;
 
@@ -1256,7 +1261,7 @@ public sealed class TransactionService(
                 if (payment.Method == PaymentMethod.UtangCredit)
                 {
                     var utang = request.Parts[payment.Sequence];
-                    await ChargeToCreditLedgerAsync(cart, utang.CustomerCreditLedgerId, payment.Amount, request, cancellationToken);
+                    await ChargeToCreditLedgerAsync(cart, utang.CustomerCreditLedgerId, payment.Amount, request, overrideApprover, cancellationToken);
                 }
 
                 payment.TenantId = CurrentTenantId;
@@ -1285,7 +1290,7 @@ public sealed class TransactionService(
 
             if (request.Method == PaymentMethod.UtangCredit)
             {
-                await ChargeToCreditLedgerAsync(cart, request.CustomerCreditLedgerId, cart.TotalAmount, request, cancellationToken);
+                await ChargeToCreditLedgerAsync(cart, request.CustomerCreditLedgerId, cart.TotalAmount, request, overrideApprover, cancellationToken);
             }
 
             paymentRepository.Add(new Payment
@@ -1704,7 +1709,16 @@ public sealed class TransactionService(
     /// CreditTransaction recorded in the same SaveChangesAsync as the payment
     /// and transaction-completion below, so a rollback can't charge a customer
     /// without actually completing the sale (or vice versa).</summary>
-    private async Task ChargeToCreditLedgerAsync(Transaction cart, Guid? customerCreditLedgerId, decimal amount, RecordPaymentRequest request, CancellationToken cancellationToken)
+    /// <summary>A manager/admin signed in approves their own override; a cashier needs an Admin/Manager approver PIN.</summary>
+    private async Task<User> ResolveCreditOverrideApproverAsync(string? approverPin, CancellationToken cancellationToken)
+    {
+        var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
+        return caller is not null && ApproverRoles.Contains(caller.Role)
+            ? caller
+            : await approverAuthorizationService.AuthorizeAsync(approverPin, cancellationToken);
+    }
+
+    private async Task ChargeToCreditLedgerAsync(Transaction cart, Guid? customerCreditLedgerId, decimal amount, RecordPaymentRequest request, User? overrideApprover, CancellationToken cancellationToken)
     {
         if (customerCreditLedgerId is not { } ledgerId)
         {
@@ -1727,19 +1741,14 @@ public sealed class TransactionService(
         {
             if (!request.AllowCreditLimitOverride)
             {
-                throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.");
-            }
-
-            var caller = await userRepository.FindActorAsync(CurrentUserId, cancellationToken);
-            if (caller is null || !ApproverRoles.Contains(caller.Role))
-            {
-                throw new ForbiddenException("Only a manager or admin can override a customer's credit limit.");
+                throw new ValidationException(nameof(RecordPaymentRequest.CustomerCreditLedgerId), "This sale would exceed the customer's credit limit.") { Code = "credit_limit_exceeded" };
             }
 
             auditLogRepository.Add(new AuditLog
             {
                 TenantId = CurrentTenantId,
                 ActorUserId = CurrentUserId,
+                ApprovedByUserId = overrideApprover!.Id,
                 ActionType = AuditActionType.CreditLimitOverride,
                 TargetEntityType = nameof(CustomerCreditLedger),
                 TargetEntityId = ledger.Id,

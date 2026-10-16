@@ -70,7 +70,7 @@ test.describe('offline browsing', () => {
     const stamp = Date.now().toString(36);
     const email = `other-${stamp}@e2e.test`;
     await call('POST', '/onboarding/bootstrap', {
-      body: { tenantName: `Other Shop ${stamp}`, businessType: 0, branchName: 'Main', adminName: 'Other Owner', adminPin: '1234', adminEmail: email, adminPassword: 'Other-password-1' },
+      body: { tenantName: `Other Shop ${stamp}`, businessType: 0, branchName: 'Main', adminName: 'Other Owner', adminPin: '123456', adminEmail: email, adminPassword: 'Other-password-1' },
     });
     const tokens = await signIn(email, 'Other-password-1');
     await page.evaluate((t) => {

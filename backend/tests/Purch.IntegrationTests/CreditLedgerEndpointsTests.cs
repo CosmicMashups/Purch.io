@@ -105,6 +105,32 @@ public sealed class CreditLedgerEndpointsTests(PostgresContainerFixture postgres
     }
 
     [Fact]
+    public async Task A_cashier_overrides_the_credit_limit_only_with_a_manager_pin()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await AuthenticatedAdminClientAsync(factory);
+        await EnableCreditLedgerAsync(admin);
+        _ = await TestSessions.AddPersonAsync(admin, "Mae Manager", MembershipRole.Manager, StaffDuty.None, "567812");
+        using var cashier = await TestSessions.CashierClientAsync(admin);
+        var ledger = (await (await admin.PostAsJsonAsync("/credit-ledger", new CreateCustomerCreditLedgerRequest("Pedro Reyes", "09191234567", null, 100m, null)))
+            .Content.ReadFromJsonAsync<CustomerCreditLedgerDto>(JsonOptions))!;
+        var item = (await (await admin.PostAsJsonAsync("/items", new CreateItemRequest("Cooking Oil", null, null, null, 250m, null, PricingType.Unit)))
+            .Content.ReadFromJsonAsync<ItemDto>(JsonOptions))!;
+        _ = await cashier.PostAsJsonAsync("/transactions/cart/lines", new AddTransactionLineRequest(item.Id, null, 1m));
+
+        var refused = await cashier.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger.Id));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("credit_limit_exceeded", (await refused.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("code").GetString());
+
+        var noPin = await cashier.PostAsJsonAsync("/transactions/cart/payments", new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger.Id, true, "Regular customer"));
+        Assert.Equal(HttpStatusCode.BadRequest, noPin.StatusCode);
+
+        var approved = await cashier.PostAsJsonAsync("/transactions/cart/payments",
+            new RecordPaymentRequest(PaymentMethod.UtangCredit, null, ledger.Id, true, "Regular customer", ApproverPin: "567812"));
+        Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
+    }
+
+    [Fact]
     public async Task Recording_a_repayment_reduces_the_balance_but_not_below_zero()
     {
         await using var factory = new PurchApiFactory(postgres.ConnectionString);

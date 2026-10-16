@@ -44,7 +44,8 @@ export function buildStockGroups(
     itemGroups.set(category.id, { label: `Items · ${category.name}`, options: [] });
   }
   const uncategorisedItems: ComboboxGroup = { label: 'Items · Uncategorised', options: [] };
-  for (const item of items.filter((i) => i.isActive)) {
+  // A service, combo or recipe item has no count of its own to move.
+  for (const item of items.filter((i) => i.isActive && i.hasOwnStock !== false)) {
     const group = (item.categoryId && itemGroups.get(item.categoryId)) || uncategorisedItems;
     group.options.push({ value: itemRef(item.id), label: item.name, keywords: item.sku ?? undefined });
   }

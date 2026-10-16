@@ -41,4 +41,5 @@ public sealed record RecordPaymentRequest(
     string? CreditLimitOverrideReason = null,
     decimal? ExpectedTotal = null,
     IReadOnlyList<PaymentPartRequest>? Parts = null,
-    Guid? PaymentKey = null);
+    Guid? PaymentKey = null,
+    string? ApproverPin = null);

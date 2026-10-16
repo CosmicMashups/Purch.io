@@ -25,55 +25,44 @@ public sealed class InventoryCogsService(
         var toUtc = new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), ReportTimeZone.Offset).ToUniversalTime();
         ReportRange.Validate(fromUtc, toUtc);
 
-        var lines = (await repository.ListLinesAsync(fromUtc, toUtc, cancellationToken))
-            .Select(l => (Line: l, Net: Math.Max(l.Quantity - l.ReturnedQuantity, 0m)))
-            .Where(x => x.Net > 0m)
-            .ToList();
+        var rows = await repository.ListAggregatesAsync(fromUtc, toUtc, cancellationToken);
 
         var items = (await itemRepository.ListByTenantAsync(tenantId, cancellationToken)).ToDictionary(i => i.Id, i => i.Name);
         var categories = (await categoryRepository.ListByTenantAsync(tenantId, cancellationToken)).ToDictionary(c => c.Id, c => c.Name);
 
-        (Guid? Id, string Name) Key((CogsLineRow Line, decimal Net) x) => mode switch
+        (Guid? Id, string Name) Key(CogsAggregateRow x) => mode switch
         {
-            "day" => (null, DateOnly.FromDateTime(x.Line.SoldAt.ToOffset(ReportTimeZone.Offset).DateTime).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
-            _ when x.Line.IsOpenItem || (mode == "item" && x.Line.ItemId is null) => (null, "Open items"),
-            "category" => (x.Line.CategoryId, x.Line.CategoryId is { } c && categories.TryGetValue(c, out var cn) ? cn : "Uncategorised"),
-            _ => (x.Line.ItemId, items.GetValueOrDefault(x.Line.ItemId!.Value, "(removed item)")),
+            "day" => (null, x.Day),
+            _ when x.IsOpenItem || (mode == "item" && x.ItemId is null) => (null, "Open items"),
+            "category" => (x.CategoryId, x.CategoryId is { } c && categories.TryGetValue(c, out var cn) ? cn : "Uncategorised"),
+            _ => (x.ItemId, items.GetValueOrDefault(x.ItemId!.Value, "(removed item)")),
         };
 
-        var groups = lines
+        var groups = rows
             .GroupBy(Key)
             .Select(g =>
             {
                 var t = Totals(g);
-                return new CogsGroupDto(g.Key.Id, g.Key.Name, g.Sum(x => x.Net), t.Cogs, t.KnownRevenue, t.Coverage, t.Excluded);
+                return new CogsGroupDto(g.Key.Id, g.Key.Name, g.Sum(x => x.Quantity), t.Cogs, t.KnownRevenue, t.Coverage, t.Excluded);
             })
             .OrderBy(g => mode == "day" ? 0m : -g.Cogs)
             .ThenBy(g => g.Name, StringComparer.Ordinal)
             .ToList();
 
-        var total = Totals(lines);
+        var total = Totals(rows);
         return new InventoryCogsDto(groups, total.Cogs, total.KnownRevenue, total.Coverage, total.Excluded);
     }
 
-    private static (decimal Cogs, decimal KnownRevenue, decimal Coverage, int Excluded) Totals(IEnumerable<(CogsLineRow Line, decimal Net)> lines)
+    private static (decimal Cogs, decimal KnownRevenue, decimal Coverage, int Excluded) Totals(IEnumerable<CogsAggregateRow> rows)
     {
         decimal cogs = 0m, known = 0m, all = 0m;
         var excluded = 0;
-        foreach (var (line, net) in lines)
+        foreach (var row in rows)
         {
-            // What the customer paid for the units that stayed sold.
-            var revenue = line.Quantity > 0m ? line.LineTotal * net / line.Quantity : 0m;
-            all += revenue;
-            if (line.UnitCost is { } cost && !line.IsOpenItem)
-            {
-                cogs += net * cost;
-                known += revenue;
-            }
-            else
-            {
-                excluded++;
-            }
+            cogs += row.Cogs;
+            known += row.KnownRevenue;
+            all += row.Revenue;
+            excluded += row.ExcludedLines;
         }
 
         return (cogs, known, ReportMath.Percent(known, all) ?? 0m, excluded);

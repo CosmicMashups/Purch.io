@@ -41,12 +41,15 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
         {
             ValidationException validationException => (
                 StatusCodes.Status400BadRequest,
-                new ValidationProblemDetails(validationException.Errors.ToDictionary(pair => pair.Key, pair => pair.Value))
-                {
-                    Title = "Validation failed.",
-                    Status = StatusCodes.Status400BadRequest,
-                    Instance = httpContext.Request.Path,
-                }),
+                WithExtension(
+                    new ValidationProblemDetails(validationException.Errors.ToDictionary(pair => pair.Key, pair => pair.Value))
+                    {
+                        Title = "Validation failed.",
+                        Status = StatusCodes.Status400BadRequest,
+                        Instance = httpContext.Request.Path,
+                    },
+                    "code",
+                    validationException.Code)),
 
             NotFoundException notFoundException => (
                 StatusCodes.Status404NotFound,

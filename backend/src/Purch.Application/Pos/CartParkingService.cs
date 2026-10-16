@@ -68,11 +68,8 @@ public sealed class CartParkingService(
         var lines = await transactionRepository.ListLinesByTransactionsAsync([.. parked.Select(t => t.Id)], cancellationToken);
         var lineCounts = lines.GroupBy(line => line.TransactionId).ToDictionary(group => group.Key, group => group.Count());
 
-        var names = new Dictionary<Guid, string?>();
-        foreach (var userId in parked.Where(t => t.ParkedByUserId is not null).Select(t => t.ParkedByUserId!.Value).Distinct())
-        {
-            names[userId] = (await userRepository.FindActorAsync(userId, cancellationToken))?.Name;
-        }
+        var names = (await userRepository.ListActorsAsync(currentTenantProvider.TenantId!.Value, cancellationToken))
+            .ToDictionary(user => user.Id, user => (string?)user.Name);
 
         return [.. parked.Select(t => new ParkedCartSummaryDto(
             t.Id,

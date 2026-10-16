@@ -11,10 +11,16 @@ public sealed class InventoryCogsServiceTests
     private static readonly Guid Tenant = Guid.NewGuid();
     private static readonly DateTimeOffset Noon = new(2026, 3, 10, 4, 0, 0, TimeSpan.Zero);
 
-    private static CogsLineRow Line(Guid? item, decimal qty, decimal total, decimal? cost, decimal returned = 0m, bool open = false, Guid? category = null) =>
-        new(Noon, item, category, open, qty, returned, total, cost);
+    // One sold line as the database would aggregate it (net of returns, open items and unknown costs excluded).
+    private static CogsAggregateRow Line(Guid? item, decimal qty, decimal total, decimal? cost, decimal returned = 0m, bool open = false, Guid? category = null)
+    {
+        var net = Math.Max(qty - returned, 0m);
+        var revenue = total * net / qty;
+        var known = cost is not null && !open;
+        return new("2026-03-10", item, category, open, net, revenue, known ? net * cost!.Value : 0m, known ? revenue : 0m, known ? 0 : 1);
+    }
 
-    private static async Task<InventoryCogsDto> RunAsync(List<CogsLineRow> lines, string groupBy = "item", List<Category>? categories = null) =>
+    private static async Task<InventoryCogsDto> RunAsync(List<CogsAggregateRow> lines, string groupBy = "item", List<Category>? categories = null) =>
         await new InventoryCogsService(new FakeRepo(lines), new FakeItems(), new FakeCategories(categories ?? []), new FakeTenant())
             .GetAsync(new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31), groupBy);
 
@@ -75,7 +81,7 @@ public sealed class InventoryCogsServiceTests
     public async Task Groups_by_category_and_day()
     {
         var cat = new Category { Id = Guid.NewGuid(), TenantId = Tenant, Name = "Drinks" };
-        var lines = new List<CogsLineRow> { Line(Guid.NewGuid(), 1, 10m, 4m, category: cat.Id), Line(Guid.NewGuid(), 1, 10m, 1m) };
+        var lines = new List<CogsAggregateRow> { Line(Guid.NewGuid(), 1, 10m, 4m, category: cat.Id), Line(Guid.NewGuid(), 1, 10m, 1m) };
 
         var byCategory = await RunAsync(lines, "category", [cat]);
         Assert.Equal(["Drinks", "Uncategorised"], byCategory.Groups.Select(g => g.Name).ToList());
@@ -97,10 +103,10 @@ public sealed class InventoryCogsServiceTests
         public Guid? TenantId => Tenant;
     }
 
-    private sealed class FakeRepo(List<CogsLineRow> lines) : IInventoryCogsRepository
+    private sealed class FakeRepo(List<CogsAggregateRow> lines) : IInventoryCogsRepository
     {
-        public Task<IReadOnlyList<CogsLineRow>> ListLinesAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<CogsLineRow>>(lines);
+        public Task<IReadOnlyList<CogsAggregateRow>> ListAggregatesAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CogsAggregateRow>>(lines);
     }
 
     private sealed class FakeItems : IItemRepository

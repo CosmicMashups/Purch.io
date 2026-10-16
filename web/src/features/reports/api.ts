@@ -1,4 +1,5 @@
 import { apiClient } from '../../lib/apiClient';
+import { businessToday } from './range';
 import type {
   DashboardInsights,
   DiscountReport,
@@ -22,7 +23,7 @@ export const reportsApi = {
     apiClient.get<InventoryValuation>('/reports/inventory/valuation', { params }).then((r) => r.data),
   /** The endpoint takes business days (yyyy-MM-dd, end inclusive) and is tenant-wide, so branchId is not sent. */
   inventoryCogs: (params: RangeParams & { groupBy: CogsGroupBy }) => {
-    const day = (ms: number) => new Date(ms + 8 * 3_600_000).toISOString().slice(0, 10);
+    const day = (ms: number) => businessToday(new Date(ms));
     const query = { from: day(new Date(params.from).getTime()), to: day(new Date(params.to).getTime() - 1), groupBy: params.groupBy };
     return apiClient.get<InventoryCogs>('/reports/inventory/cogs', { params: query }).then((r) => r.data);
   },

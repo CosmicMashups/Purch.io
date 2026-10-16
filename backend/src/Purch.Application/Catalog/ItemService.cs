@@ -486,13 +486,9 @@ public sealed class ItemService(
         if (tenant.UseSeparateInventoryTracking)
         {
             recipeLines = await itemRecipeRepository.ListByItemAsync(item.Id, cancellationToken);
-            foreach (var line in recipeLines)
+            foreach (var inventoryItem in await inventoryItemRepository.ListByIdsAsync([.. recipeLines.Select(l => l.InventoryItemId)], cancellationToken))
             {
-                var inventoryItem = await inventoryItemRepository.GetByIdAsync(line.InventoryItemId, cancellationToken);
-                if (inventoryItem is not null)
-                {
-                    inventoryItemsById[inventoryItem.Id] = inventoryItem;
-                }
+                inventoryItemsById[inventoryItem.Id] = inventoryItem;
             }
 
             if (recipeLines.Count == 0)

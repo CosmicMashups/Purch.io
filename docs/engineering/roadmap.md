@@ -44,21 +44,18 @@ Scope: valuation (on-hand x cost, by category/branch), COGS from line snapshots,
 - Production deploy: backend is Vercel-only against Supabase; migrations auto-apply at cold start and failure is non-fatal, so run migrations out-of-band first (see the deploy note).
 
 ## Parked items from U1 (none blocks U4 or U3)
-- Missing tests: discount value 0 clears kind/value/reason/amount (line and cart); price override back to catalog price (line stays out of merge/promos); cash `AmountTendered` upper bound (code is in, untested); retry test with an approver PIN.
-- Client coupling: pay-time 404 handling matches server message prefixes ("Open cart '", "Customer credit account '"); the expected-total 409 matches message text. Add a typed `resource`/code to problem details.
-- No server idempotency key on `POST /transactions/cart/payments` (client guard only); `POST /transactions/checkout` has `ClientSaleId`.
-- Utang credit-limit override has no UI (`allowCreditLimitOverride` not wired, single or split).
-- `RolesFor` unknown-key guard; `/items` ETag role rule duplicates `CanSeeCosts`; no audit on parked-cart TTL change; N+1 lookups (combo cost, ingredient cost, parked list); stale comment at `PosEndpoints.cs` near the discount routes; DTO comment says "different Admin/Manager".
-- Approver is not branch-scoped (existing service behaviour).
-- Flutter (U6): must never receive a Parked transaction (status index 5 exceeds its enum); open items arrive with an all-zero `itemId`; local `PricingEngine` must mirror manual discounts, split tender, VAT stamping and the cart cap (use the golden-case file); offline checkout cannot carry open items or split tender yet.
-- Web polish: raw gray/red colours in `EmptyState`/`ErrorState` and `ItemDialog` CostField; switches at 32px; margin hint not linked by `aria-describedby`.
+Resolved 2026-10-16: payment idempotency key (`PaymentKey` on `POST /transactions/cart/payments`, stored in `ClientSaleId`); typed `resource`/`code` on problem details (web matches those, not message text); Utang credit-limit override UI (cashier supplies an Admin/Manager approver PIN, audited with `ApprovedByUserId`); the missing tests except the approver-PIN retry test; `RolesFor` unknown-key guard; `/items` ETag uses `CanSeeCosts`; audit entry on parked-cart TTL change; stale comments; parked-list and ingredient-cost N+1s; web polish (tokens, 48px switches, `aria-describedby`).
+- **Approver branch scope (decided, enforced):** an Admin/Manager PIN only counts at the signed-in branch, or when that account has no branch (tenant-wide).
+- Still open: the retry test with an approver PIN (needs a fault-injecting unit of work); combo-cost N+1 (not found in the code, may already be gone); `PurchaseRequestService` still looks up unit costs one by one.
+- Flutter (U6): must never receive a Parked transaction (status index 5 exceeds its enum); open items arrive with an all-zero `itemId`; local `PricingEngine` must mirror manual discounts, split tender, VAT stamping and the cart cap (use the golden-case file); offline checkout cannot carry open items or split tender yet; Flutter must send `paymentKey`.
 
 ## U3 Inventory depth: follow-ups and rulings to confirm (2026-10-16)
 Open follow-ups:
-- Per-branch stock (valuation, count and import are tenant-wide today).
+- Per-branch stock: valuation, count and import stay tenant-wide (ADR 0008). Treat as final unless the owner says otherwise; tiering by location depends on it.
 - Flutter parity (U6).
-- Branch/idempotency minors: a stock import needs a branch for actors with none (`RequiresBranch`); stock-take apply rewrites `UpdatedAt` on every line; the in-transaction stale check for import commit is unit-covered only; COGS reads line rows up to 366 days (not SQL-aggregated).
-- Web minors: Review shows lines twice for Admin/Manager; item picker includes service/combo/recipe items; `day()` hardcodes +8h.
+- Stock import with no branch is handled (`RequiresBranch`, web picker). Stock-take apply rewrites `UpdatedAt` on every line on purpose: it bumps the `xmin` token so a stale count/skip fails with 409. The in-transaction stale check for import commit is unit-covered only (an integration test needs a fault-injecting unit of work).
+- COGS is now aggregated in SQL (per business day, item, category, open-item flag).
+- Web minors fixed: Review recount list is collapsed, the item picker skips items without their own stock, `day()` uses `businessToday`.
 
 Rulings to confirm (product calls made during the build):
 - `/review` is Manager/Admin only (blind-count integrity): Warehouse counters need a manager to move a take to Review.

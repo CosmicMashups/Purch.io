@@ -188,6 +188,10 @@ export interface RecordPaymentRequest {
   parts?: PaymentPart[];
   /** Idempotency key: the server returns the already-completed sale for a repeat of the same key. */
   paymentKey?: string;
+  /** Utang only: lets a sale go past the customer's credit limit. A cashier also sends an Admin/Manager approverPin. */
+  allowCreditLimitOverride?: boolean;
+  creditLimitOverrideReason?: string | null;
+  approverPin?: string | null;
 }
 
 /** Refunding a completed sale always needs an Admin/Manager's approval — see ApproverPinDialog. */

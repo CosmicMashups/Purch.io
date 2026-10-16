@@ -59,6 +59,24 @@ function payErrorText(error: unknown): string {
   return userMessage(error);
 }
 
+/** Asks for what the server needs to let an Utang sale past the customer's credit limit. A signed-in manager/admin
+ * approves it themselves, so only a cashier is asked for an Admin/Manager PIN. */
+function CreditOverrideFields({ needPin, reason, pin, onReason, onPin }: { needPin: boolean; reason: string; pin: string; onReason: (v: string) => void; onPin: (v: string) => void }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-panel border border-warn bg-warn/10 p-4">
+      <p className="text-base font-medium">This sale is over the customer's credit limit. A manager can override it.</p>
+      <FormField label="Reason for the override">
+        <input value={reason} onChange={(e) => onReason(e.target.value)} maxLength={200} autoComplete="off" className={controlClass} />
+      </FormField>
+      {needPin && (
+        <FormField label="Manager or admin PIN">
+          <input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => onPin(e.target.value)} className={controlClass} />
+        </FormField>
+      )}
+    </section>
+  );
+}
+
 export function PaymentPage() {
   const navigate = useNavigate();
   const { claims, role } = useSession();
@@ -76,6 +94,10 @@ export function PaymentPage() {
   // An Utang account the server no longer has: the split panel drops the part that used it.
   const [rejectedLedgerId, setRejectedLedgerId] = useState<string | null>(null);
   // One request per attempt: a double tap lands before React re-renders the button as busy.
+  // Set when the server refuses an Utang sale for the credit limit; the cashier can then ask a manager to override it.
+  const [limitHit, setLimitHit] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overridePin, setOverridePin] = useState('');
   const inFlight = useRef(false);
   // One key per visit to this screen: a retry or double-tap resends it, so the server pays the sale once.
   const paymentKey = useRef(crypto.randomUUID());
@@ -128,13 +150,20 @@ export function PaymentPage() {
     setSplitError(null);
     setSingleError(null);
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
-    pay.mutate({ ...body, paymentKey: paymentKey.current }, {
+    const override = limitHit && overrideReason.trim() !== '';
+    const sent: RecordPaymentRequest = {
+      ...body,
+      paymentKey: paymentKey.current,
+      ...(override && { allowCreditLimitOverride: true, creditLimitOverrideReason: overrideReason.trim(), approverPin: overridePin || null }),
+    };
+    pay.mutate(sent, {
       onSuccess: (completed) => {
         showReceipt(completed);
         navigate('/sell/receipt', { replace: true, state: { justSold: true } });
       },
       onError: (error) => {
         const text = payErrorText(error);
+        setLimitHit(error instanceof ApiError && error.code === 'credit_limit_exceeded');
         if (body.parts) setSplitError(text);
         else setSingleError(text);
         if (isMissingLedger(error)) {
@@ -160,6 +189,9 @@ export function PaymentPage() {
         <p className="mt-1 text-base text-ink-soft">VAT (12%): {formatPeso(vatOf(cart.data))}</p>
       </div>
 
+      {splitting && limitHit && (
+        <CreditOverrideFields needPin={role !== 'Admin' && role !== 'Manager'} reason={overrideReason} pin={overridePin} onReason={setOverrideReason} onPin={setOverridePin} />
+      )}
       {splitting ? (
         <SplitTenderPanel
           total={total}
@@ -246,6 +278,9 @@ export function PaymentPage() {
             )}
           </section>
 
+          {limitHit && (
+            <CreditOverrideFields needPin={role !== 'Admin' && role !== 'Manager'} reason={overrideReason} pin={overridePin} onReason={setOverrideReason} onPin={setOverridePin} />
+          )}
           {singleError && (
             <p role="alert" className="rounded-control border border-danger/40 bg-danger/10 px-4 py-3 text-base font-medium text-danger">
               {singleError}

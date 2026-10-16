@@ -124,8 +124,8 @@ export function StockTakeDetailPage() {
       )}
       {t.status === StockTakeStatus.Review && <ReviewLines lines={t.lines} />}
       {t.status === StockTakeStatus.Review && canReview && (
-        <section aria-label="Recount" className="flex flex-col gap-3">
-          <h2 className="text-lg font-bold">Recount a line</h2>
+        <details aria-label="Recount" className="flex flex-col gap-3">
+          <summary className="min-h-12 cursor-pointer text-lg font-bold">Recount a line</summary>
           <StockTakeCountList
             lines={[...t.lines].sort((a, b) => Number(!!b.needsRecount) - Number(!!a.needsRecount))}
             busy={count.isPending}
@@ -134,7 +134,7 @@ export function StockTakeDetailPage() {
               void run(() => count.mutateAsync({ lineId, counted, skip }));
             }}
           />
-        </section>
+        </details>
       )}
       {(t.status === StockTakeStatus.Applied || t.status === StockTakeStatus.Cancelled || t.status === StockTakeStatus.Draft) && (
         <ResultLines lines={t.lines} hideExpected={t.blind && t.status === StockTakeStatus.Draft} />
