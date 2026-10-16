@@ -206,7 +206,8 @@ public static class PosEndpoints
             Results.Ok(await transactionService.ApplySeniorPwdDiscountAsync(request, cancellationToken)))
             .RequireAuthorization(policy => policy.RequireRole(posSupervisor));
 
-        // --- Manager/Admin manual discount and price override (exclusive with Senior/PWD; audited) ---
+        // --- Manual discount and price override: a cashier session plus a Manager/Admin approver PIN on every call
+        // (permission-gated, exclusive with Senior/PWD, audited) ---
         _ = app.MapPut("/transactions/cart/lines/{lineId:guid}/discount", async (
             Guid lineId,
             SetManualDiscountRequest request,

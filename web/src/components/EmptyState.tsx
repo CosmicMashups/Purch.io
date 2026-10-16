@@ -6,9 +6,9 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-6 py-12 text-center">
-      <p className="text-sm font-medium text-gray-900">{title}</p>
-      {description && <p className="text-sm text-gray-500">{description}</p>}
+    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line px-6 py-12 text-center">
+      <p className="text-sm font-medium text-ink">{title}</p>
+      {description && <p className="text-sm text-ink-soft">{description}</p>}
       {action}
     </div>
   );

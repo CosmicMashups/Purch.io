@@ -309,7 +309,7 @@ export function CartPanel({ cart, isSupervisor, canDiscount = isSupervisor, onCh
             checked={cart.seniorPwdDiscountApplied}
             disabled={busy || !isSupervisor}
             onChange={(e) => onSeniorToggle(e.target.checked)}
-            className="size-6 accent-brand"
+            className="size-12 accent-brand"
           />
         </label>
 

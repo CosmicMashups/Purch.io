@@ -40,4 +40,5 @@ public sealed record RecordPaymentRequest(
     bool AllowCreditLimitOverride = false,
     string? CreditLimitOverrideReason = null,
     decimal? ExpectedTotal = null,
-    IReadOnlyList<PaymentPartRequest>? Parts = null);
+    IReadOnlyList<PaymentPartRequest>? Parts = null,
+    Guid? PaymentKey = null);

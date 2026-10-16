@@ -90,7 +90,7 @@ describe('PaymentPage', () => {
     fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
 
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 0, amountTendered: 200, customerCreditLedgerId: null, expectedTotal: 137.5 }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 0, amountTendered: 200, customerCreditLedgerId: null, expectedTotal: 137.5, paymentKey: expect.any(String) }));
     expect(await screen.findByText('Sale complete')).toBeInTheDocument();
     expect(screen.getByText('OR No. 00000041')).toBeInTheDocument();
     expect(screen.getByText('Change')).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('PaymentPage', () => {
     renderPayment();
     fireEvent.click(await screen.findByRole('radio', { name: 'Bank transfer' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm ₱137.50' }));
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 2, amountTendered: null, customerCreditLedgerId: null, expectedTotal: 137.5 }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 2, amountTendered: null, customerCreditLedgerId: null, expectedTotal: 137.5, paymentKey: expect.any(String) }));
   });
 
   it("shows the branch's GCash QR and account", async () => {
@@ -133,7 +133,7 @@ describe('PaymentPage', () => {
 
     fireEvent.change(select, { target: { value: 'c1' } });
     fireEvent.click(confirm);
-    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 5, amountTendered: null, customerCreditLedgerId: 'c1', expectedTotal: 137.5 }));
+    await waitFor(() => expect(posApi.pay).toHaveBeenCalledWith({ method: 5, amountTendered: null, customerCreditLedgerId: 'c1', expectedTotal: 137.5, paymentKey: expect.any(String) }));
   });
 
   it('goes back to Cashier when the cart is empty', async () => {
@@ -158,7 +158,7 @@ describe('PaymentPage', () => {
 describe('PaymentPage when the total on the server has moved', () => {
   it('shows the server total again and charges nothing when the sale is refused for a changed price', async () => {
     const { ApiError } = await import('../../lib/apiError');
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00 (the device showed 137.50). Review the cart and try again.'));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00 (the device showed 137.50). Review the cart and try again.', undefined, { code: 'total_changed' }));
     renderPayment();
     fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '500' } });
 
@@ -274,6 +274,7 @@ describe('PaymentPage split payment', () => {
         amountTendered: null,
         customerCreditLedgerId: null,
         expectedTotal: 137.5,
+        paymentKey: expect.any(String),
         parts: [
           { method: 0, amount: 37.5, amountTendered: 50, customerCreditLedgerId: null, reference: null },
           { method: 3, amount: 100, amountTendered: null, customerCreditLedgerId: null, reference: 'GC-778812' },
@@ -303,7 +304,7 @@ describe('PaymentPage split payment', () => {
 
   it('says the cart changed on a 409 and reloads the total', async () => {
     const { ApiError } = await import('../../lib/apiError');
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00.'));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 150.00.', undefined, { code: 'total_changed' }));
     renderPayment();
     await splitCashThenGcash();
     vi.mocked(posApi.getCart).mockResolvedValue(cartWithTotal(150));
@@ -325,7 +326,7 @@ describe('PaymentPage split payment', () => {
 
   it('names the new total on a moved-total 409, warns when payments now exceed it, and clears the error on edit', async () => {
     const { ApiError } = await import('../../lib/apiError');
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 120.00 (the device showed 137.50). Review the cart and try again.'));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('conflict', 'Prices or promos changed: the total is now 120.00 (the device showed 137.50). Review the cart and try again.', undefined, { code: 'total_changed' }));
     renderPayment();
     await splitCashThenGcash();
     vi.mocked(posApi.getCart).mockResolvedValue(cartWithTotal(120));
@@ -356,7 +357,7 @@ describe('PaymentPage split payment', () => {
   it('keeps the single Utang payment screen on a missing customer account, says so inline and clears the choice', async () => {
     const { ApiError } = await import('../../lib/apiError');
     vi.mocked(creditApi.list).mockResolvedValue(ledgers);
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Customer credit account 'c1' was not found."));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError("notFound", "Customer credit account 'c1' was not found.", undefined, { resource: "Customer credit account" }));
     renderPayment();
     fireEvent.click(await screen.findByRole('radio', { name: 'Utang / Credit' }));
     fireEvent.change(await screen.findByLabelText('Customer account'), { target: { value: 'c1' } });
@@ -370,7 +371,7 @@ describe('PaymentPage split payment', () => {
   it('keeps the split screen on a missing customer account, says so inline and drops that Utang part', async () => {
     const { ApiError } = await import('../../lib/apiError');
     vi.mocked(creditApi.list).mockResolvedValue(ledgers);
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Customer credit account 'c1' was not found."));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError("notFound", "Customer credit account 'c1' was not found.", undefined, { resource: "Customer credit account" }));
     renderPayment();
     fireEvent.click(await screen.findByRole('button', { name: 'Split payment' }));
     fireEvent.change(screen.getByLabelText('Amount for this part'), { target: { value: '37.5' } });
@@ -387,7 +388,7 @@ describe('PaymentPage split payment', () => {
 
   it.each([false, true])('when the cart is gone after a lost response (split %s), points to Recent sales instead of charging again', async (split) => {
     const { ApiError } = await import('../../lib/apiError');
-    vi.mocked(posApi.pay).mockRejectedValue(new ApiError('notFound', "Open cart 'dev1' was not found."));
+    vi.mocked(posApi.pay).mockRejectedValue(new ApiError("notFound", "Open cart 'dev1' was not found.", undefined, { resource: "Open cart" }));
     renderPayment();
     if (split) await splitCashThenGcash();
     else fireEvent.change(await screen.findByLabelText('Cash received'), { target: { value: '200' } });

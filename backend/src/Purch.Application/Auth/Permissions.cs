@@ -30,5 +30,7 @@ public static class Permissions
 
     /// <summary>Role names holding <paramref name="key"/>; the single place routes resolve keys.</summary>
     public static IReadOnlyList<string> RolesFor(string key) =>
-        Enum.GetValues<Role>().Where(r => For(r).Contains(key)).Select(r => r.ToString()).ToArray();
+        !AllKeys.Contains(key)
+            ? throw new ArgumentException($"Unknown permission key '{key}'.", nameof(key))
+            : Enum.GetValues<Role>().Where(r => For(r).Contains(key)).Select(r => r.ToString()).ToArray();
 }

@@ -443,4 +443,44 @@ public sealed class ManualDiscountTests(PostgresContainerFixture postgres)
         Assert.Equal(19.29m, reader.GetDecimal(1));
         Assert.Equal(0m, reader.GetDecimal(2));
     }
+
+    [Fact]
+    public async Task Discount_value_zero_clears_kind_value_and_amount_for_a_line_and_for_the_cart()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var item = await CreateItemAsync(admin, "Rice", 200m);
+        var lineId = (await AddAsync(admin, item)).Lines[0].Id;
+
+        _ = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 10m)));
+        var line = (await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/discount", Discount("Percent", 0m)))).Lines[0];
+        Assert.Null(line.ManualDiscountKind);
+        Assert.Null(line.ManualDiscountValue);
+        Assert.Equal(0m, line.ManualDiscountAmount);
+
+        _ = await ReadAsync(await admin.PutAsJsonAsync("/transactions/cart/discount", Discount("Fixed", 20m)));
+        var cart = await ReadAsync(await admin.PutAsJsonAsync("/transactions/cart/discount", Discount("Fixed", 0m)));
+        Assert.Null(cart.ManualDiscountKind);
+        Assert.Null(cart.ManualDiscountValue);
+        Assert.Equal(0m, cart.ManualDiscountAmount);
+        Assert.Equal(200m, cart.TotalAmount);
+    }
+
+    [Fact]
+    public async Task A_price_override_back_to_the_catalog_price_keeps_the_line_out_of_merge_and_promos()
+    {
+        await using var factory = new PurchApiFactory(postgres.ConnectionString);
+        using var admin = await TestSessions.AdminClientAsync(factory);
+        var item = await CreateItemAsync(admin, "Promo Rice", 100m);
+        _ = await admin.PostAsJsonAsync("/promos/item-discounts",
+            new CreateItemDiscountPromoRuleRequest("Half off", item.Id, PromoDiscountType.Percentage, 50m, null, null));
+        var lineId = (await AddAsync(admin, item)).Lines[0].Id;
+
+        var back = await ReadAsync(await admin.PutAsJsonAsync($"/transactions/cart/lines/{lineId}/price", new { newUnitPrice = 100m, reason = "Keep full price", approverPin = TestSessions.AdminPin }));
+        Assert.Equal(100m, back.Lines[0].PriceOverrideFrom);
+        Assert.Equal(0m, back.ItemPromoDiscountAmount);
+
+        var cart = await AddAsync(admin, item);
+        Assert.Equal(2, cart.Lines.Count);
+    }
 }

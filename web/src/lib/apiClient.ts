@@ -120,7 +120,7 @@ function mapError(error: AxiosError): ApiError {
   }
 
   const { status, data } = error.response;
-  const body = (data ?? {}) as { title?: string; detail?: string; errors?: Record<string, string[]> };
+  const body = (data ?? {}) as { title?: string; detail?: string; errors?: Record<string, string[]>; code?: string; resource?: string };
   // A broken rule comes back as { title: 'Validation failed.', errors: {...} } with no detail, so the generic
   // title would hide the one sentence that says what to fix. Prefer the first specific message.
   const firstFieldMessage = Object.values(body.errors ?? {}).flat()[0];
@@ -140,7 +140,7 @@ function mapError(error: AxiosError): ApiError {
   };
 
   const kind = kindByStatus[status] ?? 'unknown';
-  return new ApiError(kind, message, body.errors);
+  return new ApiError(kind, message, body.errors, { code: body.code, resource: body.resource });
 }
 
 apiClient.interceptors.response.use(

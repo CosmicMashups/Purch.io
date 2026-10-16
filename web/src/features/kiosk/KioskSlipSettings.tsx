@@ -68,7 +68,7 @@ export function KioskSlipSettings({ showPaperWidth = true }: { showPaperWidth?: 
           disabled={!confirmed}
           checked={config.kioskPrintSlip && confirmed}
           onChange={(e) => config.update({ kioskPrintSlip: e.target.checked })}
-          className="size-7 shrink-0 accent-brand disabled:opacity-40"
+          className="size-12 shrink-0 accent-brand disabled:opacity-40"
         />
       </label>
       {printer.portal}

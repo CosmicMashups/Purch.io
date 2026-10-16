@@ -1,5 +1,6 @@
 using Purch.Api.Http;
 using Purch.Application.Catalog;
+using Purch.Application.Common;
 using Purch.Application.EquipmentInventory;
 using Purch.Application.Inventory;
 using Purch.Domain.Enums;
@@ -43,11 +44,11 @@ public static class CatalogEndpoints
             HttpContext httpContext,
             IItemService itemService,
             ICatalogVersionProvider catalogVersion,
+            ICurrentActorProvider actor,
             CancellationToken cancellationToken) =>
             ConditionalGet.RespondAsync(
                 httpContext,
-                async () => await catalogVersion.GetItemsVersionAsync(cancellationToken)
-                    + (httpContext.User.IsInRole(nameof(Role.Admin)) || httpContext.User.IsInRole(nameof(Role.Manager)) || httpContext.User.IsInRole(nameof(Role.Warehouse)) ? string.Empty : "-nocost"),
+                async () => await catalogVersion.GetItemsVersionAsync(cancellationToken) + (actor.CanSeeCosts ? string.Empty : "-nocost"),
                 () => itemService.ListAsync(cancellationToken))).RequireAuthorization();
 
         _ = app.MapPost("/items", async (

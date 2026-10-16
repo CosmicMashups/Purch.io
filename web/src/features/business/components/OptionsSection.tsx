@@ -11,7 +11,7 @@ function Switch({ label, description, checked, busy, onChange }: { label: string
         <p className="text-base font-semibold">{label}</p>
         <p className="text-sm text-ink-soft">{description}</p>
       </div>
-      <input type="checkbox" role="switch" aria-label={label} checked={checked} disabled={busy} onChange={(e) => onChange(e.target.checked)} className="size-8 shrink-0 accent-brand" />
+      <input type="checkbox" role="switch" aria-label={label} checked={checked} disabled={busy} onChange={(e) => onChange(e.target.checked)} className="size-12 shrink-0 accent-brand" />
     </li>
   );
 }

@@ -7,6 +7,8 @@ namespace Purch.Application.Onboarding;
 public sealed partial class TenantSettingsService(
     ITenantRepository tenantRepository,
     ICurrentTenantProvider currentTenantProvider,
+    ICurrentActorProvider currentActorProvider,
+    IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork) : ITenantSettingsService
 {
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
@@ -86,6 +88,20 @@ public sealed partial class TenantSettingsService(
 
         if (request.ParkedCartTtlHours is { } ttlHours)
         {
+            if (ttlHours != tenant.ParkedCartTtlHours)
+            {
+                auditLogRepository.Add(new Domain.Entities.AuditLog
+                {
+                    TenantId = tenant.Id,
+                    ActorUserId = currentActorProvider.UserId!.Value,
+                    ActionType = Domain.Enums.AuditActionType.TenantSettingChanged,
+                    TargetEntityType = nameof(Domain.Entities.Tenant),
+                    TargetEntityId = tenant.Id,
+                    BeforeStateJson = System.Text.Json.JsonSerializer.Serialize(new { parkedCartTtlHours = tenant.ParkedCartTtlHours }),
+                    AfterStateJson = System.Text.Json.JsonSerializer.Serialize(new { parkedCartTtlHours = ttlHours }),
+                });
+            }
+
             tenant.ParkedCartTtlHours = ttlHours;
         }
 

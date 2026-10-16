@@ -973,7 +973,8 @@ public sealed class TransactionService(
         if (Math.Abs(serverTotal - expected) > 0.005m)
         {
             throw new ConflictException(
-                $"Prices or promos changed: the total is now {serverTotal:F2} (the device showed {expected:F2}). Review the cart and try again.");
+                $"Prices or promos changed: the total is now {serverTotal:F2} (the device showed {expected:F2}). Review the cart and try again.",
+                "total_changed");
         }
     }
 
@@ -1202,9 +1203,16 @@ public sealed class TransactionService(
         return sequence.LastIssuedNumber;
     }
 
-    public Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
+    public async Task<TransactionDto> RecordPaymentAsync(RecordPaymentRequest request, CancellationToken cancellationToken = default)
     {
-        return RecordPaymentCoreAsync(request, deviceIssuedReceiptNumber: null, request.ExpectedTotal, enforceExpectedTotal: true, cancellationToken);
+        // Idempotent replay: a retry or double-tap with the same key returns the sale it already completed.
+        if (request.PaymentKey is { } key
+            && await transactionRepository.GetByClientSaleIdAsync(key, cancellationToken) is { Status: TransactionStatus.Completed } done)
+        {
+            return await ToDtoAsync(done, cancellationToken);
+        }
+
+        return await RecordPaymentCoreAsync(request, deviceIssuedReceiptNumber: null, request.ExpectedTotal, enforceExpectedTotal: true, cancellationToken);
     }
 
     private async Task<TransactionDto> RecordPaymentCoreAsync(
@@ -1234,6 +1242,9 @@ public sealed class TransactionService(
         {
             EnforceExpectedTotal(cart.TotalAmount, expectedTotal);
         }
+
+        // The unique (TenantId, ClientSaleId) index makes a concurrent double-submit fail on save instead of paying twice.
+        cart.ClientSaleId ??= request.PaymentKey;
 
         if (request.Parts is not null)
         {

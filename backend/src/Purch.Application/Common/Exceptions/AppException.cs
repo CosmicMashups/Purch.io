@@ -6,4 +6,8 @@ namespace Purch.Application.Common.Exceptions;
 /// subtype below to a specific HTTP status code and a description safe to show the caller.
 /// Use these from any Application-layer service; never construct this base type directly.
 /// </summary>
-public abstract class AppException(string message) : Exception(message);
+public abstract class AppException(string message) : Exception(message)
+{
+    /// <summary>Stable machine-readable reason (e.g. "total_changed") sent as problem-details "code", so clients never match message text.</summary>
+    public virtual string? Code { get; init; }
+}

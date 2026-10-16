@@ -35,10 +35,15 @@ export function userMessage(error: unknown): string {
 export class ApiError extends Error {
   kind: ApiErrorKind;
   fieldErrors?: Record<string, string[]>;
+  /** Typed reason from the problem details: `code` on 409s, `resource` on 404s. Match on these, never on message text. */
+  code?: string;
+  resource?: string;
 
-  constructor(kind: ApiErrorKind, message: string, fieldErrors?: Record<string, string[]>) {
+  constructor(kind: ApiErrorKind, message: string, fieldErrors?: Record<string, string[]>, extra?: { code?: string; resource?: string }) {
     super(message);
     this.kind = kind;
     this.fieldErrors = fieldErrors;
+    this.code = extra?.code;
+    this.resource = extra?.resource;
   }
 }

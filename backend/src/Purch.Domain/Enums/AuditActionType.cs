@@ -66,4 +66,7 @@ public enum AuditActionType
     /// <summary>An inventory CSV import was committed with an approver PIN; lists created categories and records,
     /// the update count, stock movements, the batch id and the file hash.</summary>
     InventoryImportCommitted,
+
+    /// <summary>A tenant setting that changes till behaviour was changed (currently the parked-cart TTL); before/after hold the values.</summary>
+    TenantSettingChanged,
 }

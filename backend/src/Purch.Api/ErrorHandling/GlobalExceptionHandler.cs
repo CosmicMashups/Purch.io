@@ -50,11 +50,11 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
 
             NotFoundException notFoundException => (
                 StatusCodes.Status404NotFound,
-                BuildProblemDetails(StatusCodes.Status404NotFound, "Resource not found.", notFoundException.Message, httpContext)),
+                WithExtension(BuildProblemDetails(StatusCodes.Status404NotFound, "Resource not found.", notFoundException.Message, httpContext), "resource", notFoundException.Resource)),
 
             ConflictException conflictException => (
                 StatusCodes.Status409Conflict,
-                BuildProblemDetails(StatusCodes.Status409Conflict, "Conflict.", conflictException.Message, httpContext)),
+                WithExtension(BuildProblemDetails(StatusCodes.Status409Conflict, "Conflict.", conflictException.Message, httpContext), "code", conflictException.Code)),
 
             TooManyRequestsException tooMany => (
                 StatusCodes.Status429TooManyRequests,
@@ -110,6 +110,16 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
                     "Something went wrong on our end. If this keeps happening, please contact support.",
                     httpContext)),
         };
+    }
+
+    private static ProblemDetails WithExtension(ProblemDetails details, string name, string? value)
+    {
+        if (value is not null)
+        {
+            details.Extensions[name] = value;
+        }
+
+        return details;
     }
 
     private static ProblemDetails BuildProblemDetails(int statusCode, string title, string detail, HttpContext httpContext)

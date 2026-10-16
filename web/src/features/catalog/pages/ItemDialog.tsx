@@ -91,19 +91,20 @@ function CostField({ value, onChange, error, price, savedCost }: { value: string
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Unknown"
+            aria-describedby="cost-margin-hint"
             className={inputClass}
           />
           {savedCost && value !== '' && (
-            <button type="button" onClick={() => onChange('')} className="h-12 shrink-0 rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-700">
+            <button type="button" onClick={() => onChange('')} className="h-12 shrink-0 rounded-md border border-line px-4 text-sm font-medium text-ink">
               Clear cost
             </button>
           )}
         </div>
       </Field>
-      <p className="text-sm text-gray-600" data-testid="margin-hint">
+      <p id="cost-margin-hint" className="text-sm text-ink-soft" data-testid="margin-hint">
         {marginHint(price, value)}
       </p>
-      {savedCost && value === '' && <p className="text-sm text-gray-600">The saved cost will be removed when you save.</p>}
+      {savedCost && value === '' && <p className="text-sm text-ink-soft">The saved cost will be removed when you save.</p>}
     </div>
   );
 }

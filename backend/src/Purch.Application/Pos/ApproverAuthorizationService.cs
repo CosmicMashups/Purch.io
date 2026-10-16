@@ -44,7 +44,11 @@ public sealed class ApproverAuthorizationService(
 
         var requesterId = currentActorProvider.UserId;
         var activeUsers = await userRepository.GetActiveActorsAsync(currentTenantProvider.TenantId!.Value, cancellationToken);
-        var eligibleApprovers = activeUsers.Where(user => ApproverRoles.Contains(user.Role)).ToList();
+        // A PIN from another branch's manager does not count; a tenant-wide account (no branch) approves anywhere.
+        var branchId = currentActorProvider.BranchId;
+        var eligibleApprovers = activeUsers
+            .Where(user => ApproverRoles.Contains(user.Role) && (user.BranchId is null || user.BranchId == branchId))
+            .ToList();
 
         // A different account approves whenever one exists — that is the whole point of requiring a PIN at
         // all. A tenant with exactly one Admin/Manager account (a single-owner shop, or a fresh tenant that

@@ -9,14 +9,14 @@ interface ErrorStateProps {
  * actually-empty catalog). `onRetry` re-runs the query without a full page reload. */
 export function ErrorState({ title = 'Something went wrong', message, onRetry }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-6 py-12 text-center">
-      <p className="text-sm font-medium text-red-800">{title}</p>
-      {message && <p className="text-sm text-red-600">{message}</p>}
+    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-danger bg-surface px-6 py-12 text-center">
+      <p className="text-sm font-medium text-danger">{title}</p>
+      {message && <p className="text-sm text-ink-soft">{message}</p>}
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+          className="mt-2 rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
         >
           Try again
         </button>

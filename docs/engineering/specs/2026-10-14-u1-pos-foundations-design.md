@@ -1,6 +1,6 @@
 # U1 design: Foundations + POS selling (park carts, split tender, manual discounts, open item, cost, VAT stamping)
 
-Status: draft for review. Date: 2026-10-14. Part of the P1 competitor-gap roadmap (U1 of U6). Pricing/tier gating is out of scope.
+Status: shipped. Date: 2026-10-14. Part of the P1 competitor-gap roadmap (U1 of U6). Pricing/tier gating is out of scope.
 
 ## Decisions (agreed in brainstorm)
 - Parked carts: `Status=Parked` on `Transaction`; one Open + N Parked per device; filtered unique index unchanged.

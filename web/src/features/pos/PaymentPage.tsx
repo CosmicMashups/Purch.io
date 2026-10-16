@@ -38,11 +38,8 @@ const UNAVAILABLE = [
 /** Roles holding the SplitPay permission (backend Permissions.SplitPay). The API still enforces it. */
 const SPLIT_ROLES: readonly string[] = ['Admin', 'Manager', 'Cashier'];
 
-/*
- * The API's 404 problem details carry no resource type, only detail text built by NotFoundException as
- * "<resource> '<key>' was not found.", so the resource name at the start of the message is what tells them apart.
- */
-const notFoundOf = (error: unknown, resource: string) => error instanceof ApiError && error.kind === 'notFound' && error.message.startsWith(`${resource} '`);
+// The API's 404 problem details carry a typed `resource`; the message wording is not part of the contract.
+const notFoundOf = (error: unknown, resource: string) => error instanceof ApiError && error.kind === 'notFound' && error.resource === resource;
 
 /** 404 for the open cart on pay: an earlier attempt most likely completed the sale and its answer was lost. */
 const isLostSale = (error: unknown) => notFoundOf(error, 'Open cart');
@@ -55,7 +52,8 @@ const isMissingLedger = (error: unknown) => notFoundOf(error, 'Customer credit a
 function payErrorText(error: unknown): string {
   if (isMissingLedger(error)) return 'That customer account could not be found. Choose another customer.';
   if (error instanceof ApiError && error.kind === 'conflict') {
-    const moved = /the total is now (\d+(?:\.\d+)?)/i.exec(error.message);
+    // The code says what happened; the new total is the number in the server's sentence.
+    const moved = error.code === 'total_changed' ? /(\d+(?:\.\d+)?)/.exec(error.message) : null;
     if (moved) return `The cart changed, review the total. It is now ${formatPeso(Number(moved[1]))}.`;
   }
   return userMessage(error);
@@ -79,6 +77,8 @@ export function PaymentPage() {
   const [rejectedLedgerId, setRejectedLedgerId] = useState<string | null>(null);
   // One request per attempt: a double tap lands before React re-renders the button as busy.
   const inFlight = useRef(false);
+  // One key per visit to this screen: a retry or double-tap resends it, so the server pays the sale once.
+  const paymentKey = useRef(crypto.randomUUID());
   const canSplit = role !== null && SPLIT_ROLES.includes(role);
   const creditOn = useCreditEnabled();
   const ledgers = useCreditLedgers(choice === 'utang' && creditOn);
@@ -128,7 +128,7 @@ export function PaymentPage() {
     setSplitError(null);
     setSingleError(null);
     // A refusal is reported by the shared mutation error toast; the sale stays open to retry.
-    pay.mutate(body, {
+    pay.mutate({ ...body, paymentKey: paymentKey.current }, {
       onSuccess: (completed) => {
         showReceipt(completed);
         navigate('/sell/receipt', { replace: true, state: { justSold: true } });

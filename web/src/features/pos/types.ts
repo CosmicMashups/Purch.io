@@ -186,6 +186,8 @@ export interface RecordPaymentRequest {
   /** Split tender: one entry per tender, summing exactly to the total. When present the request-level
    * method/amountTendered/customerCreditLedgerId are ignored; omit for a single full payment. */
   parts?: PaymentPart[];
+  /** Idempotency key: the server returns the already-completed sale for a repeat of the same key. */
+  paymentKey?: string;
 }
 
 /** Refunding a completed sale always needs an Admin/Manager's approval — see ApproverPinDialog. */

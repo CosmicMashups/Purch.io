@@ -11,9 +11,9 @@ Formerly `superpowers/`. File names and dates are unchanged.
 
 | Unit | Spec | Plan | Deploy note | Status (from the files) |
 |---|---|---|---|---|
-| U1 POS foundations | [spec](specs/2026-10-14-u1-pos-foundations-design.md), [golden cases](specs/u1-golden-cases.json) | [plan](plans/2026-10-14-u1-pos-foundations.md) | [u1-pos-foundations.md](../operations/deploy-notes/u1-pos-foundations.md) | Done per the roadmap; the spec header still says "draft for review" |
+| U1 POS foundations | [spec](specs/2026-10-14-u1-pos-foundations-design.md), [golden cases](specs/u1-golden-cases.json) | [plan](plans/2026-10-14-u1-pos-foundations.md) | [u1-pos-foundations.md](../operations/deploy-notes/u1-pos-foundations.md) | Done |
 | Restock / purchase requests | [spec](specs/2026-10-15-restock-purchase-requests-design.md) | none | none; the spec says to run its migration out of band as in the U4 note | Built; known gaps listed in the spec |
-| U3 Inventory depth | [spec](specs/2026-10-15-u3-inventory-depth-design.md) | [plan](plans/2026-10-15-u3-inventory-depth.md) | [u3-inventory-depth.md](../operations/deploy-notes/u3-inventory-depth.md) | Implemented; rulings to confirm are in the roadmap; the spec header still says "draft for owner review" |
+| U3 Inventory depth | [spec](specs/2026-10-15-u3-inventory-depth-design.md) | [plan](plans/2026-10-15-u3-inventory-depth.md) | [u3-inventory-depth.md](../operations/deploy-notes/u3-inventory-depth.md) | Shipped; rulings to confirm are in the roadmap |
 | U4 Reports | [spec](specs/2026-10-15-u4-reports-design.md) | none | [u4-reports.md](../operations/deploy-notes/u4-reports.md) | Shipped |
 
 The migrations of all four units are on `origin/main` as of 2026-10-16. Remaining units (U2 customers and loyalty, U5

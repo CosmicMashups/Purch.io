@@ -1,6 +1,6 @@
 # U3 Inventory depth: design
 
-Date: 2026-10-15. Status: draft for owner review. Branch: `feat/u3-inventory-depth` (from `origin/main` at `f713a10`).
+Date: 2026-10-15. Status: shipped (rulings in the roadmap await owner confirmation). Branch: `feat/u3-inventory-depth` (from `origin/main` at `f713a10`).
 
 ## Goal
 Give managers a trustworthy picture of what stock is worth and what it cost to sell, and safe bulk tools to correct and load stock: inventory valuation, inventory-side COGS, CSV export/import of items, ingredients and stock, and stock-take sessions with variance.
